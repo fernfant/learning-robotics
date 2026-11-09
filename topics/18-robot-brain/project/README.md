@@ -61,6 +61,8 @@ Bonus (Lesson 20): `python3 lesson20_mcp_server.py` turns the robot into an **MC
 rotation, Bayes (finding the cat), a Markov chain (a cat with a favourite bed), a Kalman filter (distance while driving),
 weighted A*, Fourier (removing wheel wobble), momentum, and exploring in Q-learning. Play with each idea first:
 course Module 21 (`topics/21-robot-math.html`) links an interactive explainer for every one.
+`python3 bonus_vector_fields.py` steers the robot with a field of arrows (gradient, divergence, curl; course Module 22):
+following the gradient alone gets stuck behind a sofa from 9 of 11 starts, adding a swirl reaches the goal from all 11.
 
 ## Your robot's report card
 

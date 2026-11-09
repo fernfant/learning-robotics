@@ -201,3 +201,14 @@ Set up the folder structure, schema (CLAUDE.md), shared styles and the index.
   - momentum: 73 → 35 steps, while 0.9 overshoots and lr 0.3 alone takes 24
   - Q-learning: epsilon 0 learns fastest in the tiny maze (optimistic starting values)
 - Diffusion has no experiment, and the page says so. It ties action chunks to week 6's plan-writing tiny LM.
+
+## [2026-11-09] ingest | Matheorems: "Gradient, Divergence and Curl" (X post with an animation)
+- Link: https://x.com/matheorems/status/2119505986381901899 (8 Nov 2026). Saved as `sources/22-matheorems.json`, which stays local (third-party copy).
+- Module 22 (LLM + Robotics), `topics/22-vector-fields.html`: a kid box, then the three examples from the post explained and checked numerically, then the robot.
+- New `project/solutions/bonus_vector_fields.py` (standard library only):
+  - Numerical gradient, divergence and curl reproduce all 6 values in the post.
+  - Potential-field robot: Khatib-style attract and repel fields, plus a curl "swirl" (the repel field rotated 90°).
+  - One box: gradient alone reaches the goal from 10/11 starts (9.1 m); with swirl, 11/11 (10.0 m).
+  - A sofa wall: gradient alone reaches 2/11 (9.8 m); with swirl, 11/11 (11.2 m). Straight line is 8 m.
+- Interactive demo of the fields and robot runs. Checked in node: identical counts and average lengths to the Python.
+- Fix, course-wide: `style.css` had no `pre` rule, so long output lines made pages wider than the screen. Added `pre { overflow-x: auto; max-width: 100%; }`. Module 22 checked in the browser: page width now equals the viewport.

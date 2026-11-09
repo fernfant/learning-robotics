@@ -13,7 +13,7 @@
 <p class="lede">A personal course on two connected fields, built from links as they're added. Each module has a summary, deep dives, a self-check and further reading.</p>
 <div class="card"><p style="margin:0"><span class="track llm">LLM</span> how large language models are built, trained, evaluated and served. &nbsp; <span class="track robo">Robotics</span> how robots perceive, decide and act. &nbsp; <span class="track both">LLM + Robotics</span> shared foundations, or ideas that carry across both. Robot foundation models (VLAs) are built on LLM backbones, so the two tracks keep meeting.</p></div>
 <p><a href="sources.html"><strong>Sources &amp; summaries →</strong></a> every link added, its summary, the primary sources behind it, saved files and all external references.</p>
-<p class="meta">21 modules (108 pages) · last updated 2026-11-09</p>
+<p class="meta">22 modules (109 pages) · last updated 2026-11-09</p>
 
 <h2>Modules</h2>
 <!-- MODULES: newest at the bottom; keep numbering sequential -->
@@ -185,6 +185,14 @@
   <p class="meta">Source: @0x_meden X post (and his π0/GR00T guide) · Nov 2026</p>
 </a>
 
+<a class="card module" href="topics/22-vector-fields.html">
+  <div class="n">22</div>
+  <h3><span class="track both">LLM + Robotics</span>Gradient, divergence and curl: three ways a field of arrows moves, and how a robot steers with them</h3>
+  <p>The three animated examples from the post (∇φ = (−2x, −4y), div = ±2, curl = ±2), explained in plain words and checked numerically. Then the robot: a potential-field planner (pull to the goal, push from obstacles) that drives without a map. Following the gradient alone gets stuck behind a sofa from 9 of 11 starts. Adding a swirl (curl) around obstacles reaches the goal from all 11, at the cost of longer paths. Interactive demo of all the fields and of the robots driving, matched exactly to the Python.</p>
+  <span class="tag">vector calculus</span><span class="tag">potential fields</span><span class="tag">navigation</span><span class="tag">flow matching</span><span class="tag">beginner-friendly</span>
+  <p class="meta">Source: @matheorems X post · Nov 2026</p>
+</a>
+
 <h2>Summaries at a glance</h2>
 <div class="table-wrap"><table>
 <tr><th>#</th><th>Track</th><th>Topic</th><th>Key takeaway</th></tr>
@@ -209,6 +217,7 @@
 <tr><td>19</td><td><span class="track llm">LLM</span></td><td><a href="topics/19-evals-field-guide.html">Evals field guide</a></td><td>An eval is input, system, grader, number. Read outputs before writing graders, use code for anything definite, and trust an AI judge only after measuring it (kappa, not raw agreement), with the evidence in front of it. Every score gets an error bar; agents get pass^k.</td></tr>
 <tr><td>20</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/20-from-scratch/index.html">Six from-scratch repos</a></td><td>Read tiny code that does the real thing, run it, then use it to try to make your own robot better, and measure whether it did. Bigger models need more data; a fast brain on a laptop can be too slow on a robot; learned control is great until the world changes.</td></tr>
 <tr><td>21</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/21-robot-math.html">Robot maths, played with</a></td><td>Play with each idea first, then use it on your own robot and measure it. Estimation (Bayes, Kalman, Fourier) beats plain averaging once the robot moves; a model of the world only helps if the world has patterns; π0 and GR00T are a scene-understanding Transformer plus a noise-to-motion head.</td></tr>
+<tr><td>22</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/22-vector-fields.html">Gradient, divergence, curl</a></td><td>Gradient = uphill, divergence = spreading out or draining in, curl = swirl. A robot can drive by following a field, but pure gradients get stuck in dips; a little curl around obstacles gets it round. Measure from many starts, not one.</td></tr>
 </table></div>
 
 <h2>Concept map</h2>
@@ -228,6 +237,7 @@
 <tr><td>Homogeneous transforms &amp; forward kinematics</td><td>02</td></tr>
 <tr><td>Probability for estimation (Bayes, covariance, Monte Carlo)</td><td>02, 03, 21</td></tr>
 <tr><td>State estimation &amp; filtering (Kalman, Fourier, Markov chains)</td><td>21</td></tr>
+<tr><td>Vector calculus (gradient, divergence, curl) &amp; potential-field navigation</td><td>21, 22</td></tr>
 <tr><td>Vision-language-action models (π0, GR00T: VLM + flow-matching action head, action chunks)</td><td>05, 08, 21</td></tr>
 <tr><td>Computer vision for perception (CNNs, ResNet, dilated convs, detection)</td><td>02, 06</td></tr>
 <tr><td>Reinforcement learning (Bellman → Q-learning → DQN → PPO/GAE, SAC, RLHF)</td><td>02, 06, 18, 20</td></tr>

@@ -72,6 +72,8 @@ MODULES = [
       ("Why Momentum Really Works (Distill)", "https://distill.pub/2017/momentum"), ("REINFORCEjs", "https://cs.stanford.edu/people/karpathy/reinforcejs"),
       ("Transformer Explainer", "https://poloclub.github.io/transformer-explainer"), ("Diffusion Explainer", "https://poloclub.github.io/diffusion-explainer"),
       ("openpi", "https://github.com/Physical-Intelligence/openpi"), ("Isaac-GR00T", "https://github.com/NVIDIA/Isaac-GR00T")]),
+    ("22", "https://x.com/matheorems/status/2119505986381901899", "Matheorems", "8 Nov 2026", "X post with an animation",
+     [("3Blue1Brown: Divergence and curl", "https://www.youtube.com/watch?v=rB83DpBJQsE")]),
 ]
 
 e = html.escape

@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gradient, Divergence, Curl</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../index.html">← LLMs &amp; Robotics</a> · Module 22</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 22 · Vector fields</div>
+<h1>Gradient, divergence and curl: three ways a field of arrows can move, and how a robot steers with them</h1>
+<p class="lede">Uphill, outwards and round and round. The same three ideas train neural networks, describe flows, and drive a robot around a sofa without a map.</p>
+<p class="meta">Source: Matheorems, “Gradient, Divergence and Curl”, 8 Nov 2026 (X post with an animation) ·
+<a href="https://x.com/matheorems/status/2119505986381901899">X post</a>. The post is a short animation with three worked examples; the robot experiment on this page is ours.</p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Imagine an arrow painted on every spot of the floor. Drop a marble anywhere and it rolls the way the arrows point. That floor of arrows is a "vector field".</p>
+<h3>Think of it like this</h3>
+<ul>
+<li><b>Gradient</b> is a hill. The arrows point uphill, the steepest way. At the very top they shrink to nothing, because the top is flat.</li>
+<li><b>Divergence</b> is a tap or a plughole. Around a tap, arrows spread outwards (a source). Around a plughole, they all point in (a sink).</li>
+<li><b>Curl</b> is a whirlpool. The arrows go round and round. A little paddle wheel dropped in it would spin.</li>
+</ul>
+<h3>How a robot uses it</h3>
+<ol>
+<li>Make the goal a plughole: every arrow points towards it.</li>
+<li>Make obstacles push arrows away, like a magnet pushing another magnet.</li>
+<li>The robot just follows the arrow where it's standing. No map, no search.</li>
+<li>Problem: right in front of a wall, "go to the goal" and "get away from the wall" cancel out. The robot freezes. Fix: add a little whirlpool around obstacles so it slides around them.</li>
+</ol>
+<h3>Why robots care</h3>
+<p>This is how many simple robots, drones and game characters dodge things in real time. And "gradient" is the same word as in gradient descent, the way every neural network (including the ones in this course) learns.</p>
+<h3>Try it</h3>
+<p>In the demo below, pick "Robot: the sofa", press "Drive" without swirl and watch the robots get stuck. Then tick "swirl" and drive again.</p>
+<h3>Words to know</h3>
+<dl>
+<dt>Vector field</dt><dd>An arrow at every point.</dd>
+<dt>Source / sink</dt><dd>Where arrows spread out / where they all point in.</dd>
+<dt>Local minimum</dt><dd>A spot where every direction looks worse, even though it isn't the goal.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> the three formulas from the post, checked numerically; a potential-field robot in Python with measured results; and where these ideas show up in robotics and in machine learning.</p>
+
+<div class="toc">
+<strong>In this module</strong>
+<ol>
+<li><a href="#summary">Summary</a></li>
+<li><a href="#why-robotics">Why this matters for robotics</a></li>
+<li><a href="#gradient">Deep dive: gradient</a></li>
+<li><a href="#divergence">Deep dive: divergence</a></li>
+<li><a href="#curl">Deep dive: curl</a></li>
+<li><a href="#robot">Steering Robo-Helper with a field (interactive)</a></li>
+<li><a href="#playbook">Playbook</a></li>
+<li><a href="#check">Self-check</a></li>
+<li><a href="#glossary">Glossary &amp; further reading</a></li>
+</ol>
+</div>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>The post animates three 2D vector fields. <b>Gradient:</b> for φ = 1 − x² − 2y², ∇φ = (−2x, −4y): tracers flow uphill, cross every contour at a right angle, and the arrow shrinks to zero at the peak. <b>Divergence:</b> F = (x, y) spreads out everywhere with div F = 2 (a source); F = (−x, −y) has div F = −2 (a sink). <b>Curl:</b> F = (−y, x) rotates around the centre with curl F = 2 (out of the screen); reversed, −2. We check all six numbers in Python, then use the ideas to steer a robot: following a gradient field alone gets stuck behind a sofa from 9 of 11 starts; adding a swirl (curl) around obstacles reaches the goal from all 11.</p>
+</div>
+<ul>
+<li><strong>Gradient</strong> = direction of steepest increase. Its size is how steep. Zero at peaks, valleys and flat saddles.</li>
+<li><strong>Divergence</strong> = net outflow per unit area. Positive: a source. Negative: a sink. Zero: what flows in flows out.</li>
+<li><strong>Curl</strong> (in 2D, one number) = how much the field rotates a tiny paddle wheel. Positive: anticlockwise.</li>
+<li><strong>Two facts tie them together:</strong> a gradient field never swirls (curl of a gradient is 0), and a pure swirl never spreads (div of curl is 0). So "go downhill" can't, on its own, walk you around an obstacle.</li>
+</ul>
+
+<h2 id="why-robotics">2. Why this matters for robotics</h2>
+<div class="card note">
+<p><strong>Track: LLM + Robotics.</strong> The gradient is the heart of machine learning: every model in this course, from Robo-Helper's neuron to a Transformer, learns by following a gradient downhill. Divergence and curl are the language of flows, which robots meet in navigation, in fluids (drones, underwater robots) and in the newest robot brains.</p>
+</div>
+<ul>
+<li><strong>Potential-field navigation</strong> (Khatib, 1986): the goal attracts, obstacles repel, the robot follows the combined field. Cheap and reactive, used in arms, drones and game AI. Its known weakness is local minima, which this page shows and fixes.</li>
+<li><strong>Escaping local minima with rotation:</strong> adding a tangential (curl) component around obstacles is a standard fix (often called vortex or circulation fields). Planners like A* (<a href="18-robot-brain/06-pathfinding.html">Robo-Helper week 4</a>) don't have this problem, but need a map and a search first.</li>
+<li><strong>Gradient descent:</strong> <a href="18-robot-brain/03-learning-from-data.html">week 2</a> fits the braking distance by stepping against the gradient; <a href="21-robot-math.html#momentum">Module 21</a> adds momentum.</li>
+<li><strong>Flow matching and diffusion</strong> (<a href="21-robot-math.html#diffusion">Module 21</a>): π0 and GR00T's action heads learn a <em>velocity field</em> that carries random noise to a smooth arm motion. That's a learned vector field, and divergence appears directly in the maths of how probability flows along it.</li>
+<li><strong>Drones and underwater robots:</strong> wind and water currents are vector fields; divergence and curl describe where air or water piles up and where it spins.</li>
+</ul>
+
+<h2 id="gradient">3. Deep dive: gradient</h2>
+<p>Take a height map φ(x, y). The gradient ∇φ = (∂φ/∂x, ∂φ/∂y) is the vector of how fast φ changes as you move a tiny bit in x and in y. It points in the steepest uphill direction, and its length is the steepness.</p>
+<p>For the post's hill φ = 1 − x² − 2y²: ∂φ/∂x = −2x and ∂φ/∂y = −4y, so ∇φ = (−2x, −4y). The y slope is twice as steep, because of the 2 in front of y². Every arrow crosses the contour lines (lines of equal height) at a right angle: walking along a contour you neither climb nor fall, so the uphill direction must be straight across it. At the top (0, 0) both parts are zero, which is why the post's red probe slows to a stop there.</p>
+<p>Machine learning walks the other way: a model's error is a height map over its weights, and training takes small steps <em>against</em> the gradient, downhill. That's every <code>w -= lr * dw</code> in Robo-Helper.</p>
+
+<h2 id="divergence">4. Deep dive: divergence</h2>
+<p>div F = ∂Fx/∂x + ∂Fy/∂y measures how much more flows out of a tiny box than flows in. For F = (x, y): 1 + 1 = 2, the same everywhere, so every point is a little source and the flux out through any circle is positive. Flip it to (−x, −y) and it's −2: a sink, and the flux through the circle turns around, exactly as the post animates.</p>
+<p>For a robot, the "go to the goal" field (−(x − gx), −(y − gy)) has divergence −2 everywhere: everything drains towards the goal like water into a plughole.</p>
+
+<h2 id="curl">5. Deep dive: curl</h2>
+<p>In 2D, curl F = ∂Fy/∂x − ∂Fx/∂y. For F = (−y, x): 1 − (−1) = 2. Positive means anticlockwise, which in 3D is an arrow pointing out of the screen (right-hand rule). The post's paddle wheel, carried around the centre, spins exactly once per orbit. Reverse the field to (y, −x) and the curl is −2: clockwise, into the screen.</p>
+<p>The key fact for robots: the gradient of anything has zero curl. If you only ever follow "downhill", you can never circle round something. To go around an obstacle you need a field that swirls.</p>
+<pre><code>python3 bonus_vector_fields.py    (Robo-Helper project, solutions or homework folder)
+
+1) THE POST'S THREE FIELDS, checked numerically at a few points:
+   grad phi at (0.5, 0.5) = (-1.000, -2.000)   formula (-2x, -4y) = (-1, -2)
+   grad phi at the top (0, 0) = (0.000, 0.000)   zero: a peak is flat
+   div (x, y)    = 2.000   (source)
+   div (-x, -y)  = -2.000   (sink)
+   curl (-y, x)  = 2.000   (anticlockwise, out of the screen)
+   curl (y, -x)  = -2.000   (clockwise, into the screen)</code></pre>
+<p class="meta">The derivatives are worked out numerically (a tiny step either side), so the check doesn't rely on the formulas it's checking.</p>
+
+<h2 id="robot">6. Steering Robo-Helper with a field</h2>
+<p>A different way to drive than week 4's A*. The robot is a point in a 10 m × 10 m room with the goal at (9, 5). Three fields add up:</p>
+<ul>
+<li><b>Attract:</b> (−(x − 9), −(y − 5)), the downhill direction of a bowl centred on the goal. Divergence −2, curl 0.</li>
+<li><b>Repel:</b> near each obstacle, a push straight away from it that grows fast as you get close (the classic Khatib formula, active within 2 m of the edge).</li>
+<li><b>Swirl (optional):</b> the repel push turned 90°. It slides the robot <em>around</em> the obstacle. It has curl, so it can do what no gradient can.</li>
+</ul>
+<pre><code>2) THE ROBOT'S FIELD: goal at (9, 5), a box of radius 1.2 at (5, 5).
+   div of the pull towards the goal = -2.00  (negative everywhere: the goal is a sink)
+   curl of the pull = 0.00  (a pure gradient field never swirls)
+   curl of the swirl just above the box, at (5, 7) = -28.71  (not zero: it really swirls)
+
+3) DRIVING: 11 starts on the left, follow the arrows to the goal. (Straight line: 8.0 m.)
+   one box:
+     gradient only    reached the goal from 10/11 starts, average path 9.1 m
+     gradient + swirl reached the goal from 11/11 starts, average path 10.0 m
+   a sofa (3 circles in a wall):
+     gradient only    reached the goal from  2/11 starts, average path 9.8 m
+     gradient + swirl reached the goal from 11/11 starts, average path 11.2 m</code></pre>
+<p>With one round box, only the start exactly in line with the goal gets stuck: there, "go right" and "get pushed left" cancel perfectly. A wall is much worse. Behind the sofa, 9 of 11 starts slide into the dip in front of it and stop. The swirl fixes every one, at the cost of longer paths (it always goes round the same way, even when the other way is shorter).</p>
+
+<div class="card demo">
+<h3>Interactive: the fields, and a robot that follows them</h3>
+<p class="legend">Pick a field to see its arrows. The robot scenes use exactly the Python code's fields and driving rule (checked in node: same 10/11, 11/11, 2/11 and 11/11). <b class="p">■ reached the goal</b> &nbsp; <b class="f">■ got stuck</b></p>
+<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+<label for="vfMode" class="legend">Field</label>
+<select id="vfMode" style="font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)">
+<option value="grad">Gradient of 1 − x² − 2y²</option>
+<option value="source">Source (x, y)</option>
+<option value="sink">Sink (−x, −y)</option>
+<option value="curl">Curl (−y, x)</option>
+<option value="box">Robot: one box</option>
+<option value="sofa" selected>Robot: the sofa</option>
+</select>
+<label class="legend"><input type="checkbox" id="vfSwirl"> swirl around obstacles</label>
+<button id="vfGo" type="button" style="font:inherit;padding:6px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--fg);cursor:pointer">Drive</button>
+</div>
+<canvas id="vf" width="500" height="500" style="width:100%;max-width:500px;height:auto;display:block;margin-top:10px" aria-label="Vector field arrows and robot paths"></canvas>
+<div class="stats">
+  <div class="stat"><div class="k">Reached goal</div><div class="v" id="vfOk">–</div></div>
+  <div class="stat"><div class="k">Average path</div><div class="v" id="vfLen">–</div></div>
+  <div class="stat"><div class="k">div / curl at a point</div><div class="v" id="vfDC" style="font-size:1rem">–</div></div>
+</div>
+<p class="legend" id="vfNote"></p>
+</div>
+
+<p><b>Challenge:</b> in <code>bonus_vector_fields.py</code>, make the swirl choose its direction: turn left or right depending on which side of the obstacle the goal is. Does the sofa's average path get shorter than 11.2 m, and does it still reach 11/11?</p>
+<p><b>Challenge 2:</b> put the cat back. Make it an obstacle that moves 0.3 m/s up and down in front of the sofa. Potential fields react instantly; A* would have to replan. Which copes better?</p>
+
+<h2 id="playbook">7. Playbook</h2>
+<ol>
+<li>To feel a field, draw arrows on a grid of points (the demo, or a few lines of Python).</li>
+<li>To check a formula, compare it with a numerical derivative (a tiny step either side). That's how Robo-Helper's attention stretch checked its backprop too.</li>
+<li>To steer a robot reactively: attract to the goal, repel from obstacles, cap the speed, follow the field.</li>
+<li>Test from many starts, not one. Count how often it gets stuck. One run tells you nothing.</li>
+<li>If it gets stuck, add rotation (curl) around obstacles, or fall back to a planner like A*. Measure the cost in path length.</li>
+</ol>
+
+<h2 id="check">8. Self-check</h2>
+<details><summary>For φ = 1 − x² − 2y², why is the arrow at (0, 1) twice as long as the one at (1, 0)?</summary>
+<p>∇φ(0, 1) = (0, −4), length 4. ∇φ(1, 0) = (−2, 0), length 2. The hill is steeper in y because of the 2 in front of y².</p></details>
+<details><summary>F = (x, y) has divergence 2 everywhere, even far from the centre. Why isn't it only a source at the centre?</summary>
+<p>Divergence is local: around any tiny box, a little more flows out than in, because the arrows get longer as you move outwards. Every point adds a bit of outflow.</p></details>
+<details><summary>Why can't "follow the gradient" ever circle around an obstacle?</summary>
+<p>A gradient field has zero curl, and walking downhill you can never return to the same height, so you can't loop. Around a wall, downhill can lead into a dip that isn't the goal (a local minimum), and you stay there.</p></details>
+<details><summary>The swirl reached the goal every time but made paths longer. Why?</summary>
+<p>It always turns the same way around obstacles, even when the other way would be shorter. A smarter swirl picks its direction from where the goal is (that's the first challenge).</p></details>
+<details><summary>Where do vector fields show up in robot brains like π0?</summary>
+<p>Their action heads use flow matching: a network learns a velocity field that carries random noise to a realistic arm motion, then the robot follows it in a few steps, a learned field instead of a hand-made one.</p></details>
+
+<h2 id="glossary">9. Glossary &amp; further reading</h2>
+<div class="table-wrap"><table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<tr><td>Vector field</td><td>An arrow (a vector) at every point of a space.</td></tr>
+<tr><td>Potential</td><td>A height map whose gradient gives the field.</td></tr>
+<tr><td>Gradient ∇φ</td><td>(∂φ/∂x, ∂φ/∂y): steepest uphill direction; length = steepness.</td></tr>
+<tr><td>Divergence</td><td>∂Fx/∂x + ∂Fy/∂y: outflow per area. + source, − sink.</td></tr>
+<tr><td>Curl (2D)</td><td>∂Fy/∂x − ∂Fx/∂y: rotation. + anticlockwise.</td></tr>
+<tr><td>Contour</td><td>A line of equal height. The gradient crosses it at a right angle.</td></tr>
+<tr><td>Local minimum</td><td>A dip that isn't the lowest point: following the gradient gets stuck there.</td></tr>
+<tr><td>Potential-field planner</td><td>Drive by following attract + repel fields, without a map or search.</td></tr>
+</table></div>
+<ul>
+<li><a href="https://x.com/matheorems/status/2119505986381901899">The post, with its animation</a></li>
+<li>3Blue1Brown, <a href="https://www.youtube.com/watch?v=rB83DpBJQsE">Divergence and curl: the language of Maxwell's equations, fluid flow, and more</a></li>
+<li>Khan Academy, <a href="https://www.khanacademy.org/math/multivariable-calculus">Multivariable calculus</a> (gradient, divergence, curl units)</li>
+<li>O. Khatib (1986), “Real-Time Obstacle Avoidance for Manipulators and Mobile Robots”, <em>International Journal of Robotics Research</em> 5(1): the original potential-field paper</li>
+<li>Related: <a href="21-robot-math.html">Module 21</a> (A*, Kalman, momentum, diffusion: interactive), <a href="18-robot-brain/06-pathfinding.html">Robo-Helper week 4</a> (A*), <a href="18-robot-brain/03-learning-from-data.html">week 2</a> (gradient descent), <a href="02-tensortonic.html">Module 02</a> (maths drills)</li>
+</ul>
+
+<footer>Module 22 · added 2026-11-09 · <a href="../index.html">Back to course index</a></footer>
+</main>
+
+<script>
+const GOAL = [9, 5], INFLUENCE = 2.0;
+const SCENES = { box: [[5, 5, 1.2]], sofa: [[5, 3.8, 0.9], [5, 5, 0.9], [5, 6.2, 0.9]] };
+function attract(x, y) { return [-(x - GOAL[0]), -(y - GOAL[1])]; }
+function repel(x, y, obs, k = 6) {
+  let fx = 0, fy = 0;
+  for (const [ox, oy, r] of obs) {
+    const dx = x - ox, dy = y - oy, d = Math.hypot(dx, dy), gap = Math.max(d - r, 1e-3);
+    if (gap < INFLUENCE) { const push = k * (1 / gap - 1 / INFLUENCE) / gap ** 2; fx += push * dx / d; fy += push * dy / d; }
+  }
+  return [fx, fy];
+}
+function swirl(x, y, obs) { const [fx, fy] = repel(x, y, obs); return [-fy, fx]; }
+function drive(start, obs, useSwirl, dt = 0.02, steps = 4000, maxSpeed = 1) {
+  let [x, y] = start, length = 0;
+  const path = [[x, y]];
+  for (let i = 0; i < steps; i++) {
+    const a = attract(x, y), r = repel(x, y, obs), s = useSwirl ? swirl(x, y, obs) : [0, 0];
+    let vx = a[0] + r[0] + s[0], vy = a[1] + r[1] + s[1];
+    const sp = Math.hypot(vx, vy);
+    if (sp > maxSpeed) { vx = vx / sp * maxSpeed; vy = vy / sp * maxSpeed; }
+    x += vx * dt; y += vy * dt; length += Math.hypot(vx, vy) * dt;
+    if (i % 5 === 0) path.push([x, y]);
+    if (Math.hypot(x - GOAL[0], y - GOAL[1]) < 0.1) return { ok: true, length, path };
+  }
+  return { ok: false, length, path };
+}
+function starts() { return Array.from({ length: 11 }, (_, i) => [1, 2.5 + 0.5 * i]); }
+function runScene(name, useSwirl) {
+  const res = starts().map(s => drive(s, SCENES[name], useSwirl));
+  const ok = res.filter(r => r.ok);
+  return { res, ok: ok.length, avg: ok.length ? ok.reduce((a, r) => a + r.length, 0) / ok.length : 0 };
+}
+const H = 1e-4;
+function divAt(F, x, y) { return (F(x + H, y)[0] - F(x - H, y)[0]) / (2 * H) + (F(x, y + H)[1] - F(x, y - H)[1]) / (2 * H); }
+function curlAt(F, x, y) { return (F(x + H, y)[1] - F(x - H, y)[1]) / (2 * H) - (F(x, y + H)[0] - F(x, y - H)[0]) / (2 * H); }
+const MATH = {
+  grad: (x, y) => [-2 * x, -4 * y], source: (x, y) => [x, y], sink: (x, y) => [-x, -y], curl: (x, y) => [-y, x],
+};
+
+if (typeof document !== 'undefined') {
+  const $ = id => document.getElementById(id);
+  const cv = $('vf'), ctx = cv.getContext('2d');
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  let last = null;
+  function arrows(F, toPx, xs, ys, scale) {
+    ctx.strokeStyle = css('--muted'); ctx.fillStyle = css('--muted'); ctx.lineWidth = 1;
+    for (const x of xs) for (const y of ys) {
+      const [fx, fy] = F(x, y), m = Math.hypot(fx, fy);
+      if (!isFinite(m) || m === 0) continue;
+      const len = Math.min(scale * m, scale * 1.2), ux = fx / m, uy = fy / m;
+      const [px, py] = toPx(x, y), qx = px + ux * len, qy = py + uy * len;
+      ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(qx, qy); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(qx, qy); ctx.lineTo(qx - 4 * ux + 2.5 * uy, qy - 4 * uy - 2.5 * ux); ctx.lineTo(qx - 4 * ux - 2.5 * uy, qy - 4 * uy + 2.5 * ux); ctx.fill();
+    }
+  }
+  function draw() {
+    const mode = $('vfMode').value, W = cv.width;
+    ctx.clearRect(0, 0, W, W);
+    if (MATH[mode]) {
+      const toPx = (x, y) => [W / 2 + x * W / 2.4, W / 2 - y * W / 2.4];   // y up, like the post
+      const xs = Array.from({ length: 13 }, (_, i) => -1 + i / 6);
+      const F = (x, y) => { const [a, b] = MATH[mode](x, y); return [a, -b]; };   // flip y for the screen
+      if (mode === 'grad') {
+        ctx.strokeStyle = css('--line'); ctx.lineWidth = 1;
+        for (const c of [0.8, 0.5, 0, -0.5, -1]) {
+          ctx.beginPath();
+          for (let t = 0; t <= 64; t++) {
+            const a = 2 * Math.PI * t / 64, rx = Math.sqrt(Math.max(1 - c, 0)), ry = rx / Math.SQRT2;
+            const [px, py] = toPx(rx * Math.cos(a), ry * Math.sin(a));
+            t ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+          }
+          ctx.stroke();
+        }
+      }
+      arrows(F, toPx, xs, xs, 14);
+      const d = divAt(MATH[mode], 0.3, -0.7), c = curlAt(MATH[mode], 0.3, -0.7);
+      $('vfDC').textContent = `${d.toFixed(2)} / ${c.toFixed(2)}`;
+      $('vfOk').textContent = '–'; $('vfLen').textContent = '–';
+      $('vfNote').textContent = mode === 'grad' ? 'Arrows point uphill and cross the contours at right angles; they shrink to zero at the peak (the centre).' :
+        mode === 'source' ? 'div = 2 everywhere: every point pushes a little outwards.' :
+        mode === 'sink' ? 'div = −2: everything drains inwards.' : 'curl = 2: anticlockwise, the same spin everywhere.';
+      return;
+    }
+    const obs = SCENES[mode], s = W / 10, toPx = (x, y) => [x * s, y * s];
+    const useSwirl = $('vfSwirl').checked;
+    const total = (x, y) => { const a = attract(x, y), r = repel(x, y, obs), w = useSwirl ? swirl(x, y, obs) : [0, 0]; return [a[0] + r[0] + w[0], a[1] + r[1] + w[1]]; };
+    const grid = Array.from({ length: 19 }, (_, i) => 0.5 + i * 0.5);
+    arrows(total, toPx, grid, grid, 11);
+    ctx.fillStyle = css('--line');
+    for (const [ox, oy, r] of obs) { ctx.beginPath(); ctx.arc(ox * s, oy * s, r * s, 0, 2 * Math.PI); ctx.fill(); }
+    ctx.fillStyle = css('--accent'); ctx.beginPath(); ctx.arc(GOAL[0] * s, GOAL[1] * s, 7, 0, 2 * Math.PI); ctx.fill();
+    if (last && last.mode === mode && last.swirl === useSwirl) {
+      for (const r of last.run.res) {
+        ctx.strokeStyle = r.ok ? css('--pass') : css('--fail'); ctx.lineWidth = 2; ctx.beginPath();
+        r.path.forEach(([x, y], i) => i ? ctx.lineTo(x * s, y * s) : ctx.moveTo(x * s, y * s)); ctx.stroke();
+      }
+      $('vfOk').textContent = `${last.run.ok}/11`;
+      $('vfLen').textContent = last.run.ok ? last.run.avg.toFixed(1) + ' m' : '–';
+    } else { $('vfOk').textContent = '–'; $('vfLen').textContent = '–'; }
+    const F = useSwirl ? (x, y) => total(x, y) : (x, y) => attract(x, y);
+    $('vfDC').textContent = `${divAt(attract, 7, 4).toFixed(1)} / ${curlAt(F, 5, 7).toFixed(1)}`;
+    $('vfNote').textContent = 'div of the pull at (7, 4) / curl of the arrows at (5, 7). Press Drive to send 11 robots from the left edge. ' +
+      (useSwirl ? 'With swirl, the arrows near the obstacles slide sideways.' : 'Without swirl, the arrows in front of the sofa point into a dead end.');
+  }
+  $('vfGo').addEventListener('click', () => {
+    const mode = $('vfMode').value;
+    if (!SCENES[mode]) { $('vfMode').value = 'sofa'; }
+    const m = $('vfMode').value, sw = $('vfSwirl').checked;
+    last = { mode: m, swirl: sw, run: runScene(m, sw) };
+    draw();
+  });
+  ['vfMode', 'vfSwirl'].forEach(id => $(id).addEventListener('change', draw));
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+  draw();
+} else {
+  module.exports = { runScene, divAt, curlAt, attract, swirl, SCENES, MATH };
+}
+</script>
+</body>
+</html>
