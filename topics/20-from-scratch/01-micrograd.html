@@ -181,7 +181,7 @@ held-out accuracy 100.0%</code></pre>
 <p>Module 18 uses the standard library only, and every gradient is written by hand. micrograd is the next rung up. It's still pure Python, but the gradients are worked out <em>for</em> you.</p>
 
 <h3>a) Check our hand-derived gradients with a 27-line engine</h3>
-<p>In <a href="../18-robot-brain/04-neuron.html">Lesson 4</a> the update rule is <code>w −= lr × (p − label) × x</code>. In <a href="../18-robot-brain/15-tiny-lm.html#attention">Lesson 15's attention stretch</a>, <code>lesson15_attention.py</code> back-propagates through softmax with <code>d_s = a × (d_a − Σ a·d_a)</code>. We wrote a micrograd-style <code>V</code> class (27 lines with <code>+ × ** exp log</code>) and let it compute both gradients automatically:</p>
+<p>In <a href="../18-robot-brain/04-neuron.html">Lesson 4</a> the update rule is <code>w −= lr × (p − label) × x</code>. In <a href="../18-robot-brain/15b-attention.html">the week 6 attention stretch</a>, <code>lesson15_attention.py</code> back-propagates through softmax with <code>d_s = a × (d_a − Σ a·d_a)</code>. We wrote a micrograd-style <code>V</code> class (27 lines with <code>+ × ** exp log</code>) and let it compute both gradients automatically:</p>
 <pre><code># 7 Nov 2026 · MacBook (Apple M4), CPU
 $ venv/bin/python scripts/tiny_value.py
 lesson04 neuron, p = 0.885948
@@ -256,7 +256,7 @@ micrograd MLP 2-8-8-1 (105 params)
 <li><a href="https://github.com/karpathy/micrograd">karpathy/micrograd</a>: the repo, with <code>demo.ipynb</code> and <code>trace_graph.ipynb</code></li>
 <li><a href="https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95">microgpt</a>, a whole GPT in pure Python, and its <a href="https://karpathy.github.io/2026/02/12/microgpt/">explainer post</a> (both linked from the README)</li>
 <li><a href="https://pytorch.org/">PyTorch</a>, which the tests use as the reference</li>
-<li>Back in this course: <a href="../18-robot-brain/04-neuron.html">Lesson 4, the neuron</a>, <a href="../18-robot-brain/05-evaluation.html">Lesson 5, precision and recall</a>, <a href="../18-robot-brain/15-tiny-lm.html#attention">Lesson 15, attention</a></li>
+<li>Back in this course: <a href="../18-robot-brain/04-neuron.html">Lesson 4, the neuron</a>, <a href="../18-robot-brain/05-evaluation.html">Lesson 5, precision and recall</a>, <a href="../18-robot-brain/15b-attention.html">Lesson 15b, attention (week 6 stretch)</a></li>
 <li>Next: <a href="02-mingpt.html">minGPT</a>, which uses PyTorch's autograd to train a whole Transformer</li>
 </ul>
 

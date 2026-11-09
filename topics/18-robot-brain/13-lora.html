@@ -3,21 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 13 · LoRA</title>
+<title>Week 9 · LoRA</title>
 <link rel="stylesheet" href="../../style.css">
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 9 · Lesson 13</nav>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 9 · Part B</nav>
 
-<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 9 · Lesson 13</div>
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 9 of 12 · Part B</div>
 <h1>Teaching an old model a new trick: fine-tuning and LoRA</h1>
-<p class="lede">Last lesson made brains smaller and taught them from a teacher. This one fixes a model you didn't train yourself: a factory model for a sensor that's mounted a bit wonky. A factory trained a model for robots like yours. But your robot is a little bit different, and the model gets things wrong. You could retrain every number in it. Or you could notice that the fix is simple, and train a tiny add-on instead.</p>
-<div class="card note" id="journey"><strong>Step 16 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed ✓ learns from a teacher. <strong>Today</strong> it learns to fix a model it didn't train, cheaply. Next: <a href="18-world-class.html">Week 10 · A world-class brain (Claude)</a>. <a href="index.html#my-robot">Your robot, week by week</a>.</div>
+<p class="lede">Part A of this week made brains smaller and taught them from a teacher. This one fixes a model you didn't train yourself: a factory model for a sensor that's mounted a bit wonky. A factory trained a model for robots like yours. But your robot is a little bit different, and the model gets things wrong. You could retrain every number in it. Or you could notice that the fix is simple, and train a tiny add-on instead.</p>
+<div class="card note" id="journey"><strong>Week 9 of 12 · Part B.</strong> So far your robot: ✓ says hello ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed ✓ learns from a teacher. <strong>Today</strong> you learn how to fix a model you didn't train, cheaply. Next: <a href="18-world-class.html">Week 10 · A world-class brain (Claude)</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> no new gap in this part. It's a side quest, and <a href="#add-to-robot">here's the honest reason why</a>.</div>
 
 <div class="facts">
   <div><b>Time</b>2–3 hours</div>
-  <div><b>You'll need</b>Python 3 (no earlier lesson files needed this time), paper and a pencil, a recipe or a kitchen scale</div>
+  <div><b>You'll need</b>Python 3 (no earlier homework files needed this time), paper and a pencil, a recipe or a kitchen scale</div>
+  <div><b>Homework file</b><code>lesson13_lora.py</code></div>
   <div><b>New words</b>matrix, matrix × vector, fine-tuning, parameters, LoRA, adapter, rank, frozen</div>
   <div><b>Project piece</b>Adapts a factory model to YOUR robot cheaply</div>
 </div>
@@ -73,13 +74,13 @@ danger 5    -0.01   0.07  -0.05   0.06   0.01   0.90</code></pre>
 <pre><code>output 0 = row 0 · x = 1×1 + 2×1 = 3
 output 1 = row 1 · x = 3×1 + 4×1 = 7
 W x = [3, 7]</code></pre>
-<p>That's all a layer of a neural network does (plus a squash like sigmoid, sometimes). It's Lesson 4's neuron, done for several neurons at once: each row is one neuron's weights.</p>
+<p>That's all a layer of a neural network does (plus a squash like sigmoid, sometimes). It's week 3's neuron, done for several neurons at once: each row is one neuron's weights.</p>
 <details><summary>Predict first: W = [[2, 0], [1, 3]] and x = [1, 2]. What is W x?</summary>
 <p><code>[2, 7]</code>. Row 0: 2×1 + 0×2 = 2. Row 1: 1×1 + 3×2 = 7. Notice the 0 in row 0: input 1 has no effect at all on output 0. Zeros in the table mean "no connection".</p>
 </details>
 
 <h3>Step 2: fine-tuning means nudging the numbers</h3>
-<p>Fine-tuning uses the same idea as Lesson 3: look at the error, nudge each number to shrink it. For a table, the rule is:</p>
+<p>Fine-tuning uses the same idea as week 2: look at the error, nudge each number to shrink it. For a table, the rule is:</p>
 <pre><code>err = W x − y                      (prediction minus the right answer)
 W[i][j] −= lr × err[i] × x[j]       (for every row i and column j)</code></pre>
 <p>Example. A tiny robot with <code>W = [[1, 0], [0, 1]]</code>. It reads <code>x = [1, 0.5]</code>, and the right danger levels are <code>y = [1, 1]</code>. Use <code>lr = 0.5</code>:</p>
@@ -204,7 +205,7 @@ two leaky sensors, LoRA rank 2: test error 0.0000</code></pre>
 <details><summary>Hint 3</summary><p>Return the list of <code>w + a</code> for <code>w, a</code> in <code>zip(matvec(W, x), matvec(A, bx))</code>.</p></details>
 
 <h3>4.6 <code>mse(predict, examples)</code></h3>
-<p>Mean squared error (Lesson 3) over <em>every</em> output number of every example. <code>predict</code> is a function you call with x. Example: <code>mse(lambda x: [0, 0], [([1], [1, 3])])</code> → errors 1 and 3 → (1 + 9) / 2 = <code>5.0</code>.</p>
+<p>Mean squared error (week 2) over <em>every</em> output number of every example. <code>predict</code> is a function you call with x. Example: <code>mse(lambda x: [0, 0], [([1], [1, 3])])</code> → errors 1 and 3 → (1 + 9) / 2 = <code>5.0</code>.</p>
 <details><summary>Hint 1</summary><p>Keep a running total of squared errors and a count of how many numbers you added.</p></details>
 <details><summary>Hint 2</summary><p>For each <code>x, y</code> in examples, call <code>predict(x)</code> once, then zip its outputs with y.</p></details>
 <details><summary>Hint 3</summary><p>For each pair <code>p, t</code>: <code>total += (p - t) ** 2</code> and <code>count += 1</code>. Return <code>total / count</code>.</p></details>
@@ -246,7 +247,9 @@ python3 check.py 13</code></pre>
 </ul>
 
 <h2 id="add-to-robot">Add it to your robot</h2>
-<p>Nothing to add to your robot this week. LoRA fixes a separate sensor model, and your simulated room has no wonky sensor. A real robot would load the LoRA-fixed model in <code>look()</code>.</p>
+<p><strong>No gap this time, and here's the honest reason.</strong> LoRA fixes a model whose <em>hardware</em> is a bit different from the factory's: a sensor mounted at a funny angle, a wheel that's slightly smaller. Your robot lives in a pretend room inside <code>world.py</code>, and every pretend sensor in it is mounted perfectly straight. Its readings are noisy (week 2), but the noise is just as likely to go up as down. Nothing leaks from one direction into another the way the sensor in this lesson does. So there's nothing wonky for LoRA to fix. If we invented a fake wonky sensor just so you'd have a gap, you'd be fixing a problem we made up, and that's not real engineering.</p>
+<p>So this part is a <strong>side quest</strong>: a skill you keep for later. Where would it go? On a real robot, in <code>look()</code>. You'd measure a few readings on <em>your</em> robot, train a tiny adapter with your <code>train_lora</code>, and run every reading through <code>lora_forward</code>. You'll see that idea again in week 12, when you think about putting your robot on real wheels.</p>
+<p>Your robot isn't standing still, though. The teacher-trained brain from Part A is already in it. Next week (week 10) you can let it ask Claude, if a grown-up has a key. Week 11 gives it an exam, and week 12 has two more gaps, including the boss.</p>
 
 <h2 id="challenge">5. Real-world challenge: adapt, don't rebuild</h2>
 <p>You'll feel why "the change is usually simple" is true in everyday life.</p>
@@ -264,11 +267,12 @@ python3 check.py 13</code></pre>
 <li>Is the scale off by the same amount every time (an offset, like always +20 g), or by the same percentage (like always 5% heavy)? Work out the one correction.</li>
 <li>Write that one correction on a sticky note on the scale, instead of re-marking every line.</li>
 </ol>
+<p><strong>On your own (15 minutes, just you and a ruler).</strong> Pretend your ruler is "wonky": measure 5 things (a pencil, your phone, a book, a mug, your hand), but start every measurement at the 1 cm mark instead of 0. Write each reading down. Then measure them properly, from 0. Every reading was 1 cm too big. Five wrong numbers, one root cause, one fix: "take away 1". That's rank 1.</p>
 <p><strong>What to notice:</strong> the number of <em>root causes</em> is the rank. One root cause can change many numbers, and still be described by one small rule. Most real adjustments are low rank, which is exactly why LoRA works so well on huge models.</p>
 
 <h2 id="project">6. Your Robo-Helper so far</h2>
-<p>Robo-Helper can now be <strong>adapted cheaply</strong>. Your file has <code>lora_forward</code> (run the factory model plus your adapter) and <code>train_lora</code> (learn the adapter from a handful of measurements on your robot). The factory model W stays frozen and shared; your robot's personality fits in 12 numbers. Together with <a href="12-preferences.html">Lesson 12</a> (learning what people prefer), that's the big idea of the later weeks: you rarely build a robot brain from nothing, you <em>teach</em> one that already exists.</p>
-<p>In <a href="14-go-real.html">Lesson 14</a> you'll go real. Real sensors never match the factory spec exactly, so "measure a few examples on your actual robot and fit a small correction" is the first thing you'd do with real hardware, whether it's a 12-number adapter like <code>train_lora</code> makes, or a LoRA on a robot foundation model.</p>
+<p>Robo-Helper can now be <strong>adapted cheaply</strong>. Your file has <code>lora_forward</code> (run the factory model plus your adapter) and <code>train_lora</code> (learn the adapter from a handful of measurements on your robot). The factory model W stays frozen and shared; your robot's personality fits in 12 numbers. In week 12 you'll add <a href="12-preferences.html">learning what people prefer</a>. Together, that's the big idea of the later weeks: you rarely build a robot brain from nothing, you <em>teach</em> one that already exists.</p>
+<p>In <a href="14-go-real.html">week 12's last part</a> you'll go real. Real sensors never match the factory spec exactly, so "measure a few examples on your actual robot and fit a small correction" is the first thing you'd do with real hardware, whether it's a 12-number adapter like <code>train_lora</code> makes, or a LoRA on a robot foundation model.</p>
 
 <h2 id="mistakes">7. Common mistakes</h2>
 <ul>
@@ -289,16 +293,16 @@ python3 check.py 13</code></pre>
 <h2 id="deeper">9. Go deeper (optional)</h2>
 <ul>
 <li><a href="../12-training-inference-videos/03-lora.html">LoRA, explained with videos</a>: the real thing, including <a href="../12-training-inference-videos/03-lora.html#init">why B starts at zero</a>, QLoRA and newer variants, and OpenVLA.</li>
-<li><a href="../08-ai-research-engineer/05-alignment-preference.html">Alignment and preference training</a>: how LoRA adapters are used to cheaply train models on people's preferences, which joins this lesson to <a href="12-preferences.html">Lesson 12</a>.</li>
+<li><a href="../08-ai-research-engineer/05-alignment-preference.html">Alignment and preference training</a>: how LoRA adapters are used to cheaply train models on people's preferences, which joins this lesson to <a href="12-preferences.html">Week 12</a>.</li>
 <li><a href="../16-hands-on-llm-serving.html#why-robotics">Hands-on LLM serving: why it matters for robotics</a>: multi-LoRA serving, one base model with many small adapters, mapped to one robot model with per-robot adapters.</li>
 <li><a href="../07-post-training.html#sft">Post-training: supervised fine-tuning</a>: what fine-tuning big language models looks like in practice.</li>
 </ul>
 
 <nav class="pager">
-  <a href="17-faster.html"><small>Previous</small>Week 9 · Faster and cheaper</a>
+  <a href="17-faster.html"><small>Previous</small>Week 9 · Part A: Faster and cheaper</a>
   <a class="next" href="18-world-class.html"><small>Next</small>Week 10 · A world-class brain (Claude)</a>
 </nav>
-<footer>Build a Robot Brain · Week 9 · Lesson 13</footer>
+<footer>Build a Robot Brain · Week 9 of 12 · Part B</footer>
 </main>
 
 <script>

@@ -127,7 +127,7 @@ if __name__ == "__main__":
         try:
             small.append(get_brain(n))
         except NotImplementedError:
-            print(f"({n}: not built yet, it comes with the Lesson 15 stretch or Lesson 17)")
+            print(f"({n}: not built yet: it comes with the week 6 stretch or week 9)")
     words = get_brain("words")
     thinkers = [(words, lambda: parse_command(words.model, command))] + [(b, (lambda b: lambda: b.model.generate(command))(b)) for b in small]
     for brain, think in thinkers:

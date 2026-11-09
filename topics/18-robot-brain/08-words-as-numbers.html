@@ -3,17 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 8 · Next-word model</title>
+<title>Week 5 · Next-word model</title>
 <link rel="stylesheet" href="../../style.css">
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 5 · Lesson 8</nav>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 5 of 12 · Part A</nav>
 
-<div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 5 · Lesson 8</div>
+<div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 5 of 12 · Part A</div>
 <h1>Words as numbers: a tiny next-word model</h1>
 <p class="lede">Count which word follows which, turn the counts into chances, and roll a die. That's a language model. It's tiny and a bit silly, and it's the great-great-grandparent of ChatGPT. Then you'll give it a real job on the robot: fixing typos in your commands, the way your phone keyboard does.</p>
-<div class="card note" id="journey"><strong>Step 9 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus). <strong>Today</strong> it learns to turn words into numbers, and fix typos in what you type. Next: <a href="09-understanding-commands.html">Week 5 · Understanding commands</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>put teh red blok in the bin</code> once lesson 9 is done too.</div>
+<div class="card note" id="journey"><strong>Week 5 of 12 · Part A.</strong> So far your robot: ✓ says hello ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes. <strong>Today</strong> it learns to turn words into numbers, and fix typos in what you type. Next: <a href="09-understanding-commands.html">Week 5 · Part B: Understanding commands</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>put teh red blok in the bin</code>: it fixes the typos straight away. After Part B of this week it also bins the block.</div>
 
 <div class="facts">
   <div><b>Time</b>3–4 hours</div>
@@ -46,7 +46,7 @@
 </section>
 <p class="deeper"><strong>Going deeper:</strong> everything below is the full lesson: the idea built from nothing, two demos, your homework, and a challenge away from the screen.</p>
 
-<div class="card note"><strong>What this adds to your robot:</strong> a typo fixer that runs in front of the robot's small brains. You build the word counter in Lesson 9, later this week. On 9 commands with real typos, that word counter does exactly what it does for the correct spelling <strong>6 of 9</strong> times without the fixer, and <strong>9 of 9</strong> with it (measured by <code>python3 progress.py --solutions</code>: <code>typo commands handled like the correct spelling: 6/9 -&gt; 9/9 with the typo fixer</code>).</div>
+<div class="card note"><strong>What this adds to your robot:</strong> a typo fixer. <strong>Before:</strong> <code>go to the bleu block</code> → your robot can't find a block called "bleu" and gives up. <strong>After:</strong> it says <code>(I think you meant: 'go to the blue block')</code> and drives there.</div>
 
 <h2 id="problem">1. The problem</h2>
 <p>Here's the only text our model will ever read. It's the <code>STORY</code> in <code>lesson08_words.py</code>:</p>
@@ -65,7 +65,7 @@ the robot is happy . the room is tidy .</code></pre>
 <p>Computers can't count "words" until we decide what a word is. Our rule: lowercase everything, keep runs of letters (and apostrophes) as words, and keep the full stop as its own token, because "end of sentence" is useful to know. Everything else (commas, question marks, numbers) is thrown away.</p>
 <pre><code>"The cat. Sat"                      → ["the", "cat", ".", "sat"]
 "Where's the cat? It's 5 o'clock!"  → ["where's", "the", "cat", "it's", "o'clock"]</code></pre>
-<p>Notice <code>"where's"</code> stays as one token. Remember that. It causes a real bug in <a href="09-understanding-commands.html">Lesson 9</a>.</p>
+<p>Notice <code>"where's"</code> stays as one token. Remember that. It causes a real bug in <a href="09-understanding-commands.html">Part B</a>.</p>
 <p>The whole story becomes 66 tokens, using 23 different ones.</p>
 
 <h3>Step 2: count what follows what</h3>
@@ -124,7 +124,7 @@ stop after n new words, or if the last word never had anything after it</code></
 <p>The loop is the same: give the chances of each next token, pick one, add it, repeat. When an AI chatbot writes to you, it's doing your <code>generate</code> loop, one token at a time. What modern LLMs add:</p>
 <ul>
 <li><strong>Much longer memory.</strong> Ours looks at 1 previous word. Modern models look at thousands, even hundreds of thousands, of previous tokens: your whole question and the conversation so far.</li>
-<li><strong>A neural network instead of a count table.</strong> Why not just count longer word groups? Try it: our story has 23 tokens, so a table for "last word → next" has 23 × 23 = 529 slots. English has about 50,000 common words. For "last 10 words → next" you'd need 50,000<sup>11</sup> slots, more than the number of atoms in the Earth, and almost all of them would be zero because nobody ever wrote those exact 10 words. A neural network (the neurons from <a href="04-neuron.html">Lesson 4</a>, stacked very deep, using a trick called <em>attention</em>) learns <em>patterns</em> instead, so it can handle word combinations it has never seen.</li>
+<li><strong>A neural network instead of a count table.</strong> Why not just count longer word groups? Try it: our story has 23 tokens, so a table for "last word → next" has 23 × 23 = 529 slots. English has about 50,000 common words. For "last 10 words → next" you'd need 50,000<sup>11</sup> slots, more than the number of atoms in the Earth, and almost all of them would be zero because nobody ever wrote those exact 10 words. A neural network (the neurons from <a href="04-neuron.html">week 3</a>, stacked very deep, using a trick called <em>attention</em>) learns <em>patterns</em> instead, so it can handle word combinations it has never seen.</li>
 <li><strong>Huge amounts of text.</strong> Ours read 66 tokens. Big models read trillions, from books, websites and code.</li>
 <li><strong>Smarter tokens.</strong> Instead of whole words, they use word pieces, so new words like "unboxable" become "un" + "box" + "able".</li>
 <li><strong>Extra training to be helpful.</strong> After learning to predict text, they're trained further to follow instructions and to refuse harmful requests.</li>
@@ -132,14 +132,14 @@ stop after n new words, or if the last word never had anything after it</code></
 <p>But under all that, the job is still: <em>predict the next token</em>. You've just built the smallest possible version.</p>
 
 <h3 id="typos">Step 7: the robot's first job, fixing typos</h3>
-<p>People type fast and make mistakes. Next lesson's word counter (<a href="09-understanding-commands.html">Lesson 9</a>) has never seen "bleu", so for "go to the bleu block" it finds no object and replies <code>Sorry, I can't do that: 'go' needs an object</code>. For the correct spelling it drives to the blue block. A next-word model can fix that. Two parts.</p>
+<p>People type fast and make mistakes. The word counter you'll build in <a href="09-understanding-commands.html">Part B</a> has never seen "bleu", so for "go to the bleu block" it finds no object at all, and your robot gives up. For the correct spelling it drives to the blue block. A next-word model can fix that. Two parts.</p>
 <p><strong>Part 1: list every word one typo away.</strong> There are four kinds of typo. For "cat":</p>
 <pre><code>delete one letter          cat → at
 swap two neighbours        cat → act
 replace one letter         cat → bat   (try all 26 letters in each place)
 insert one letter          cat → cart  (try all 26 letters in each gap)</code></pre>
 <p>A 3-letter word has 3 deletes, 2 swaps, 3 × 26 = 78 replaces and 4 × 26 = 104 inserts: 187 in all. Some come out the same (replacing "c" with "c" gives "cat" back), so the <em>set</em> has 182 different strings. Almost all are nonsense like "zat". We keep only the <strong>known</strong> words: words the model has counted.</p>
-<p><strong>Part 2: let the word before decide.</strong> For the robot, the known words come from Lesson 9's 34 example commands (53 different tokens). Here's the same typo with two different words before it:</p>
+<p><strong>Part 2: let the word before decide.</strong> For the robot, the known words come from the 34 example commands of Part B (53 different tokens: 52 words, plus the full stop we add between commands). Here's the same typo with two different words before it:</p>
 <pre><code>"go te ..."   known words one typo from "te": me, the, to
               seen after "go": to (0.25)                → to
 "put te ..."  known words one typo from "te": me, the, to
@@ -188,7 +188,7 @@ the robot is happy . the room is tidy .</textarea>
 
 <div class="card demo">
 <h3>Interactive: the typo fixer</h3>
-<p class="legend">The same <code>edits1</code>, <code>fix_word</code> and <code>fix_typos</code> as the Python. The known words and the counts come from the commands in the box, which start as Lesson 9's 34 <code>TRAIN</code> commands, joined with full stops exactly like <code>lesson08_words.py</code> does. Type a command with typos and see how each word is chosen.</p>
+<p class="legend">The same <code>edits1</code>, <code>fix_word</code> and <code>fix_typos</code> as the Python. The known words and the counts come from the commands in the box, which start as Part B's 34 <code>TRAIN</code> commands, joined with full stops exactly like <code>lesson08_words.py</code> does. Type a command with typos and see how each word is chosen.</p>
 <p><label for="typoIn">Command: </label><input id="typoIn" value="put teh red blok in the bin" size="34"></p>
 <p>
 <button data-t="put teh red blok in the bin">put teh red blok in the bin</button>
@@ -270,7 +270,7 @@ python3 lesson08_words.py</code></pre>
 -> the robot picks up the blue block in the robot stops . the
 -> the blue block in the red block . the blue block in the
 
-Fixing typos with the robot's command words (from Lesson 9's examples):
+Fixing typos with the robot's command words (from week 5's command examples):
   'put teh red blok in the bin'    -&gt; 'put the red block in the bin'
   'go to the bleu block'           -&gt; 'go to the blue block'
   'whre is the green block'        -&gt; 'where is the green block'
@@ -281,18 +281,18 @@ Fixing typos with the robot's command words (from Lesson 9's examples):
   'head to the red blokc'          -&gt; 'head to the red block'
   'put the red bclok away'         -&gt; 'put the red bclok away'   (wanted 'put the red block away')
 fixed 8 of 9</code></pre>
-<p>The typo part needs your Lesson 9 file, because it borrows <code>TRAIN</code> from <code>lesson09_commands.py</code>. If you haven't done Lesson 9 yet, the first part still runs; come back to the typo part next week. Why 0.12 and not 0.125? The program rounds to 2 decimal places for printing, and Python rounds 0.125 to the even neighbour, 0.12.</p>
+<p>The typo part borrows the example commands, <code>TRAIN</code>, from <code>lesson09_commands.py</code>. They're already written in that file, so this works now, before you start that lesson. One miss: "bclok" is more than one typo away from "block", and the fixer only looks one typo away. Why 0.12 and not 0.125? The program rounds to 2 decimal places for printing, and Python rounds 0.125 to the even neighbour, 0.12.</p>
 
 <h3>Check it</h3>
 <pre><code>cd ..
 python3 check.py 8</code></pre>
-<p>Seven checks: <code>tokenize</code>, <code>count_bigrams</code>, <code>next_word_probs</code>, <code>generate</code>, <code>edits1</code> and <code>fix_typos</code> (which also tests your <code>fix_word</code>). Green ✓ per check, red ✗ with a hint, yellow <code>…</code> for "not written yet". Real hints you might see:</p>
+<p>Six checks for your seven functions: <code>tokenize</code>, <code>count_bigrams</code>, <code>next_word_probs</code>, <code>generate</code>, <code>edits1</code> and <code>fix_typos</code> (which also tests your <code>fix_word</code>). Green ✓ per check, red ✗ with a hint, yellow <code>…</code> for "not written yet". Real hints you might see. The checker prints only the line in code; the words after <strong>What it means</strong> are our explanation, not part of its output:</p>
 <ul>
-<li><code>✗ edits1: 'ab' has exactly 130 different one-typo versions, got 133</code>. You returned a list with repeats. Turn it into a <code>set</code>.</li>
-<li><code>✗ fix_typos: 'bok' is one typo from 'box' but two from 'block' -&gt; 'box'</code>. Your <code>fix_word</code> picked from all the words seen after <code>prev</code>, not just the candidates one typo away.</li>
-<li><code>✗ fix_typos: known words and hopeless words stay as they are</code>. "purple" has no known word one typo away, so it must come back unchanged.</li>
-<li><code>✗ count_bigrams: count_bigrams(['a','b','a','b','c']) should be {'a': {'b': 2}, 'b': {'a': 1, 'c': 1}}</code>. Compare with your pairs on paper. A missing pair or an extra one at the end is the usual cause.</li>
-<li><code>✗ generate: stop when there are no options</code>. Your loop crashed or kept going after a word with nothing after it.</li>
+<li><code>✗ edits1: 'ab' has exactly 130 different one-typo versions, got 133</code> <strong>What it means:</strong> You returned a list with repeats. Turn it into a <code>set</code>.</li>
+<li><code>✗ fix_typos: 'bok' is one typo from 'box' but two from 'block' -&gt; 'box'</code> <strong>What it means:</strong> Your <code>fix_word</code> picked from all the words seen after <code>prev</code>, not just the candidates one typo away.</li>
+<li><code>✗ fix_typos: known words and hopeless words stay as they are</code> <strong>What it means:</strong> "purple" has no known word one typo away, so it must come back unchanged.</li>
+<li><code>✗ count_bigrams: count_bigrams(['a','b','a','b','c']) should be {'a': {'b': 2}, 'b': {'a': 1, 'c': 1}}</code> <strong>What it means:</strong> Compare with your pairs on paper. A missing pair or an extra one at the end is the usual cause.</li>
+<li><code>✗ generate: stop when there are no options</code> <strong>What it means:</strong> Your loop crashed or kept going after a word with nothing after it.</li>
 </ul>
 
 <h3>Stretch</h3>
@@ -304,15 +304,33 @@ python3 check.py 8</code></pre>
 </ul>
 
 <h2 id="add-to-robot">Add it to your robot</h2>
-<p>Fill in <code>clean(self, text)</code>: run every command through your typo fixer before the robot reads it. Its word counts come from the words your robot knows (Lesson 9's training commands).</p>
-<details><summary>Hint 1</summary><p><code>CACHE["counts"] = count_bigrams(tokenize(" . ".join(words)))</code>, where <code>words</code> are the commands in <code>TRAIN</code>.</p></details>
-<details><summary>Hint 2</summary><p>Then <code>return fix_typos(text, CACHE["counts"])</code>. The provided <code>command()</code> prints "I think you meant…" for you.</p></details>
-<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 5: fixes typos"</em>.</p>
-<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
+<p>Fill in <code>clean(self, text)</code> in <code>my_robot.py</code>: run every command through your typo fixer before the robot reads it. Its word counts come from the words your robot knows: the example commands, <code>TRAIN</code>, in <code>lesson09_commands.py</code>. <code>TRAIN</code> is a list of pairs like <code>("halt", "stop")</code>: a command and what it means. You only want the command text.</p>
+<div class="card note"><strong>New Python this time: taking one half of each pair.</strong> A loop can unpack each pair into two names, and a list comprehension keeps just the half you want:
+<pre><code>pairs = [("halt", "stop"), ("go to red", "go")]
+words = [command for command, intent in pairs]     # ["halt", "go to red"]</code></pre></div>
+<details><summary>Hint 1</summary><p>Start <code>clean</code> with these two imports:</p>
+<pre><code>from lesson08_words import tokenize, count_bigrams, fix_typos
+from lesson09_commands import TRAIN</code></pre>
+<p>Then build the counts once and keep them in <code>CACHE["counts"]</code>, exactly as the docstring says:</p>
+<pre><code>words = [command for command, intent in TRAIN]
+CACHE["counts"] = count_bigrams(tokenize(" . ".join(words)))</code></pre>
+<p>Careful: <code>" . ".join(TRAIN)</code> crashes, because <code>TRAIN</code> holds pairs, not strings.</p></details>
+<details><summary>Hint 2</summary><p>Put those two lines inside <code>if "counts" not in CACHE:</code>, so they only run once. Then <code>return fix_typos(text, CACHE["counts"])</code>. The provided <code>command()</code> prints "I think you meant…" for you.</p></details>
+<details><summary>Hint 3</summary><p>Fill in the blanks:</p>
+<pre><code>from lesson08_words import tokenize, count_bigrams, fix_typos
+from lesson09_commands import TRAIN
+if "counts" not in CACHE:
+    words = [____ for command, intent in TRAIN]
+    CACHE["counts"] = count_bigrams(tokenize(" . ".join(____)))
+return fix_typos(____, CACHE["counts"])</code></pre></details>
+<p>Check it: <code>cd ..</code> back to <code>project</code>, then <code>python3 check.py robot</code>. Your new check is <em>"week 5: fixes typos"</em>. If you joined <code>TRAIN</code> itself, you'll see:</p>
+<pre><code>  ✗ week 5: fixes typos: crashed with TypeError: sequence item 0: expected str instance, tuple found. TRAIN is a list of (command, intent) pairs: join only the commands, words = [command for command, intent in TRAIN]</code></pre>
+<p>That means "<code>join</code> wanted strings, but item 0 was a pair". Take just the commands, as in Hint 1.</p>
+<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output, before Part B:</p>
 <pre><code>Zippy&gt; put teh red blok in the bin
   (I think you meant: 'put the red block in the bin')
-  The red block is in the bin.</code></pre>
-<p>It works once Lesson 9's piece is in too (later this week).</p>
+  I can't do that yet: week 5. Fill in this gap in my_robot.py</code></pre>
+<p>Your robot already reads the typos right. It can't <em>do</em> sentences yet: that's the gap you fill in Part B. After Part B, the same command bins the red block.</p>
 
 <h2 id="challenge">5. Real-world challenge: a language model in a cup</h2>
 <p>You'll train and run a bigram model by hand on your own writing.</p>
@@ -328,7 +346,7 @@ python3 check.py 8</code></pre>
 <h2 id="project">6. Your Robo-Helper so far</h2>
 <p>You've added a <strong>baby language model</strong> (<code>tokenize</code>, <code>count_bigrams</code>, <code>next_word_probs</code>, <code>generate</code>) and its first robot job, a <strong>typo fixer</strong> (<code>edits1</code>, <code>fix_word</code>, <code>fix_typos</code>).</p>
 <div class="card note"><strong>What this adds to your robot:</strong> in the course's simulator, <code>brains.clean()</code> runs your <code>fix_typos</code> in front of the small brains, using the words of every command they were trained on. Measured with <code>python3 progress.py --solutions</code>: typo commands handled exactly like the correct spelling go from <strong>6/9</strong> to <strong>9/9</strong> for the word counter. Without the fixer, "go to the bleu block" and "put the gren block away" are refused, and "fnd the red block" puts the red block in the bin instead of finding it. "put the red bclok away" stays unfixed, but the robot still gets it right, because "put" and "red" are enough for the word counter.</div>
-<p>The robot won't write stories in the final project. Two pieces live on: the typo fixer, and <code>tokenize</code>. In <a href="09-understanding-commands.html">Lesson 9</a>, <code>lesson09_commands.py</code> starts with <code>from lesson08_words import tokenize</code> and uses it to chop up commands like "put the red block in the bin" before counting words to guess what you want. Then Lesson 11's capstone uses that command reader, so your tokenizer ends up inside the finished Robo-Helper. And in <a href="10-llm-safety.html">Lesson 10</a> you'll plug in a <em>real</em> LLM: the grown-up version of what you just made.</p>
+<p>The robot won't write stories in the final project. Two pieces live on: the typo fixer, and <code>tokenize</code>. In <a href="09-understanding-commands.html">Part B</a>, <code>lesson09_commands.py</code> starts with <code>from lesson08_words import tokenize</code> and uses it to chop up commands like "put the red block in the bin" before counting words to guess what you want. Then week 7's capstone uses that command reader, so your tokenizer ends up inside the finished Robo-Helper. And in <a href="10-llm-safety.html">week 7</a> you'll plug in a <em>real</em> LLM: the grown-up version of what you just made.</p>
 
 <h2 id="mistakes">7. Common mistakes</h2>
 <ul>
@@ -358,10 +376,10 @@ python3 check.py 8</code></pre>
 </ul>
 
 <nav class="pager">
-  <a href="07-trial-and-error.html"><small>Previous</small>Bonus · Trial and error</a>
-  <a class="next" href="09-understanding-commands.html"><small>Next</small>Week 5 · Understanding commands</a>
+  <a href="06-pathfinding.html"><small>Previous</small>Week 4 · Finding the way</a>
+  <a class="next" href="09-understanding-commands.html"><small>Next</small>Week 5 · Part B: Understanding commands</a>
 </nav>
-<footer>Build a Robot Brain · Week 5 · Lesson 8</footer>
+<footer>Build a Robot Brain · Week 5 of 12 · Part A (homework file: lesson08_words.py)</footer>
 </main>
 
 <script>

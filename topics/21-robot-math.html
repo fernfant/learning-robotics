@@ -79,7 +79,7 @@
 <tr><td>Fourier</td><td><a href="18-robot-brain/02-sensors.html">Week 2</a></td><td>Wheel wobble removed: error 0.44 m → 0.11 m</td></tr>
 <tr><td>Momentum</td><td><a href="18-robot-brain/03-learning-from-data.html">Week 2</a></td><td>Braking fit: 73 steps → 35 with momentum 0.5 (but 0.9 overshoots)</td></tr>
 <tr><td>Reinforcement learning</td><td><a href="18-robot-brain/07-trial-and-error.html">Bonus</a></td><td>A surprise: in this tiny maze, exploring more only slows learning down</td></tr>
-<tr><td>Transformers</td><td><a href="18-robot-brain/15-tiny-lm.html#attention">Week 6 stretch</a></td><td>Attention: new commands 89% → 92% (average of 3 seeds)</td></tr>
+<tr><td>Transformers</td><td><a href="18-robot-brain/15b-attention.html">Week 6 stretch</a></td><td>Attention: new commands 89% → 92% (average of 3 seeds)</td></tr>
 <tr><td>Diffusion</td><td><a href="18-robot-brain/15-tiny-lm.html">Week 6</a> (action chunks)</td><td>No experiment: explained, with what it would take</td></tr>
 </table></div>
 
@@ -198,7 +198,7 @@
 <h2 id="transformers">11. Transformers</h2>
 <p><b>Play:</b> <a href="https://poloclub.github.io/transformer-explainer">Polo Club (Georgia Tech): Transformer Explainer</a>. A real GPT-2 running in your browser. Type a sentence, then click into the attention heads and move the temperature slider.</p>
 <p><b>The idea:</b> every word asks every other word "how relevant are you to me?" (queries times keys), turns the scores into weights with softmax, and takes a weighted mix of their information (values). Stack that many times and you have the "understanding" half of π0 and GR00T.</p>
-<p><b>In Robo-Helper:</b> you built single-head attention, with backprop by hand, in the <a href="18-robot-brain/15-tiny-lm.html#attention">week 6 stretch</a>. Its measured gain: new commands 89% → 92% on average over 3 seeds, the same 8/12 on the bake-off. A real nanoGPT on the same robot data is in <a href="20-from-scratch/03-nanogpt.html">Module 20</a>.</p>
+<p><b>In Robo-Helper:</b> you built single-head attention, with backprop by hand, in the <a href="18-robot-brain/15b-attention.html">week 6 stretch</a>. Its measured gain: new commands 89% → 92% on average over 3 seeds, the same 8/12 on the bake-off. A real nanoGPT on the same robot data is in <a href="20-from-scratch/03-nanogpt.html">Module 20</a>.</p>
 <p><b>Challenge:</b> in the explainer, set the temperature to 0.2 and then 2.0 on the same prompt. Then find where Robo-Helper's tiny LM uses softmax, and say what a temperature would do to its plans.</p>
 
 <h2 id="diffusion">12. Diffusion, and how π0 and GR00T move</h2>

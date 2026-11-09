@@ -3,23 +3,38 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 0 · Setup and algorithms</title>
+<title>Week 1 Part A · Setup and algorithms</title>
 <link rel="stylesheet" href="../../style.css">
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 1 · Lesson 0</nav>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 1 · Part A</nav>
 
-<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 1 · Lesson 0</div>
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 1 of 12 · Part A</div>
 <h1>Setup, and your first algorithm</h1>
 <p class="lede">Get Python running on your computer, meet the robot's room, and write your first two functions. On the way you'll learn the most important idea in all of computing: an algorithm is a list of exact steps.</p>
-<div class="card note" id="journey"><strong>Step 1 of 21.</strong> Your robot starts from nothing. <strong>Today</strong> it learns to run your first robot program. Next: <a href="01-coordinates.html">Week 1 · Moving on a grid</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> open <code>homework/my_robot.py</code>, give your robot a name, and run it. It can't do anything yet: every week <em>you</em> add a piece.<br><strong>Ask an adult today:</strong> installing Python (you may need an admin password).</div>
+<div class="card note" id="journey"><strong>Week 1 of 12 · Part A.</strong> Your robot starts from nothing. <strong>Today</strong> you set up Python, write your first two functions, and your robot says hello. Next: <a href="01-coordinates.html">Week 1 · Part B: Moving on a grid</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> open <code>homework/my_robot.py</code>, give your robot a name, and run it. Once your <code>introduce()</code> works, it greets you by name. Every week after that, <em>you</em> add a new power.<br><strong>Ask an adult today:</strong> installing Python (you may need an admin password).</div>
 
 <div class="facts">
   <div><b>Time</b>1.5–3 h (setup is most of it)</div>
-  <div><b>You'll need</b>A computer, the course folder, a friend and some bread (for the challenge)</div>
+  <div><b>You'll need</b>A computer, the course folder (and, for the challenge, a friend and some bread, or just paper)</div>
   <div><b>New words</b>Algorithm, terminal, folder path, function, loop</div>
-  <div><b>Project piece</b>Run your first robot script</div>
+  <div><b>Project piece</b>Your robot says hello</div>
+  <div><b>Homework file</b><code>lesson00_hello.py</code></div>
+</div>
+
+<div class="card demo" id="warmup">
+<h2 style="margin-top:0">2-minute warm-up: drive it before you build it</h2>
+<p class="legend">This is the robot you'll build. Press the arrow buttons (or click a square next to the robot) to drive it. Grey squares are walls, the coloured squares are blocks, <code>B</code> is the bin, and <code>c</code> is the cat. Can you reach the bin? The fewest moves possible is 11.</p>
+<canvas id="wuGrid" width="700" height="400" style="height:auto" aria-label="The robot's room; drive the robot with the buttons"></canvas>
+<p><button id="wuN">↑ N</button> <button id="wuS">↓ S</button> <button id="wuW">← W</button> <button id="wuE">→ E</button> <button id="wuReset">Back to start</button></p>
+<div class="stats">
+  <div class="stat"><div class="k">Position</div><div class="v" id="wuPos">–</div></div>
+  <div class="stat"><div class="k">Moves</div><div class="v" id="wuMoves">–</div></div>
+  <div class="stat"><div class="k">Bumps</div><div class="v" id="wuBumps">–</div></div>
+</div>
+<p class="legend" id="wuMsg"></p>
+<p class="legend">Right now <em>you</em> are the robot's brain. By week 12 your robot drives itself: you type "put the red block in the bin" and it plans the route, stops for the cat, and does it. Week 1 Part B has a bigger version of this demo.</p>
 </div>
 
 <section class="kid" id="start">
@@ -124,7 +139,7 @@ py check.py 0               # Windows</code></pre>
   … introduce: not written yet (Lesson 0: write this function)
   … steps_to_wall: not written yet (Lesson 0: write this function)
   0/2 passed</code></pre>
-<p><strong>That's a success.</strong> Python works, the checker works, and it found your homework file. Yellow <code>…</code> means "not written yet". Later you'll see green <code>✓</code> (correct) and red <code>✗</code> (wrong, with a hint).</p>
+<p><strong>That's a success.</strong> Python works, the checker works, and it found your homework file. (The checker names each lesson by its file number: "Lesson 0" means <code>lesson00_hello.py</code>, today's file.) Yellow <code>…</code> means "not written yet". Later you'll see green <code>✓</code> (correct) and red <code>✗</code> (wrong, with a hint).</p>
 <p>Now look at the robot's room. Go into the homework folder and run the world file:</p>
 <pre><code>cd homework
 python3 world.py            # Windows: py world.py
@@ -174,7 +189,7 @@ answer: 3</code></pre>
 
 <h3>Why not just subtract?</h3>
 <p>You might spot a shortcut: answer = wall − start − 1. For 1 and 5 that gives 3. Correct! So why does the homework say "use a loop, not subtraction"?</p>
-<p>Because a real robot doesn't know where the wall is in advance. It only knows "is the square in front of me free?" Next lesson you'll replace "is it the wall square?" with a real check on the room map, and in Lesson 2 that check becomes a <em>sensor</em>. Subtraction only works when you already know the answer. The loop works when you have to find out. That's how robots think: look, move, look again.</p>
+<p>Because a real robot doesn't know where the wall is in advance. It only knows "is the square in front of me free?" In Part B you'll replace "is it the wall square?" with a real check on the room map, and in week 2 that check becomes a <em>sensor</em>. Subtraction only works when you already know the answer. The loop works when you have to find out. That's how robots think: look, move, look again.</p>
 
 <h3>Turning steps into Python</h3>
 <p>Each line of the paper algorithm becomes a line of Python:</p>
@@ -203,7 +218,7 @@ answer: 3</code></pre>
 </div>
 <pre><code id="trace"></code></pre>
 </div>
-<p>Try these: start 4, wall 5 (the edge case). Start 0, wall 10. Does the answer always equal wall − start − 1? It does here, because the corridor is empty. In Lesson 2 the corridor will have real walls in it, and only the "look, then move" version will still work.</p>
+<p>Try these: start 4, wall 5 (the edge case). Start 0, wall 10. Does the answer always equal wall − start − 1? It does here, because the corridor is empty. In week 2 the corridor will have real walls in it, and only the "look, then move" version will still work.</p>
 
 <h2 id="homework">4. Homework</h2>
 <p>Open <code>homework/lesson00_hello.py</code> in your editor. You'll see two functions. Each has a <em>docstring</em> (the text in triple quotes) that says exactly what it must do, and a line <code>raise NotImplementedError(...)</code>. That line means "not written yet". Delete it and write your code in its place.</p>
@@ -252,16 +267,47 @@ Steps to wall: 3</code></pre>
 <p>Write <code>steps_to_wall_left(start_x, wall_x)</code> where the wall is on the <em>left</em> (so <code>wall_x</code> is smaller than <code>start_x</code>) and the robot walks left. Trace <code>steps_to_wall_left(6, 2)</code> on paper first. (The checker doesn't test this one; test it yourself with <code>print</code>.)</p>
 
 <h2 id="add-to-robot">Add it to your robot</h2>
-<p>Your robot is a file you'll build yourself, one piece a week: <code>homework/my_robot.py</code>. Open it now. At the top, change <code>NAME = "Robo-Helper"</code> to your robot's own name. Then run it:</p>
-<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
-<pre><code>cd homework
-python3 my_robot.py
+<p>Your robot is a file you'll build yourself, one piece a week: <code>homework/my_robot.py</code>. Open it now. At the top, change <code>NAME = "Robo-Helper"</code> to your robot's own name (ours is Zippy). Save it.</p>
+<p>You've already given it its first power. When <code>my_robot.py</code> starts, it calls <em>your</em> <code>introduce()</code> with its name. The line that does it is already in the file:</p>
+<pre><code>from lesson00_hello import introduce</code></pre>
+<p>Then run it: <code>cd homework</code>, then <code>python3 my_robot.py</code> (Windows: <code>py my_robot.py</code>). Type <code>help</code> to see what it can do, and <code>quit</code> to stop. Real output, after this lesson's homework:</p>
+<pre><code>Hello, I am Zippy!
 
 === Zippy: built up to week 0 ===
-  · week  1 (lesson    1): moves with arrows (EESS)
+  · week  1: moves with arrows (EESS)
+  · week  2: looks around: 'look'
+  · week  3: stops before it bumps into the cat
   ...
-  Next gap to fill: week 1, the arrows() method in my_robot.py.</code></pre>
+  · week 12: the boss: uses what it SEES ('tidy up the room', 'the block closest to the bin')
+  Next gap to fill: week 1, the arrows() method in my_robot.py (see 'Add it to your robot' on the week 1 page).
+##########
+#Rr.c....#
+#..##....#
+#..#..b..#
+#....##..#
+#g.......#
+#.#....B.#
+##########
+Type commands like EESS, look, goto blue, put the red block in the bin, exam.   help / reset / quit
+
+Zippy&gt; EEEE
+  I can't do that yet: week 1. Fill in this gap in my_robot.py</code></pre>
+<p>Your robot says hello. If it doesn't, run <code>python3 check.py 0</code> first: the greeting only appears once <code>introduce</code> works. Each <code>·</code> is a locked power. It turns into a <code>✓</code> when you fill that week's gap. The <code>c</code> in the room is a cat. Your robot doesn't know it's there yet. You'll meet it in Part B.</p>
 <p>Every gap in the file is marked <code># TODO week N</code>. Until you fill it, your robot politely says "I can't do that yet".</p>
+
+<div class="card note" id="robot-file"><strong>How your robot file works.</strong> You'll fill in the gaps, so here are the ideas the file uses.
+<ul>
+<li><strong>A class is a blueprint.</strong> <code>class Robot:</code> describes what every robot knows and can do. <code>Robot()</code> builds one real robot from it.</li>
+<li><strong>A method is a function that lives inside the class.</strong> <code>arrows</code>, <code>look</code> and <code>goto</code> are methods. You write them like any function, indented under the class.</li>
+<li><strong><code>self</code> means "this robot".</strong> Every method gets it as its first input. <code>self.pos</code> is where <em>this</em> robot is, and <code>self.binned</code> is the set of blocks <em>this</em> robot has put away.</li>
+<li><strong>Helpers we wrote for you.</strong> You call them with <code>self.</code> in front. For example, <code>self.step(square)</code> moves the robot one square and tells you what happened: <code>"moved"</code>, <code>"stopped"</code> or <code>"bump"</code>.</li>
+</ul>
+<p>A 3-line example. This method isn't in your file. It just shows the shape:</p>
+<pre><code>class Robot:
+    def where(self):
+        return f"I am at {self.pos}."</code></pre>
+<p>If <code>zippy = Robot()</code> and <code>zippy.pos</code> is <code>(1, 1)</code>, then <code>zippy.where()</code> returns <code>"I am at (1, 1)."</code>. You don't pass <code>self</code> yourself: Python fills it in with <code>zippy</code>. Every gap you fill is a method like this one.</p>
+</div>
 
 <h2 id="challenge">5. Real-world challenge: the literal friend</h2>
 <p>You'll feel what it's like to be a programmer whose computer does exactly what you wrote.</p>
@@ -272,15 +318,16 @@ python3 my_robot.py
 <li><strong>Record every bug.</strong> For each step that went wrong, write: step number, what you meant, what they did, and what kind of bug it was: <em>vague</em> (unclear words), <em>missing</em> (a step you forgot), <em>order</em> (right step, wrong place), or <em>never stops</em>.</li>
 <li><strong>Fix and run again.</strong> Write version 2 and repeat. Keep going until a run has zero bugs.</li>
 </ol>
+<div class="card note"><strong>On your own (no friend, no kitchen):</strong> write 8–15 numbered steps for drawing a house on paper. Put them away for an hour. Then follow them yourself, as literally and sillily as you can: if a step says "draw a square" without saying where or how big, draw it tiny in a corner. Record the bugs the same way, fix them, and try again.</div>
 <p><strong>What to record:</strong> the number of bugs in version 1, version 2 and version 3, and which kind was most common. Most people find 5–10 bugs in version 1. <strong>What it teaches:</strong> computers aren't clever about what you meant. Precision is the whole job, and testing (your friend) finds bugs you couldn't see while writing. That's exactly why this course has <code>check.py</code>.</p>
 
 <h2 id="project">6. Your Robo-Helper so far</h2>
-<pre><code>Lesson 0  ✓ Python works, the checker works, the robot can greet you and count steps to a wall</code></pre>
+<pre><code>Week 1A  ✓ Python works, the checker works, the robot greets you by name and can count steps to a wall</code></pre>
 <p>The robot can't move yet, but you've learned its habit of mind: <em>look at the next square, decide, step, repeat</em>. That idea comes straight back:</p>
 <ul>
-<li><a href="01-coordinates.html">Lesson 1</a> gives the robot real moves on the 2D grid (<code>move</code>, <code>safe_move</code>).</li>
-<li><a href="02-sensors.html">Lesson 2</a> turns your <code>steps_to_wall</code> loop into <code>distance_to_wall</code>: the same "step until blocked" loop, but in any direction on the real room map.</li>
-<li>In the <a href="11-capstone.html">Lesson 11 capstone</a>, <code>RoboHelper.drive_to</code> calls that <code>distance_to_wall</code> before every move to decide how fast it's safe to go.</li>
+<li><a href="01-coordinates.html">Week 1 Part B</a> gives the robot real moves on the 2D grid (<code>move</code>, <code>safe_move</code>).</li>
+<li><a href="02-sensors.html">Week 2</a> turns your <code>steps_to_wall</code> loop into <code>distance_to_wall</code>: the same "step until blocked" loop, but in any direction on the real room map.</li>
+<li>In the <a href="11-capstone.html">week 7 capstone</a>, <code>RoboHelper.drive_to</code> calls that <code>distance_to_wall</code> before every move to decide how fast it's safe to go.</li>
 </ul>
 
 <h2 id="mistakes">7. Common mistakes</h2>
@@ -296,7 +343,7 @@ python3 my_robot.py
 <details><summary>In your own words, what makes a list of steps an algorithm?</summary><p>Every step is exact, the order is right, and it's guaranteed to stop with an answer. "Make a sandwich" isn't an algorithm. A numbered list a literal friend can follow without guessing is.</p></details>
 <details><summary>Predict: what does <code>steps_to_wall(3, 9)</code> return? Trace it.</summary><p><strong>5.</strong> x goes 3 → 4 → 5 → 6 → 7 → 8, which is five moves. At x = 8 the next square is 9, the wall, so it stops.</p></details>
 <details><summary>Predict: if <code>introduce</code> uses <code>print</code> and no <code>return</code>, what does <code>x = introduce("Robo")</code> put in <code>x</code>?</summary><p><code>None</code>. The greeting appears on screen, but the function hands back nothing. Every Python function without a <code>return</code> returns <code>None</code>.</p></details>
-<details><summary>Why does the homework forbid subtraction for <code>steps_to_wall</code>?</summary><p>Subtraction needs you to already know where the wall is. A robot finds out by checking one square at a time. The loop version still works when the corridor has unknown walls in it, which is exactly what Lesson 2 needs.</p></details>
+<details><summary>Why does the homework forbid subtraction for <code>steps_to_wall</code>?</summary><p>Subtraction needs you to already know where the wall is. A robot finds out by checking one square at a time. The loop version still works when the corridor has unknown walls in it, which is exactly what week 2 needs.</p></details>
 <details><summary>You type <code>python3 check.py 0</code> and get "can't open file 'check.py'". What's wrong?</summary><p>The terminal is in the wrong folder. Use <code>ls</code> or <code>dir</code> to see where you are, then <code>cd</code> into the <code>project</code> folder (the one that contains <code>check.py</code>).</p></details>
 
 <h2 id="deeper">9. Go deeper (optional)</h2>
@@ -308,9 +355,9 @@ python3 my_robot.py
 
 <nav class="pager">
   <a href="index.html"><small>Previous</small>Course hub</a>
-  <a class="next" href="01-coordinates.html"><small>Next</small>Week 1 · Moving on a grid</a>
+  <a class="next" href="01-coordinates.html"><small>Next</small>Week 1 · Part B: Moving on a grid</a>
 </nav>
-<footer>Build a Robot Brain · Week 1 · Lesson 0</footer>
+<footer>Build a Robot Brain · Week 1 of 12 · Part A</footer>
 </main>
 
 <script>
@@ -377,6 +424,59 @@ document.getElementById('resetBtn').onclick = reset;
 sIn.oninput = reset; wIn.oninput = reset;
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
 reset();
+</script>
+<script>
+// Warm-up: drive the robot. Same moves and walls as Week 1 Part B's move/safe_move; the cat at (4, 1) bumps, like the week-1 robot.
+(() => {
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const cv = document.getElementById('wuGrid'), ctx = cv.getContext('2d');
+  const ROOM = ["##########", "#........#", "#..##....#", "#..#.....#", "#....##..#", "#........#", "#.#....B.#", "##########"];
+  const BLOCKS = { red: [2, 1], blue: [6, 3], green: [1, 5] }, CAT = [4, 1], START = [1, 1], BIN = [7, 6];
+  const DIRS = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] };
+  const same = (a, b) => a[0] === b[0] && a[1] === b[1], fmt = p => `(${p[0]}, ${p[1]})`;
+  let pos, moves, bumps, trail, msg;
+  function reset() { pos = START; moves = 0; bumps = 0; trail = [START]; msg = 'Press a button to drive.'; draw(); }
+  function go(d) {
+    const n = [pos[0] + DIRS[d][0], pos[1] + DIRS[d][1]];
+    moves++;
+    if (ROOM[n[1]][n[0]] === '#') { bumps++; msg = `Bonk! ${fmt(n)} is a wall.`; }
+    else if (same(n, CAT)) { bumps++; msg = 'BUMP! You walked into the cat. Your robot will learn to stop for it in week 3.'; }
+    else { pos = n; trail.push(n); msg = same(n, BIN) ? `You reached the bin in ${moves} moves!` + (moves === 11 ? ' That is the fewest possible.' : ' Can you do it in 11?') : `Now at ${fmt(n)}.`; }
+    draw();
+  }
+  function geom() { const cs = Math.min(cv.width / 10, cv.height / 8); return { cs, ox: (cv.width - cs * 10) / 2, oy: (cv.height - cs * 8) / 2 }; }
+  function draw() {
+    const { cs, ox, oy } = geom(), seen = new Set(trail.map(fmt));
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 10; x++) {
+      const c = ROOM[y][x], px = ox + x * cs, py = oy + y * cs;
+      ctx.fillStyle = c === '#' ? css('--muted') : seen.has(fmt([x, y])) ? css('--accent-soft') : css('--card');
+      ctx.fillRect(px, py, cs, cs); ctx.strokeStyle = css('--line'); ctx.strokeRect(px, py, cs, cs);
+      if (c === 'B') { ctx.fillStyle = css('--fg'); ctx.font = 'bold 18px sans-serif'; ctx.fillText('B', px + cs / 2, py + cs / 2); }
+    }
+    const col = { red: css('--fail'), blue: css('--pass'), green: css('--accent') };
+    for (const [k, [x, y]] of Object.entries(BLOCKS)) { ctx.fillStyle = col[k]; ctx.fillRect(ox + x * cs + cs * 0.25, oy + y * cs + cs * 0.25, cs * 0.5, cs * 0.5); }
+    ctx.fillStyle = css('--warn'); ctx.font = 'bold 20px sans-serif'; ctx.fillText('c', ox + CAT[0] * cs + cs / 2, oy + CAT[1] * cs + cs / 2);
+    const rx = ox + pos[0] * cs + cs / 2, ry = oy + pos[1] * cs + cs / 2;
+    ctx.fillStyle = css('--accent'); ctx.beginPath(); ctx.arc(rx, ry, cs * 0.33, 0, 7); ctx.fill();
+    ctx.fillStyle = css('--bg'); ctx.font = 'bold 16px sans-serif'; ctx.fillText('R', rx, ry);
+    document.getElementById('wuPos').textContent = fmt(pos);
+    document.getElementById('wuMoves').textContent = moves;
+    document.getElementById('wuBumps').textContent = bumps;
+    document.getElementById('wuMsg').textContent = msg;
+  }
+  cv.addEventListener('click', e => {
+    const r = cv.getBoundingClientRect(), { cs, ox, oy } = geom();
+    const x = Math.floor(((e.clientX - r.left) * cv.width / r.width - ox) / cs), y = Math.floor(((e.clientY - r.top) * cv.height / r.height - oy) / cs);
+    const d = Object.keys(DIRS).find(k => DIRS[k][0] === x - pos[0] && DIRS[k][1] === y - pos[1]);
+    if (d) go(d); else { msg = 'Click a square right next to the robot (up, down, left or right).'; draw(); }
+  });
+  ['N', 'S', 'E', 'W'].forEach(d => document.getElementById('wu' + d).onclick = () => go(d));
+  document.getElementById('wuReset').onclick = reset;
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+  reset();
+})();
 </script>
 </body>
 </html>

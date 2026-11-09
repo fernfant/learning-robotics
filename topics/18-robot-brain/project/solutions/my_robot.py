@@ -14,7 +14,9 @@ Everything that makes the robot clever is yours.
 """
 
 import inspect
+import json
 import random
+import traceback
 import sys
 import time
 from pathlib import Path
@@ -22,7 +24,7 @@ from pathlib import Path
 from world import ROOM, OBJECTS, ROBOT_START, find_bin, render
 
 NAME = "Robo-Helper"         # WEEK 1: give your robot its own name!
-CAT = (4, 1)                 # the cat. It is NOT on the map, so your robot only finds out by sensing it.
+CAT = (4, 1)                 # the cat at (4, 1) is drawn for you, but it's NOT on the robot's map: the robot only finds out by sensing it.
 CACHE = {}                   # brains you've trained, so the robot only trains them once per run
 
 
@@ -33,13 +35,15 @@ class Robot:
         self.binned = set()             # blocks already in the bin
         self.blocked = set()            # squares where the robot found something in the way
         self.last_path = []
+        self.last_stop = None           # week 3: (stop chance, threshold) the last time it saw something
+        self.slow = False               # week 8: 'slowbrain on' pretends the brain is very slow
         self.quiet, self.animate = quiet, animate
 
     # ======================= WEEK 1 (Lesson 1): moving =======================
     def arrows(self, text):
         """Move one square for each letter in text ("EESN": east, east, south, north), using your
         Lesson 1 move() and safe_move(). For every letter:
-          - if safe_move would leave the robot where it is, there's a wall: return "Bonk! A wall."
+          - if safe_move would leave the robot where it is, there's a wall: return f"Bonk! A wall. I'm at {self.pos}."
           - otherwise call self.step(the new square). If it returns "bump" or "stopped", return
             self.step_message(that result, the square) straight away.
         After the last letter, return f"I'm at {self.pos}."
@@ -48,7 +52,7 @@ class Robot:
         from lesson01_moving import move, safe_move
         for d in text.upper():
             if safe_move(ROOM, self.pos, d) == self.pos:
-                return "Bonk! A wall."
+                return f"Bonk! A wall. I'm at {self.pos}."
             result = self.step(move(self.pos, d))
             if result != "moved":
                 return self.step_message(result, move(self.pos, d))
@@ -57,17 +61,21 @@ class Robot:
 
     # ======================= WEEK 2 (Lessons 2-3): sensing =======================
     def look(self):
-        """Return what the sensors see, like "Walls: north 0, east 7, south 5, west 0. Safe speed: 0.25 m/s."
-        Use your Lesson 2 distance_to_wall() for "N", "E", "S", "W" (in that order, written north/east/south/west).
-        For the safe speed (Lesson 3): fit_line(STOP_DATA) gives w, b; the free distance in metres is
-        (the smallest of the four distances) * 0.5 + 0.5; then max_safe_speed(w, b, free)."""
+        """What the sensors see. A real sensor is noisy, so average 16 readings (Lesson 2):
+          for each direction "N", "E", "S", "W":  true = distance_to_wall(ROOM, self.pos, direction)
+                                                    seen = smoothed_reading(true, 0.5, 16, random.Random())
+          return f"Walls (average of 16 readings): north {N:.1f}, east {E:.1f}, south {S:.1f}, west {W:.1f}."
+        Lesson 3 adds the safe speed to the end: w, b, _ = fit_line(STOP_DATA); one square is 0.5 m, so the free space
+        in metres is (the smallest TRUE distance) * 0.5 + 0.5; then add f" Safe speed: {max_safe_speed(w, b, free)} m/s." """
         # BEGIN ROBOT week=2 lessons=2-3
-        from lesson02_sensors import distance_to_wall
+        from lesson02_sensors import distance_to_wall, smoothed_reading
         from lesson03_learning import STOP_DATA, fit_line, max_safe_speed
-        d = {k: distance_to_wall(ROOM, self.pos, k) for k in "NESW"}
+        true = {k: distance_to_wall(ROOM, self.pos, k) for k in "NESW"}
+        seen = {k: smoothed_reading(true[k], 0.5, 16, random.Random()) for k in "NESW"}
         w, b, _ = fit_line(STOP_DATA)
-        speed = max_safe_speed(w, b, min(d.values()) * 0.5 + 0.5)
-        return f"Walls: north {d['N']}, east {d['E']}, south {d['S']}, west {d['W']}. Safe speed: {speed} m/s."
+        speed = max_safe_speed(w, b, min(true.values()) * 0.5 + 0.5)
+        return (f"Walls (average of 16 readings): north {seen['N']:.1f}, east {seen['E']:.1f}, south {seen['S']:.1f}, "
+                f"west {seen['W']:.1f}. Safe speed: {speed} m/s.")
         # END ROBOT
 
     # ======================= WEEK 3 (Lessons 4-5): stopping in time =======================
@@ -75,15 +83,17 @@ class Robot:
         """Something is one square ahead (0.5 m away) and the robot is driving at 0.5 m/s. Should it stop?
         Train your Lesson 4 neuron on make_obstacle_data(450, random.Random(0)), pick the threshold with your
         Lesson 5 safest_threshold(), then return should_stop(weights, bias, (0.5, 0.5), threshold).
+        Also remember what it decided, so the robot can tell you: self.last_stop = (neuron(w, b, (0.5, 0.5)), threshold).
         Tip: train once and keep it in CACHE["stop"] so it isn't retrained on every step."""
         # BEGIN ROBOT week=3 lessons=4-5
-        from lesson04_neuron import make_obstacle_data, train_neuron, should_stop
+        from lesson04_neuron import make_obstacle_data, train_neuron, should_stop, neuron
         from lesson05_evaluate import safest_threshold
         if "stop" not in CACHE:
             data = make_obstacle_data(450, random.Random(0))
             w, b = train_neuron(data)
             CACHE["stop"] = (w, b, safest_threshold(w, b, data))
         w, b, t = CACHE["stop"]
+        self.last_stop = (neuron(w, b, (0.5, 0.5)), t)
         return should_stop(w, b, (0.5, 0.5), t)
         # END ROBOT
 
@@ -103,7 +113,7 @@ class Robot:
             path = self.plan_route(target)            (PROVIDED below: your route(), or a nicer one in week 12)
             if path is None: return "I can't find a way there."
             for each square after the first: result = self.step(square)
-                "bump"    -> return self.step_message("bump", square)
+                "bump" (or "late") -> return self.step_message(result, square)
                 "stopped" -> self.say(self.step_message("stopped", square)) and plan again (break)
             if every step worked: return ""
           After 6 tries: return "Too many surprises, giving up." """
@@ -114,10 +124,10 @@ class Robot:
                 return "I can't find a way there."
             for square in path[1:]:
                 result = self.step(square)
-                if result == "bump":
-                    return self.step_message("bump", square)
+                if result in ("bump", "late"):
+                    return self.step_message(result, square)
                 if result == "stopped":
-                    self.say(self.step_message("stopped", square) + " Planning a new route.")
+                    self.say(self.step_message("stopped", square))
                     break
             else:
                 return ""
@@ -126,13 +136,16 @@ class Robot:
 
     # ======================= WEEK 5 (Lessons 8-9): understanding words =======================
     def clean(self, text):
-        """Fix typos with your Lesson 8 fix_typos(). The word counts come from the words your robot knows:
-        count_bigrams(tokenize(" . ".join(the commands in Lesson 9's TRAIN))). Keep them in CACHE["counts"]."""
+        """Fix typos with your Lesson 8 fix_typos(). The word counts come from the words your robot knows,
+        the commands in Lesson 9's TRAIN (a list of (command, intent) pairs, so take just the command):
+            words = [command for command, intent in TRAIN]
+            CACHE["counts"] = count_bigrams(tokenize(" . ".join(words)))
+        Then return fix_typos(text, CACHE["counts"])."""
         # BEGIN ROBOT week=5 lessons=8
         from lesson08_words import tokenize, count_bigrams, fix_typos
         from lesson09_commands import TRAIN
         if "counts" not in CACHE:
-            words = [t for t, _ in TRAIN] + ["put the red and blue blocks away", "put all the blocks in the bin"]
+            words = [command for command, intent in TRAIN]
             CACHE["counts"] = count_bigrams(tokenize(" . ".join(words)))
         return fix_typos(text, CACHE["counts"])
         # END ROBOT
@@ -155,7 +168,8 @@ class Robot:
           put  -> if already binned: "The red block is already in the bin."
                   goto the object, then goto find_bin(ROOM) (stop early with the message if a goto fails),
                   then add it to self.binned, set self.objects[it] to the bin's position,
-                  and return "The red block is in the bin." """
+                  and return "The red block is in the bin."
+          anything else -> raise ValueError(f"I don't know how to {intent!r}") """
         # BEGIN ROBOT week=5 lessons=9
         intent, obj = action["intent"], action["object"]
         if intent == "stop":
@@ -164,6 +178,8 @@ class Robot:
             return f"The {obj} is in the bin." if obj in self.binned else f"The {obj} is at {self.objects[obj]}."
         if intent == "go":
             return self.goto(self.objects[obj]) or f"I'm next to the {obj}."
+        if intent != "put":
+            raise ValueError(f"I don't know how to {intent!r}")
         if obj in self.binned:
             return f"The {obj} is already in the bin."
         msg = self.goto(self.objects[obj]) or self.goto(find_bin(ROOM))
@@ -205,12 +221,17 @@ class Robot:
     # ======================= WEEK 8 (Lesson 16): how fast does it think? =======================
     def think_time(self, text):
         """How long does understanding text take? Time self.understand(text) 5 times with your Lesson 16 time_it(),
-        then summarize(). Return f"(I thought for {p50 in ms:.2f} ms, so I'd roll {distance in mm:.2f} mm meanwhile.)"
-        using thinking_distance(p50 seconds), which gives metres."""
+        then summary = summarize(...). Return f"(I thought for {p50 in ms:.2f} ms, so I'd roll {distance in mm:.2f} mm meanwhile.)"
+        using thinking_distance(p50 seconds), which gives metres.
+        Then the budget: if NOT fits_budget(summary, 0.2), add " Too slow! I'd hit the cat before deciding to stop." """
         # BEGIN ROBOT week=8 lessons=16
-        from lesson16_speed import time_it, summarize, thinking_distance
-        p50 = summarize(time_it(lambda: self.understand(text), 5))["p50"]
-        return f"(I thought for {p50 * 1000:.2f} ms, so I'd roll {thinking_distance(p50) * 1000:.2f} mm meanwhile.)"
+        from lesson16_speed import time_it, summarize, thinking_distance, fits_budget
+        summary = summarize(time_it(lambda: self.understand(text), 5))
+        p50 = summary["p50"]
+        msg = f"(I thought for {p50 * 1000:.2f} ms, so I'd roll {thinking_distance(p50) * 1000:.2f} mm meanwhile.)"
+        if not fits_budget(summary, 0.2):
+            msg += " Too slow! I'd hit the cat before deciding to stop."
+        return msg
         # END ROBOT
 
     # ======================= WEEK 9 (Lesson 17): learning from a teacher =======================
@@ -275,10 +296,33 @@ class Robot:
         return best_route(CACHE["taste"], ROOM, routes) if routes else self.route(target)
         # END ROBOT
 
+    # ======================= WEEK 12 BOSS (Lesson 14): use what your robot can SEE =======================
+    def see_and_plan(self, text):
+        """The two exam tasks every small brain fails need the robot to look at the room, not just read words.
+        Your robot KNOWS where every block is (self.objects) and where the bin is. Return a plan for:
+          "...closest to the bin..."         -> put away the unbinned block nearest the bin (Lesson 1's manhattan())
+          "...room..." / "...everything..." / "...all..."  (but NOT if the text says "except" or "but")
+                                             -> put away every unbinned block, red then blue then green
+        A plan is a list of actions like [{"intent": "put", "object": "blue block"}].
+        For anything else return None, and your language brain handles it as usual."""
+        # BEGIN ROBOT week=12 lessons=14
+        from lesson01_moving import manhattan
+        words = text.lower().split()
+        left = [b for b in ("red block", "blue block", "green block") if b not in self.binned]
+        if "closest" in words and left:
+            nearest = min(left, key=lambda b: manhattan(self.objects[b], find_bin(ROOM)))
+            return [{"intent": "put", "object": nearest}]
+        if any(w in words for w in ("room", "everything", "all")) and not any(w in words for w in ("except", "but")):
+            return [{"intent": "put", "object": b} for b in left]
+        return None
+        # END ROBOT
+
     # ======================= PROVIDED: the glue that joins your pieces =======================
     def step(self, square):
         """Move one square. Returns "moved", "stopped" (it saw the cat in time) or "bump"."""
         if square == CAT:
+            if self.slow:
+                return "late"               # 'slowbrain on': it was still thinking when it reached the cat
             if built(self.should_stop_for) and self.should_stop_for(square):
                 self.blocked.add(square)
                 return "stopped"
@@ -290,8 +334,11 @@ class Robot:
 
     def step_message(self, result, square):
         if result == "bump":
-            return "BUMP! I walked into the cat. (I can't sense things that aren't on the map: add week 3.)"
-        return f"Something is in the way at {square}! I stopped just in time."
+            return "BUMP! I walked into the cat. (It's not on my map, so I can't sense it yet: add week 3.)"
+        if result == "late":
+            return "BUMP! My slow brain was still thinking when I reached the cat. (Type 'slowbrain off'.)"
+        why = f" (stop chance {self.last_stop[0]:.2f}, my safe threshold {self.last_stop[1]:.2f})" if self.last_stop else ""
+        return f"Something is in the way at {square}! I stopped just in time{why}."
 
     def plan_route(self, target):
         if built(self.nicest_route) and not self.blocked:
@@ -310,6 +357,12 @@ class Robot:
         return CACHE["brain"]
 
     def understand(self, text):
+        if self.slow:
+            time.sleep(0.5)                     # 'slowbrain on': pretend to be a huge brain far away
+        if built(self.see_and_plan):
+            plan = self.see_and_plan(text)
+            if plan:
+                return plan
         if built(self.understand_plans):
             return self.understand_plans(text)
         return self.understand_words(text)
@@ -334,7 +387,12 @@ class Robot:
         self.last_path = [self.pos]
         try:
             if t and set(t.upper()) <= set("NSEW"):
-                return self.arrows(t)
+                return self.arrows(t.upper())
+            if low in ("slowbrain on", "slowbrain off"):
+                self.slow = low.endswith("on")
+                return "Pretending to be a very slow brain (half a second per thought)." if self.slow else "Normal brain again."
+            if low.startswith("json:"):
+                return self.run_plan([json.loads(t[5:])])  # pretend an AI sent this exact answer (Lesson 10)
             if low == "look":
                 return self.look()
             if low.startswith("goto "):
@@ -360,21 +418,33 @@ class Robot:
                 self.say(self.think_time(t))
             if isinstance(plan, str):
                 return plan
-            replies = []
-            for action in plan:
-                if built(self.is_safe):
-                    ok, reason = self.is_safe(action)
-                    if not ok:
-                        replies.append(f"Sorry, I won't do that: {reason}.")
-                        break
-                elif not action or action.get("intent") not in ("put", "go", "find", "stop") or (
-                        action.get("intent") != "stop" and action.get("object") not in self.objects):
-                    replies.append(f"Uh oh, I don't know what to do with {action}. (No safety check yet: add week 7.)")
-                    break
-                replies.append(self.do(action))
-            return " ".join(r for r in replies if r)
+            return self.run_plan(plan)
         except NotImplementedError as e:
             return f"I can't do that yet: {e}"
+        except Exception as e:
+            where = traceback.extract_tb(e.__traceback__)[-1]
+            return (f"Oops, my code broke: {type(e).__name__}: {e} (in {where.name}(), line {where.lineno} of "
+                    f"{Path(where.filename).name}). Read the hint again, fix it, and try again.")
+
+    def run_plan(self, plan):
+        """Check each action (if you've built week 7's is_safe), then do it. Without a safety check, a bad
+        action reaches do() as it is, and do() may crash on it."""
+        replies = []
+        for action in plan:
+            if built(self.is_safe):
+                ok, reason = self.is_safe(action)
+                if not ok:
+                    replies.append(f"Sorry, I won't do that: {reason}.")
+                    break
+                replies.append(self.do(action))
+                continue
+            try:
+                replies.append(self.do(action))
+            except (KeyError, TypeError, ValueError) as e:
+                replies.append(f"Uh oh! I tried to do {action} and crashed ({type(e).__name__}: {e}). Your code is fine: "
+                               "it's a bad action. Week 7's safety check will stop bad actions before they reach do().")
+                break
+        return " ".join(r for r in replies if r)
 
 
 # ======================= PROVIDED: what's built, the typing loop, the showcase =======================
@@ -384,7 +454,8 @@ PIECES = [("arrows", 1, "1", "moves with arrows (EESS)"), ("look", 2, "2-3", "lo
           ("understand_plans", 6, "15", "writes whole plans and asks when you're vague"), ("is_safe", 7, "10", "checks every action first"),
           ("think_time", 8, "16", "knows how long it thinks"), ("teacher_brain", 9, "17", "has a teacher-trained brain"),
           ("ask_claude", 10, "18", "can ask Claude: 'claude: tidy up the room' (needs a key)"), ("exam", 11, "19", "sits the exam: 'exam'"),
-          ("nicest_route", 12, "12", "picks the routes people like")]
+          ("nicest_route", 12, "12", "picks the routes people like"),
+          ("see_and_plan", 12, "14", "the boss: uses what it SEES ('tidy up the room', 'the block closest to the bin')")]
 
 
 def built(method):
@@ -394,23 +465,30 @@ def built(method):
 
 def banner(robot):
     done = [p for p in PIECES if built(getattr(robot, p[0]))]
+    try:
+        from lesson00_hello import introduce
+        print("\n" + introduce(NAME))
+    except NotImplementedError:
+        pass
     print(f"\n=== {NAME}: built up to week {max([p[1] for p in done] or [0])} ===")
     for name, week, lessons, what in PIECES:
-        print(f"  {'✓' if built(getattr(robot, name)) else '·'} week {week:>2} (lesson {lessons:>4}): {what}")
-    todo = [p for p in PIECES if not built(getattr(robot, p[0]))]
+        print(f"  {'✓' if built(getattr(robot, name)) else '·'} week {week:>2}: {what}")
+    todo = [p for p in PIECES if not built(getattr(robot, p[0])) and p[0] != "ask_claude"]   # Claude is optional
     if todo:
-        print(f"  Next gap to fill: week {todo[0][1]}, the {todo[0][0]}() method in my_robot.py.")
+        print(f"  Next gap to fill: week {todo[0][1]}, the {todo[0][0]}() method in my_robot.py (see 'Add it to your robot' on the week {todo[0][1]} page).")
     try:
         from lesson11_robohelper import evaluate
-        print(f"  Your capstone RoboHelper (Lesson 11) passes {evaluate()[0]:.0%} of its final test.")
+        print(f"  Your week-7 capstone (RoboHelper, its simpler twin) passes {evaluate()[0]:.0%} of its final test.")
     except NotImplementedError:
         pass
 
 
 def showcase():
     print(f"\n*** {NAME}: THE SHOWCASE ***")
+    banner(Robot())
     for cmd in ["EEE", "look", "goto blue", "put teh green blok in the bin", "put the red and blue blocks away",
-                "put the block away", "put the purple block in the bin", "exam"]:
+                "put the block away", "where's the green one?", "tidy up the room", 'json: {"intent": "launch", "object": "red block"}',
+                "exam"]:
         r = Robot()
         print(f"\n> {cmd}")
         reply = r.command(cmd)
@@ -433,6 +511,8 @@ def showcase():
         passed, total = passed + (got == want), total + 1
         print(f"  {'✓' if got == want else '✗'} {cmd!r:40} binned: {got:30} wanted: {want}")
     print(f"\n{NAME} passed {passed} of {total} of your tests.")
+    built_count = sum(built(getattr(Robot, p[0])) for p in PIECES)
+    print(f"\n*** {NAME}: {built_count} of {len(PIECES)} pieces built, every one of them by you. ***")
 
 
 if __name__ == "__main__":

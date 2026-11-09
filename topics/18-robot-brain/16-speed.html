@@ -3,21 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 16 · How fast is a brain?</title>
+<title>Week 8 · How fast is a brain?</title>
 <link rel="stylesheet" href="../../style.css">
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 8 · Lesson 16</nav>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 8 of 12</nav>
 
-<div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 8 · Lesson 16</div>
+<div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 8 of 12</div>
 <h1>How fast is a brain? Latency, tokens and cost</h1>
-<p class="lede">The robot works. Weeks 8–11 ask: how fast is its brain, how much does it cost, and which brain is best? You've built three kinds of brain for Robo-Helper, and in week 10 it gets a world-class one over the internet. Before you trust any of them, you need two numbers you can't see by reading the code: how long it takes to answer, and what each answer costs. This lesson is the start of inference engineering (inference means a brain answering, not learning): measuring brains like an engineer, not like a fan.</p>
-<div class="card note" id="journey"><strong>Step 14 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot. <strong>Today</strong> it learns to measure how long each brain thinks, and how far it rolls meanwhile. Next: <a href="17-faster.html">Week 9 · Faster and cheaper</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try any sentence: it tells you how long it thought.</div>
+<p class="lede">The robot works. Weeks 8–11 ask: how fast is its brain, how much does it cost, and which brain is best? You've built two kinds of brain for Robo-Helper (three if you did the attention stretch), and in week 10 it gets a world-class one over the internet. Before you trust any of them, you need two numbers you can't see by reading the code: how long it takes to answer, and what each answer costs. This lesson is the start of inference engineering (inference means a brain answering, not learning): measuring brains like an engineer, not like a fan.</p>
+<div class="card note" id="journey"><strong>Week 8 of 12.</strong> So far your robot: ✓ says hello ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot. <strong>Today</strong> it learns to measure how long each brain thinks, and how far it rolls meanwhile. Next: <a href="17-faster.html">Week 9 · Part A: Faster and cheaper</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try any sentence: it tells you how long it thought. Then type <code>slowbrain on</code> and try <code>stop</code>, then <code>EEEE</code>: now it's too slow for the cat.</div>
 
 <div class="facts">
   <div><b>Time</b>2–3 hours</div>
-  <div><b>You'll need</b>Python 3, your finished Lessons 9 and 15, a 30 cm ruler, a friend, paper and a pencil</div>
+  <div><b>You'll need</b>Python 3, your finished week 5 and week 6 files, a 30 cm ruler, a friend, paper and a pencil</div>
   <div><b>New words</b>inference, latency, median (p50), percentile, p95, tail, mean, TTFT, streaming, throughput, token, latency budget</div>
   <div><b>Project piece</b>A stopwatch and a price tag for every brain</div>
 </div>
@@ -56,11 +56,11 @@
 <h2 id="problem">1. The problem</h2>
 <p>By now Robo-Helper can have several different brains:</p>
 <ul>
-<li><strong>words</strong>: Lesson 9's word counter. It counts words and picks the intent with the best score.</li>
-<li><strong>tinylm</strong>: Lesson 15's tiny language model. About 2,700 numbers, writes its plan word by word.</li>
-<li><strong>attention</strong> (optional: only if you did the Lesson 15 stretch): the same model with attention. It works out which words to look at again for every word it writes.</li>
-<li><strong>tinylm-4bit</strong>: you build this next week, in Lesson 17. Until then its row is skipped. It's the attention model, taught extra phrasings and then squeezed to 4-bit numbers.</li>
-<li><strong>a world-class model over the internet</strong> (Claude), coming in week 10 (Lesson 18). Billions of numbers, on computers far away. It can plan a whole tidy-up, but your question has to travel there and the answer has to travel back.</li>
+<li><strong>words</strong>: your week 5 word counter. It counts words and picks the intent with the best score.</li>
+<li><strong>tinylm</strong>: your week 6 tiny language model. About 2,700 numbers, writes its plan word by word.</li>
+<li><strong>attention</strong> (optional: only if you did the <a href="15b-attention.html">week 6 attention stretch</a>): the same model with attention. It works out which words to look at again for every word it writes.</li>
+<li><strong>tinylm-4bit</strong>: you build this next week, in week 9. Until then its row is skipped. It's the attention model, taught extra phrasings and then squeezed to 4-bit numbers.</li>
+<li><strong>a world-class model over the internet</strong> (Claude), coming in week 10. Billions of numbers, on computers far away. It can plan a whole tidy-up, but your question has to travel there and the answer has to travel back.</li>
 </ul>
 <p>Which one should drive the robot? "The smartest" sounds right, until you remember the cat. You need to know how fast each one is. So let's measure.</p>
 <p><strong>Obvious idea 1: time it once.</strong> Start a stopwatch, ask, stop the stopwatch. But computers are busy doing many things at once. The first call is often slower (the program is still "warming up": loading things into memory). An internet answer might hit a slow moment on the network. One measurement is one roll of the dice.</p>
@@ -69,7 +69,7 @@
 <h2 id="principles">2. First principles</h2>
 
 <h3>Step 1: training versus inference</h3>
-<p>So far most of our lessons were about <strong>training</strong>: showing a model examples and nudging its numbers (Lessons 3, 4, 15). Training happens once, and it can be slow. Nobody minds if it takes all night.</p>
+<p>So far most of our lessons were about <strong>training</strong>: showing a model examples and nudging its numbers (weeks 2, 3 and 6). Training happens once, and it can be slow. Nobody minds if it takes all night.</p>
 <p><strong>Inference</strong> is the other half: the trained model, sitting still, being <em>used</em>. Every time someone says "put the red block in the bin", the brain runs inference once. A robot (or a chatbot with millions of users) runs inference again and again, forever. So most of the money and most of the waiting in AI is spent on inference, not training. <strong>Inference engineering</strong> is the job of making it fast, cheap and reliable. That's this lesson and the next.</p>
 
 <h3>Step 2: a precise stopwatch</h3>
@@ -115,15 +115,15 @@ p95: ceil(0.95 × 10) − 1 = 10 − 1 = 9    → sorted[9] = 4.8 s</code></pre>
 </details>
 <p>Real robots are built in <strong>layers</strong>, fast at the bottom and smart at the top:</p>
 <ul>
-<li><strong>Reflexes</strong> (microseconds to milliseconds): a bumper switch, the "stop" word, the stop-neuron from Lesson 4. Always on the robot. Never skipped.</li>
+<li><strong>Reflexes</strong> (microseconds to milliseconds): a bumper switch, the "stop" word, the stop-neuron from week 3. Always on the robot. Never skipped.</li>
 <li><strong>A small local brain</strong> (milliseconds): our word counter or tiny LM. Good enough for "go to the red block".</li>
-<li><strong>A big brain far away</strong> (seconds): plans the whole tidy-up, handles "the blue one, no wait, the green one". Its plan is checked (Lesson 10) and the reflexes still watch while it runs.</li>
+<li><strong>A big brain far away</strong> (seconds): plans the whole tidy-up, handles "the blue one, no wait, the green one". Its plan is checked (week 7) and the reflexes still watch while it runs.</li>
 </ul>
 <p>Self-driving cars and warehouse robots work like this: a fast controller keeps them safe many times a second, and a slower planner decides where to go. The big brain plans; the small brains react.</p>
 
 <h3>Step 7: tokens, streaming and TTFT</h3>
 <p>An LLM doesn't read letters or whole words. It reads and writes <strong>tokens</strong>: chunks of text from a fixed list it learned. Common short words are usually one token ("the", "red"); long or rare words get split into pieces. A rough rule for English is about 4 letters per token, so 100 words is roughly 130 tokens. (It's only a rule of thumb: every model has its own token list.)</p>
-<p>Lesson 15's tiny LM showed you the core loop: predict the next word, add it, repeat. A big LLM does exactly that, one token at a time. So instead of waiting for the whole answer, the server can <strong>stream</strong> it: send each token the moment it's written. That splits the waiting into two parts:</p>
+<p>Your week 6 tiny LM showed you the core loop: predict the next word, add it, repeat. A big LLM does exactly that, one token at a time. So instead of waiting for the whole answer, the server can <strong>stream</strong> it: send each token the moment it's written. That splits the waiting into two parts:</p>
 <pre><code>ask ──────────── first token ── token ── token ── … ── last token
     |←── TTFT ──→|←────────── the rest of the answer ──────────→|
     |←──────────────────────── total time ─────────────────────→|</code></pre>
@@ -147,20 +147,23 @@ one command, 1,000 tokens in and 200 out:
   total                   = $0.008       (less than a penny)
 
 1,000 commands a day      = $8 a day</code></pre>
-<p>Two surprises. First: why 1,000 tokens in, for an 8-word command? Because every request also sends the instructions ("you are a robot, here are your tools, here are the rules") and a description of the room. That gets re-sent <em>every single time</em>. Second: output costs 5× more than input, so a chatty answer costs more than a long question. Lesson 17 attacks both.</p>
+<p>Two surprises. First: why 1,000 tokens in, for an 8-word command? Because every request also sends the instructions ("you are a robot, here are your tools, here are the rules") and a description of the room. That gets re-sent <em>every single time</em>. Second: output costs 5× more than input, so a chatty answer costs more than a long question. Week 9 attacks both.</p>
 <details><summary>Predict first: a million tokens in and nothing out. How much?</summary>
 <p>$4. That's what "per million" means. A million tokens is roughly 750,000 words: about ten long novels.</p>
 </details>
 
 <h3>Step 9: the real numbers, on our computer</h3>
-<p>Running <code>lesson16_speed.py</code> times each local brain 200 times on "put the red block in the bin":</p>
+<p>Running <code>lesson16_speed.py</code> times each local brain 200 times on "put the red block in the bin". One run on our computer, for the two brains you have built by week 8:</p>
 <pre><code>words (Lesson 9)                p50 0.012 ms   p95 0.013 ms   robot travels 0.01 mm while thinking
-tinylm (Lesson 15)              p50 0.269 ms   p95 0.317 ms   robot travels 0.32 mm while thinking
-attention (Lesson 15 stretch)   p50 0.323 ms   p95 0.384 ms   robot travels 0.38 mm while thinking
+tinylm (Lesson 15)              p50 0.269 ms   p95 0.317 ms   robot travels 0.32 mm while thinking</code></pre>
+<p>The tiny LM is about 25× slower than the word counter, because it does thousands of multiplications instead of a few dozen look-ups. But both are hundreds of times inside the 0.2 s budget. Notice how close p50 and p95 are: a small program on your own computer is very <em>consistent</em>. Internet brains have a much longer tail, because there are many more places to get stuck (your Wi-Fi, the internet, the queue at the server, how long the model decides to think).</p>
+<details><summary>Later rows (only if you did the attention stretch, or after week 9)</summary>
+<p>You haven't built these brains yet, so your own run skips them. The same run on our computer, with every brain built:</p>
+<pre><code>attention (Lesson 15 stretch)   p50 0.323 ms   p95 0.384 ms   robot travels 0.38 mm while thinking
 tinylm-4bit (Lesson 17)         p50 0.362 ms   p95 0.372 ms   robot travels 0.37 mm while thinking</code></pre>
-<p>The tiny LM is about 25× slower than the word counter, because it does thousands of multiplications instead of a few dozen look-ups. Attention is a little slower again, because it works out a fresh set of weights for every word it writes. But all of them are hundreds of times inside the 0.2 s budget. Notice how close p50 and p95 are: a small program on your own computer is very <em>consistent</em>. Internet brains have a much longer tail, because there are many more places to get stuck (your Wi-Fi, the internet, the queue at the server, how long the model decides to think).</p>
-<p>One surprise: the 4-bit brain is no faster than the attention model it came from (in this run it was even a little slower, which is just noise). In our Python, Lesson 17's 4-bit copy still keeps its rounded numbers as ordinary decimals, so it does exactly the same sums. It's 8× smaller to store, but speed only comes when the computer does the maths with small whole numbers, which needs special hardware or libraries. Measure; don't assume.</p>
-<p>When real recorded runs of Claude as the planner and the agent are added, their p50, p95, travel distance and cost for 12 commands go here.</p>
+<p>Attention is a little slower than the tiny LM, because it works out a fresh set of weights for every word it writes. And a surprise: the 4-bit brain is no faster than the attention model it came from (in this run it was even a little slower, which is just noise). In our Python, week 9's 4-bit copy still keeps its rounded numbers as ordinary decimals, so it does exactly the same sums. It's 8× smaller to store, but speed only comes when the computer does the maths with small whole numbers, which needs special hardware or libraries. Measure; don't assume.</p>
+</details>
+<p>Claude's rows appear here after a grown-up records them with an API key (see <a href="18-world-class.html">week 10</a>).</p>
 <!-- CLAUDE-RESULTS -->
 <p>Until then, the demo below lets you try values for the internet brain and see what they would mean. They are not measurements.</p>
 
@@ -196,7 +199,7 @@ tinylm-4bit (Lesson 17)         p50 0.362 ms   p95 0.372 ms   robot travels 0.37
 </div>
 
 <h2 id="homework">4. Homework</h2>
-<p>Open <code>homework/lesson16_speed.py</code>. It needs your finished Lesson 9 (the word counter) and Lesson 15 (the tiny LM), because the bottom of the file times them. It also times the attention stretch and Lesson 17's 4-bit brain. Until you've built those, it skips their rows. Already written for you: <code>measure_stream</code>, which times a real streamed answer from Claude (only used if you have an API key), and <code>load_recorded_seconds</code>, which reads recorded real runs. Write these seven functions, in order.</p>
+<p>Open <code>homework/lesson16_speed.py</code>. It needs your finished week 5 word counter and week 6 tiny LM, because the bottom of the file times them. It also times the attention stretch and week 9's 4-bit brain, but skips their rows until you've built them. Already written for you: <code>measure_stream</code>, which times a real streamed answer from Claude (only used if you have an API key), and <code>load_recorded_seconds</code>, which reads recorded runs of Claude once a grown-up has made them (week 10). Write these seven functions, in order.</p>
 
 <h3>4.1 <code>time_it(fn, repeats=20)</code></h3>
 <p>Call <code>fn()</code> <code>repeats</code> times, timing each call on its own. Return the list of times in seconds. Example: <code>time_it(lambda: sum(range(1000)), 5)</code> → a list of 5 small numbers, like <code>[2.1e-05, 1.4e-05, 1.3e-05, 1.3e-05, 1.3e-05]</code> (yours will differ; notice the first one is often the slowest).</p>
@@ -237,19 +240,20 @@ tinylm-4bit (Lesson 17)         p50 0.362 ms   p95 0.372 ms   robot travels 0.37
 <h3>Run it</h3>
 <pre><code>cd homework
 python3 lesson16_speed.py</code></pre>
-<p>What you should see (this is the real output of the reference solution; your milliseconds will be different, because your computer is different):</p>
+<p>What you should see at week 8 (real output of the reference solution, with weeks 1 to 8 done and no stretch):</p>
 <pre><code>Timing each brain's THINKING on 'put the red block in the bin' (200 runs)
 
 brain                                 p50        p95  robot travels while thinking
-words (Lesson 9)                  0.012ms    0.013ms  0.01 mm
-tinylm (Lesson 15)                0.269ms    0.317ms  0.32 mm
-attention (Lesson 15 stretch)     0.323ms    0.384ms  0.38 mm
-tinylm-4bit (Lesson 17)           0.362ms    0.372ms  0.37 mm
+(attention: not built yet: it comes with the week 6 stretch or week 9)
+(tinylm-4bit: not built yet: it comes with the week 6 stretch or week 9)
+words (Lesson 9)                  0.006ms    0.008ms  0.01 mm
+tinylm (Lesson 15)                0.141ms    0.150ms  0.15 mm
 planner (Claude)              no recordings yet (see brains.py record)
 agent (Claude)                no recordings yet (see brains.py record)
 
 Budget: the robot must react to a 'stop!' within 0.2 s.
 Which brains could you trust with that? Which could still plan a whole tidy-up?</code></pre>
+<p>Your milliseconds will be different, because your computer is different. Even our own runs differ: this one was about twice as fast as the one in Step 9 (tinylm 0.141 ms here, 0.269 ms there). That's why we time things many times, and why you should compare brains in the <em>same</em> run. The "not built yet" lines are for brains you haven't made (the stretch and week 9). The Claude lines say "no recordings yet" until a grown-up records real runs with an API key (week 10).</p>
 <p>Answer those last two questions in a comment at the bottom of your file. (Hint: Step 6.)</p>
 
 <h3>Check it</h3>
@@ -265,20 +269,53 @@ python3 check.py 16</code></pre>
 <h3>Stretch</h3>
 <ul>
 <li>Time the word counter with <code>repeats=5</code> and print every timing. Is the first one slower? Now time it 2,000 times and compare the p95 with 200 times. Which do you trust more?</li>
-<li>Time the tiny LM on a long command (repeat "the red block" 20 times in one sentence). Does latency grow with the length of the command? Why? (Look at <code>read</code> in Lesson 15.)</li>
+<li>Time the tiny LM on a long command (repeat "the red block" 20 times in one sentence). Does latency grow with the length of the command? Why? (Look at <code>read</code> in your week 6 file.)</li>
 <li>Add a <code>p99</code> to <code>summarize</code>. With 20 timings, what position is it? Is that a sensible thing to report?</li>
 <li>If you have an API key: call <code>measure_stream</code> 10 times and print TTFT, total, and <code>tokens_per_second</code>. Then <code>summarize</code> the totals.</li>
 </ul>
 
 <h2 id="add-to-robot">Add it to your robot</h2>
-<p>Fill in <code>think_time(self, text)</code>: time how long <code>self.understand(text)</code> takes with your <code>time_it()</code> and <code>summarize()</code>, and how far the robot rolls meanwhile with <code>thinking_distance()</code>.</p>
-<details><summary>Hint 1</summary><p><code>p50 = summarize(time_it(lambda: self.understand(text), 5))["p50"]</code> (that's seconds).</p></details>
-<details><summary>Hint 2</summary><p>Multiply by 1000 for milliseconds; <code>thinking_distance(p50)</code> gives metres, so multiply that by 1000 for millimetres too.</p></details>
-<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 8: think_time"</em>.</p>
+<p>Fill in <code>think_time(self, text)</code>: time how long <code>self.understand(text)</code> takes with your <code>time_it()</code> and <code>summarize()</code>, say how far the robot rolls meanwhile with <code>thinking_distance()</code>, and check the 0.2 s budget with <code>fits_budget()</code>. The docstring is the spec:</p>
+<pre><code>summary = summarize(time_it(lambda: self.understand(text), 5))
+return f"(I thought for {p50 in ms:.2f} ms, so I'd roll {distance in mm:.2f} mm meanwhile.)"
+   using thinking_distance(p50 seconds), which gives metres
+if NOT fits_budget(summary, 0.2), add " Too slow! I'd hit the cat before deciding to stop."</code></pre>
+<p>The provided <code>command()</code> prints your message before every reply that needs thinking.</p>
+<div class="card note"><strong>New Python this time: <code>lambda</code>, and <code>:.2f</code>.</strong> <code>time_it</code> wants a function it can call with no inputs. <code>lambda: ...</code> makes one on the spot, without a <code>def</code>. And <code>:.2f</code> inside an f-string shows a number with exactly 2 decimals:
+<pre><code>ask = lambda: 2 + 3        # a tiny function; ask() gives 5
+print(f"{0.123456:.2f}")    # 0.12</code></pre></div>
+<details><summary>Hint 1</summary><p>Start the method with this import (your week 8 file):</p>
+<pre><code>from lesson16_speed import time_it, summarize, thinking_distance, fits_budget</code></pre>
+<p>Then time it: <code>summary = summarize(time_it(lambda: self.understand(text), 5))</code>. <code>summary["p50"]</code> is in seconds.</p></details>
+<details><summary>Hint 2</summary><p>Multiply <code>p50</code> by 1000 for milliseconds. <code>thinking_distance(p50)</code> gives metres, so multiply that by 1000 for millimetres too. Build the message, then, only if <code>not fits_budget(summary, 0.2)</code>, add the "Too slow!" sentence to the end with <code>msg += ...</code>.</p></details>
+<details><summary>Hint 3</summary><p>Fill in the blanks:</p>
+<pre><code>from lesson16_speed import time_it, summarize, thinking_distance, fits_budget
+summary = summarize(time_it(lambda: self.understand(text), 5))
+p50 = summary[____]
+msg = f"(I thought for {p50 * 1000:.2f} ms, so I'd roll {thinking_distance(____) * 1000:.2f} mm meanwhile.)"
+if not fits_budget(summary, ____):
+    msg += " Too slow! I'd hit the cat before deciding to stop."
+return msg</code></pre></details>
+<p>Check it: <code>cd ..</code> back to <code>project</code>, then <code>python3 check.py robot</code>. Your new check is <em>"week 8: think_time"</em>.</p>
 <p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
 <pre><code>Zippy&gt; put the red block in the bin
-  (I thought for 0.24 ms, so I'd roll 0.24 mm meanwhile.)
-  ...</code></pre>
+  (Training my language brain. About 10-20 seconds, once...)
+  (I thought for 0.21 ms, so I'd roll 0.21 mm meanwhile.)
+  The red block is in the bin.</code></pre>
+<p>A fifth of a millisecond: your brains are fast. So what would a slow one do? Your robot has a provided switch, <code>slowbrain on</code>, that pretends its brain is far away on the internet: every thought takes an extra half second. Real output:</p>
+<pre><code>Zippy&gt; slowbrain on
+  Pretending to be a very slow brain (half a second per thought).
+Zippy&gt; stop
+  (I thought for 504.37 ms, so I'd roll 504.37 mm meanwhile.) Too slow! I'd hit the cat before deciding to stop.
+  Stopping.
+Zippy&gt; EEEE
+  BUMP! My slow brain was still thinking when I reached the cat. (Type 'slowbrain off'.)
+Zippy&gt; slowbrain off
+  Normal brain again.
+Zippy&gt; stop
+  (I thought for 0.18 ms, so I'd roll 0.18 mm meanwhile.)
+  Stopping.</code></pre>
+<p>Same command, same right answer. But the slow brain took half a second to say "stop", and at 1 m/s the robot rolled half a metre first: your <code>fits_budget</code> says that's over the 0.2 s budget. <code>EEEE</code> shows what that means: the slow brain was still thinking when the robot reached the cat, so it bumped right into it, even though your week 3 stop check works. That's why the stop reflex has to live on the robot (Step 6). (Your milliseconds will differ a little; the slow one will always be just over 500.)</p>
 
 <h2 id="challenge">5. Real-world challenge: measure your own brain's latency</h2>
 <p>You are a brain too. Let's find your p50 and p95, and see if you fit the 0.2 s stop budget.</p>
@@ -294,15 +331,16 @@ time:       0.10 s 0.14 s  0.18 s  0.20 s  0.23 s  0.25 s</code></pre></li>
 <li>Now do 20 more while <strong>distracted</strong>: your friend asks you maths questions, or you count backwards from 100 in sevens. Work out p50 and p95 again.</li>
 </ol>
 <p><strong>Part B: time to first token.</strong> Ask a friend "name ten animals" and use a phone stopwatch with laps. Press lap at the first animal and at the last. TTFT = time to the first animal. Throughput = 9 ÷ (total − TTFT) animals per second. Try a harder question ("name ten countries in Africa"). Which grows more: TTFT or total?</p>
+<p><strong>On your own (no friend needed):</strong> you can't drop a ruler on yourself without seeing it coming, so use a phone stopwatch instead. Start it, and try to stop it at exactly 1.00 s without looking at the screen. Do it 20 times and write down how far off you were each time (1.13 s is 0.13 s off). Sort the 20 "off by" numbers and find p50, p95 and the mean, then do 20 more while counting backwards from 100 in sevens. For Part B, time yourself naming ten animals out loud, pressing lap at the first and the last.</p>
 <p><strong>What to record:</strong> both sets of 20 times sorted, p50, p95 and mean for each, and the animal timings.</p>
 <p><strong>What it should teach you:</strong> distraction barely moves your p50 but stretches your tail, just like a busy computer or a busy server. Your p95 is probably close to the 0.2 s budget, and that's with a <em>local</em> brain (yours) and no internet. Harder questions mostly add to the "thinking before the first word" time, just like an LLM that thinks before it writes.</p>
 
 <h2 id="project">6. Your Robo-Helper so far</h2>
 <div class="card note">
-<p><strong>What this adds to your robot.</strong> Before this lesson, nobody knew how long the robot's brain took, so nobody knew if it could stop in time. Now you know. Row 16 of <code>python3 progress.py --solutions</code> measured: <em>"tiny LM p95 0.3 ms = 0.3 mm rolled while thinking"</em> on "put the red and blue blocks away". It thinks in 0.3 thousandths of a second, so it rolls less than half a millimetre while thinking. The robot must start stopping within 0.2 seconds, so that's plenty fast. (Your number will differ: it depends on your computer and how busy it is.)</p>
+<p><strong>What this adds to your robot.</strong> Before this lesson, nobody knew how long the robot's brain took, so nobody knew if it could stop in time. Now you know. On our computer, the tiny LM's p95 on "put the red and blue blocks away" was 0.3 ms, so it rolls 0.3 mm while thinking. It thinks in 0.3 thousandths of a second, so it rolls less than half a millimetre while thinking. The robot must start stopping within 0.2 seconds, so that's plenty fast. (Your number will differ: it depends on your computer and how busy it is.)</p>
 </div>
 <p>Robo-Helper now has a <strong>stopwatch and a price tag</strong>. <code>time_it</code> and <code>summarize</code> give any brain a p50 and p95; <code>thinking_distance</code> turns that into metres; <code>fits_budget</code> says yes or no for a safety budget; <code>cost_usd</code> says what each answer costs.</p>
-<p>These get used for real later. In <a href="19-bakeoff.html">Lesson 19</a>, the bake-off runs every brain on the same 12 tasks, and its <code>scorecard()</code> function calls your <code>summarize()</code> and <code>cost_usd()</code> to report each brain's p50, p95 and total cost side by side. Before that, <a href="17-faster.html">Lesson 17</a> uses this lesson's way of thinking to make the brains cheaper and faster, and <a href="18-world-class.html">Lesson 18</a> puts a world-class brain in charge of planning while the fast local layers keep watch.</p>
+<p>These get used for real later. In <a href="19-bakeoff.html">week 11</a>, the bake-off runs every brain on the same 12 tasks, and its <code>scorecard()</code> function calls your <code>summarize()</code> and <code>cost_usd()</code> to report each brain's p50, p95 and total cost side by side. Before that, <a href="17-faster.html">week 9</a> uses this week's way of thinking to make the brains cheaper and faster, and <a href="18-world-class.html">week 10</a> puts a world-class brain in charge of planning while the fast local layers keep watch.</p>
 
 <h2 id="mistakes">7. Common mistakes</h2>
 <ul>
@@ -325,15 +363,15 @@ time:       0.10 s 0.14 s  0.18 s  0.20 s  0.23 s  0.25 s</code></pre></li>
 <li><a href="../09-inference-engineering/index.html">Inference engineering</a>: the grown-up version of this lesson, as 10 pages and 25 interview-style problems.</li>
 <li><a href="../09-inference-engineering/01-request-lifecycle.html#p1">What happens between a request arriving and the first token leaving</a>: everything hiding inside TTFT.</li>
 <li><a href="../09-inference-engineering/05-latency.html#p17">"Your p99 latency is 10× your p50. Diagnose it"</a>: where long tails come from, and how engineers hunt them down.</li>
-<li><a href="../04-distill-small-models.html#latency">Latency is a safety number</a>: why robots need small, fast models, and a preview of Lesson 17.</li>
+<li><a href="../04-distill-small-models.html#latency">Latency is a safety number</a>: why robots need small, fast models, and a preview of week 9.</li>
 <li><a href="../15-inference-engineering-companion.html#why-robotics">Inference engineering companion: why it matters for robotics</a>.</li>
 </ul>
 
 <nav class="pager">
   <a href="11-capstone.html"><small>Previous</small>Week 7 · Capstone: the whole robot</a>
-  <a class="next" href="17-faster.html"><small>Next</small>Week 9 · Faster and cheaper</a>
+  <a class="next" href="17-faster.html"><small>Next</small>Week 9 · Part A: Faster and cheaper</a>
 </nav>
-<footer>Build a Robot Brain · Week 8 · Lesson 16</footer>
+<footer>Build a Robot Brain · Week 8 of 12 (homework file: lesson16_speed.py)</footer>
 </main>
 
 <script>

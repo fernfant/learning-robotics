@@ -3,21 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 11 · Capstone: Robo-Helper</title>
+<title>Week 7 · Capstone: Robo-Helper</title>
 <link rel="stylesheet" href="../../style.css">
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 7 · Lesson 11</nav>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 7 of 12 · Part B</nav>
 
-<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 7 · Lesson 11</div>
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 7 of 12 · Part B</div>
 <h1>Capstone: Robo-Helper</h1>
 <p class="lede">This is the end of part 1: today the robot works! It's not the end of the course. Weeks 8–12 make its brain faster, smarter and better tested. Ten lessons of pieces: moving, sensing, braking, a stop-neuron, honest testing, route planning, a word model, a command reader and a safety layer. Today they click together into one robot that understands you, drives around a surprise, and tells you honestly how good it is.</p>
-<div class="card note" id="journey"><strong>Step 13 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers. <strong>Today</strong> it learns to work as one whole robot, tested end to end. Next: <a href="16-speed.html">Week 8 · How fast is a brain?</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> nothing new to add this week. Run <code>python3 my_robot.py</code>: the start screen now shows your capstone's test score.</div>
+<div class="card note" id="journey"><strong>Week 7 of 12 · Part B.</strong> So far your robot: ✓ says hello ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers. <strong>Today</strong> it learns to work as one whole robot, tested end to end. Next: <a href="16-speed.html">Week 8 · How fast is a brain?</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> no new gap in Part B. Run <code>python3 my_robot.py</code>: the start screen now shows your capstone's test score.</div>
+<div class="card note"><strong>Two robots? Yes, on purpose.</strong> This week you build <code>RoboHelper</code>, a <em>simpler twin</em> of your own robot. It only uses week 5's word counter (no typo fixer, no tiny LM), and it's written as one careful class so it can be tested, scored and raced fairly. Your <code>my_robot.py</code> is already smarter: the two commands RoboHelper fails today, "find the green block" and "make me a sandwich", your own robot gets right (try them!). The score on this page, 83%, belongs to the twin, not to your robot. Your robot sits its own exam in week 11.</div>
 
 <div class="facts">
   <div><b>Time</b>3–4 hours (plus the stretch)</div>
-  <div><b>You'll need</b>Python 3 and your finished Lessons 1–6, 8, 9 and 10</div>
+  <div><b>You'll need</b>Python 3, your finished files from weeks 1–5, and Part A of this week (<code>lesson10_llm_safety.py</code>)</div>
   <div><b>New words</b>system, integration, pipeline, test set, failure analysis, confidence</div>
   <div><b>Project piece</b>The full robot, tested</div>
 </div>
@@ -56,43 +57,43 @@
 <h2 id="principles">2. First principles</h2>
 <h3>Step 1: draw the pipeline</h3>
 <p>The top of your homework file has the whole plan in five lines. Each arrow is a hand-off between lessons:</p>
-<pre><code>command text --(L9 parser / L10 safety checks)--&gt; action
-action       --(L6 A* planner)--&gt;                  route
-route        --(L1 moving, L2 sensing, L4/L5 stop detector, L3 safe speed)--&gt; driving
-result       --(L5 evaluation habits)--&gt;           success rate on a test set</code></pre>
-<p>The trick to building a system is agreeing on the <strong>shape of each message</strong>. Lesson 9 outputs <code>{"intent": ..., "object": ...}</code>. Lesson 10 checks exactly that shape. Lesson 6 takes two <code>(x, y)</code> squares and returns a list of squares. Because every piece agreed on its inputs and outputs, you can snap them together.</p>
+<pre><code>command text --(week 5 parser / week 7 safety checks)--&gt; action
+action       --(week 4 A* planner)--&gt;                    route
+route        --(week 1 moving, week 2 sensing and safe speed, week 3 stop detector)--&gt; driving
+result       --(week 3 testing habits)--&gt;                success rate on a test set</code></pre>
+<p>The trick to building a system is agreeing on the <strong>shape of each message</strong>. Week 5's parser outputs <code>{"intent": ..., "object": ...}</code>. Part A's safety layer checks exactly that shape. Week 4's A* takes two <code>(x, y)</code> squares and returns a list of squares. Because every piece agreed on its inputs and outputs, you can snap them together.</p>
 
-<h3>Step 2: what each earlier lesson does inside Robo-Helper</h3>
+<h3>Step 2: what each earlier week does inside Robo-Helper</h3>
 <p>Open <code>lesson11_robohelper.py</code> and look at the imports and at <code>__init__</code>. Most of it is written for you. Here's every earlier piece, and exactly where it's used:</p>
 <div class="table-wrap"><table>
-<tr><th>Lesson</th><th>What's used</th><th>Where, and what for</th></tr>
+<tr><th>Week (file)</th><th>What's used</th><th>Where, and what for</th></tr>
 <tr><td>world.py</td><td><code>ROOM</code>, <code>OBJECTS</code>, <code>ROBOT_START</code>, <code>find_bin</code>, <code>render</code></td><td>The map, the three blocks, the start (1, 1), the bin's square (7, 6), and drawing the room.</td></tr>
-<tr><td>L1 Moving</td><td>directions as (dx, dy), <code>move</code>, <code>manhattan</code></td><td><code>drive_to</code> turns each step of the route back into "N/S/E/W" using L1's direction changes. <code>move</code> runs inside L2's sensor and L6's <code>neighbors</code>. <code>manhattan</code> is A*'s guess of the distance left.</td></tr>
-<tr><td>L2 Sensors</td><td><code>distance_to_wall</code></td><td>Before each step: how many free squares are ahead? Times <code>SQUARE</code> (0.5 m), plus one square, gives the free distance in metres.</td></tr>
-<tr><td>L3 Learning</td><td><code>STOP_DATA</code>, <code>fit_line</code>, <code>max_safe_speed</code></td><td>In <code>__init__</code>, <code>fit_line</code> learns the braking line (w ≈ 0.81, b ≈ 0.07). In <code>drive_to</code>, <code>max_safe_speed</code> picks the fastest speed that can still stop in the free distance.</td></tr>
-<tr><td>L4 Neuron</td><td><code>make_obstacle_data</code>, <code>train_neuron</code>, <code>should_stop</code></td><td><code>__init__</code> makes 450 examples and trains the stop-neuron. In <code>drive_to</code>, when a surprise is one square ahead, <code>should_stop</code> decides whether to brake.</td></tr>
-<tr><td>L5 Evaluation</td><td><code>safest_threshold</code></td><td>Picks the stop-neuron's threshold so it catches at least 97% of real obstacles. The trained robot gets 0.17, well below 0.5, because a missed stop is worse than a false alarm. (You'll use L5's habits again in <code>evaluate()</code>.)</td></tr>
-<tr><td>L6 Paths</td><td><code>astar_path</code></td><td><code>drive_to</code> plans with A*, passing <code>blocked=self.known_blocked</code> so the second plan avoids the cat.</td></tr>
-<tr><td>L7 Q-learning</td><td>nothing</td><td>A side quest. Robo-Helper has a map, so A* is the better tool here. Q-learning shines when there's no map.</td></tr>
-<tr><td>L8 Words</td><td><code>tokenize</code></td><td>Used inside L9 to split commands into words.</td></tr>
-<tr><td>L9 Commands</td><td><code>TRAIN</code>, <code>train_intent_model</code>, <code>parse_command</code></td><td><code>__init__</code> trains the word-counter. <code>self.parse(text)</code> turns words into an action.</td></tr>
-<tr><td>L10 Safety</td><td><code>validate_action</code></td><td>Your job, in <code>run_command</code>: every action is checked before the robot moves.</td></tr>
+<tr><td>Week 1 · Moving</td><td>directions as (dx, dy), <code>move</code>, <code>manhattan</code></td><td><code>drive_to</code> turns each step of the route back into "N/S/E/W" using week 1's direction changes. <code>move</code> runs inside week 2's sensor and week 4's <code>neighbors</code>. <code>manhattan</code> is A*'s guess of the distance left.</td></tr>
+<tr><td>Week 2 · Sensors</td><td><code>distance_to_wall</code></td><td>Before each step: how many free squares are ahead? Times <code>SQUARE</code> (0.5 m), plus one square, gives the free distance in metres.</td></tr>
+<tr><td>Week 2 · Learning from data</td><td><code>STOP_DATA</code>, <code>fit_line</code>, <code>max_safe_speed</code></td><td>In <code>__init__</code>, <code>fit_line</code> learns the braking line (w ≈ 0.81, b ≈ 0.07). In <code>drive_to</code>, <code>max_safe_speed</code> picks the fastest speed that can still stop in the free distance.</td></tr>
+<tr><td>Week 3 · Neuron</td><td><code>make_obstacle_data</code>, <code>train_neuron</code>, <code>should_stop</code></td><td><code>__init__</code> makes 450 examples and trains the stop-neuron. In <code>drive_to</code>, when a surprise is one square ahead, <code>should_stop</code> decides whether to brake.</td></tr>
+<tr><td>Week 3 · Honest testing</td><td><code>safest_threshold</code></td><td>Picks the stop-neuron's threshold so it catches at least 97% of real obstacles. The trained robot gets 0.17, well below 0.5, because a missed stop is worse than a false alarm. (You'll use week 3's testing habits again in <code>evaluate()</code>.)</td></tr>
+<tr><td>Week 4 · Paths</td><td><code>astar_path</code></td><td><code>drive_to</code> plans with A*, passing <code>blocked=self.known_blocked</code> so the second plan avoids the cat.</td></tr>
+<tr><td>Bonus · Q-learning</td><td>nothing</td><td>A side quest. Robo-Helper has a map, so A* is the better tool here. Q-learning shines when there's no map.</td></tr>
+<tr><td>Week 5 · Words</td><td><code>tokenize</code></td><td>Used inside the word counter to split commands into words.</td></tr>
+<tr><td>Week 5 · Commands</td><td><code>TRAIN</code>, <code>train_intent_model</code>, <code>parse_command</code></td><td><code>__init__</code> trains the word-counter. <code>self.parse(text)</code> turns words into an action.</td></tr>
+<tr><td>Week 7 · Safety (Part A)</td><td><code>validate_action</code></td><td>Your job, in <code>run_command</code>: every action is checked before the robot moves.</td></tr>
 </table></div>
-<p>So if Lesson 11 breaks, the bug might be in an earlier file. That's normal in real systems. <code>check.py 11</code> tells you if an earlier lesson isn't finished yet.</p>
+<p>So if your capstone breaks, the bug might be in an earlier file. That's normal in real systems. <code>check.py 11</code> tells you if an earlier lesson isn't finished yet.</p>
 
 <h3>Step 3: follow the cat by hand</h3>
-<p>Let's trace the drive to the blue block. A* (L6) plans the shortest route from (1, 1) to (6, 3), 7 steps:</p>
+<p>Let's trace the drive to the blue block. A* (week 4) plans the shortest route from (1, 1) to (6, 3), 7 steps:</p>
 <pre><code>(1,1) → (2,1) → (3,1) → (4,1) → (5,1) → (5,2) → (5,3) → (6,3)</code></pre>
 <p>The robot steps to (2, 1), then to (3, 1). The next square is (4, 1), and the cat is there. <code>drive_to</code> works out how fast it's going:</p>
 <pre><code>direction                  = E   (from (3,1) to (4,1): dx = +1)
-distance_to_wall((3,1),E)  = 5 free squares          (L2)
+distance_to_wall((3,1),E)  = 5 free squares          (week 2)
 free distance              = 5 × 0.5 + 0.5 = 3.0 m
 max_safe_speed: needs  0.81 × speed + 0.07 + 0.2 ≤ 3.0
                        speed ≤ 3.37, but the top speed tried is 3.00
-                → speed = 3.0 m/s                     (L3)</code></pre>
-<p>Now the stop-neuron (L4) sees something 0.5 m ahead, closing at 3.0 m/s. The trained weights are about −5.17 for distance and 4.92 for speed, with bias 5.33:</p>
+                → speed = 3.0 m/s                     (week 2)</code></pre>
+<p>Now the stop-neuron (week 3) sees something 0.5 m ahead, closing at 3.0 m/s. The trained weights are about −5.17 for distance and 4.92 for speed, with bias 5.33:</p>
 <pre><code>z = −5.17 × 0.5 + 4.92 × 3.0 + 5.33 = −2.58 + 14.77 + 5.33 = 17.52
-sigmoid(17.52) ≈ 1.00   ≥ 0.17 (L5's threshold)   → STOP</code></pre>
+sigmoid(17.52) ≈ 1.00   ≥ 0.17 (week 3's threshold)   → STOP</code></pre>
 <p>The robot logs <em>"Something is in the way at (4, 1)! Stopping and finding another route."</em>, adds (4, 1) to <code>known_blocked</code>, and asks A* again from where it is, (3, 1):</p>
 <pre><code>(3,1) → (2,1) → (2,2) → (2,3) → (2,4) → (3,4) → (4,4) → (4,3) → (5,3) → (6,3)</code></pre>
 <p>That's 9 more steps (it has to back up, because (3, 2) is a wall). Then from the block to the bin: (7,3) → (7,4) → (7,5) → (7,6), 4 steps. Total: 2 + 9 + 4 = 15 moves instead of 11. Slower, but nobody stepped on the cat.</p>
@@ -100,7 +101,7 @@ sigmoid(17.52) ≈ 1.00   ≥ 0.17 (L5's threshold)   → STOP</code></pre>
 <p>A* would plan the exact same route through (4, 1) again. The robot would stop again, plan again, stop again... <code>drive_to</code> has <code>max_replans=5</code> for this reason: after 5 tries it logs "Too many surprises, giving up." and returns <code>False</code>. Remembering what you've seen is what turns a stop into a <em>replan</em>.</p></details>
 
 <h3>Step 4: one demo is not a test</h3>
-<p>Lesson 5's big lesson was: test on many examples, including ones that should fail. <code>TEST_COMMANDS</code> has 12 commands, each with what a correct robot should do:</p>
+<p>Week 3's big lesson was: test on many examples, including ones that should fail. <code>TEST_COMMANDS</code> has 12 commands, each with what a correct robot should do:</p>
 <ul>
 <li><b>"ok"</b>: the command should succeed, and the bin must hold <em>exactly</em> the listed blocks: nothing missing, nothing extra. Binning the wrong block is a failure even if the right one went in too.</li>
 <li><b>"refuse"</b>: the command should be refused. "put the purple block in the bin", "make me a sandwich" and "go to the moon" are impossible. Refusing is the <em>correct, safe</em> behaviour, so a refusal counts as a pass.</li>
@@ -111,21 +112,21 @@ sigmoid(17.52) ≈ 1.00   ≥ 0.17 (L5's threshold)   → STOP</code></pre>
 <p>The finished robot scores <strong>83%</strong>, 10 out of 12. The two failures:</p>
 <pre><code>FAILED: ('find the green block', 'The green block is in the bin.')
 FAILED: ('make me a sandwich', 'Stopping.')</code></pre>
-<p>The first one is scary. Asked <em>where</em> the green block was, the robot <em>threw it in the bin</em>. Lesson 9's classifier scored "put" just above "find" (a gap of only 0.09), because "the green block" appears in lots of "put" examples. If the test had only checked "is the right block in the bin?", this would have passed. Checking that nothing <em>else</em> changed is what caught it.</p>
+<p>The first one is scary. Asked <em>where</em> the green block was, the robot <em>threw it in the bin</em>. Week 5's word counter scored "put" just above "find" (a gap of only 0.09), because "the green block" appears in lots of "put" examples. If the test had only checked "is the right block in the bin?", this would have passed. Checking that nothing <em>else</em> changed is what caught it.</p>
 <p>The second one:</p>
-<p>The robot was asked for a sandwich and decided it was a "stop" command. Why? Let's do Lesson 9's maths by hand. None of the four words "make me a sandwich" appear in the "stop" examples, and only "me" appears anywhere (twice, in "find"). For a word an intent has never seen, Lesson 9 gives it a probability of 1 ÷ (words in that intent + vocabulary size). The vocabulary has 52 words:</p>
+<p>The robot was asked for a sandwich and decided it was a "stop" command. Why? Let's do week 5's maths by hand. None of the four words "make me a sandwich" appear in the "stop" examples, and only "me" appears anywhere (twice, in "find"). For a word an intent has never seen, the word counter gives it a probability of 1 ÷ (words in that intent + vocabulary size). The vocabulary has 52 words:</p>
 <pre><code>"stop" has seen 15 words in total:   unseen word → 1 / (15 + 52) = 1/67
 "put"  has seen 61 words in total:   unseen word → 1 / (61 + 52) = 1/113</code></pre>
 <p>The "stop" examples are short, so "stop" has the fewest words, so it gives the <em>biggest</em> share to words it has never seen. Four strange words in a row, and "stop" wins. The real scores:</p>
 <pre><code>stop  −18.27     find  −18.77     go  −19.70     put  −20.13</code></pre>
 <p>The deeper problem: <code>predict_intent</code> always returns the highest score. It has no way to say <strong>"I don't know"</strong>. That's the stretch goal of this capstone.</p>
 <details><summary>Predict first: "go to the moon" is also nonsense. Why does it pass (get refused)?</summary>
-<p>The classifier picks "go" (the word "go" helps a lot). But <code>extract_object</code> finds no colour, so the object is <code>None</code>, and Lesson 10's rule says "go" needs an object. Refused, for the right result, but by luck rather than by understanding. It's worth knowing <em>why</em> a test passes, not just that it does.</p></details>
+<p>The classifier picks "go" (the word "go" helps a lot). But <code>extract_object</code> finds no colour, so the object is <code>None</code>, and Part A's rule 4 says "go" needs an object. Refused, for the right result, but by luck rather than by understanding. It's worth knowing <em>why</em> a test passes, not just that it does.</p></details>
 
 <h2 id="play">3. Play with it</h2>
 <div class="card demo">
 <h3>Interactive: run Robo-Helper</h3>
-<p class="legend">The same pipeline as the Python, step for step: Lesson 9's word-counter (trained on the same 34 sentences), Lesson 10's checks, Lesson 6's A*, Lesson 2's sensor, Lesson 3's braking and Lesson 4's stop-neuron with the weights and 0.17 threshold that the Python trains. Click a floor square to add or remove a surprise (orange). The robot remembers what it's done until you reset.</p>
+<p class="legend">The same pipeline as the Python, step for step: week 5's word counter (trained on the same 34 sentences), Part A's checks, week 4's A*, week 2's sensor and braking, and week 3's stop-neuron with the weights and 0.17 threshold that the Python trains. Click a floor square to add or remove a surprise (orange). The robot remembers what it's done until you reset.</p>
 <canvas id="room" width="500" height="400" style="height:auto" aria-label="The room: walls, blocks, the bin, surprises and the robot"></canvas>
 <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
 <input id="cmdIn" type="text" value="put the blue block in the bin" aria-label="Command" style="flex:1;min-width:200px;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)">
@@ -170,16 +171,23 @@ FAILED: ('make me a sandwich', 'Stopping.')</code></pre>
 <p>Run each test command on a <strong>fresh</strong> <code>RoboHelper(surprises=surprises, seed=seed)</code>. Decide pass or fail. Return <code>(pass_rate, failures)</code>, where failures is a list of <code>(command, message)</code>.</p>
 <p>Example: if 10 of 12 pass, return <code>(10/12, [("find the green block", "The green block is in the bin."), ("make me a sandwich", "Stopping.")])</code>, and 10/12 prints as 83%.</p>
 <details><summary>Hint 1</summary><p>Each entry in <code>commands</code> is a triple: <code>for text, expect, binned in commands:</code>.</p></details>
-<details><summary>Hint 2</summary><p>For "ok" tests you need two things: <code>result["ok"]</code> is true, and <code>robot.binned</code> is <em>exactly</em> the set <code>binned</code>. Two sets are equal with <code>==</code>. (Why not "every listed block is in the bin", <code>binned &lt;= robot.binned</code>? Because then a robot that bins <em>everything</em> would pass.)</p></details>
-<details><summary>Hint 3</summary><pre><code>for each (text, expect, binned):
-    robot = fresh RoboHelper;  result = robot.run_command(text)
-    if expect == "ok":  good = result["ok"] and binned &lt;= robot.binned
-    else:               good = not result["ok"]
-    count it, or append (text, result["message"]) to failures
+<details><summary>Hint 2</summary><p>For "ok" tests you need two things: <code>result["ok"]</code> is true, and <code>robot.binned</code> is <em>exactly</em> the set <code>binned</code>. Two sets are equal with <code>==</code>: <code>{"red block"} == {"red block"}</code> is <code>True</code>, but <code>{"red block", "green block"} == {"red block"}</code> is <code>False</code>. (Why not "every listed block is in the bin", <code>binned &lt;= robot.binned</code>? Because then a robot that bins an <em>extra</em> block would still pass.)</p></details>
+<details><summary>Hint 3</summary><p>Fill in the blanks:</p><pre><code>passed, failures = 0, []
+for text, expect, binned in commands:
+    robot = RoboHelper(surprises=surprises, seed=seed)
+    result = robot.run_command(____)
+    if expect == "ok":
+        good = result["ok"] and robot.binned == ____
+    else:
+        good = not result["ok"]
+    if good:
+        passed += 1
+    else:
+        failures.append((text, ____))
 return passed / len(commands), failures</code></pre></details>
 
 <h3>Run it</h3>
-<pre><code>cd project/homework
+<pre><code>cd homework
 python3 lesson11_robohelper.py</code></pre>
 <p>What you should see (real output from the solution):</p>
 <pre><code>##########
@@ -212,46 +220,54 @@ Test set: 83% passed
 <p>The first map is the start: R at (1, 1). The last map shows the robot parked on the bin, and the blue block gone from (6, 3). The log line is the cat.</p>
 
 <h3>Check it</h3>
-<pre><code>cd project
+<pre><code>cd ..
 python3 check.py 11</code></pre>
-<p>Five checks: <code>put works</code>, <code>find works</code>, <code>refuses safely</code>, <code>replans around surprises</code> and <code>evaluate</code>. The last one needs <strong>at least 80%</strong>. A red ✗ shows a hint such as <em>"with a surprise at (4, 1) the robot should log a stop and still finish"</em> or <em>"test pass rate should be at least 80% (got 75%)"</em>. If you see a yellow … saying <em>"can't load yet, an earlier lesson isn't finished"</em>, run <code>python3 check.py all</code> to find which one.</p>
+<p>Five checks: <code>put works</code>, <code>find works</code>, <code>refuses safely</code>, <code>replans around surprises</code> and <code>evaluate</code>. The last one needs <strong>at least 80%</strong>. It also checks that "find the green block" is in your failures, because binning the green block is wrong. A red ✗ shows a hint such as <em>"with a surprise at (4, 1) the robot should log a stop and still finish"</em>, <em>"test pass rate should be at least 80% (got 75%)"</em> or <em>"'find the green block' bins the green block, which is wrong: it must be in your failures. Compare with ==, not &lt;= (robot.binned must be EXACTLY the expected set)"</em>. If you see a yellow … saying <em>"can't load yet, an earlier lesson isn't finished"</em>, run <code>python3 check.py all</code> to find which one.</p>
 
 <h3>Stretch: teach the robot to say "I don't know"</h3>
 <p>This is the real capstone. Professionals spend most of their time here: finding why a system fails, and fixing it without breaking something else.</p>
 <ol>
-<li><b>Diagnose.</b> Print <code>intent_scores</code> (from Lesson 9) for all 12 test commands, sorted, and the gap between the top two. You already know the sandwich's gap is 0.50. Which <em>passing</em> commands also have a tiny gap?</li>
-<li><b>Fix it, idea A: a confidence margin.</b> If the top score beats the second by less than some number, don't guess: return an action that Lesson 10's <code>validate_action</code> will refuse.</li>
+<li><b>Diagnose.</b> Print <code>intent_scores</code> (from your week 5 file, <code>lesson09_commands.py</code>) for all 12 test commands, sorted, and the gap between the top two. You already know the sandwich's gap is 0.50. Which <em>passing</em> commands also have a tiny gap?</li>
+<li><b>Fix it, idea A: a confidence margin.</b> If the top score beats the second by less than some number, don't guess: return an action that Part A's <code>validate_action</code> will refuse.</li>
 <li><b>Fix it, idea B: an "unknown" intent.</b> Add a few training examples of things the robot can't do ("tell me a joke", "play some music"...) labelled <code>"unknown"</code>. "unknown" isn't in <code>ALLOWED_INTENTS</code>, so your safety layer refuses it for free.</li>
 <li><b>Re-measure.</b> Run <code>evaluate()</code> again. Did the score go up? Did anything that used to pass now fail?</li>
 </ol>
-<details><summary>Hint 1: where to plug it in</summary><p>You don't need to edit Lesson 9. <code>run_command</code> takes a <code>parser</code> argument, and <code>__init__</code> builds <code>self.intent_model</code>. Either write a new parse function that uses <code>intent_scores(self.intent_model, text)</code>, or train the model on <code>TRAIN</code> plus your extra examples. (Import <code>intent_scores</code> from <code>lesson09_commands</code>.)</p></details>
-<details><summary>Hint 2: choosing the margin</summary><p>Sort the scores from high to low and subtract the second from the first. Look at the gaps of the commands you <em>want</em> to accept ("stop" is 2.25, "halt now" is 1.90, "put the red block in the bin" is 4.74) and the one you want to refuse (sandwich, 0.50). Pick a number in between. Don't pick it by staring at the test set alone, though, or you're cheating on the exam (Lesson 5!). Try it on a few new commands of your own too.</p></details>
+<details><summary>Hint 1: where to plug it in</summary><p>You don't need to edit your week 5 file. <code>run_command</code> takes a <code>parser</code> argument, and <code>__init__</code> builds <code>self.intent_model</code>. Either write a new parse function that uses <code>intent_scores(self.intent_model, text)</code>, or train the model on <code>TRAIN</code> plus your extra examples. (Import <code>intent_scores</code> from <code>lesson09_commands</code>.)</p></details>
+<details><summary>Hint 2: choosing the margin</summary><p>Sort the scores from high to low and subtract the second from the first. Look at the gaps of the commands you <em>want</em> to accept ("stop" is 2.25, "halt now" is 1.90, "put the red block in the bin" is 4.74) and the one you want to refuse (sandwich, 0.50). Pick a number in between. Don't pick it by staring at the test set alone, though, or you're cheating on the exam (remember week 3!). Try it on a few new commands of your own too.</p></details>
 <details><summary>Hint 3: the surprise you'll find</summary><p>With a margin of about 0.6, the sandwich is refused and the score climbs to 92%. "find the green block" still fails, but look <em>how</em>: its gap is only 0.09, so now the robot refuses instead of binning the block. A refusal is a much safer failure than doing the wrong thing. To make it pass, the classifier has to get "find" right. What would a few more "find" examples ("where's the X", "locate the X") do? Re-run <code>evaluate()</code> after each change.</p></details>
-<p>Write down your before and after numbers, and keep them. They go straight into your project README in <a href="12-preferences.html">the coming lessons</a> and <a href="14-go-real.html">Lesson 14</a>.</p>
+<p>Write down your before and after numbers, and keep them. They can go into your project README in <a href="14-go-real.html">week 12</a>.</p>
 
 <h2 id="add-to-robot">Add it to your robot</h2>
-<p>Nothing new to fill in this week: your capstone <code>RoboHelper</code> is the same robot, written carefully as a class that can be tested and raced. Run <code>my_robot.py</code>: the start screen now shows your capstone's test score.</p>
-<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
+<p>No new gap in Part B. Your week 7 piece was <code>is_safe</code>, in <a href="10-llm-safety.html#add-to-robot">Part A</a>. Run <code>my_robot.py</code> (<code>cd homework</code>, <code>python3 my_robot.py</code>): the start screen now also shows the twin's test score. Real output:</p>
 <pre><code>=== Zippy: built up to week 7 ===
-  ...
-  Your capstone RoboHelper (Lesson 11) passes 83% of its final test.</code></pre>
+  ...                                  (one ✓ or · line per piece)
+  Next gap to fill: week 8, the think_time() method in my_robot.py (see 'Add it to your robot' on the week 8 page).
+  Your week-7 capstone (RoboHelper, its simpler twin) passes 83% of its final test.</code></pre>
+<p>Then give your own robot RoboHelper's two failures. Real output:</p>
+<pre><code>Zippy&gt; find the green block
+  (Training my language brain. About 10-20 seconds, once...)
+  The green block is at (1, 5).
+Zippy&gt; make me a sandwich
+  Sorry, that's not something I can do.</code></pre>
+<p>Both right, because your robot has the week 6 tiny LM and RoboHelper doesn't. The twin is simpler so that it's easy to test. Your robot is the one that keeps getting smarter.</p>
 
 <h2 id="real-world">5. Real-world challenge: be Robo-Helper</h2>
 <p>You'll run the whole pipeline with your own body, in a real room, with a family member as the user. You need squared paper, a pencil, a cushion, and three small objects (your "blocks").</p>
 <ol>
-<li><b>Map (L1).</b> Draw a room in your home on squared paper, one square per floor tile or per big step. Mark walls and furniture as <code>#</code>, a box or basket as the bin <code>B</code>, and where the three objects sit.</li>
-<li><b>Write the rules (L10).</b> Allowed: put / go / find / stop, and only your three objects. Anything else: refuse politely.</li>
-<li><b>Write a test set (L5).</b> Ask your family member to write 10 commands on slips of paper <em>before</em> you start. Ask for some normal, some odd, and at least two impossible ones.</li>
-<li><b>Run each command.</b> Plan the route on paper first (L6: count the steps). Then walk it, slowly. Meanwhile your helper may quietly drop the cushion on your route (the cat). If it's one step ahead: stop, mark it on the map as blocked, re-plan on paper, carry on.</li>
+<li><b>Map (week 1).</b> Draw a room in your home on squared paper, one square per floor tile or per big step. Mark walls and furniture as <code>#</code>, a box or basket as the bin <code>B</code>, and where the three objects sit.</li>
+<li><b>Write the rules (week 7, Part A).</b> Allowed: put / go / find / stop, and only your three objects. Anything else: refuse politely.</li>
+<li><b>Write a test set (week 3).</b> Ask your family member to write 10 commands on slips of paper <em>before</em> you start. Ask for some normal, some odd, and at least two impossible ones.</li>
+<li><b>Run each command.</b> Plan the route on paper first (week 4: count the steps). Then walk it, slowly. Meanwhile your helper may quietly drop the cushion on your route (the cat). If it's one step ahead: stop, mark it on the map as blocked, re-plan on paper, carry on.</li>
 <li><b>Score yourself.</b> For each command record: understood correctly? refused when it should be? how many steps planned, how many walked? Work out your pass rate.</li>
 <li><b>Failure analysis.</b> For every failure, write <em>why</em> in one line. Did you ever guess what an odd command meant instead of refusing?</li>
 </ol>
+<p><b>On your own (no family member needed):</b> write your 10 commands on slips, fold them, and leave them in a jar overnight so you forget them. For the cat, roll a die before each walk: on a 1 or 2, drop the cushion on the square two steps ahead of you, halfway along your route.</p>
 <p><b>What it teaches:</b> each part is easy alone. Doing them in order, under surprises, while keeping honest score, is the actual skill. And humans also find it hard to say "I don't know" instead of guessing.</p>
 
 <h2 id="so-far">6. Your Robo-Helper so far</h2>
-<p><strong>Run <code>python3 my_robot.py</code>:</strong> the start screen now says "Your capstone RoboHelper (Lesson 11) passes 83% of its final test" (or whatever <em>your</em> score is). Your own robot file and your RoboHelper are the same robot, built twice: once piece by piece in <code>my_robot.py</code>, once carefully as a class you can test. That's the end of part 1: you've built a whole robot from scratch.</p>
-<p>This is it: <strong>the full robot, tested</strong>. <code>RoboHelper</code> understands, checks, plans, senses, brakes, replans, and reports a score with a list of failures. Every earlier lesson (except the Q-learning side quest) is inside it.</p>
-<p>Next comes inference engineering: <a href="16-speed.html">week 8</a> measures how fast and expensive each brain is, week 9 makes brains faster and cheaper, week 10 plugs in a world-class model, and <a href="19-bakeoff.html">week 11</a> races every brain on the same tasks with <code>sim.py</code>, which runs <em>this</em> robot. In week 12, <a href="12-preferences.html">Lesson 12</a> learns from people's preferences, and <a href="14-go-real.html">Lesson 14</a> takes <code>run_command</code>, your <code>evaluate()</code> score and your failure list, and turn them into a project README, a demo recording, and (if you like) a real wheeled robot.</p>
+<p><strong>Run <code>python3 my_robot.py</code>:</strong> the start screen now says "Your week-7 capstone (RoboHelper, its simpler twin) passes 83% of its final test" (or whatever <em>your</em> score is). That score is the simpler twin's. Your own <code>my_robot.py</code> already gets the twin's two failures right. That's the end of part 1: you've built a whole robot from scratch, and a twin you can test.</p>
+<p>This is it: <strong>the full robot, tested</strong>. <code>RoboHelper</code> understands, checks, plans, senses, brakes, replans, and reports a score with a list of failures. Every earlier week (except the Q-learning side quest) is inside it.</p>
+<p>Next comes inference engineering: <a href="16-speed.html">week 8</a> measures how fast and expensive each brain is, week 9 makes brains faster and cheaper, week 10 plugs in a world-class model, and <a href="19-bakeoff.html">week 11</a> races every brain on the same tasks with <code>sim.py</code>, which runs <em>this</em> robot. In week 12, <a href="12-preferences.html">Part A</a> learns from people's preferences, and <a href="14-go-real.html">Part B</a> turns your robot, its exam score and its failures into a project README, a demo recording, and (if you like) a real wheeled robot.</p>
 
 <h2 id="mistakes">7. Common mistakes</h2>
 <ul>
@@ -259,13 +275,13 @@ python3 check.py 11</code></pre>
 <li><b>Counting a refusal as a failure.</b> For "refuse" tests, <code>ok False</code> is the <em>pass</em>. Without this you'd get 75%, and check.py says <em>"test pass rate should be at least 80% (got 75%)"</em>.</li>
 <li><b>Skipping the safety check.</b> Without <code>validate_action</code>, "put the purple block away" crashes: "purple" isn't a known colour, so the object is <code>None</code>, and <code>self.objects[None]</code> raises a <code>KeyError</code>. A robot that crashes mid-drive is not a safe robot. check.py: <em>"an unknown object must be refused"</em>.</li>
 <li><b>Forgetting to update the world after "put".</b> If <code>self.binned</code> and <code>self.objects[X]</code> aren't updated, "where is the blue block" still says (6, 3). check.py: <em>"the red block should be in robot.binned"</em>.</li>
-<li><b>Using <code>==</code> instead of <code>&lt;=</code> for binned.</b> The docstring says "every object in <code>binned</code> is in <code>robot.binned</code>", which is <code>&lt;=</code>. With <code>==</code> you'd get 83%. The reason is a real hidden bug, and finding it is what the stretch is about.</li>
+<li><b>Using <code>&lt;=</code> instead of <code>==</code> for binned.</b> The docstring says <code>robot.binned</code> must be <em>exactly</em> the set <code>binned</code>, which is <code>==</code>. With <code>&lt;=</code>, "find the green block" passes even though the robot threw the green block in the bin, and you'd get 92%. That hides a real bug. check.py catches it: <em>"'find the green block' bins the green block, which is wrong: it must be in your failures. Compare with ==, not &lt;= (robot.binned must be EXACTLY the expected set)"</em>. With <code>==</code> you get the honest 83%.</li>
 </ul>
 
 <h2 id="check">8. Check yourself</h2>
 <details><summary>Why does every test in <code>evaluate()</code> use a fresh robot?</summary><p>So each test starts from the same state. Otherwise the result of one test depends on what the earlier tests did, and changing the order would change the score.</p></details>
 <details><summary>Predict: on one robot, you run "put the red block in the bin" twice. What does the second call say?</summary><p><code>"The red block is already in the bin."</code> with <code>ok True</code>. The robot doesn't move.</p></details>
-<details><summary>Why is the stop threshold 0.17 and not 0.5?</summary><p>Lesson 5's <code>safest_threshold</code> picks the highest threshold that still catches at least 97% of real obstacles. Missing a real obstacle is much worse than braking for nothing, so it accepts more false alarms.</p></details>
+<details><summary>Why is the stop threshold 0.17 and not 0.5?</summary><p>Week 3's <code>safest_threshold</code> picks the highest threshold that still catches at least 97% of real obstacles. Missing a real obstacle is much worse than braking for nothing, so it accepts more false alarms.</p></details>
 <details><summary>Why does "make me a sandwich" become "stop"?</summary><p>The classifier always picks the top score, and "stop" has the fewest training words (15), so it gives the biggest probability to words it has never seen (1/67 versus 1/113 for "put"). Four unknown words make "stop" win. There's no "I don't know" option.</p></details>
 <details><summary>The robot scored 83%. Is it 83% good at real life?</summary><p>No. It's 83% on 12 hand-picked commands, in one room, with one surprise. Real people type far stranger things. And as the stretch shows, a test can pass while the robot does the wrong thing. A score is only as honest as the test set behind it.</p></details>
 
@@ -278,10 +294,10 @@ python3 check.py 11</code></pre>
 </ul>
 
 <nav class="pager">
-  <a href="10-llm-safety.html"><small>Previous</small>Week 7 · Using a real AI safely</a>
+  <a href="10-llm-safety.html"><small>Previous</small>Week 7 · Part A: using a real AI safely</a>
   <a class="next" href="16-speed.html"><small>Next</small>Week 8 · How fast is a brain?</a>
 </nav>
-<footer>Build a Robot Brain · Week 7 · Lesson 11</footer>
+<footer>Build a Robot Brain · Week 7 of 12 · Part B (homework file: lesson11_robohelper.py)</footer>
 </main>
 
 <script>

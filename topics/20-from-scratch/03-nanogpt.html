@@ -212,7 +212,7 @@ And have their somell all of rangue</code></pre>
 
 <h2 id="robohelper">5. Connect to Robo-Helper (Module 18): a nanoGPT brain, measured</h2>
 <p class="meta">Measured on 8 Nov 2026, with the first version of Robo-Helper's training data: 350 examples, which by accident included 3 of the 12 bake-off commands. On 9 Nov those were removed (343 examples). The small Module 18 brains' bake-off scores didn't change, and the tiny LM's held-out score went from 86% to 92%. Every brain here was compared on the same data, but if you re-run, expect the exact numbers to move by a few points.</p>
-<p>Our <a href="../18-robot-brain/15-tiny-lm.html">Lesson 15, a tiny language model</a>, is the hand-built version of what nanoGPT does. It writes a plan one word at a time, like <code>put red blue &lt;end&gt;</code>. Its <a href="../18-robot-brain/15-tiny-lm.html#attention">Stretch 2: attention</a> is the exact bridge.</p>
+<p>Our <a href="../18-robot-brain/15-tiny-lm.html">Lesson 15, a tiny language model</a>, is the hand-built version of what nanoGPT does. It writes a plan one word at a time, like <code>put red blue &lt;end&gt;</code>. Its <a href="../18-robot-brain/15b-attention.html">attention stretch (week 6)</a> is the exact bridge.</p>
 <div class="table-wrap"><table>
 <tr><th></th><th>Our TinyLM / attention stretch (Lesson 15)</th><th>nanoGPT</th></tr>
 <tr><td>Reading the input</td><td>Average of the command's word embeddings, or one head of attention (stretch)</td><td>Multi-head <em>causal self-attention</em>: every position looks at all earlier ones, in every layer</td></tr>
@@ -302,7 +302,7 @@ TIME PER DECISION: model.generate("put the red block in the bin"), 200 runs
 <li><a href="https://karpathy.ai/zero-to-hero.html">Neural Networks: Zero to Hero</a>, especially the <a href="https://www.youtube.com/watch?v=kCc8FmEb1nY">GPT video</a> that builds this model step by step</li>
 <li><a href="https://github.com/openai/gpt-2">OpenAI GPT-2</a>, the model nanoGPT reproduces, and <a href="https://huggingface.co/datasets/openwebtext">OpenWebText</a>, the open copy of its training data</li>
 <li><a href="https://github.com/KellerJordan/modded-nanogpt">modded-nanogpt</a>, the speedrun fork that inspired nanochat's leaderboard</li>
-<li>Back in this course: <a href="../18-robot-brain/15-tiny-lm.html#attention">Lesson 15, Stretch 2: attention</a></li>
+<li>Back in this course: <a href="../18-robot-brain/15b-attention.html">Week 6 stretch: attention</a></li>
 </ul>
 
 <nav class="pager">

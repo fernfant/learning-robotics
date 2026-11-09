@@ -3,23 +3,24 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 1 · Coordinates and moving</title>
+<title>Week 1 Part B · Coordinates and moving</title>
 <link rel="stylesheet" href="../../style.css">
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 1 · Lesson 1</nav>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 1 · Part B</nav>
 
-<div class="eyebrow"><span class="track robo">Robotics</span>Build a Robot Brain · Week 1 · Lesson 1</div>
+<div class="eyebrow"><span class="track robo">Robotics</span>Build a Robot Brain · Week 1 of 12 · Part B</div>
 <h1>Where am I? Coordinates and moving on a grid</h1>
 <p class="lede">Before a robot can go anywhere, it needs a way to say where it is. Two numbers do the job. Moving becomes adding, walls become a check, and "how far?" becomes a tiny formula.</p>
-<div class="card note" id="journey"><strong>Step 2 of 21.</strong> So far your robot: ✓ runs code. <strong>Today</strong> it learns to move around the room. Next: <a href="02-sensors.html">Week 2 · Noisy senses</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>EEEE</code> (watch out for the cat!).</div>
+<div class="card note" id="journey"><strong>Week 1 of 12 · Part B.</strong> So far your robot: ✓ says hello. <strong>Today</strong> it learns to move around the room. Next: <a href="02-sensors.html">Week 2 · Part A: Noisy senses</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>EEEE</code>. The <code>c</code> at (4, 1) is a cat, and your robot can't sense it yet: <a href="#cat">see why</a>.</div>
 
 <div class="facts">
   <div><b>Time</b>2–3 h</div>
-  <div><b>You'll need</b>Lesson 0 done, squared paper, a pencil</div>
+  <div><b>You'll need</b>Part A done, squared paper, a pencil</div>
   <div><b>New words</b>Coordinates, tuple, dictionary, path, Manhattan distance</div>
   <div><b>Project piece</b>The robot can move</div>
+  <div><b>Homework file</b><code>lesson01_moving.py</code></div>
 </div>
 
 <section class="kid" id="start">
@@ -115,7 +116,7 @@ path = [(1, 1), (2, 1), (3, 1), (3, 1)]</code></pre>
 down:   from y = 3 to y = 1  →  3 - 1 = 2 steps
 total:  3 + 2 = 5</code></pre>
 <p>This is called the <strong>Manhattan distance</strong>, after the city where the streets form a grid and taxis can't cut through buildings. In general: <code>|x1 − x2| + |y1 − y2|</code>. The bars <code>| |</code> mean "absolute value": drop the minus sign. Why? Because if you subtract the other way round, 2 − 5 = −3, and a distance can't be negative. Python's <code>abs(-3)</code> gives <code>3</code>.</p>
-<p>One important thing: Manhattan distance <em>ignores walls</em>. It's the shortest possible distance in a perfect world. The real route can only be the same or longer. In <a href="06-pathfinding.html">Lesson 6</a> that "never too big" property is exactly what makes A* search work.</p>
+<p>One important thing: Manhattan distance <em>ignores walls</em>. It's the shortest possible distance in a perfect world. The real route can only be the same or longer. In <a href="06-pathfinding.html">week 4</a> that "never too big" property is exactly what makes A* search work.</p>
 
 <h2 id="play">3. Play with it</h2>
 <div class="card demo">
@@ -207,14 +208,39 @@ Ended at (5, 3) | distance to red block: 5</code></pre>
 <p>Write <code>commands_to(start, goal)</code> that returns a command string that walks straight to the goal, ignoring walls: first all the E or W steps, then all the N or S steps. Check that <code>len(commands_to(a, b)) == manhattan(a, b)</code> for a few pairs. Then run it through <code>follow</code> from (1, 1) to the bin at (7, 6) and count how many bumps it gets. (Not checked by <code>check.py</code>.)</p>
 
 <h2 id="add-to-robot">Add it to your robot</h2>
-<p>Fill in <code>arrows(self, text)</code> in <code>my_robot.py</code>: for each letter, use <em>your</em> <code>safe_move()</code> to spot walls and <code>move()</code> to find the next square, then hand that square to <code>self.step()</code> (provided), which moves the robot and draws it.</p>
-<details><summary>Hint 1</summary><p>Start with <code>from lesson01_moving import move, safe_move</code> inside the method.</p></details>
-<details><summary>Hint 2</summary><p>If <code>safe_move(ROOM, self.pos, d) == self.pos</code>, the robot would hit a wall: return <code>"Bonk! A wall."</code></p></details>
-<details><summary>Hint 3</summary><p><code>result = self.step(move(self.pos, d))</code>. If <code>result != "moved"</code>, return <code>self.step_message(result, move(self.pos, d))</code>. After the loop, return <code>f"I'm at {self.pos}."</code></p></details>
-<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 1: arrows"</em>.</p>
-<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
-<pre><code>Zippy&gt; EEEE
-  BUMP! I walked into the cat. (I can't sense things that aren't on the map: add week 3.)</code></pre>
+<p>Fill in <code>arrows(self, text)</code> in <code>my_robot.py</code>. It moves the robot one square for each letter, so <code>EESN</code> means east, east, south, north. You need both of your functions, and they do different jobs: <code>safe_move</code> tells you whether there's a wall (it leaves the robot where it is if there is), and <code>move</code> tells you which square you'd step to. Hand that square to <code>self.step()</code> (provided), which moves the robot and draws it. (New to <code>self</code>? Read <a href="00-setup.html#robot-file">How your robot file works</a> first.)</p>
+<div class="card note" id="cat"><strong>The cat.</strong> When you run <code>my_robot.py</code>, the room shows a <code>c</code> at (4, 1). That's a cat. It is drawn for you, but it's NOT on the robot's map: the robot only finds out by sensing it. Real robots meet surprises like this too. In week 1 your robot can't sense anything yet, so <code>EEEE</code> walks right into it and says: <em>BUMP! I walked into the cat. (It's not on my map, so I can't sense it yet: add week 3.)</em> In week 3 you fix that.</div>
+<div class="card note"><strong>New Python this time: <code>return</code> inside a loop.</strong> A <code>return</code> stops the whole method straight away, even in the middle of a <code>for</code> loop. The loop never finishes.
+<pre><code>for d in "EEN":
+    if d == "N": return "Found N!"   # stops here; nothing after this runs</code></pre></div>
+<details><summary>Hint 1</summary><p>Start with this import, inside the method:</p><pre><code>from lesson01_moving import move, safe_move</code></pre><p>Then loop over the letters: <code>for d in text:</code>. (The robot already turns lowercase into capitals before calling <code>arrows</code>, so <code>eess</code> works too.)</p></details>
+<details><summary>Hint 2</summary><p>If <code>safe_move(ROOM, self.pos, d) == self.pos</code>, the next square is a wall: return <code>f"Bonk! A wall. I'm at {self.pos}."</code></p></details>
+<details><summary>Hint 3</summary><p>Fill in the blanks:</p><pre><code>for d in text:
+    if safe_move(ROOM, self.pos, d) == self.pos:
+        return f"Bonk! A wall. I'm at {self.pos}."
+    result = self.step(____)
+    if result != "moved":
+        return self.step_message(result, ____)
+return f"I'm at {____}."</code></pre><p>Stuck for real? The worked version is in <code>solutions/my_robot.py</code>.</p></details>
+<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 1: arrows"</em>. It also tries lowercase <code>sss</code>. Real output (the other 14 checks stay yellow until their week):</p>
+<pre><code>Your robot: my_robot.py
+  ✓ week 1: arrows
+  … week 2: look: not written yet (fill in look() first)
+  ...
+  1/15 passed</code></pre>
+<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output (it also draws the room after each command; we've left that out):</p>
+<pre><code>Hello, I am Zippy!
+...
+Zippy&gt; N
+  Bonk! A wall. I'm at (1, 1).
+
+Zippy&gt; sss
+  I'm at (1, 4).
+
+Zippy&gt; reset
+
+Zippy&gt; EEEE
+  BUMP! I walked into the cat. (It's not on my map, so I can't sense it yet: add week 3.)</code></pre>
 <p>Your robot walks straight into the cat. It can't sense it yet: that's week 3.</p>
 
 <h2 id="challenge">5. Real-world challenge: map your room</h2>
@@ -226,16 +252,18 @@ Ended at (5, 3) | distance to red block: 5</code></pre>
 <li><strong>Be the robot.</strong> Stand at the door, then follow your string one step per letter without looking where you're going: only at the paper. Or have a friend follow it. If a step would hit furniture, stay put (and count a bump).</li>
 <li><strong>Record:</strong> where you meant to end up, where you actually ended up, number of bumps, number of commands, and the Manhattan distance.</li>
 </ol>
-<p><strong>What it teaches:</strong> you'll find that the map and the real room don't quite agree (your steps aren't all the same size, the bed sticks out further than you drew). That gap between the map and reality is a real robotics problem: robots also drift, and that's why Lesson 2 adds sensors. You'll also see that your number of commands is never smaller than the Manhattan distance, and is bigger whenever furniture is in the way.</p>
+<div class="card note"><strong>On your own:</strong> this one works alone. Do steps 1–4, then be the robot yourself: follow your own string one step per letter, looking only at the paper.</div>
+<p><strong>What it teaches:</strong> you'll find that the map and the real room don't quite agree (your steps aren't all the same size, the bed sticks out further than you drew). That gap between the map and reality is a real robotics problem: robots also drift, and that's why week 2 adds sensors. You'll also see that your number of commands is never smaller than the Manhattan distance, and is bigger whenever furniture is in the way.</p>
 
 <h2 id="project">6. Your Robo-Helper so far</h2>
-<pre><code>Lesson 0  ✓ the robot greets you and counts steps to a wall
-Lesson 1  ✓ move, safe_move, follow, manhattan: the robot can move around the room</code></pre>
+<pre><code>Week 1A  ✓ the robot greets you and counts steps to a wall
+Week 1B  ✓ move, safe_move, follow, manhattan: the robot can move around the room</code></pre>
 <p>These four functions are the robot's legs, and later lessons import them directly:</p>
 <ul>
-<li><a href="02-sensors.html">Lesson 2</a>: <code>distance_to_wall</code> calls your <code>move</code> to look further and further ahead.</li>
-<li><a href="06-pathfinding.html">Lesson 6</a>: <code>astar_path</code> uses <code>move</code> to find neighbours and <code>manhattan</code> as its guess of the distance left.</li>
-<li><a href="07-trial-and-error.html">Lesson 7</a>: the Q-learning robot practises in a maze using your <code>safe_move</code>, bumps and all.</li>
+<li><a href="02-sensors.html">Week 2</a>: <code>distance_to_wall</code> calls your <code>move</code> to look further and further ahead.</li>
+<li><a href="06-pathfinding.html">Week 4</a>: <code>astar_path</code> uses <code>move</code> to find neighbours and <code>manhattan</code> as its guess of the distance left.</li>
+<li>Week 12's boss gap uses your <code>manhattan</code> to find the block closest to the bin.</li>
+<li><a href="07-trial-and-error.html">The bonus trial-and-error lesson</a>: the Q-learning robot practises in a maze using your <code>safe_move</code>, bumps and all.</li>
 </ul>
 
 <h2 id="mistakes">7. Common mistakes</h2>
@@ -251,7 +279,7 @@ Lesson 1  ✓ move, safe_move, follow, manhattan: the robot can move around the 
 <details><summary>What change (dx, dy) does "S" mean, and why is it +1 not −1?</summary><p><code>(0, 1)</code>. South is down the screen, and y counts rows from the top, so going down makes y bigger.</p></details>
 <details><summary>Predict: what does <code>follow(ROOM, (2, 1), "SS")</code> return? Use the grid in section 2.</summary><p><code>[(2, 1), (2, 2), (2, 3)]</code>. Both squares below (2, 1) are floor, so there are no bumps.</p></details>
 <details><summary>Predict: what does <code>follow(ROOM, (1, 1), "NW")</code> return?</summary><p><code>[(1, 1), (1, 1), (1, 1)]</code>. Both moves hit walls, so the robot stays put twice, but each turn still adds an entry to the path.</p></details>
-<details><summary>What is the Manhattan distance from the robot's start (1, 1) to the bin (7, 6)? Can the real route ever be shorter?</summary><p>6 + 5 = <strong>11</strong>. No: Manhattan distance ignores walls, so it's the best case. Walls can only make the real route the same or longer. (In Lesson 6 you'll find the real shortest route is exactly 11.)</p></details>
+<details><summary>What is the Manhattan distance from the robot's start (1, 1) to the bin (7, 6)? Can the real route ever be shorter?</summary><p>6 + 5 = <strong>11</strong>. No: Manhattan distance ignores walls, so it's the best case. Walls can only make the real route the same or longer. (In week 4 you'll find the real shortest route is exactly 11.)</p></details>
 <details><summary>Why is it useful that <code>safe_move</code> calls <code>move</code> instead of doing its own maths?</summary><p>The maths lives in one place. If you change or fix <code>move</code> (or add diagonal directions), <code>safe_move</code> and <code>follow</code> get the fix for free.</p></details>
 
 <h2 id="deeper">9. Go deeper (optional)</h2>
@@ -262,10 +290,10 @@ Lesson 1  ✓ move, safe_move, follow, manhattan: the robot can move around the 
 </ul>
 
 <nav class="pager">
-  <a href="00-setup.html"><small>Previous</small>Week 1 · Setup and your first program</a>
-  <a class="next" href="02-sensors.html"><small>Next</small>Week 2 · Noisy senses</a>
+  <a href="00-setup.html"><small>Previous</small>Week 1 · Part A: Setup and your first program</a>
+  <a class="next" href="02-sensors.html"><small>Next</small>Week 2 · Part A: Noisy senses</a>
 </nav>
-<footer>Build a Robot Brain · Week 1 · Lesson 1</footer>
+<footer>Build a Robot Brain · Week 1 of 12 · Part B</footer>
 </main>
 
 <script>

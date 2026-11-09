@@ -188,7 +188,7 @@ real 242.67 s</code></pre>
 
 <h2 id="robohelper">5. Connect to Robo-Helper (Module 18)</h2>
 <p class="meta">Measured on 8 Nov 2026, with the first version of Robo-Helper's training data: 350 examples, which by accident included 3 of the 12 bake-off commands. On 9 Nov those were removed (343 examples). The small Module 18 brains' bake-off scores didn't change, and the tiny LM's held-out score went from 86% to 92%. Every brain here was compared on the same data, but if you re-run, expect the exact numbers to move by a few points.</p>
-<p><a href="../18-robot-brain/15-tiny-lm.html">Lesson 15</a>'s tiny language model is minGPT's little cousin. It reads the command's words, writes a plan one word at a time ("put red blue"), and has its backprop written by hand in the standard library. Its <a href="../18-robot-brain/15-tiny-lm.html#attention">attention stretch</a> computes exactly minGPT's score → softmax → weighted average, for one head and one query. minGPT is the next rung up: many heads, every position at once, a causal mask, residual blocks, and PyTorch working out the gradients.</p>
+<p><a href="../18-robot-brain/15-tiny-lm.html">Lesson 15</a>'s tiny language model is minGPT's little cousin. It reads the command's words, writes a plan one word at a time ("put red blue"), and has its backprop written by hand in the standard library. Its <a href="../18-robot-brain/15b-attention.html">attention stretch</a> computes exactly minGPT's score → softmax → weighted average, for one head and one query. minGPT is the next rung up: many heads, every position at once, a causal mask, residual blocks, and PyTorch working out the gradients.</p>
 
 <h3>The experiment: a character-level minGPT as Robo-Helper's brain</h3>
 <p>We built a brain called <code>minigpt</code>. It's a minGPT with 2 layers, 4 heads and 64-wide embeddings (110,208 weights), reading <strong>characters</strong>. It trains on exactly the same 350 examples as the tiny LM (<code>lesson15_tiny_lm.training_data()</code>, as (command, plan words) pairs). Each example becomes one string, with the loss masked on the command part, as in the adder:</p>
@@ -263,7 +263,7 @@ minigpt (typo-aug) no fixer, mean of 3 seeds:  57%  58%  56%</code></pre>
 <li><a href="https://github.com/openai/gpt-2">openai/gpt-2</a> (the TensorFlow model definition) and <a href="https://github.com/openai/image-gpt">openai/image-gpt</a>, both cited in the README</li>
 <li><a href="https://arxiv.org/abs/1606.08415">Gaussian Error Linear Units (GELU)</a>, cited in <code>model.py</code></li>
 <li><a href="https://github.com/huggingface/transformers">huggingface/transformers</a>, the full-featured reference the README compares against</li>
-<li>In this course: <a href="../06-30u30/13-attention.html">Module 06, Day 13: attention</a>, <a href="../06-30u30/14-annotated-transformer.html">Day 14: the annotated Transformer</a>, <a href="../18-robot-brain/15-tiny-lm.html#attention">Lesson 15's attention stretch</a></li>
+<li>In this course: <a href="../06-30u30/13-attention.html">Module 06, Day 13: attention</a>, <a href="../06-30u30/14-annotated-transformer.html">Day 14: the annotated Transformer</a>, <a href="../18-robot-brain/15b-attention.html">the week 6 attention stretch</a></li>
 <li>Next: <a href="03-nanogpt.html">nanoGPT</a>, the rewrite "that has teeth"</li>
 </ul>
 

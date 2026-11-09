@@ -3,21 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 12 · Learning preferences</title>
+<title>Week 12 · Learning preferences</title>
 <link rel="stylesheet" href="../../style.css">
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 12 · Lesson 12</nav>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 12 · Part A</nav>
 
-<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 12 · Lesson 12</div>
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 12 of 12 · Part A</div>
 <h1>Learning what people prefer: reinforcement learning from human feedback, by hand</h1>
-<p class="lede">Why does this come last? Every brain you built can now do the job. The last question is how to do it the way <em>people</em> like. That's also how chatbots are taught their manners. Nobody can write down the rule for "the best route". But anyone can look at two routes and say "that one". This lesson turns those quick answers into a reward the robot can learn from. It's the same recipe that turned raw language models into helpful chat assistants.</p>
-<div class="card note" id="journey"><strong>Step 20 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed ✓ learns from a teacher ✓ fixes a wonky sensor ✓ can use Claude ✓ MCP (bonus) ✓ has a scorecard. <strong>Today</strong> it learns to pick the routes people like best. Next: <a href="14-go-real.html">Week 12 · Going real</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>goto bin</code>: now it picks the route people like.</div>
+<p class="lede">Why does this come near the end? Every brain you built can now do the job. The last question is how to do it the way <em>people</em> like. That's also how chatbots are taught their manners. Nobody can write down the rule for "the best route". But anyone can look at two routes and say "that one". This lesson turns those quick answers into a reward the robot can learn from. It's the same recipe that turned raw language models into helpful chat assistants.</p>
+<div class="card note" id="journey"><strong>Week 12 of 12 · Part A.</strong> So far your robot: ✓ says hello ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed ✓ learns from a teacher ✓ can ask Claude (with a key) ✓ sits its own exam (10/12). <strong>Today</strong> it learns to pick the routes people like best. Next: <a href="14-go-real.html">Week 12 · Part B: the boss, and going real</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>goto bin</code>: now it sets off along the route people like (and finds out who's sitting on it).</div>
 
 <div class="facts">
   <div><b>Time</b>2–3 hours</div>
-  <div><b>You'll need</b>Python 3, your finished Lessons 1, 4 and 6 (<code>move</code>, <code>sigmoid</code>, <code>astar_path</code>), paper, and one patient family member</div>
+  <div><b>You'll need</b>Python 3, your finished weeks 1, 3 and 4 (<code>move</code>, <code>sigmoid</code>, <code>astar_path</code>), paper, and one patient family member</div>
+  <div><b>Homework file</b><code>lesson12_preferences.py</code></div>
   <div><b>New words</b>preference, feature, reward model, Bradley-Terry, best-of-n, policy, RLHF, reward hacking</div>
   <div><b>Project piece</b>Picks the route people like best</div>
 </div>
@@ -27,7 +28,7 @@
 <p class="big">Can't write down what "good" means? Ask people to compare two options. Learn a score that agrees with their choices. Then pick whatever scores highest.</p>
 
 <h3>The problem</h3>
-<p>Robo-Helper can now carry the red block to the bin along the shortest route (Lesson 11). Your little brother watches and says "it keeps scraping the wall, and it wiggles too much". Your mum says "I don't care, just be quick". You try to write a rule: "shortest, unless it's near a wall, unless the other route has more turns, unless…". It never ends. Every rule you write has an exception. Yet everyone in the room can instantly point at a route on the screen and say "I like that one better".</p>
+<p>Robo-Helper can now carry the red block to the bin along the shortest route (week 4). Your little brother watches and says "it keeps scraping the wall, and it wiggles too much". Your mum says "I don't care, just be quick". You try to write a rule: "shortest, unless it's near a wall, unless the other route has more turns, unless…". It never ends. Every rule you write has an exception. Yet everyone in the room can instantly point at a route on the screen and say "I like that one better".</p>
 
 <h3>The idea in one picture</h3>
 <p>Think about an eye test at the optician. They never ask "on a scale of 1 to 10, how sharp is this?" because nobody can answer that reliably. They ask "better with lens one… or lens two?" again and again. From a pile of easy "one or two" answers, they work out a precise prescription. We'll do the same: lots of easy "A or B?" answers, and maths turns them into a precise <em>taste</em> the robot can use.</p>
@@ -71,7 +72,7 @@
 #***.....#                   #......*.#
 #.#****B.#                   #.#....B.#
 ##########                   ##########</code></pre>
-<p>Same length. Which is "better"? Route P hugs the left wall and then scrapes along the bottom wall, and it changes direction 3 times. Route Q runs along the top, turns once, and drives straight down column 7, mostly in open floor. Most people prefer Q. But A* from Lesson 6 only knows about length, so it can't tell them apart and happens to give you P.</p>
+<p>Same length. Which is "better"? Route P hugs the left wall and then scrapes along the bottom wall, and it changes direction 3 times. Route Q runs along the top, turns once, and drives straight down column 7, mostly in open floor. Most people prefer Q. But A* from week 4 only knows about length, so it can't tell them apart and happens to give you P.</p>
 <p><strong>Obvious idea 1: write the rule yourself.</strong> "Each step costs 1, each wall-scrape costs 0.5, each turn costs 1." Where did 0.5 come from? You made it up. Is a turn worse than a scrape? For whom? Your brother and your mum would give different numbers, and neither could tell you theirs if you asked.</p>
 <p><strong>Obvious idea 2: ask people to score each route out of 10.</strong> Try it: someone says "7" for a route today and "5" for the same route tomorrow. One person's 7 is another's 9. Scores out of 10 are shaky.</p>
 <p><strong>What people <em>are</em> good at:</strong> comparing. "A or B?" takes a second, and the answers are much more consistent. So that's what we'll collect.</p>
@@ -111,12 +112,12 @@ features(P) = (11, 10, 3)</code></pre>
 <p>In the code, the simulated person has <code>TRUE_TASTE = (−1.0, −0.6, −0.8)</code>: every step costs 1 point, every wall-scrape 0.6, every turn 0.8. All negative, because they dislike all three.</p>
 <pre><code>reward(P) = −1.0 × 11 + −0.6 × 10 + −0.8 × 3 = −11 − 6.0 − 2.4 = −19.4
 reward(Q) = −1.0 × 11 + −0.6 × 8  + −0.8 × 1 = −11 − 4.8 − 0.8 = −16.6</code></pre>
-<p>Q scores higher (less negative), so this person prefers Q. This is exactly Lesson 4's neuron: inputs times weights, added up. The big question is how to <em>find</em> the weights when nobody can tell you them.</p>
+<p>Q scores higher (less negative), so this person prefers Q. This is exactly week 3's neuron: inputs times weights, added up. The big question is how to <em>find</em> the weights when nobody can tell you them.</p>
 
 <h3>Step 3: people are a bit random (Bradley-Terry)</h3>
 <p>If you show someone the same pair twice, they won't always pick the same one, especially when the two are close. So we don't say "the person picks the higher reward". We say:</p>
 <pre><code>chance the person picks A = sigmoid(reward(A) − reward(B))</code></pre>
-<p>That's Lesson 4's <code>sigmoid</code>, the S-shaped squash from any number into 0…1. Look at what it does with the reward <em>gap</em>:</p>
+<p>That's week 3's <code>sigmoid</code>, the S-shaped squash from any number into 0…1. Look at what it does with the reward <em>gap</em>:</p>
 <pre><code>gap = 0      → sigmoid(0)   = 0.50    a coin flip: they like both equally
 gap = 0.8    → sigmoid(0.8) = 0.69    a slight favourite
 gap = 2.8    → sigmoid(2.8) = 0.94    a clear favourite
@@ -133,7 +134,7 @@ gap = −2.8   → sigmoid(−2.8) = 0.06   a clear loser</code></pre>
 <pre><code>p = sigmoid(reward(A) − reward(B))
 for each feature i:
     w[i] += lr × (chose_a − p) × (A[i] − B[i])</code></pre>
-<p>That's <em>exactly</em> Lesson 4's neuron learning rule, with one twist: the input is the <strong>difference</strong> between A and B. Let's run it by hand with <code>lr = 0.01</code>, on two real comparisons from the program's data.</p>
+<p>That's <em>exactly</em> week 3's neuron learning rule, with one twist: the input is the <strong>difference</strong> between A and B. Let's run it by hand with <code>lr = 0.01</code>, on two real comparisons from the program's data.</p>
 <pre><code>Comparison 1: A = (11, 8, 1)  B = (11, 8, 3)  person chose A (chose_a = 1)
   weights now      [0, 0, 0]
   p                = sigmoid(0 − 0) = 0.5
@@ -148,7 +149,7 @@ Comparison 2: A = (13, 10, 4)  B = (11, 9, 5)  person chose A (!)
   A − B            = (2, 1, −1)
   change           = 0.005 × (2, 1, −1) = (0.01, 0.005, −0.005)
   weights after    [0.01, 0.005, −0.005]   ← "longer is good"?!</code></pre>
-<p>Look at comparison 2. The person picked the <em>longer</em> route. That happens: people are a bit random (Step 3). One answer pushes the length weight the wrong way. But over 150 comparisons, the random ones are outvoted by the sensible ones, just like averaging noisy sensor readings in Lesson 2. After 300 passes over all 150 comparisons, the program learns:</p>
+<p>Look at comparison 2. The person picked the <em>longer</em> route. That happens: people are a bit random (Step 3). One answer pushes the length weight the wrong way. But over 150 comparisons, the random ones are outvoted by the sensible ones, just like averaging noisy sensor readings in week 2. After 300 passes over all 150 comparisons, the program learns:</p>
 <pre><code>learned taste: [−1.03, −0.44, −0.73]
 true taste:    (−1.0,  −0.6,  −0.8)</code></pre>
 <p>Pretty close, and nobody ever told it a single weight. It only saw "A" or "B".</p>
@@ -164,7 +165,7 @@ robot's chosen route features:                      (11, 8, 1)    ← route Q</c
 <p>The robot picks route Q: <strong>exactly as short</strong> as A*'s route, but it brushes walls on 8 squares instead of 10 and turns once instead of 3 times. It's also the very route the true taste ranks first. The robot learned what this person likes, from nothing but "A or B?".</p>
 
 <h3>How good is it, honestly?</h3>
-<p>We test on <strong>100 new comparisons</strong> it never trained on (Lesson 5: always test on fresh data). The learned taste agrees with the person <strong>84%</strong> of the time. Is 84% bad? Here's the twist: the <em>true</em> taste, the exact numbers inside the simulated person's head, also agrees with their own answers only <strong>84%</strong> of the time on those same 100. The person is a bit random, so 84% is the <strong>ceiling</strong>. Nothing could do better. Our model hit it.</p>
+<p>We test on <strong>100 new comparisons</strong> it never trained on (week 3: always test on fresh data). The learned taste agrees with the person <strong>84%</strong> of the time. Is 84% bad? Here's the twist: the <em>true</em> taste, the exact numbers inside the simulated person's head, also agrees with their own answers only <strong>84%</strong> of the time on those same 100. The person is a bit random, so 84% is the <strong>ceiling</strong>. Nothing could do better. Our model hit it.</p>
 
 <h3>Step 6: a discovery (you can only learn about things that vary)</h3>
 <p>An earlier version of this lesson used only the routes that were exactly 11 steps long. It trained happily, and learned a length weight of <strong>0.0</strong>. Not −1.0. Zero. The robot concluded that length doesn't matter at all.</p>
@@ -173,7 +174,7 @@ robot's chosen route features:                      (11, 8, 1)    ← route Q</c
 </details>
 <p>This is a big, general lesson: <strong>a model can only learn about things that vary in its data.</strong> If every car in your photos is red, your model learns nothing about colour. If every route is 11 steps, nothing about length. When you collect data, make sure the things you care about actually change.</p>
 
-<h3>Step 7: how this connects to real RLHF (and to Lesson 7)</h3>
+<h3>Step 7: how this connects to real RLHF (and to the bonus maze lesson)</h3>
 <p>Big chat assistants were trained with exactly this recipe, scaled up:</p>
 <ol>
 <li><strong>Collect comparisons.</strong> The language model writes two answers to the same question. A person picks the better one. Repeat hundreds of thousands of times.</li>
@@ -181,7 +182,7 @@ robot's chosen route features:                      (11, 8, 1)    ← route Q</c
 <li><strong>Use the reward.</strong> Here's where real RLHF goes further than best-of-n. Best-of-n is honest and works (some real systems do it), but it means writing many answers every time and throwing most away. So instead they use <strong>reinforcement learning</strong> to change the <em>policy</em> itself (the language model) so it produces high-reward answers on the first try. The popular algorithms are <strong>PPO</strong> and, more recently, <strong>GRPO</strong>.</li>
 </ol>
 <p>There's a catch. The reward model is only an imitation of people's taste, and it has blind spots. If you push the policy hard enough, it finds weird outputs that the reward model scores highly but that no person would like. That's called <strong>reward hacking</strong>. Imagine our robot finding a bizarre route the reward model loves because it has 0 turns, even though it drives through a gap no real robot fits through. To stop this, real RLHF adds a <strong>KL penalty</strong>: a leash that charges the policy points for drifting too far from how it behaved before training. "Get more reward, but stay close to your old self."</p>
-<div class="note"><strong>Compare with Lesson 7.</strong> In Q-learning, <em>we</em> wrote the reward: −1 per step, +10 at the goal. That works when you can write down what you want. Here the reward is <strong>learned from people</strong>, because nobody can write down "a route that feels nice" or "a helpful, polite answer". RLHF = "learn the reward from humans" + "reinforcement learning on that reward". You've now done both halves.</div>
+<div class="note"><strong>Compare with the bonus maze lesson.</strong> In Q-learning, <em>we</em> wrote the reward: −1 per step, +10 at the goal. That works when you can write down what you want. Here the reward is <strong>learned from people</strong>, because nobody can write down "a route that feels nice" or "a helpful, polite answer". RLHF = "learn the reward from humans" + "reinforcement learning on that reward". You've now done both halves.</div>
 
 <h2 id="play">3. Play with it</h2>
 <div class="card demo">
@@ -206,7 +207,7 @@ robot's chosen route features:                      (11, 8, 1)    ← route Q</c
 </div>
 
 <h2 id="homework">4. Homework</h2>
-<p>Open <code>homework/lesson12_preferences.py</code>. It imports <code>move</code> (Lesson 1), <code>sigmoid</code> (Lesson 4) and <code>astar_path</code> (Lesson 6), so those must be finished. Already written for you: <code>TRUE_TASTE</code>, <code>candidate_routes</code>, <code>ask_person</code> (the simulated person) and <code>collect_comparisons</code>. Write these six functions, in order.</p>
+<p>Open <code>homework/lesson12_preferences.py</code>. It imports <code>move</code> (week 1), <code>sigmoid</code> (week 3) and <code>astar_path</code> (week 4), so those must be finished. Already written for you: <code>TRUE_TASTE</code>, <code>candidate_routes</code>, <code>ask_person</code> (the simulated person) and <code>collect_comparisons</code>. Write these six functions, in order.</p>
 
 <h3>4.1 <code>route_features(room, path)</code></h3>
 <p>Return the tuple <code>(length, near_wall, turns)</code> as defined in Step 1.</p>
@@ -218,7 +219,7 @@ robot's chosen route features:                      (11, 8, 1)    ← route Q</c
 <h3>4.2 <code>reward(weights, features)</code></h3>
 <p>The weighted sum: <code>w1*f1 + w2*f2 + w3*f3</code>.</p>
 <p>Example: <code>reward([-1, -0.5, -2], (10, 4, 1))</code> → −10 − 2 − 2 = <code>-14</code>.</p>
-<details><summary>Hint 1</summary><p>This is the neuron from Lesson 4, without a bias.</p></details>
+<details><summary>Hint 1</summary><p>This is the neuron from week 3, without a bias.</p></details>
 <details><summary>Hint 2</summary><p><code>zip(weights, features)</code> pairs up each weight with its feature.</p></details>
 <details><summary>Hint 3</summary><p>Return the <code>sum</code> of <code>w * f</code> for each <code>w, f</code> in that zip.</p></details>
 
@@ -280,10 +281,27 @@ python3 check.py 12</code></pre>
 
 <h2 id="add-to-robot">Add it to your robot</h2>
 <p>Fill in <code>nicest_route(self, target)</code>: learn people's taste with your reward model, then pick the candidate route they'd like best. The provided <code>plan_route()</code> uses it whenever nothing is blocked.</p>
-<details><summary>Hint 1</summary><p>Learn the taste once, from routes between the start and the bin: <code>CACHE["taste"] = train_reward_model(collect_comparisons(...))</code>.</p></details>
-<details><summary>Hint 2</summary><p>Then <code>best_route(CACHE["taste"], ROOM, candidate_routes(ROOM, self.pos, target))</code>.</p></details>
-<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 12: nicer routes"</em>.</p>
-<p>From the start to the bin it now picks a route with 1 turn instead of 3, and fewer squares brushing the walls.</p>
+<details><summary>Hint 1</summary><p>Start the method with this import line:</p><pre><code>from lesson12_preferences import candidate_routes, collect_comparisons, train_reward_model, best_route</code></pre></details>
+<details><summary>Hint 2</summary><p>Two jobs. <b>Learn the taste once</b>, and keep it in <code>CACHE["taste"]</code> so the robot doesn't re-learn it every time it moves: only do it <code>if "taste" not in CACHE</code>. Learn it from the routes between <code>ROBOT_START</code> and the bin, <code>find_bin(ROOM)</code>, with 150 comparisons and <code>random.Random(0)</code>, exactly as the docstring says. <b>Then pick</b> the best of the candidate routes from where the robot is now. If there are none, fall back to your week 4 <code>self.route(target)</code>.</p></details>
+<details><summary>Hint 3 (fill in the blanks)</summary><pre><code>if "taste" not in CACHE:
+    start_routes = candidate_routes(ROOM, ROBOT_START, find_bin(ROOM))
+    CACHE["taste"] = train_reward_model(collect_comparisons(ROOM, ____, 150, random.Random(0)))
+routes = candidate_routes(ROOM, self.pos, ____)
+return best_route(CACHE["taste"], ROOM, routes) if routes else self.route(target)</code></pre></details>
+<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 12: nicer routes"</em>. If it's red, the hint says <em>"the nicest route to the bin should have fewer turns than A*'s"</em>.</p>
+<p>From the start to the bin it now plans a route with 1 turn instead of 3, and fewer squares brushing the walls: route Q from Step 1, along the top and straight down column 7. Now try it (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
+<pre><code>Zippy&gt; goto bin
+  Something is in the way at (4, 1)! I stopped just in time (stop chance 0.99, my safe threshold 0.17).
+##########
+#*r*c....#
+#.*##....#
+#.*#..b..#
+#.*..##..#
+#g**.....#
+#.#****R.#
+##########
+  I'm at (7, 6).</code></pre>
+<p>Ha! The nice route runs along the top, and the cat is sitting right on it. Your robot set off the way people like, stopped in time (week 3), and planned a new way round (week 4). The nice route is for when nothing is in the way. Every piece you built is still working together.</p>
 
 <h2 id="challenge">5. Real-world challenge: learn a real person's taste</h2>
 <p>You'll do RLHF on a real human, with paper.</p>
@@ -294,11 +312,12 @@ python3 check.py 12</code></pre>
 <li><strong>Test it.</strong> Ask 5 brand-new pairs. Before each, predict their choice using your weights. Record how many you got right.</li>
 <li><strong>Show them.</strong> Tell them their "taste weights". Do they agree? ("I care about price twice as much as sweetness? Hmm, true.")</li>
 </ol>
+<p><strong>On your own (15 minutes).</strong> Be your own "person". Pick 8 snacks (or games, or songs) and give each the 3 numbers. Then, without looking at the numbers, compare 15 random pairs and tick the one you'd pick. Put your answers into <code>train_reward_model</code>, or do one pass by hand. Does the result match what you <em>think</em> you care about? Surprises count as discoveries.</p>
 <p><strong>What to notice:</strong> the person never told you a weight, but you found them. Did they answer the repeated pair the same way both times? If not, that's the "a bit random" from Bradley-Terry. And if all your snacks cost the same, what did you learn about price? (Step 6!)</p>
 
 <h2 id="project">6. Your Robo-Helper so far</h2>
-<p>Robo-Helper (Lesson 11) works, and the bake-off (Lesson 19) showed which brain understands people best, but it only knows one meaning of "best": shortest. Now it has a <code>reward</code> model, a way to learn it from people (<code>train_reward_model</code>), and <code>best_route</code>, which picks the route people actually like from the 24 candidates. The route planner from Lesson 6 is still doing the heavy lifting (every candidate is built by <code>astar_path</code>); the new piece sits on top and chooses between them.</p>
-<p>Next, in <a href="13-lora.html">Lesson 13</a>, you'll teach the robot a different kind of new trick: adapting a factory-trained model to <em>your</em> robot's slightly different hardware with <code>train_lora</code>, by training only a handful of numbers. And in <a href="14-go-real.html">Lesson 14</a> you'll think about putting all of this on a real robot, where asking people "A or B?" is how real robot companies tune behaviour that no rule can describe.</p>
+<p>Your robot works, and the bake-off (week 11) showed which brain understands people best, but it only knows one meaning of "best": shortest. Now it has a <code>reward</code> model, a way to learn it from people (<code>train_reward_model</code>), and <code>best_route</code>, which picks the route people actually like from the 24 candidates. The route planner from week 4 is still doing the heavy lifting (every candidate is built by <code>astar_path</code>); the new piece sits on top and chooses between them.</p>
+<p>Back in week 9, <a href="13-lora.html">LoRA</a> showed how to adapt a model cheaply, by training only a handful of numbers. Here you taught the robot <em>taste</em>. Next, in <a href="14-go-real.html">Part B</a>, your robot fights the boss: the two exam tasks it still fails. Then it's showtime, and you'll think about putting it all on a real robot, where asking people "A or B?" is how real robot companies tune behaviour that no rule can describe.</p>
 
 <h2 id="mistakes">7. Common mistakes</h2>
 <ul>
@@ -306,7 +325,7 @@ python3 check.py 12</code></pre>
 <li><strong>Counting a square twice</strong> because two of its neighbours are walls. Use <code>any(...)</code>, which is True or False, so each square adds at most 1.</li>
 <li><strong>Getting the difference backwards.</strong> <code>B − A</code> instead of <code>A − B</code> (or <code>p − y</code> instead of <code>y − p</code>) makes the robot learn the opposite of the person's taste. Checker hint: <em>"all three learned weights should be negative"</em>.</li>
 <li><strong>Resetting the weights inside the loop.</strong> If <code>w = [0, 0, 0]</code> is inside the epoch loop, it forgets everything each pass. The checker will say it <em>"should agree with the person on new comparisons at least 78% of the time"</em>.</li>
-<li><strong>Testing on the training comparisons.</strong> It feels good but it's not honest (Lesson 5). Always report agreement on the 100 new ones.</li>
+<li><strong>Testing on the training comparisons.</strong> It feels good but it's not honest (week 3). Always report agreement on the 100 new ones.</li>
 </ul>
 
 <h2 id="check">8. Check yourself</h2>
@@ -314,7 +333,7 @@ python3 check.py 12</code></pre>
 <details><summary>Predict: <code>prob_prefers_a([-1, 0, 0], (5, 0, 0), (9, 0, 0))</code>. Roughly what comes out?</summary><p>Rewards are −5 and −9, gap = 4, sigmoid(4) ≈ 0.98. A is much shorter and this person only cares about length, so they almost always pick A. (The checker wants more than 0.95.)</p></details>
 <details><summary>The model agrees with the person only 84% of the time. Why is that fine here?</summary><p>Because the person's <em>own</em> true taste agrees with their answers only 84% of the time too. They're a bit random on close pairs. 84% is the ceiling, and the model reached it.</p></details>
 <details><summary>All your training routes are 11 steps long. What length weight do you learn, and why?</summary><p>Exactly 0.0. Every comparison has a length difference of 0, so the update for that weight is always multiplied by 0. You can only learn about things that vary in your data.</p></details>
-<details><summary>What's the difference between the reward in Lesson 7 and the reward here? And what does real RLHF do that we didn't?</summary><p>In Lesson 7 we wrote the reward by hand (−1 per step, +10 at the goal). Here the reward is learned from people's comparisons. We then used it with best-of-n (score every option, pick the top). Real RLHF also trains the policy itself with reinforcement learning (PPO or GRPO) to produce high-reward outputs, with a KL penalty that keeps it close to its old behaviour so it can't "hack" the imperfect reward model.</p></details>
+<details><summary>What's the difference between the reward in the bonus maze lesson and the reward here? And what does real RLHF do that we didn't?</summary><p>In the bonus maze lesson we wrote the reward by hand (−1 per step, +10 at the goal). Here the reward is learned from people's comparisons. We then used it with best-of-n (score every option, pick the top). Real RLHF also trains the policy itself with reinforcement learning (PPO or GRPO) to produce high-reward outputs, with a KL penalty that keeps it close to its old behaviour so it can't "hack" the imperfect reward model.</p></details>
 
 <h2 id="deeper">9. Go deeper (optional)</h2>
 <ul>
@@ -322,14 +341,14 @@ python3 check.py 12</code></pre>
 <li><a href="../06-30u30/30-rlhf.html">30u30 Day 30: RLHF</a>: the paper behind learning rewards from human preferences, walked through.</li>
 <li><a href="../06-30u30/29-ppo.html">30u30 Day 29: PPO</a>: the reinforcement-learning algorithm classic RLHF uses to train the policy on the learned reward.</li>
 <li><a href="../12-training-inference-videos/06-grpo.html">GRPO</a>: a simpler, newer RL method that compares a group of answers to each other, used to train reasoning models.</li>
-<li><a href="04-neuron.html">Lesson 4: the neuron</a> and <a href="07-trial-and-error.html">Lesson 7: Q-learning</a>: the two halves of this lesson, if you want to look back.</li>
+<li><a href="04-neuron.html">Week 3: the neuron</a> and <a href="07-trial-and-error.html">The bonus maze lesson: Q-learning</a>: the two halves of this lesson, if you want to look back.</li>
 </ul>
 
 <nav class="pager">
   <a href="19-bakeoff.html"><small>Previous</small>Week 11 · The bake-off</a>
   <a class="next" href="14-go-real.html"><small>Next</small>Week 12 · Going real</a>
 </nav>
-<footer>Build a Robot Brain · Week 12 · Lesson 12</footer>
+<footer>Build a Robot Brain · Week 12 of 12 · Part A</footer>
 </main>
 
 <script>

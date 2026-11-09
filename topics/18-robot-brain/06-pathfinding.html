@@ -3,21 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 6 · Finding the way</title>
+<title>Week 4 · Finding the way</title>
 <link rel="stylesheet" href="../../style.css">
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 4 · Lesson 6</nav>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 4 of 12</nav>
 
-<div class="eyebrow"><span class="track robo">Robotics</span>Build a Robot Brain · Week 4 · Lesson 6</div>
+<div class="eyebrow"><span class="track robo">Robotics</span>Build a Robot Brain · Week 4 of 12</div>
 <h1>Finding the way: BFS and A*</h1>
 <p class="lede">Robo-Helper knows where it is and where the bin is. Now it needs a route that doesn't go through walls, and the shortest one. You'll build breadth-first search, which explores like a ripple on a pond, then A*, which aims the ripple at the goal.</p>
-<div class="card note" id="journey"><strong>Step 7 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe. <strong>Today</strong> it learns to plan the shortest route around things. Next: <a href="07-trial-and-error.html">Bonus · Trial and error</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>goto blue</code>.</div>
+<div class="card note" id="journey"><strong>Week 4 of 12.</strong> So far your robot: ✓ says hello ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe. <strong>Today</strong> it learns to plan the shortest route around things. Next: <a href="08-words-as-numbers.html">Week 5 · Part A: Words as numbers</a> (or the optional side quest, <a href="07-trial-and-error.html">Bonus · Trial and error</a>). <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>goto blue</code>.</div>
 
 <div class="facts">
   <div><b>Time</b>2–4 hours, plus the challenge</div>
-  <div><b>You'll need</b>Python 3, Lesson 1 finished, squared paper and a pencil</div>
+  <div><b>You'll need</b>Python 3, week 1 finished, squared paper and a pencil</div>
   <div><b>New words</b>search, queue, frontier, breadth-first search (BFS), heuristic, A*, priority queue</div>
   <div><b>Project piece</b>Route planning</div>
 </div>
@@ -68,7 +68,7 @@ y=7  ##########</code></pre>
 <h2 id="principles">2. First principles</h2>
 
 <h3>Step 1: neighbours</h3>
-<p>From any square, the possible next squares are its 4 neighbours (north, south, east, west) that aren't walls. Using Lesson 1's <code>move</code>: from (1, 1), north is (1, 0), a wall. South is (1, 2), free. East is (2, 1), free. West is (0, 1), a wall. So <code>neighbors(ROOM, (1, 1))</code> is <code>[(1, 2), (2, 1)]</code>, in the order N, S, E, W. The order matters: it decides which of several equally short routes we find.</p>
+<p>From any square, the possible next squares are its 4 neighbours (north, south, east, west) that aren't walls. Using week 1's <code>move</code>: from (1, 1), north is (1, 0), a wall. South is (1, 2), free. East is (2, 1), free. West is (0, 1), a wall. So <code>neighbors(ROOM, (1, 1))</code> is <code>[(1, 2), (2, 1)]</code>, in the order N, S, E, W. The order matters: it decides which of several equally short routes we find.</p>
 
 <h3>Step 2: rings (breadth-first search)</h3>
 <p>Write 0 on the start. Write 1 on its free neighbours. Write 2 on <em>their</em> unnumbered neighbours. Keep going. This is the whole room, numbered:</p>
@@ -97,7 +97,7 @@ take (2,1) → (2,2) seen; (3,1) is new            queue: [(1,3), (2,2), (3,1)]<
 </details>
 
 <h3>Step 4: aim the ripple (A*)</h3>
-<p>BFS explores in every direction equally, even away from the goal. Let's give it a hint: the <strong>Manhattan distance</strong> from Lesson 1, <code>|x1 − x2| + |y1 − y2|</code>. It ignores walls, so it's never more than the true number of steps left. It's an optimistic guess.</p>
+<p>BFS explores in every direction equally, even away from the goal. Let's give it a hint: the <strong>Manhattan distance</strong> from week 1, <code>|x1 − x2| + |y1 − y2|</code>. It ignores walls, so it's never more than the true number of steps left. It's an optimistic guess.</p>
 <p>For every square we track <code>g</code> = steps taken so far, and <code>h</code> = the Manhattan guess of steps left. Then:</p>
 <pre><code>f = g + h      "the best this route could possibly be, if it goes through here"</code></pre>
 <p>A* always explores the square with the <strong>smallest f</strong> next. To find the smallest quickly, it uses a <strong>priority queue</strong> (Python's <code>heapq</code>). Worked example from the start, with the bin at (7, 6):</p>
@@ -138,11 +138,11 @@ Click to:
 <p>Things to try: run BFS, then A*, from the start corner (40 vs 35). Move the robot to (4, 1) and compare again. Drop a box at (1, 5) and watch both find a different 11-step route. Box the robot in completely: both should report no route.</p>
 
 <h2 id="homework">4. Homework</h2>
-<p>Open <code>project/homework/lesson06_paths.py</code>. It imports <code>move</code> and <code>manhattan</code> from your Lesson 1 file, so finish that first. Write these four, in order:</p>
+<p>Open <code>project/homework/lesson06_paths.py</code>. It imports <code>move</code> and <code>manhattan</code> from your week 1 file (<code>lesson01_moving.py</code>), so finish that first. Write these four, in order:</p>
 
 <h3>4.1 <code>neighbors(room, pos, blocked=())</code></h3>
 <p>Return the free squares one step N, S, E, W of <code>pos</code>, in that order, skipping any in <code>blocked</code>. Example: <code>neighbors(ROOM, (1, 1))</code> → <code>[(1, 2), (2, 1)]</code>; with <code>blocked={(2, 1)}</code> → <code>[(1, 2)]</code>.</p>
-<details><summary>Hint 1</summary><p>You already have <code>move(pos, direction)</code> from Lesson 1 and <code>is_free(room, pos)</code> from <code>world.py</code>.</p></details>
+<details><summary>Hint 1</summary><p>You already have <code>move(pos, direction)</code> from week 1 and <code>is_free(room, pos)</code> from <code>world.py</code>.</p></details>
 <details><summary>Hint 2</summary><p>A string is a sequence: <code>for d in "NSEW":</code> loops over the four directions in the right order.</p></details>
 <details><summary>Hint 3</summary><p>Make an empty list. For each direction d in "NSEW": p = move(pos, d); if p is free and p not in blocked, append it. Return the list.</p></details>
 
@@ -156,12 +156,12 @@ Click to:
 <p>Like BFS, but use a priority queue of <code>(f, g, square)</code> tuples with <code>heapq</code>, and keep a <code>cost</code> dictionary of the best <code>g</code> found for each square. Return <code>(path, expanded)</code>, where <code>expanded</code> counts the squares you took off the queue (not counting out-of-date ones). Example: from the start to the bin, the path is 11 steps and <code>expanded</code> is 35.</p>
 <details><summary>Hint 1</summary><p><code>heapq.heappush(frontier, (f, g, square))</code> adds; <code>heapq.heappop(frontier)</code> removes the tuple with the smallest f (ties broken by g, then by the square). Start the frontier as <code>[(manhattan(start, goal), 0, start)]</code> and <code>cost = {start: 0}</code>.</p></details>
 <details><summary>Hint 2</summary><p>After popping <code>(_, g, cur)</code>: if <code>g &gt; cost[cur]</code>, skip it with <code>continue</code>. Otherwise add 1 to <code>expanded</code>, check for the goal, and look at neighbours.</p></details>
-<details><summary>Hint 3</summary><p>For each neighbour nxt: new_g = g + 1. If new_g is smaller than cost.get(nxt, infinity): set cost[nxt] = new_g, came_from[nxt] = cur, and push (new_g + manhattan(nxt, goal), new_g, nxt). If the frontier runs out, return (None, expanded).</p></details>
+<details><summary>Hint 3</summary><p>For each neighbour nxt: new_g = g + 1. If new_g is smaller than <code>cost.get(nxt, float('inf'))</code> (<code>float('inf')</code> is Python's infinity: bigger than every number, so a square you've never reached always gets updated): set cost[nxt] = new_g, came_from[nxt] = cur, and push (new_g + manhattan(nxt, goal), new_g, nxt). If the frontier runs out, return (None, expanded).</p></details>
 
 <h3>4.4 <code>path_to_commands(path)</code></h3>
 <p>Turn a list of squares into a string of letters. Example: <code>[(1, 1), (2, 1), (2, 2), (1, 2)]</code> → <code>"ESW"</code>.</p>
 <details><summary>Hint 1</summary><p>Look at each pair of neighbouring squares in the path. <code>zip(path, path[1:])</code> gives you <code>(a, b)</code> pairs.</p></details>
-<details><summary>Hint 2</summary><p>The change from a to b is <code>(b[0] − a[0], b[1] − a[1])</code>, for example <code>(1, 0)</code>. Lesson 1's <code>DIRECTIONS</code> maps letters to changes. You need the reverse.</p></details>
+<details><summary>Hint 2</summary><p>The change from a to b is <code>(b[0] − a[0], b[1] − a[1])</code>, for example <code>(1, 0)</code>. Week 1's <code>DIRECTIONS</code> maps letters to changes. You need the reverse.</p></details>
 <details><summary>Hint 3</summary><p>Build a reversed dictionary {change: letter} from DIRECTIONS. For each pair, look up the change and collect the letter. Join the letters into one string.</p></details>
 
 <h3>Run it</h3>
@@ -186,7 +186,7 @@ python3 check.py 6</code></pre>
 <p>Hints you might see:</p>
 <pre><code>  ✗ neighbors: neighbors of (1, 1) are (1, 2) then (2, 1), checking N, S, E, W
   ✗ bfs unreachable: a boxed-in robot should get None</code></pre>
-<p><code>5/5 passed  🎉 lesson complete!</code> means you're done.</p>
+<p>The checker runs 5 tests for 4 functions: <code>bfs_path</code> gets two (one for a normal route, one for a robot that's boxed in). <code>5/5 passed  🎉 lesson complete!</code> means you're done.</p>
 
 <h3>Stretch</h3>
 <ul>
@@ -196,16 +196,56 @@ python3 check.py 6</code></pre>
 </ul>
 
 <h2 id="add-to-robot">Add it to your robot</h2>
-<p>Fill in <code>route(self, target)</code> with your <code>astar_path()</code>, then <code>goto(self, target)</code>: follow the route square by square with <code>self.step()</code>, and if the robot stops for the cat, plan again (it remembers the blocked square).</p>
-<details><summary>Hint 1</summary><p><code>route</code> is two lines: <code>path, _ = astar_path(ROOM, self.pos, target, blocked=self.blocked)</code>, then <code>return path</code>.</p></details>
-<details><summary>Hint 2</summary><p>In <code>goto</code>, use <code>for square in path[1:]</code>. On <code>"stopped"</code>, <code>self.say(...)</code> and <code>break</code> to plan again; on <code>"bump"</code>, give up.</p></details>
-<details><summary>Hint 3</summary><p>Python's <code>for ... else</code> runs the <code>else</code> only if the loop never hit <code>break</code>: that's "every step worked", so <code>return ""</code>.</p></details>
-<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 4: goto"</em>.</p>
+<p>Two gaps in <code>my_robot.py</code> this week.</p>
+<ol>
+<li><code>route(self, target)</code>: the shortest path from <code>self.pos</code> to <code>target</code> with your <code>astar_path()</code>, avoiding the squares in <code>self.blocked</code>. Return just the path.</li>
+<li><code>goto(self, target)</code>: follow the route square by square with <code>self.step()</code>. If the robot stops for the cat, plan again. (When it stops, the provided <code>step()</code> adds the cat's square to <code>self.blocked</code>, so the new route goes round it.)</li>
+</ol>
+<p>This is the plan for <code>goto</code>, from its docstring. Notice the outer loop: it lets the robot plan up to 6 times.</p>
+<pre><code>for attempt in range(6):
+    path = self.plan_route(target)          # PROVIDED: calls your route()
+    if path is None: return "I can't find a way there."
+    for square in path[1:]:                 # path[0] is where you are now
+        result = self.step(square)
+        "bump" (or "late") → return self.step_message(result, square)
+        "stopped" → self.say(self.step_message("stopped", square)), then break (plan again)
+    if every step worked: return ""
+return "Too many surprises, giving up."</code></pre>
+<p>("late" only happens in week 8, when you make the robot's brain slow on purpose. Treat it like a bump.) <code>self.say(msg)</code> is provided: it prints a message straight away, while the robot keeps going. <code>return</code> hands back the robot's final answer.</p>
+<div class="card note"><strong>New Python this time: <code>for … else</code>.</strong> A loop can have an <code>else</code>. It runs only if the loop finished <em>without</em> hitting <code>break</code>:
+<pre><code>for n in [2, 4, 6]:
+    if n == 5:
+        break
+else:
+    print("no 5 anywhere")      # runs: the loop never hit break</code></pre>
+<p>Put <code>5</code> in the list and nothing is printed. In <code>goto</code>, "the loop never hit <code>break</code>" means "every step worked".</p></div>
+<details><summary>Hint 1</summary><p>Start <code>route</code> with this import:</p>
+<pre><code>from lesson06_paths import astar_path</code></pre>
+<p><code>astar_path</code> returns two things, <code>(path, expanded)</code>. <code>route</code> only needs the path, so catch the second one in <code>_</code> (Python's name for "I don't need this"). Pass <code>blocked=self.blocked</code>.</p></details>
+<details><summary>Hint 2</summary><p>In <code>goto</code>, put the inner <code>for square in path[1:]:</code> loop inside the outer <code>for attempt in range(6):</code> loop. Check <code>result in ("bump", "late")</code> and <code>result == "stopped"</code> with two <code>if</code>s. Then give the <em>inner</em> loop an <code>else: return ""</code>.</p></details>
+<details><summary>Hint 3</summary><p>Fill in the blanks:</p>
+<pre><code>path, _ = astar_path(ROOM, self.pos, ____, blocked=self.blocked)
+return path</code></pre>
+<pre><code>for attempt in range(6):
+    path = self.plan_route(target)
+    if path is None:
+        return "I can't find a way there."
+    for square in path[1:]:
+        result = self.step(____)
+        if result in ("bump", "late"):
+            return self.step_message(result, square)
+        if result == "stopped":
+            self.say(self.step_message("stopped", square))
+            ____
+    else:
+        return ____
+return "Too many surprises, giving up."</code></pre></details>
+<p>Check it: <code>cd ..</code> back to <code>project</code>, then <code>python3 check.py robot</code>. Your new check is <em>"week 4: goto"</em>.</p>
 <p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
 <pre><code>Zippy&gt; goto blue
-  Something is in the way at (4, 1)! I stopped just in time. Planning a new route.
+  Something is in the way at (4, 1)! I stopped just in time (stop chance 0.99, my safe threshold 0.17).
   I'm at (6, 3).</code></pre>
-<p>It drives off, finds the cat, stops, plans a way round and gets there.</p>
+<p>It drives off, finds the cat, stops, plans a way round and gets there. The first line is your <code>self.say(...)</code>. The second is what the <code>goto</code> command prints when your <code>goto</code> returns <code>""</code>.</p>
 
 <h2 id="challenge">5. Real-world challenge: route-plan your home</h2>
 <ol>
@@ -216,13 +256,14 @@ python3 check.py 6</code></pre>
 <li><strong>Run A* on a fresh copy.</strong> For each square you explore, write <code>g + h</code>. Always continue from the smallest. Count squares again. Which method numbered fewer?</li>
 <li><strong>Walk it.</strong> Walk the planned route counting your steps. Does it match the number on the goal? Then put a bag in the middle of the route (a surprise obstacle) and replan from where you're standing.</li>
 </ol>
-<p><strong>What to record:</strong> your map, the BFS and A* square counts, the planned and walked step counts. <strong>What it teaches:</strong> BFS really is a ripple, the heuristic really does save work, and real routes need replanning when the world surprises you, which is exactly what Robo-Helper does in Lesson 11.</p>
+<p><strong>On your own:</strong> this one already works alone. If you can't walk around right now, do steps 1 to 5 on paper and "walk" the route with a coin on the map.</p>
+<p><strong>What to record:</strong> your map, the BFS and A* square counts, the planned and walked step counts. <strong>What it teaches:</strong> BFS really is a ripple, the heuristic really does save work, and real routes need replanning when the world surprises you, which is exactly what Robo-Helper does in week 7's capstone.</p>
 
 <h2 id="project">6. Your Robo-Helper so far</h2>
-<p>Robo-Helper can now <strong>plan routes</strong>. Given where it is, where it wants to go, and which squares are blocked, <code>astar_path</code> gives it the shortest route, and <code>path_to_commands</code> turns that into moves like the ones you wrote in Lesson 1.</p>
+<p>Robo-Helper can now <strong>plan routes</strong>. Given where it is, where it wants to go, and which squares are blocked, <code>astar_path</code> gives it the shortest route, and <code>path_to_commands</code> turns that into moves like the ones you wrote in week 1.</p>
 <ul>
-<li><strong>Lesson 11</strong> (the capstone): <code>drive_to</code> calls <code>astar_path(self.room, self.pos, target, blocked=self.known_blocked)</code>. When the Lesson 4–5 stop detector spots a surprise (say a cat at (4, 1)), that square goes into <code>known_blocked</code> and the robot replans from where it stands.</li>
-<li><strong>Lesson 7</strong> is a side quest: what if the robot has <em>no map</em> at all? Then it can't search like this, and has to learn the way by trial and error.</li>
+<li><strong>Week 7's capstone</strong>: <code>drive_to</code> calls <code>astar_path(self.room, self.pos, target, blocked=self.known_blocked)</code>. When week 3's stop detector spots a surprise (say a cat at (4, 1)), that square goes into <code>known_blocked</code> and the robot replans from where it stands.</li>
+<li><strong>The bonus side quest</strong> (<a href="07-trial-and-error.html">trial and error</a>): what if the robot has <em>no map</em> at all? Then it can't search like this, and has to learn the way by trial and error.</li>
 </ul>
 
 <h2 id="mistakes">7. Common mistakes</h2>
@@ -249,10 +290,11 @@ python3 check.py 6</code></pre>
 </ul>
 
 <nav class="pager">
-  <a href="05-evaluation.html"><small>Previous</small>Week 3 · Honest testing</a>
-  <a class="next" href="07-trial-and-error.html"><small>Next</small>Bonus · Trial and error</a>
+  <a href="05-evaluation.html"><small>Previous</small>Week 3 · Part B: Honest testing</a>
+  <a class="next" href="08-words-as-numbers.html"><small>Next</small>Week 5 · Part A: Words as numbers</a>
 </nav>
-<footer>Build a Robot Brain · Week 4 · Lesson 6</footer>
+<p class="legend">Optional side quest before week 5: <a href="07-trial-and-error.html">Bonus · Trial and error</a>. It adds nothing to <code>my_robot.py</code>, so skip it if you like.</p>
+<footer>Build a Robot Brain · Week 4 of 12 (homework file: lesson06_paths.py)</footer>
 </main>
 
 <script>

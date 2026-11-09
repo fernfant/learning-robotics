@@ -3,21 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 4 · The artificial neuron</title>
+<title>Week 3 · The artificial neuron</title>
 <link rel="stylesheet" href="../../style.css">
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 3 · Lesson 4</nav>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 3 of 12 · Part A</nav>
 
-<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 3 · Lesson 4</div>
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 3 of 12 · Part A</div>
 <h1>The artificial neuron: should the robot stop?</h1>
-<p class="lede">Two sensor numbers go in, one "how sure am I that I must stop?" comes out. You'll build the neuron from a simple weighted vote, find out why it needs a squash, and then let it learn its own weights with the same trick you used in Lesson 3.</p>
-<div class="card note" id="journey"><strong>Step 5 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance. <strong>Today</strong> it learns to decide by itself when to stop. Next: <a href="05-evaluation.html">Week 3 · Honest testing</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>EEEE</code> once lesson 5 is done too: it stops before the cat.</div>
+<p class="lede">Two sensor numbers go in, one "how sure am I that I must stop?" comes out. You'll build the neuron from a simple weighted vote, find out why it needs a squash, and then let it learn its own weights with the same trick you used in week 2.</p>
+<div class="card note" id="journey"><strong>Week 3 of 12 · Part A.</strong> So far your robot: ✓ says hello ✓ moves ✓ senses ✓ knows its braking distance. <strong>Today</strong> it learns to decide by itself when to stop. Next: <a href="05-evaluation.html">Week 3 · Part B: Honest testing</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>EEEE</code>: this time it stops before the cat!</div>
 
 <div class="facts">
   <div><b>Time</b>2–3 hours, plus the challenge</div>
-  <div><b>You'll need</b>Python 3, pen and paper, a calculator, Lesson 3 done</div>
+  <div><b>You'll need</b>Python 3, pen and paper, a calculator, week 2 done</div>
   <div><b>New words</b>neuron, weight, bias, sigmoid, probability, epoch, decision boundary</div>
   <div><b>Project piece</b>An obstacle detector</div>
 </div>
@@ -51,7 +51,7 @@
 <li><code>x1</code> = <strong>distance</strong> to the thing ahead, in metres;</li>
 <li><code>x2</code> = <strong>closing speed</strong>: how fast that distance is shrinking, in metres per second.</li>
 </ul>
-<p>We want one answer: the <strong>probability that the robot must stop</strong>. In the simulated world, the true rule is "stop if <code>distance − closing speed &lt; 1</code>", which means: if in one second you'd be closer than 1 metre, brake. But the robot doesn't know this rule. And, as you saw in Lesson 2, its sensor is noisy, so near the line the readings are genuinely confusing.</p>
+<p>We want one answer: the <strong>probability that the robot must stop</strong>. In the simulated world, the true rule is "stop if <code>distance − closing speed &lt; 1</code>", which means: if in one second you'd be closer than 1 metre, brake. But the robot doesn't know this rule. And, as you saw in week 2, its sensor is noisy, so near the line the readings are genuinely confusing.</p>
 <p>The obvious approach is to hand-write rules: <code>if distance &lt; 1: stop</code>. Try it on a few examples:</p>
 <pre><code>distance  speed   true answer   "distance &lt; 1" says
   0.5      0.0       stop           stop   ✓
@@ -77,7 +77,7 @@
 </details>
 
 <h3>Step 2: why squash?</h3>
-<p><code>z</code> can be any number: −2.8, 0.5, 47. That's awkward. Is 47 "very sure" or just "sure"? And "above 0 → stop" is a hard switch: change a weight a tiny bit and the answer either flips completely or doesn't change at all. You can't learn by nudging something that never moves smoothly. (In Lesson 3 you nudged downhill on a smooth error curve. A switch has no slope to follow.)</p>
+<p><code>z</code> can be any number: −2.8, 0.5, 47. That's awkward. Is 47 "very sure" or just "sure"? And "above 0 → stop" is a hard switch: change a weight a tiny bit and the answer either flips completely or doesn't change at all. You can't learn by nudging something that never moves smoothly. (In week 2 you nudged downhill on a smooth error curve. A switch has no slope to follow.)</p>
 <p>So we squash <code>z</code> through the <strong>sigmoid</strong>:</p>
 <pre><code>sigmoid(z) = 1 / (1 + e^(−z))          e ≈ 2.718
 
@@ -89,8 +89,8 @@
    1       0.731
    2       0.881
    4       0.982      almost certainly "stop"</code></pre>
-<p>Big negative → close to 0. Big positive → close to 1. Zero → 0.5. It's smooth, so a tiny change to a weight makes a tiny change to the answer, and we can learn. And the output is a probability, which Lesson 5 will turn into a careful stop decision.</p>
-<p class="note"><strong>Computer gotcha:</strong> for <code>z = −1000</code>, <code>e^(−z) = e^1000</code>, which is too big for Python: <code>math.exp(1000)</code> raises <code>OverflowError</code>. The fix is the same maths written differently: when <code>z &lt; 0</code>, use <code>e^z / (1 + e^z)</code>. Multiply top and bottom of the original by <code>e^z</code> to see they're equal.</p>
+<p>Big negative → close to 0. Big positive → close to 1. Zero → 0.5. It's smooth, so a tiny change to a weight makes a tiny change to the answer, and we can learn. And the output is a probability, which Part B of this week will turn into a careful stop decision.</p>
+<p class="note"><strong>Computer gotcha:</strong> <code>e^z</code> grows very fast: <code>e^1 ≈ 2.7</code>, <code>e^2 = 2.718 × 2.718 ≈ 7.4</code>, <code>e^10 ≈ 22,026</code>. For <code>z = −1000</code> the formula needs <code>e^1000</code>, which is too big for Python: <code>math.exp(1000)</code> raises <code>OverflowError</code>. So when <code>z &lt; 0</code>, use this other formula, which always gives the same answer but never overflows: <code>e^z / (1 + e^z)</code>. You don't need to know why they're equal to do the homework; just use the right one for each case.</p>
 
 <p>So a neuron is just:</p>
 <pre><code>probability of stop = sigmoid(w1 * x1 + w2 * x2 + bias)</code></pre>
@@ -103,7 +103,7 @@
 <li>Nudge each weight: <code>w_i = w_i − lr × error × x_i</code>, and the bias: <code>bias = bias − lr × error</code>.</li>
 </ol>
 <p>Why <strong>error × input</strong>? If the neuron said 0.9 but the answer was 0 (go), the error is +0.9, so we pull weights down. If an input was big, it was more to blame, so its weight moves more. If an input was 0, it didn't contribute, so its weight doesn't move at all. That's fair blame.</p>
-<p><strong>This is Lesson 3 again.</strong> There your line's gradient was <code>dw = average of 2 × (predict − y) × x</code>. Same shape: error times input. The differences: we update after <em>every</em> example instead of averaging all of them first, and the "2" is gone because for probabilities we measure error in a slightly different way that makes the maths cancel neatly. It is still gradient descent: walk downhill on the error.</p>
+<p><strong>This is week 2's line fitting again.</strong> There your line's gradient was <code>dw = average of 2 × (predict − y) × x</code>. Same shape: error times input. The differences: we update after <em>every</em> example instead of averaging all of them first, and the "2" is gone. (Grown-ups use a different error score for yes/no answers, and with it the 2 cancels out. You'll meet it much later. For now, trust the rule "error × input".) It is still gradient descent: walk downhill on the error.</p>
 
 <h3>Worked example, by hand</h3>
 <p>The first two training examples the Python file generates are <code>(7.81, 1.93)</code> label 0, and <code>(6.52, 1.28)</code> label 0. Learning rate <code>lr = 0.05</code>. Start: <code>w = [0, 0]</code>, <code>bias = 0</code>.</p>
@@ -158,6 +158,7 @@ Example 2: x = (6.52, 1.28), label 0
 <p class="legend" id="probe">Click the chart to probe a point.</p>
 </div>
 <p>Things to try: set all weights to 0 (everything is 0.5, the line disappears). Press "Train 1 epoch" a few times and watch the line swing into place. Then make <code>w2</code> negative: what happens to fast-approaching obstacles?</p>
+<p><strong>Boss challenge:</strong> drag the sliders until <em>Missed stops</em> is 0. Three stars if <em>False alarms</em> is also under 40. (It can be done. Training alone doesn't get there: after 200 epochs it still misses 10.)</p>
 
 <h2 id="homework">4. Homework</h2>
 <p>Open <code>project/homework/lesson04_neuron.py</code>. <code>make_obstacle_data</code> is written for you. Write these four functions, in order:</p>
@@ -195,6 +196,7 @@ python3 lesson04_neuron.py</code></pre>
 (1.5, 1.0) stop prob 0.9
 (0.5, 0.0) stop prob 0.95</code></pre>
 <p>Read it: far and slow → 0.0 (go). 1.5 m away but closing at 1 m/s → 0.9 (stop!). Half a metre away, even standing still → 0.95 (stop).</p>
+<p>How good is it? The trained neuron gets <strong>96.2%</strong> of its 450 training examples right. That's just under the 96.7% of the perfect hand-made rule from Step 1: noisy data stops both of them reaching 100%. (Part B of this week tests it properly, on examples it has never seen.)</p>
 
 <h3>Check it</h3>
 <pre><code>cd ..
@@ -212,14 +214,46 @@ python3 check.py 4</code></pre>
 </ul>
 
 <h2 id="add-to-robot">Add it to your robot</h2>
-<p>Fill in <code>should_stop_for(self, square)</code>: something is 0.5 m ahead and the robot is doing 0.5 m/s. Train <em>your</em> neuron and ask it: stop or not? (For now use the threshold 0.5; Lesson 5 picks a safer one.)</p>
-<details><summary>Hint 1</summary><p>Train once and keep it: <code>if "stop" not in CACHE: CACHE["stop"] = ...</code></p></details>
-<details><summary>Hint 2</summary><p><code>data = make_obstacle_data(450, random.Random(0))</code>, <code>w, b = train_neuron(data)</code>, then <code>return should_stop(w, b, (0.5, 0.5), threshold)</code>.</p></details>
-<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 3: stops for the cat"</em>.</p>
+<p>Fill in <code>should_stop_for(self, square)</code> in <code>my_robot.py</code>. Something is 0.5 m ahead and the robot is doing 0.5 m/s. Train <em>your</em> neuron and ask it: stop or not? Use the threshold <strong>0.5</strong> for now. (The docstring also mentions <code>safest_threshold</code>: that's Part B of this week, which swaps 0.5 for a safer number. Your robot already works without it.)</p>
+<p>Also write down what the neuron decided, so the robot can tell you: <code>self.last_stop = (stop chance, threshold)</code>. The robot prints it when it stops.</p>
+<p class="legend">How the cat works: the simulator puts the cat at (4, 1). It's not on the robot's map. When the robot is about to drive into that square, it asks your <code>should_stop_for</code> "stop or not?". Your neuron makes the call.</p>
+<div class="card note"><strong>New Python this time: a dictionary as a memory.</strong> <code>CACHE</code> is a dictionary that lives for the whole run. Store something once, then reuse it instead of working it out again:
+<pre><code>if "stop" not in CACHE:          # first time only
+    CACHE["stop"] = train_neuron(data)
+w, b = CACHE["stop"]             # every time after that</code></pre></div>
+<details><summary>Hint 1</summary><p>Start the method with these imports (your week 3 file):</p>
+<pre><code>from lesson04_neuron import make_obstacle_data, train_neuron, should_stop, neuron</code></pre>
+<p>Train once and keep it in <code>CACHE["stop"]</code>, like the box above, so the robot doesn't retrain on every step.</p></details>
+<details><summary>Hint 2</summary><p>Inside the <code>if</code>, make the data and train:</p>
+<pre><code>data = make_obstacle_data(450, random.Random(0))
+CACHE["stop"] = train_neuron(data)</code></pre>
+<p>Then, after the <code>if</code>:</p>
+<pre><code>w, b = CACHE["stop"]
+self.last_stop = (neuron(w, b, (0.5, 0.5)), 0.5)
+return should_stop(w, b, (0.5, 0.5), 0.5)</code></pre></details>
+<details><summary>Hint 3</summary><p>Fill in the blanks:</p>
+<pre><code>from lesson04_neuron import make_obstacle_data, train_neuron, should_stop, neuron
+if "stop" not in CACHE:
+    data = make_obstacle_data(____, random.Random(0))
+    CACHE["stop"] = train_neuron(____)
+w, b = CACHE["stop"]
+self.last_stop = (neuron(w, b, ____), 0.5)
+return should_stop(w, b, ____, 0.5)</code></pre></details>
+<p>Check it: <code>cd ..</code> back to <code>project</code>, then <code>python3 check.py robot</code>. Your new check is <em>"week 3: stops for the cat"</em>. Real output (the next line stays yellow until Part B):</p>
+<pre><code>Your robot: my_robot.py
+  ✓ week 1: arrows
+  ✓ week 2: look
+  ✓ week 2 part B: look's safe speed
+  ✓ week 3: stops for the cat
+  … week 3 part B: the safest threshold: not written yet (week 3 Part B: swap 0.5 for safest_threshold())
+  ...
+  4/15 passed</code></pre>
+<p>If you forget <code>self.last_stop</code>, it says:</p>
+<pre><code>  ✗ week 3: stops for the cat: remember self.last_stop = (stop chance, threshold), and the chance should be above the threshold</code></pre>
 <p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
 <pre><code>Zippy&gt; EEEE
-  Something is in the way at (4, 1)! I stopped just in time.</code></pre>
-<p>Same command as week 1. This time your robot sees the cat and stops one square before it.</p>
+  Something is in the way at (4, 1)! I stopped just in time (stop chance 0.99, my safe threshold 0.50).</code></pre>
+<p>Same command as week 1, when it BUMPed. This time your robot sees the cat and stops one square before it. Your neuron was 99% sure, well above 0.5.</p>
 
 <h2 id="challenge">5. Real-world challenge: be a neuron for a week</h2>
 <p>Train a neuron on your own decisions, by hand, with paper.</p>
@@ -230,13 +264,14 @@ python3 check.py 4</code></pre>
 <li><strong>Record:</strong> your final weights, and how many of your 10 decisions the neuron now gets right (probability ≥ 0.5 means "coat").</li>
 <li><strong>Explain the weights.</strong> Is the rain weight positive? Is the temperature weight negative? Which clue matters more to you, according to your own neuron?</li>
 </ol>
+<p><strong>On your own (no people needed):</strong> use the hourly forecast in a weather app instead. Take 10 hours from tomorrow's forecast, write <code>x1</code> (chance of rain) and <code>x2</code> (temperature in tens of degrees), and decide for each one: "would I take a coat if I went out then?" That's your label. Then do steps 3 to 5 exactly as above.</p>
 <p><strong>What this teaches:</strong> a neuron's weights are a summary of a person's (or a robot's) habits, and you can read them. You'll also feel why computers do this part: two passes over 10 rows by hand is already a lot of arithmetic. The robot did 200 passes over 450 rows.</p>
 
 <h2 id="project">6. Your Robo-Helper so far</h2>
-<p>Robo-Helper can move (Lesson 1), sense distance (Lesson 2) and knows its braking distance (Lesson 3). Now it has an <strong>obstacle detector</strong>: <code>train_neuron</code> learns the weights, <code>should_stop</code> turns a sensor reading into a decision.</p>
+<p>Robo-Helper can move (week 1), sense distance and knows its braking distance (week 2). Now it has an <strong>obstacle detector</strong>: <code>train_neuron</code> learns the weights, <code>should_stop</code> turns a sensor reading into a decision.</p>
 <ul>
-<li><strong>Lesson 5</strong> asks "is it any good?": it tests this neuron on examples it never saw, and <code>safest_threshold</code> picks a threshold lower than 0.5 so it almost never misses a needed stop.</li>
-<li><strong>Lesson 11</strong> (the capstone) calls <code>train_neuron</code> when Robo-Helper starts up, and in <code>drive_to</code> calls <code>should_stop(..., (0.5, speed), threshold)</code> whenever something unexpected appears one square ahead. If it says stop, the robot brakes and plans a new route.</li>
+<li><strong>Part B of this week</strong> asks "is it any good?": it tests this neuron on examples it never saw, and <code>safest_threshold</code> picks a threshold lower than 0.5 so it almost never misses a needed stop.</li>
+<li><strong>Week 7's capstone</strong> calls <code>train_neuron</code> when Robo-Helper starts up, and in <code>drive_to</code> calls <code>should_stop(..., (0.5, speed), threshold)</code> whenever something unexpected appears one square ahead. If it says stop, the robot brakes and plans a new route.</li>
 </ul>
 
 <h2 id="mistakes">7. Common mistakes</h2>
@@ -253,7 +288,7 @@ python3 check.py 4</code></pre>
 <details><summary>Why can't we learn with a hard "z &gt; 0 → 1, else 0" switch?</summary><p>A tiny nudge to a weight usually doesn't change the output at all, so there's no signal saying which way to move. The sigmoid is smooth, so every nudge shows up as a small change in the probability.</p></details>
 <details><summary>An input is 0 for one example. How much does its weight change on that example?</summary><p>Not at all: the nudge is <code>lr × error × 0 = 0</code>. That input played no part in the mistake, so it gets no blame.</p></details>
 <details><summary>Predict: if you trained with <code>epochs=0</code>, what would <code>should_stop(w, b, (0.5, 0.0))</code> return?</summary><p>The weights stay <code>[0, 0]</code> and bias 0, so the probability is 0.5 for every input. <code>0.5 &gt;= 0.5</code> is True. The untrained robot says "stop" to everything, which is safe but useless.</p></details>
-<details><summary>How is this the same as Lesson 3?</summary><p>Both start from zero and repeatedly move each parameter a little in the direction that shrinks the error, with a step size <code>lr</code>. The nudge is "error × input" in both. Lesson 3 averaged over all examples per step. Here we nudge after each example.</p></details>
+<details><summary>How is this the same as week 2's line fitting?</summary><p>Both start from zero and repeatedly move each parameter a little in the direction that shrinks the error, with a step size <code>lr</code>. The nudge is "error × input" in both. In week 2 you averaged over all examples per step. Here we nudge after each example.</p></details>
 
 <h2 id="more">9. Go deeper (optional)</h2>
 <ul>
@@ -265,9 +300,9 @@ python3 check.py 4</code></pre>
 
 <nav class="pager">
   <a href="03-learning-from-data.html"><small>Previous</small>Week 2 · Learning from data</a>
-  <a class="next" href="05-evaluation.html"><small>Next</small>Week 3 · Honest testing</a>
+  <a class="next" href="05-evaluation.html"><small>Next</small>Week 3 · Part B: Honest testing</a>
 </nav>
-<footer>Build a Robot Brain · Week 3 · Lesson 4</footer>
+<footer>Build a Robot Brain · Week 3 of 12 · Part A (homework file: lesson04_neuron.py)</footer>
 </main>
 
 <script>

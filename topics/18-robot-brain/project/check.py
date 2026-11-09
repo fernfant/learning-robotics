@@ -12,6 +12,7 @@ Run it from the project folder (the one that contains this file).
 import importlib
 import math
 import random
+import re
 import sys
 from pathlib import Path
 
@@ -220,7 +221,10 @@ def lesson11(m):
         ("refuses safely", lambda: expect(not m.RoboHelper().run_command("put the purple block away")["ok"], "an unknown object must be refused")),
         ("replans around surprises", lambda: (lambda r: [r.run_command("put the blue block in the bin"),
                                                          expect("blue block" in r.binned and r.log, "with a surprise at (4, 1) the robot should log a stop and still finish")])(m.RoboHelper(surprises={(4, 1)}))),
-        ("evaluate", lambda: (lambda res: expect(res[0] >= 0.8, f"test pass rate should be at least 80% (got {res[0]:.0%})"))(m.evaluate())),
+        ("evaluate", lambda: (lambda res: [expect(res[0] >= 0.8, f"test pass rate should be at least 80% (got {res[0]:.0%})"),
+                                            expect(any("find the green block" in str(f[0]) for f in res[1]),
+                                                   "'find the green block' bins the green block, which is wrong: it must be in your failures. "
+                                                   "Compare with ==, not <= (robot.binned must be EXACTLY the expected set)")])(m.evaluate())),
     ]
 
 
@@ -286,7 +290,7 @@ def lesson15(m):
         ("plan_examples", lambda: (lambda ex: [expect(len(ex) == 3 + 6 + len(m.ALL_PHRASES) + 3, f"1 template, 1 except template -> 3 + 6 + {len(m.ALL_PHRASES)} + 3 examples, got {len(ex)}"),
                                                expect(ex[0][1] == ["put", "red"] and ex[0][0] in ("bin the red block", "bin the red one"), "first: the red block, plan ['put', 'red']"),
                                                expect(ex[3][1] == ["put", "red", "blue"], "first pair is (red, blue) -> ['put', 'red', 'blue']"),
-                                               expect(ex[5][1] == ["put", "red", "blue"], "the pair (blue, red) is still written in COLOURS order -> ['put', 'red', 'blue']"),
+                                               expect(ex[5][1] == ["put", "red", "blue"], "the pair (blue, red) must be written in COLOURS order -> ['put', 'red', 'blue'], not [a, b] (sort the pair by COLOURS)"),
                                                expect(ex[-1] == ("bin everything except the green", ["put", "red", "blue"]), "except green -> ['put', 'red', 'blue']")])(
             m.plan_examples(["bin {x}"], ["everything except the {c}"], random.Random(0)))),
         ("trains and writes plans", lambda: (lambda model: [
@@ -466,6 +470,14 @@ def robot(m):
         r.understand = lambda t: [{"intent": "put", "object": "purple block"}]
         return r, r.command("put the purple block in the bin")
 
+    def typos():
+        try:
+            got = R(quiet=True).clean("put teh red blok in the bin")
+        except TypeError as e:
+            raise Fail(f"crashed with TypeError: {e}. TRAIN is a list of (command, intent) pairs: "
+                       "join only the commands, words = [command for command, intent in TRAIN]")
+        expect(got == "put the red block in the bin", f"clean('put teh red blok in the bin') should give 'put the red block in the bin', got {got!r}")
+
     def nicer():
         from lesson06_paths import astar_path
         from lesson12_preferences import route_features
@@ -473,23 +485,39 @@ def robot(m):
         return route_features(m.ROOM, r.nicest_route(bin_)), route_features(m.ROOM, astar_path(m.ROOM, m.ROBOT_START, bin_)[0])
 
     return [
-        ("week 1: arrows", lambda: (need("arrows"), (lambda a, b: [expect(a[0].pos == (1, 4), f"'SSS' from (1, 1) should end at (1, 4), ended at {a[0].pos}"),
-                                                                   expect("Bonk" in b[1], f"'N' from (1, 1) hits the wall: the reply should say Bonk, got {b[1]!r}")])(fresh("SSS"), fresh("N")))),
-        ("week 2: look", lambda: (need("look"), (lambda r: [expect("north 0, east 7, south 5, west 0" in r[1], f"at the start: north 0, east 7, south 5, west 0; got {r[1]!r}"),
-                                                            expect("Safe speed" in r[1], "also say the safe speed (Lesson 3)")])(fresh("look")))),
+        ("week 1: arrows", lambda: (need("arrows"), (lambda a, b, c: [expect(a[0].pos == (1, 4), f"'SSS' from (1, 1) should end at (1, 4), ended at {a[0].pos}"),
+                                                                      expect("Bonk" in b[1], f"'N' from (1, 1) hits the wall: the reply should say Bonk, got {b[1]!r}"),
+                                                                      expect(c[0].pos == (1, 4), "lowercase 'sss' should work too")])(fresh("SSS"), fresh("N"), fresh("sss")))),
+        ("week 2: look", lambda: (need("look"), (lambda r: (lambda nums: expect(len(nums) >= 4 and all(abs(a - b) <= 0.5 for a, b in zip(nums, (0, 7, 5, 0))),
+                                                                                f"at the start the walls are about north 0, east 7, south 5, west 0 (averaged, so close but not exact); got {r[1]!r}"))(
+            [float(x) for x in re.findall(r"(?:north|east|south|west) (-?\d+(?:\.\d+)?)", r[1])]))(fresh("look")))),
+        ("week 2 part B: look's safe speed", lambda: (need("look"), (lambda r: (_ for _ in ()).throw(NotImplementedError("add the safe speed in week 2 Part B")) if "Safe speed" not in r[1]
+                                                                          else expect("Safe speed: 0.25 m/s" in r[1], f"at the start (against the north wall) the safe speed is 0.25 m/s; got {r[1]!r}"))(fresh("look")))),
         ("week 3: stops for the cat", lambda: (need("arrows", "should_stop_for"), (lambda r: [expect("stopped just in time" in r[1], f"'EEEE' drives at the cat: it should stop in time, got {r[1]!r}"),
-                                                                                             expect(r[0].pos == (3, 1), f"it should stop at (3, 1), right before the cat at (4, 1); it's at {r[0].pos}")])(fresh("EEEE")))),
+                                                                                             expect(r[0].pos == (3, 1), f"it should stop at (3, 1), right before the cat at (4, 1); it's at {r[0].pos}"),
+                                                                                             expect(r[0].last_stop is not None and r[0].last_stop[0] >= r[0].last_stop[1],
+                                                                                                    "remember self.last_stop = (stop chance, threshold), and the chance should be above the threshold")])(fresh("EEEE")))),
+        ("week 3 part B: the safest threshold", lambda: (need("should_stop_for"), (lambda r: (_ for _ in ()).throw(NotImplementedError("week 3 Part B: swap 0.5 for safest_threshold()"))
+                                                                                    if r.last_stop is None or abs(r.last_stop[1] - 0.5) < 1e-9
+                                                                                    else expect(r.last_stop[1] < 0.5, f"safest_threshold should give a threshold below 0.5 (it's {r.last_stop[1]:.2f})"))(fresh("EEEE")[0]))),
         ("week 4: goto", lambda: (need("route", "goto", "should_stop_for"), (lambda r: expect(r[0].pos == (6, 3), f"'goto blue' should end at the blue block (6, 3) after going round the cat; ended at {r[0].pos} ({r[1]!r})"))(fresh("goto blue")))),
-        ("week 5: fixes typos", lambda: (need("clean"), expect(R(quiet=True).clean("put teh red blok in the bin") == "put the red block in the bin", "clean('put teh red blok in the bin') should give 'put the red block in the bin'"))),
+        ("week 5: fixes typos", lambda: (need("clean"), typos())),
         ("week 5: understands and does", lambda: (need("understand_words", "do", "goto"), (lambda a, b: [expect(a[0].binned == {"red block"}, f"'put the red block in the bin' should bin the red block; binned {a[0].binned}"),
                                                                                                          expect("(1, 5)" in b[1], f"'where is the green block' should say (1, 5); got {b[1]!r}")])(fresh("put the red block in the bin"), fresh("where is the green block")))),
         ("week 6: plans", lambda: (need("understand_plans", "do", "goto"), (lambda a, b: [expect(a[0].binned == {"red block", "blue block"}, f"'put the red and blue blocks away' should bin both; binned {a[0].binned}"),
                                                                                          expect(b[1].strip().endswith("?"), f"'put the block away' is vague: it should ask a question; got {b[1]!r}")])(fresh("put the red and blue blocks away"), fresh("put the block away")))),
-        ("week 7: safety", lambda: (need("is_safe"), (lambda r: [expect(r[1].startswith("Sorry"), f"an unsafe action (the purple block) must be refused; got {r[1]!r}"),
-                                                                 expect(r[0].pos == m.ROBOT_START, "and the robot must not move")])(unsafe()))),
+        ("week 7: safety", lambda: (need("is_safe"), (lambda r, j: [expect(r[1].startswith("Sorry"), f"an unsafe action (the purple block) must be refused; got {r[1]!r}"),
+                                                                    expect(r[0].pos == m.ROBOT_START, "and the robot must not move"),
+                                                                    expect(j[1].startswith("Sorry"), f"'json: {{\"intent\": \"launch\", \"object\": \"red block\"}}' must be refused; got {j[1]!r}")])(
+            unsafe(), fresh('json: {"intent": "launch", "object": "red block"}')))),
         ("week 8: think_time", lambda: (need("think_time", "understand_words"), (lambda t: expect("I thought for" in t and "mm" in t, f"think_time should say 'I thought for ... ms ... mm'; got {t!r}"))(R(quiet=True).think_time("stop")))),
         ("week 9: teacher brain", lambda: (need("teacher_brain", "understand_plans"), (lambda r: expect("(1, 5)" in r[1], f"with the teacher's labels it should understand \"where's the green one?\" and say (1, 5); got {r[1]!r}"))(fresh("where's the green one?")))),
         ("week 11: exam", lambda: (need("exam", "understand_plans"), (lambda t: expect(int(t.split()[2]) >= 8, f"your robot should pass at least 8 of the 12 tasks; {t!r}"))(R(quiet=True).exam()))),
+        ("week 12 boss: uses what it sees", lambda: (need("see_and_plan", "do", "goto"), (lambda a, b, c: [
+            expect(a[0].binned == {"red block", "blue block", "green block"}, f"'tidy up the room' should bin all three; binned {a[0].binned}"),
+            expect(b[0].binned == {"blue block"}, f"the block closest to the bin is the blue one; binned {b[0].binned}"),
+            expect(c is None, "'bin everything except the green block' says except: leave it to the language brain (return None)")])(
+            fresh("tidy up the room"), fresh("put away the block that's closest to the bin"), R(quiet=True).see_and_plan("bin everything except the green block")))),
         ("week 12: nicer routes", lambda: (need("nicest_route"), (lambda f: expect(f[0][2] < f[1][2], f"the nicest route to the bin should have fewer turns than A*'s; got {f[0]} vs {f[1]}"))(nicer()))),
     ]
 

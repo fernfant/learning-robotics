@@ -14,7 +14,9 @@ Everything that makes the robot clever is yours.
 """
 
 import inspect
+import json
 import random
+import traceback
 import sys
 import time
 from pathlib import Path
@@ -22,7 +24,7 @@ from pathlib import Path
 from world import ROOM, OBJECTS, ROBOT_START, find_bin, render
 
 NAME = "Robo-Helper"         # WEEK 1: give your robot its own name!
-CAT = (4, 1)                 # the cat. It is NOT on the map, so your robot only finds out by sensing it.
+CAT = (4, 1)                 # the cat at (4, 1) is drawn for you, but it's NOT on the robot's map: the robot only finds out by sensing it.
 CACHE = {}                   # brains you've trained, so the robot only trains them once per run
 
 
@@ -33,44 +35,49 @@ class Robot:
         self.binned = set()             # blocks already in the bin
         self.blocked = set()            # squares where the robot found something in the way
         self.last_path = []
+        self.last_stop = None           # week 3: (stop chance, threshold) the last time it saw something
+        self.slow = False               # week 8: 'slowbrain on' pretends the brain is very slow
         self.quiet, self.animate = quiet, animate
 
     # ======================= WEEK 1 (Lesson 1): moving =======================
     def arrows(self, text):
         """Move one square for each letter in text ("EESN": east, east, south, north), using your
         Lesson 1 move() and safe_move(). For every letter:
-          - if safe_move would leave the robot where it is, there's a wall: return "Bonk! A wall."
+          - if safe_move would leave the robot where it is, there's a wall: return f"Bonk! A wall. I'm at {self.pos}."
           - otherwise call self.step(the new square). If it returns "bump" or "stopped", return
             self.step_message(that result, the square) straight away.
         After the last letter, return f"I'm at {self.pos}."
         """
-        # TODO week 1: add it to your robot (Lesson 1, 'Add it to your robot'). Read the docstring above.
-        raise NotImplementedError("week 1 (Lesson 1). Fill in this gap in my_robot.py")
+        # TODO week 1: fill in this gap (see 'Add it to your robot' on the week 1 page). Read the docstring above.
+        raise NotImplementedError("week 1. Fill in this gap in my_robot.py")
 
     # ======================= WEEK 2 (Lessons 2-3): sensing =======================
     def look(self):
-        """Return what the sensors see, like "Walls: north 0, east 7, south 5, west 0. Safe speed: 0.25 m/s."
-        Use your Lesson 2 distance_to_wall() for "N", "E", "S", "W" (in that order, written north/east/south/west).
-        For the safe speed (Lesson 3): fit_line(STOP_DATA) gives w, b; the free distance in metres is
-        (the smallest of the four distances) * 0.5 + 0.5; then max_safe_speed(w, b, free)."""
-        # TODO week 2: add it to your robot (Lesson 2-3, 'Add it to your robot'). Read the docstring above.
-        raise NotImplementedError("week 2 (Lesson 2-3). Fill in this gap in my_robot.py")
+        """What the sensors see. A real sensor is noisy, so average 16 readings (Lesson 2):
+          for each direction "N", "E", "S", "W":  true = distance_to_wall(ROOM, self.pos, direction)
+                                                    seen = smoothed_reading(true, 0.5, 16, random.Random())
+          return f"Walls (average of 16 readings): north {N:.1f}, east {E:.1f}, south {S:.1f}, west {W:.1f}."
+        Lesson 3 adds the safe speed to the end: w, b, _ = fit_line(STOP_DATA); one square is 0.5 m, so the free space
+        in metres is (the smallest TRUE distance) * 0.5 + 0.5; then add f" Safe speed: {max_safe_speed(w, b, free)} m/s." """
+        # TODO week 2: fill in this gap (see 'Add it to your robot' on the week 2 page). Read the docstring above.
+        raise NotImplementedError("week 2. Fill in this gap in my_robot.py")
 
     # ======================= WEEK 3 (Lessons 4-5): stopping in time =======================
     def should_stop_for(self, square):
         """Something is one square ahead (0.5 m away) and the robot is driving at 0.5 m/s. Should it stop?
         Train your Lesson 4 neuron on make_obstacle_data(450, random.Random(0)), pick the threshold with your
         Lesson 5 safest_threshold(), then return should_stop(weights, bias, (0.5, 0.5), threshold).
+        Also remember what it decided, so the robot can tell you: self.last_stop = (neuron(w, b, (0.5, 0.5)), threshold).
         Tip: train once and keep it in CACHE["stop"] so it isn't retrained on every step."""
-        # TODO week 3: add it to your robot (Lesson 4-5, 'Add it to your robot'). Read the docstring above.
-        raise NotImplementedError("week 3 (Lesson 4-5). Fill in this gap in my_robot.py")
+        # TODO week 3: fill in this gap (see 'Add it to your robot' on the week 3 page). Read the docstring above.
+        raise NotImplementedError("week 3. Fill in this gap in my_robot.py")
 
     # ======================= WEEK 4 (Lesson 6): finding the way =======================
     def route(self, target):
         """The shortest path from self.pos to target, avoiding self.blocked: your Lesson 6 astar_path().
         Return just the path (a list of squares), or None if there isn't one."""
-        # TODO week 4: add it to your robot (Lesson 6, 'Add it to your robot'). Read the docstring above.
-        raise NotImplementedError("week 4 (Lesson 6). Fill in this gap in my_robot.py")
+        # TODO week 4: fill in this gap (see 'Add it to your robot' on the week 4 page). Read the docstring above.
+        raise NotImplementedError("week 4. Fill in this gap in my_robot.py")
 
     def goto(self, target):
         """Drive to target. Returns "" if it arrived, or a message saying why not.
@@ -78,25 +85,28 @@ class Robot:
             path = self.plan_route(target)            (PROVIDED below: your route(), or a nicer one in week 12)
             if path is None: return "I can't find a way there."
             for each square after the first: result = self.step(square)
-                "bump"    -> return self.step_message("bump", square)
+                "bump" (or "late") -> return self.step_message(result, square)
                 "stopped" -> self.say(self.step_message("stopped", square)) and plan again (break)
             if every step worked: return ""
           After 6 tries: return "Too many surprises, giving up." """
-        # TODO week 4: add it to your robot (Lesson 6, 'Add it to your robot'). Read the docstring above.
-        raise NotImplementedError("week 4 (Lesson 6). Fill in this gap in my_robot.py")
+        # TODO week 4: fill in this gap (see 'Add it to your robot' on the week 4 page). Read the docstring above.
+        raise NotImplementedError("week 4. Fill in this gap in my_robot.py")
 
     # ======================= WEEK 5 (Lessons 8-9): understanding words =======================
     def clean(self, text):
-        """Fix typos with your Lesson 8 fix_typos(). The word counts come from the words your robot knows:
-        count_bigrams(tokenize(" . ".join(the commands in Lesson 9's TRAIN))). Keep them in CACHE["counts"]."""
-        # TODO week 5: add it to your robot (Lesson 8, 'Add it to your robot'). Read the docstring above.
-        raise NotImplementedError("week 5 (Lesson 8). Fill in this gap in my_robot.py")
+        """Fix typos with your Lesson 8 fix_typos(). The word counts come from the words your robot knows,
+        the commands in Lesson 9's TRAIN (a list of (command, intent) pairs, so take just the command):
+            words = [command for command, intent in TRAIN]
+            CACHE["counts"] = count_bigrams(tokenize(" . ".join(words)))
+        Then return fix_typos(text, CACHE["counts"])."""
+        # TODO week 5: fill in this gap (see 'Add it to your robot' on the week 5 page). Read the docstring above.
+        raise NotImplementedError("week 5. Fill in this gap in my_robot.py")
 
     def understand_words(self, text):
         """One sentence -> a list with ONE action, using your Lesson 9 parse_command().
         Train the word counter once: CACHE["words"] = train_intent_model(TRAIN)."""
-        # TODO week 5: add it to your robot (Lesson 9, 'Add it to your robot'). Read the docstring above.
-        raise NotImplementedError("week 5 (Lesson 9). Fill in this gap in my_robot.py")
+        # TODO week 5: fill in this gap (see 'Add it to your robot' on the week 5 page). Read the docstring above.
+        raise NotImplementedError("week 5. Fill in this gap in my_robot.py")
 
     def do(self, action):
         """Carry out one action, like {"intent": "put", "object": "red block"}. Return what the robot says.
@@ -106,9 +116,10 @@ class Robot:
           put  -> if already binned: "The red block is already in the bin."
                   goto the object, then goto find_bin(ROOM) (stop early with the message if a goto fails),
                   then add it to self.binned, set self.objects[it] to the bin's position,
-                  and return "The red block is in the bin." """
-        # TODO week 5: add it to your robot (Lesson 9, 'Add it to your robot'). Read the docstring above.
-        raise NotImplementedError("week 5 (Lesson 9). Fill in this gap in my_robot.py")
+                  and return "The red block is in the bin."
+          anything else -> raise ValueError(f"I don't know how to {intent!r}") """
+        # TODO week 5: fill in this gap (see 'Add it to your robot' on the week 5 page). Read the docstring above.
+        raise NotImplementedError("week 5. Fill in this gap in my_robot.py")
 
     # ======================= WEEK 6 (Lesson 15): writing whole plans =======================
     def understand_plans(self, text):
@@ -118,29 +129,30 @@ class Robot:
           "ask"  -> return "Which block do you mean: red, blue or green?"
           "none" -> return "Sorry, that's not something I can do."
           otherwise return the plan (a list of actions)."""
-        # TODO week 6: add it to your robot (Lesson 15, 'Add it to your robot'). Read the docstring above.
-        raise NotImplementedError("week 6 (Lesson 15). Fill in this gap in my_robot.py")
+        # TODO week 6: fill in this gap (see 'Add it to your robot' on the week 6 page). Read the docstring above.
+        raise NotImplementedError("week 6. Fill in this gap in my_robot.py")
 
     # ======================= WEEK 7 (Lesson 10): safety =======================
     def is_safe(self, action):
         """Your Lesson 10 validate_action(action, set(self.objects)). Return its (ok, reason)."""
-        # TODO week 7: add it to your robot (Lesson 10, 'Add it to your robot'). Read the docstring above.
-        raise NotImplementedError("week 7 (Lesson 10). Fill in this gap in my_robot.py")
+        # TODO week 7: fill in this gap (see 'Add it to your robot' on the week 7 page). Read the docstring above.
+        raise NotImplementedError("week 7. Fill in this gap in my_robot.py")
 
     # ======================= WEEK 8 (Lesson 16): how fast does it think? =======================
     def think_time(self, text):
         """How long does understanding text take? Time self.understand(text) 5 times with your Lesson 16 time_it(),
-        then summarize(). Return f"(I thought for {p50 in ms:.2f} ms, so I'd roll {distance in mm:.2f} mm meanwhile.)"
-        using thinking_distance(p50 seconds), which gives metres."""
-        # TODO week 8: add it to your robot (Lesson 16, 'Add it to your robot'). Read the docstring above.
-        raise NotImplementedError("week 8 (Lesson 16). Fill in this gap in my_robot.py")
+        then summary = summarize(...). Return f"(I thought for {p50 in ms:.2f} ms, so I'd roll {distance in mm:.2f} mm meanwhile.)"
+        using thinking_distance(p50 seconds), which gives metres.
+        Then the budget: if NOT fits_budget(summary, 0.2), add " Too slow! I'd hit the cat before deciding to stop." """
+        # TODO week 8: fill in this gap (see 'Add it to your robot' on the week 8 page). Read the docstring above.
+        raise NotImplementedError("week 8. Fill in this gap in my_robot.py")
 
     # ======================= WEEK 9 (Lesson 17): learning from a teacher =======================
     def teacher_brain(self):
         """A smarter language brain: re-train on a teacher's labels with your Lesson 17 code:
         best_student(distill_examples(UNLABELLED, best_teacher()))."""
-        # TODO week 9: add it to your robot (Lesson 17, 'Add it to your robot'). Read the docstring above.
-        raise NotImplementedError("week 9 (Lesson 17). Fill in this gap in my_robot.py")
+        # TODO week 9: fill in this gap (see 'Add it to your robot' on the week 9 page). Read the docstring above.
+        raise NotImplementedError("week 9. Fill in this gap in my_robot.py")
 
     # ======================= WEEK 10 (Lesson 18): a world-class brain (needs an API key) =======================
     def ask_claude(self, text):
@@ -149,16 +161,16 @@ class Robot:
           plan_obj, info = ask_planner(client, room, text)
           not valid -> "I won't run Claude's plan: <reason>."    clarify -> return the question
           otherwise return Claude's reply plus self.do(a) for each action in plan_obj["plan"]."""
-        # TODO week 10: add it to your robot (Lesson 18, 'Add it to your robot'). Read the docstring above.
-        raise NotImplementedError("week 10 (Lesson 18). Fill in this gap in my_robot.py")
+        # TODO week 10: fill in this gap (see 'Add it to your robot' on the week 10 page). Read the docstring above.
+        raise NotImplementedError("week 10. Fill in this gap in my_robot.py")
 
     # ======================= WEEK 11 (Lesson 19): the exam =======================
     def exam(self):
         """Sit the 12 bake-off tasks. For each task in Lesson 19's TASKS: make a FRESH Robot(quiet=True),
         reply = robot.command(task["command"]), then your score_task(task, robot, {"reply": reply}).
         Print a ✓ or ✗ line per task (unless self.quiet), and return f"I passed {passed} of {len(TASKS)}." """
-        # TODO week 11: add it to your robot (Lesson 19, 'Add it to your robot'). Read the docstring above.
-        raise NotImplementedError("week 11 (Lesson 19). Fill in this gap in my_robot.py")
+        # TODO week 11: fill in this gap (see 'Add it to your robot' on the week 11 page). Read the docstring above.
+        raise NotImplementedError("week 11. Fill in this gap in my_robot.py")
 
     # ======================= WEEK 12 (Lesson 12): the routes people like =======================
     def nicest_route(self, target):
@@ -166,13 +178,27 @@ class Robot:
         learn the taste once (CACHE["taste"] = train_reward_model(collect_comparisons(ROOM, routes from
         ROBOT_START to the bin, 150, random.Random(0)))), then return best_route(taste, ROOM, routes).
         If there are no candidate routes, return self.route(target)."""
-        # TODO week 12: add it to your robot (Lesson 12, 'Add it to your robot'). Read the docstring above.
-        raise NotImplementedError("week 12 (Lesson 12). Fill in this gap in my_robot.py")
+        # TODO week 12: fill in this gap (see 'Add it to your robot' on the week 12 page). Read the docstring above.
+        raise NotImplementedError("week 12. Fill in this gap in my_robot.py")
+
+    # ======================= WEEK 12 BOSS (Lesson 14): use what your robot can SEE =======================
+    def see_and_plan(self, text):
+        """The two exam tasks every small brain fails need the robot to look at the room, not just read words.
+        Your robot KNOWS where every block is (self.objects) and where the bin is. Return a plan for:
+          "...closest to the bin..."         -> put away the unbinned block nearest the bin (Lesson 1's manhattan())
+          "...room..." / "...everything..." / "...all..."  (but NOT if the text says "except" or "but")
+                                             -> put away every unbinned block, red then blue then green
+        A plan is a list of actions like [{"intent": "put", "object": "blue block"}].
+        For anything else return None, and your language brain handles it as usual."""
+        # TODO week 12: fill in this gap (see 'Add it to your robot' on the week 12 page). Read the docstring above.
+        raise NotImplementedError("week 12. Fill in this gap in my_robot.py")
 
     # ======================= PROVIDED: the glue that joins your pieces =======================
     def step(self, square):
         """Move one square. Returns "moved", "stopped" (it saw the cat in time) or "bump"."""
         if square == CAT:
+            if self.slow:
+                return "late"               # 'slowbrain on': it was still thinking when it reached the cat
             if built(self.should_stop_for) and self.should_stop_for(square):
                 self.blocked.add(square)
                 return "stopped"
@@ -184,8 +210,11 @@ class Robot:
 
     def step_message(self, result, square):
         if result == "bump":
-            return "BUMP! I walked into the cat. (I can't sense things that aren't on the map: add week 3.)"
-        return f"Something is in the way at {square}! I stopped just in time."
+            return "BUMP! I walked into the cat. (It's not on my map, so I can't sense it yet: add week 3.)"
+        if result == "late":
+            return "BUMP! My slow brain was still thinking when I reached the cat. (Type 'slowbrain off'.)"
+        why = f" (stop chance {self.last_stop[0]:.2f}, my safe threshold {self.last_stop[1]:.2f})" if self.last_stop else ""
+        return f"Something is in the way at {square}! I stopped just in time{why}."
 
     def plan_route(self, target):
         if built(self.nicest_route) and not self.blocked:
@@ -204,6 +233,12 @@ class Robot:
         return CACHE["brain"]
 
     def understand(self, text):
+        if self.slow:
+            time.sleep(0.5)                     # 'slowbrain on': pretend to be a huge brain far away
+        if built(self.see_and_plan):
+            plan = self.see_and_plan(text)
+            if plan:
+                return plan
         if built(self.understand_plans):
             return self.understand_plans(text)
         return self.understand_words(text)
@@ -228,7 +263,12 @@ class Robot:
         self.last_path = [self.pos]
         try:
             if t and set(t.upper()) <= set("NSEW"):
-                return self.arrows(t)
+                return self.arrows(t.upper())
+            if low in ("slowbrain on", "slowbrain off"):
+                self.slow = low.endswith("on")
+                return "Pretending to be a very slow brain (half a second per thought)." if self.slow else "Normal brain again."
+            if low.startswith("json:"):
+                return self.run_plan([json.loads(t[5:])])  # pretend an AI sent this exact answer (Lesson 10)
             if low == "look":
                 return self.look()
             if low.startswith("goto "):
@@ -254,21 +294,33 @@ class Robot:
                 self.say(self.think_time(t))
             if isinstance(plan, str):
                 return plan
-            replies = []
-            for action in plan:
-                if built(self.is_safe):
-                    ok, reason = self.is_safe(action)
-                    if not ok:
-                        replies.append(f"Sorry, I won't do that: {reason}.")
-                        break
-                elif not action or action.get("intent") not in ("put", "go", "find", "stop") or (
-                        action.get("intent") != "stop" and action.get("object") not in self.objects):
-                    replies.append(f"Uh oh, I don't know what to do with {action}. (No safety check yet: add week 7.)")
-                    break
-                replies.append(self.do(action))
-            return " ".join(r for r in replies if r)
+            return self.run_plan(plan)
         except NotImplementedError as e:
             return f"I can't do that yet: {e}"
+        except Exception as e:
+            where = traceback.extract_tb(e.__traceback__)[-1]
+            return (f"Oops, my code broke: {type(e).__name__}: {e} (in {where.name}(), line {where.lineno} of "
+                    f"{Path(where.filename).name}). Read the hint again, fix it, and try again.")
+
+    def run_plan(self, plan):
+        """Check each action (if you've built week 7's is_safe), then do it. Without a safety check, a bad
+        action reaches do() as it is, and do() may crash on it."""
+        replies = []
+        for action in plan:
+            if built(self.is_safe):
+                ok, reason = self.is_safe(action)
+                if not ok:
+                    replies.append(f"Sorry, I won't do that: {reason}.")
+                    break
+                replies.append(self.do(action))
+                continue
+            try:
+                replies.append(self.do(action))
+            except (KeyError, TypeError, ValueError) as e:
+                replies.append(f"Uh oh! I tried to do {action} and crashed ({type(e).__name__}: {e}). Your code is fine: "
+                               "it's a bad action. Week 7's safety check will stop bad actions before they reach do().")
+                break
+        return " ".join(r for r in replies if r)
 
 
 # ======================= PROVIDED: what's built, the typing loop, the showcase =======================
@@ -278,7 +330,8 @@ PIECES = [("arrows", 1, "1", "moves with arrows (EESS)"), ("look", 2, "2-3", "lo
           ("understand_plans", 6, "15", "writes whole plans and asks when you're vague"), ("is_safe", 7, "10", "checks every action first"),
           ("think_time", 8, "16", "knows how long it thinks"), ("teacher_brain", 9, "17", "has a teacher-trained brain"),
           ("ask_claude", 10, "18", "can ask Claude: 'claude: tidy up the room' (needs a key)"), ("exam", 11, "19", "sits the exam: 'exam'"),
-          ("nicest_route", 12, "12", "picks the routes people like")]
+          ("nicest_route", 12, "12", "picks the routes people like"),
+          ("see_and_plan", 12, "14", "the boss: uses what it SEES ('tidy up the room', 'the block closest to the bin')")]
 
 
 def built(method):
@@ -288,23 +341,30 @@ def built(method):
 
 def banner(robot):
     done = [p for p in PIECES if built(getattr(robot, p[0]))]
+    try:
+        from lesson00_hello import introduce
+        print("\n" + introduce(NAME))
+    except NotImplementedError:
+        pass
     print(f"\n=== {NAME}: built up to week {max([p[1] for p in done] or [0])} ===")
     for name, week, lessons, what in PIECES:
-        print(f"  {'✓' if built(getattr(robot, name)) else '·'} week {week:>2} (lesson {lessons:>4}): {what}")
-    todo = [p for p in PIECES if not built(getattr(robot, p[0]))]
+        print(f"  {'✓' if built(getattr(robot, name)) else '·'} week {week:>2}: {what}")
+    todo = [p for p in PIECES if not built(getattr(robot, p[0])) and p[0] != "ask_claude"]   # Claude is optional
     if todo:
-        print(f"  Next gap to fill: week {todo[0][1]}, the {todo[0][0]}() method in my_robot.py.")
+        print(f"  Next gap to fill: week {todo[0][1]}, the {todo[0][0]}() method in my_robot.py (see 'Add it to your robot' on the week {todo[0][1]} page).")
     try:
         from lesson11_robohelper import evaluate
-        print(f"  Your capstone RoboHelper (Lesson 11) passes {evaluate()[0]:.0%} of its final test.")
+        print(f"  Your week-7 capstone (RoboHelper, its simpler twin) passes {evaluate()[0]:.0%} of its final test.")
     except NotImplementedError:
         pass
 
 
 def showcase():
     print(f"\n*** {NAME}: THE SHOWCASE ***")
+    banner(Robot())
     for cmd in ["EEE", "look", "goto blue", "put teh green blok in the bin", "put the red and blue blocks away",
-                "put the block away", "put the purple block in the bin", "exam"]:
+                "put the block away", "where's the green one?", "tidy up the room", 'json: {"intent": "launch", "object": "red block"}',
+                "exam"]:
         r = Robot()
         print(f"\n> {cmd}")
         reply = r.command(cmd)
@@ -327,6 +387,8 @@ def showcase():
         passed, total = passed + (got == want), total + 1
         print(f"  {'✓' if got == want else '✗'} {cmd!r:40} binned: {got:30} wanted: {want}")
     print(f"\n{NAME} passed {passed} of {total} of your tests.")
+    built_count = sum(built(getattr(Robot, p[0])) for p in PIECES)
+    print(f"\n*** {NAME}: {built_count} of {len(PIECES)} pieces built, every one of them by you. ***")
 
 
 if __name__ == "__main__":

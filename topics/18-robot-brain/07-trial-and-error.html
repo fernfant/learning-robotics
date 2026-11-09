@@ -3,21 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 7 · Q-learning</title>
+<title>Bonus · Q-learning</title>
 <link rel="stylesheet" href="../../style.css">
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Bonus · Lesson 7</nav>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Bonus side quest (after week 4)</nav>
 
-<div class="eyebrow"><span class="track robo">Robotics</span>Build a Robot Brain · Bonus · Lesson 7</div>
+<div class="eyebrow"><span class="track robo">Robotics</span>Build a Robot Brain · Bonus side quest (after week 4)</div>
 <h1>Learning by trial and error: Q-learning</h1>
 <p class="lede">No map, no planner, nobody telling it the answer. Just a robot that tries things, gets points, and slowly writes down which moves were worth it.</p>
-<div class="card note" id="journey"><strong>Step 8 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes. <strong>Today</strong> it learns to learn a maze just by trying. Next: <a href="08-words-as-numbers.html">Week 5 · Words as numbers</a>. <a href="index.html#my-robot">Your robot, week by week</a>.</div>
+<div class="card note" id="journey"><strong>Bonus (optional side quest, after week 4).</strong> There's nothing to add to <code>my_robot.py</code> here, so skip to <a href="08-words-as-numbers.html">week 5</a> if you like. So far your robot: ✓ says hello ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes. <strong>Today</strong> it learns to learn a maze just by trying. Next: <a href="08-words-as-numbers.html">Week 5 · Part A: Words as numbers</a>. <a href="index.html#my-robot">Your robot, week by week</a>.</div>
 
 <div class="facts">
   <div><b>Time</b>2–3 hours</div>
-  <div><b>You'll need</b>Python 3, your Lesson 1 <code>safe_move</code>, paper and a pencil</div>
+  <div><b>You'll need</b>Python 3, your week 1 <code>safe_move</code>, paper and a pencil</div>
   <div><b>New words</b>reward, episode, Q-value, explore vs exploit, learning rate, discount</div>
   <div><b>Project piece</b>Learns a maze by itself (a side quest)</div>
 </div>
@@ -27,7 +27,7 @@
 <p class="big">If you can't see the map, you can still learn the way: try moves, notice which ones led to a reward, and keep a scoreboard of "how good is this move from here?"</p>
 
 <h3>The problem</h3>
-<p>In Lesson 6 the robot planned perfect routes with A*. But A* cheated a little: it was handed the whole map of the room. Now drop the robot into a maze it has never seen. No map. All it knows is where it is standing, the four moves it can make, and a beep when it reaches the goal. How can it ever find the shortest way?</p>
+<p>In week 4 the robot planned perfect routes with A*. But A* cheated a little: it was handed the whole map of the room. Now drop the robot into a maze it has never seen. No map. All it knows is where it is standing, the four moves it can make, and a beep when it reaches the goal. How can it ever find the shortest way?</p>
 
 <h3>The idea in one picture</h3>
 <p>Think about the first week at a new school. You don't have a map, so on day one you wander, take wrong turns and arrive late. Each time you reach the classroom you remember which corridors got you there. By Friday you walk the quick way without thinking. Nobody gave you a map. You built a mental scoreboard of "from this corridor, turning left is good" by doing it again and again. That scoreboard is exactly what Q-learning builds.</p>
@@ -45,14 +45,14 @@
 <p class="deeper"><strong>Going deeper:</strong> everything below is the full lesson: the idea built from nothing, a demo, your homework, and a challenge away from the screen.</p>
 
 <h2 id="problem">1. The problem</h2>
-<p>Here is the maze from <code>lesson07_trial_error.py</code>. <code>S</code> is the start, <code>G</code> the goal, <code>#</code> a wall. Coordinates work just like Lesson 1: <code>(x, y)</code>, with y growing downwards.</p>
+<p>Here is the maze from <code>lesson07_trial_error.py</code>. <code>S</code> is the start, <code>G</code> the goal, <code>#</code> a wall. Coordinates work just like week 1: <code>(x, y)</code>, with y growing downwards.</p>
 <pre><code>#######
 #S..#.#      S is at (1, 1)
 #.#.#.#      G is at (5, 4)
 #.#...#
 #...#G#
 #######</code></pre>
-<p>You can see the shortest way is 7 steps (E, E, S, S, E, E, S). The robot can't see this picture. It only knows the square it's on. If it moves into a wall, <code>safe_move</code> from Lesson 1 keeps it where it was, and it has wasted a step.</p>
+<p>You can see the shortest way is 7 steps (E, E, S, S, E, E, S). The robot can't see this picture. It only knows the square it's on. If it moves into a wall, <code>safe_move</code> from week 1 keeps it where it was, and it has wasted a step.</p>
 <p><strong>Obvious idea 1: wander randomly until you hit G.</strong> It works, eventually. With random moves, the robot's very first attempt in our code took 58 steps. The second took 101. And it never gets better, because it remembers nothing.</p>
 <p><strong>Obvious idea 2: remember the whole route that worked, and repeat it.</strong> Better, but the first route that worked was a 58-step mess full of bumps into walls. Repeating a bad route doesn't make it good. We need to remember something smaller and smarter than "the route".</p>
 
@@ -121,7 +121,7 @@ otherwise:          pick the best-scoring move (exploit, 80% of the time)</code>
 <p>During training, ε = 0.2 is still switched on, so about one move in five is random. Random moves sometimes bump into walls or wander off, adding a few steps. When we follow the greedy path, nothing is random, so the robot takes the 7-step route it has learned. Exploring costs a little now and buys you knowledge for later.</p>
 </details>
 
-<div class="note"><strong>Honest note.</strong> Q-learning needed hundreds of attempts to learn a 7-step route in a tiny maze. A* (Lesson 6) solved a bigger room instantly. When you <em>have</em> a map, plan with it. Trial and error shines when you <em>can't</em> write down the rules: how to balance on two legs, how hard to grip an egg, how to win a game.</div>
+<div class="note"><strong>Honest note.</strong> Q-learning needed hundreds of attempts to learn a 7-step route in a tiny maze. A* (week 4) solved a bigger room instantly. When you <em>have</em> a map, plan with it. Trial and error shines when you <em>can't</em> write down the rules: how to balance on two legs, how hard to grip an egg, how to win a game.</div>
 
 <h2 id="play">3. Play with it</h2>
 <div class="card demo">
@@ -146,7 +146,7 @@ otherwise:          pick the best-scoring move (exploit, 80% of the time)</code>
 </div>
 
 <h2 id="homework">4. Homework</h2>
-<p>Open <code>homework/lesson07_trial_error.py</code>. The maze, <code>ACTIONS = "NSEW"</code> and <code>find_char</code> are written for you. It imports <code>safe_move</code> from <em>your</em> Lesson 1 file, so Lesson 1 must be finished. Write these five functions, in order. Q is a dictionary with keys like <code>((1, 1), "E")</code>.</p>
+<p>Open <code>homework/lesson07_trial_error.py</code>. The maze, <code>ACTIONS = "NSEW"</code> and <code>find_char</code> are written for you. It imports <code>safe_move</code> from <em>your</em> week 1 file (<code>lesson01_moving.py</code>), so week 1 must be finished. Write these five functions, in order. Q is a dictionary with keys like <code>((1, 1), "E")</code>.</p>
 
 <h3>4.1 <code>best_action(Q, pos)</code></h3>
 <p>Return the move (one letter) with the highest Q-value at <code>pos</code>. Missing values count as 0. On a tie, return the one that comes first in <code>"NSEW"</code>.</p>
@@ -177,7 +177,7 @@ otherwise:          pick the best-scoring move (exploit, 80% of the time)</code>
 
 <h3>4.5 <code>greedy_path(Q, room, start, goal, max_steps=100)</code></h3>
 <p>Use what was learned, with no exploring: from <code>start</code>, keep taking <code>best_action</code> until you reach <code>goal</code>. Return every square visited, including the start.</p>
-<details><summary>Hint 1</summary><p>This is very like <code>follow</code> from Lesson 1, except the robot picks each move itself.</p></details>
+<details><summary>Hint 1</summary><p>This is very like <code>follow</code> from week 1, except the robot picks each move itself.</p></details>
 <details><summary>Hint 2</summary><p>Add a safety limit. If Q is untrained, the best move might be "N" into a wall forever, and your loop would never end.</p></details>
 <details><summary>Hint 3</summary><p><code>path = [start]</code>. While the last square isn't the goal and <code>len(path) &lt;= max_steps</code>: move with <code>safe_move</code> using <code>best_action</code>, append the new square. Return path.</p></details>
 
@@ -203,7 +203,7 @@ python3 check.py 7</code></pre>
 <li><code>✗ best_action: all zeros: pick the first action, 'N'</code> means your tie-break is wrong (maybe you used <code>&gt;=</code>, so the <em>last</em> tied letter wins).</li>
 <li><code>✗ q_update: target = -1 + 0.9 * 4; Q moves halfway there</code> means your target or your α step is off. Work the 1.3 example on paper and compare.</li>
 </ul>
-<p>Yellow <code>…</code> means "not written yet". All four green and you'll see <code>4/4 passed</code>.</p>
+<p>Yellow <code>…</code> means "not written yet". The checker runs 4 tests for your 5 functions: the last test, <code>q_learn finds the shortcut</code>, checks <code>q_learn</code> and <code>greedy_path</code> together. All four green and you'll see <code>4/4 passed</code>.</p>
 
 <h3>Stretch</h3>
 <ul>
@@ -211,6 +211,9 @@ python3 check.py 7</code></pre>
 <li>Make ε shrink over time: start at 1.0 and multiply it by 0.98 after each episode. Do the last episodes get down to 7?</li>
 <li>Draw your own bigger maze in the <code>MAZE</code> list (keep the walls round the edge) and train on it. How many episodes does it need now?</li>
 </ul>
+
+<h2 id="add-to-robot">Add it to your robot</h2>
+<p><strong>Bonus: nothing to add.</strong> Your robot has a map, so it keeps using your week 4 A*. There's no gap for this lesson in <code>my_robot.py</code>, and <code>check.py robot</code> doesn't look at it. Section 6 explains why.</p>
 
 <h2 id="challenge">5. Real-world challenge: be the Q-learner</h2>
 <p>You'll learn a "maze" with no map, using only rewards, exactly like the robot.</p>
@@ -222,12 +225,13 @@ python3 check.py 7</code></pre>
 <li>Play 6 to 8 episodes. Mostly pick your best-scoring move, but roll a die before each move: on a 1, pick a random direction (that's ε ≈ 0.17).</li>
 <li>Record the steps per episode in a little table and draw a quick bar chart.</li>
 </ol>
+<p><strong>On your own (no partner needed):</strong> draw the secret maze yourself, then fold it over or turn it face down so you can't see it. Unfold and check only one square at a time, after you call each move. At the end, compare your steps-per-episode chart with the robot's, from the first line <code>python3 lesson07_trial_error.py</code> prints.</p>
 <p><strong>What to notice:</strong> the numbers fill in from the goal backwards, and your episodes get shorter even though you never saw the map. Also notice how annoying the die is when you already "know" the way, and think about when it saved you from a long route. Bonus: swap roles and see if your partner learns faster or slower than you.</p>
 
 <h2 id="project">6. Your Robo-Helper so far</h2>
-<p>Let's be honest: this lesson is a <strong>side quest</strong>. The finished Robo-Helper (Lesson 11) does <em>not</em> use Q-learning to drive around the room. It has a map, so it uses <code>astar_path</code> from Lesson 6, which is faster and always finds the shortest route. That's the right engineering choice. Don't use trial and error when you can plan.</p>
+<p>Let's be honest: this lesson is a <strong>side quest</strong>. The finished Robo-Helper (week 7's capstone) does <em>not</em> use Q-learning to drive around the room. It has a map, so it uses <code>astar_path</code> from week 4, which is faster and always finds the shortest route. That's the right engineering choice. Don't use trial and error when you can plan.</p>
 <p>So why learn it? Because there's a whole family of robot skills where nobody can write the map or the rules down. Walking, running, picking up squishy things, balancing. For those, real robotics teams use the same loop you just wrote: try, get a reward, update, repeat. They run it millions of times inside a <strong>simulator</strong> (a video-game copy of the robot and the world), because a real robot falling over a million times would break. Then they copy what was learned to the real robot. The maths is fancier (a neural network instead of a table, and methods such as PPO instead of plain Q-learning), but the idea is yours now.</p>
-<p>What you built: <code>q_learn</code> and <code>greedy_path</code>, a robot that learns <code>MAZE</code> by itself. What comes next uses language instead: in <a href="08-words-as-numbers.html">Lesson 8</a> the robot starts turning words into numbers, the first step towards understanding "put the red block in the bin".</p>
+<p>What you built: <code>q_learn</code> and <code>greedy_path</code>, a robot that learns <code>MAZE</code> by itself. What comes next uses language instead: in <a href="08-words-as-numbers.html">week 5</a> the robot starts turning words into numbers, the first step towards understanding "put the red block in the bin".</p>
 
 <h2 id="mistakes">7. Common mistakes</h2>
 <ul>
@@ -240,7 +244,7 @@ python3 check.py 7</code></pre>
 
 <h2 id="check">8. Check yourself</h2>
 <details><summary>Why is each step worth −1 instead of 0?</summary><p>So that shorter routes earn more points. With −1 per step, "get the most points" means "reach G in the fewest steps". The reward describes the goal; the learning finds the route.</p></details>
-<details><summary>What's the difference between A* (Lesson 6) and Q-learning?</summary><p>A* needs the map and plans before moving. Q-learning needs no map. It learns from experience, but needs many attempts. If you have a map, A* is better.</p></details>
+<details><summary>What's the difference between A* (week 4) and Q-learning?</summary><p>A* needs the map and plans before moving. Q-learning needs no map. It learns from experience, but needs many attempts. If you have a map, A* is better.</p></details>
 <details><summary>Predict: <code>Q = {((3, 3), "E"): 6.0, ((3, 3), "S"): 6.0}</code>. What does <code>best_action(Q, (3, 3))</code> return?</summary><p><code>"S"</code>. N and W are 0. S and E tie at 6.0, and S comes before E in <code>"NSEW"</code>, so the tie-break picks S.</p></details>
 <details><summary>What would happen with ε = 0 from the very start?</summary><p>Surprise: in this maze it still learns the 7-step route (the first episodes take 79, 43, 48, 25, 30 steps, then it settles on 7). Here's why. Every move it tries costs −1, so its Q drops below 0. Moves it has <em>never</em> tried are still at 0, so they now look best. The robot ends up exploring "by accident". In big worlds, or with positive rewards along the way, that trick fails and the robot locks onto the first route that worked. That's why real systems keep some ε. (Bonus: with ε = 1, fully random, the greedy route is <em>also</em> 7. Q-learning learns about the best moves even while acting randomly, because its target always uses the <em>best</em> Q at the next square.)</p></details>
 <details><summary>With α = 0.5, a Q-value starts at 0 and gets the target 10 three times. What is it?</summary><p>0 → 5 → 7.5 → 8.75. Each time it moves halfway to 10.</p></details>
@@ -255,9 +259,9 @@ python3 check.py 7</code></pre>
 
 <nav class="pager">
   <a href="06-pathfinding.html"><small>Previous</small>Week 4 · Finding the way</a>
-  <a class="next" href="08-words-as-numbers.html"><small>Next</small>Week 5 · Words as numbers</a>
+  <a class="next" href="08-words-as-numbers.html"><small>Next</small>Week 5 · Part A: Words as numbers</a>
 </nav>
-<footer>Build a Robot Brain · Bonus · Lesson 7</footer>
+<footer>Build a Robot Brain · Bonus side quest (homework file: lesson07_trial_error.py)</footer>
 </main>
 
 <script>

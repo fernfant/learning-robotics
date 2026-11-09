@@ -3,21 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 14 · Going real</title>
+<title>Week 12 · The boss, and going real</title>
 <link rel="stylesheet" href="../../style.css">
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 12 · Lesson 14</nav>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 12 · Part B</nav>
 
-<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 12 · Lesson 14</div>
-<h1>Going real: hardware, showing your work, what's next</h1>
-<p class="lede">Your robot brain works, on your laptop, in a perfect pretend room. This last lesson is about the two steps that turn a school project into something real: showing it to other people honestly, and (if you want) putting it on wheels.</p>
-<div class="card note" id="journey"><strong>Step 21 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed ✓ learns from a teacher ✓ fixes a wonky sensor ✓ can use Claude ✓ MCP (bonus) ✓ has a scorecard ✓ picks routes people like. <strong>Today</strong> it learns to go real: show it off, or build it for real. This is the last lesson. Look back at <a href="index.html#report-card">everything it can do</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>python3 my_robot.py --show</code>, your showcase.<br><strong>Ask an adult today:</strong> buying or building hardware, if you go that far.</div>
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 12 of 12 · Part B</div>
+<h1>The boss, and going real: showing your work, hardware, what's next</h1>
+<p class="lede">Your robot brain works, on your laptop, in a perfect pretend room. It passes 10 of the 12 exam tasks. First you beat the boss: the last two tasks, which no word-reading brain can do. Then come the two steps that turn a school project into something real: showing it to other people honestly, and (if you want) putting it on wheels.</p>
+<div class="card note" id="journey"><strong>Week 12 of 12 · Part B.</strong> So far your robot: ✓ says hello ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed ✓ learns from a teacher ✓ can ask Claude (with a key) ✓ sits its own exam ✓ picks routes people like. <strong>Today</strong> it beats the boss, then puts on its show. This is the last part of the course. Look back at <a href="index.html#report-card">everything it can do</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> one last gap, <a href="#add-to-robot">the boss</a> (<code>see_and_plan</code> in <code>my_robot.py</code>). No new gap besides the boss. Write <code>my_tasks.txt</code>, then run <code>python3 my_robot.py --show</code> (type it in the terminal, from the <code>homework</code> folder, not inside the robot).<br><strong>Ask an adult today:</strong> buying or building hardware, if you go that far.</div>
 
 <div class="facts">
   <div><b>Time</b>2–4 hours (a hardware build: a few weekends)</div>
-  <div><b>You'll need</b>Your finished project, a way to record your screen. Optional: a small robot kit.</div>
+  <div><b>You'll need</b>Your robot with weeks 1 to 12 Part A filled in, a way to record your screen. Optional: a small robot kit.</div>
+  <div><b>Homework file</b><code>my_robot.py</code> (the boss gap), plus a README you write</div>
   <div><b>New words</b>README, demo, showcase, ultrasonic sensor, motor, drift, kill switch</div>
   <div><b>Project piece</b>Share it, or put it on a real robot</div>
 </div>
@@ -39,12 +40,12 @@
 <dt>Kill switch</dt><dd>A physical switch that cuts the power instantly, whatever the code is doing.</dd>
 </dl>
 </section>
-<p class="deeper"><strong>The full lesson:</strong> four parts: showing your work, going physical (optional), safety and ethics, and where to go next. There's no Python file this time: your homework is the README and a demo.</p>
+<p class="deeper"><strong>The full lesson:</strong> the boss gap first (in <a href="#add-to-robot">Add it to your robot</a>), then four parts: showing your work, going physical (optional), safety and ethics, and where to go next. The only Python is the boss gap. The rest of your homework is a README and a demo.</p>
 
 <h2 id="problem">1. The problem</h2>
 <p>Two problems, actually.</p>
-<p><b>Nobody can see your work.</b> Your code is spread over 20 files. Someone new doesn't know to start at <code>lesson11_robohelper.py</code>, doesn't know about <code>check.py</code>, and doesn't know that 83% is the honest score, not a bug. Without a guide, most people give up after a minute.</p>
-<p><b>The pretend world is too kind.</b> In <code>world.py</code>, a step east moves the robot exactly one square. The sensor in Lesson 2 has neat, made-up noise. The cat sits still on one square. Real motors don't turn exactly the same amount each time, real sensors get confused by soft cushions, and real cats move. Every robot that works in real life first worked in a simulation, and then had to be fixed for the real world.</p>
+<p><b>Nobody can see your work.</b> Your code is spread over 20 files. Someone new doesn't know to start at <code>my_robot.py</code>, doesn't know about <code>--show</code> or <code>check.py</code>, and doesn't know what your robot is bad at. Without a guide, most people give up after a minute.</p>
+<p><b>The pretend world is too kind.</b> In <code>world.py</code>, a step east moves the robot exactly one square. The sensor in week 2 has neat, made-up noise. The cat sits still on one square. Real motors don't turn exactly the same amount each time, real sensors get confused by soft cushions, and real cats move. Every robot that works in real life first worked in a simulation, and then had to be fixed for the real world.</p>
 
 <h2 id="principles">2. First principles</h2>
 
@@ -58,11 +59,11 @@
 <li><b>What fails, and why?</b> The honest list.</li>
 <li><b>What would you do next?</b></li>
 </ol>
-<p>That list <em>is</em> your README's outline. You have every piece already. For the results, use your own <code>evaluate()</code> output: <code>Test set: 83% passed</code>, with <code>FAILED: ('find the green block', 'The green block is in the bin.')</code> and <code>FAILED: ('make me a sandwich', 'Stopping.')</code>. Add your Lesson 19 bake-off table: which brain passed what, how long it thought, and what it cost. If you did the Lesson 11 stretch, show the before and after.</p>
-<details><summary>Predict first: two READMEs. A says "My robot understands commands perfectly!". B says "83% on a 12-command test set. It thinks 'make me a sandwich' means stop, because the classifier can't say 'I don't know'." Which one would an engineer trust more?</summary>
-<p>B, by a mile. "Perfectly" makes an engineer suspicious straight away, because nothing is perfect, so either you didn't test it or you're hiding something. B shows that you <em>tested</em>, you <em>measured</em>, you <em>understood</em> the failure, and you can explain it. That's exactly what people who hire engineers look for. Honest failures are a strength, not a weakness.</p></details>
+<p>That list <em>is</em> your README's outline. You have every piece already, and the numbers come from <em>your</em> robot. Run <code>python3 my_robot.py --show</code> (section 6) and copy two results: the exam line (<code>I passed 12 of 12.</code> once you've beaten the boss) and your own tests' line (for example <code>Zippy passed 6 of 8 of your tests.</code>), with its ✗ lines. Add week 11's bake-off table, too: which brain passed what, how long it thought, and what it cost. Your robot's story is in there: 5/12 with week 5's word counter, 8/12 with week 6's tiny LM, 10/12 with week 9's teacher, and 12/12 with the boss. (Week 7's capstone RoboHelper, with its 83%, was the careful test version of the same robot. You can mention it as where the testing started.)</p>
+<details><summary>Predict first: two READMEs. A says "My robot understands commands perfectly! 12 out of 12!". B says "12 of 12 on the course exam, but 6 of 8 on my own harder tests. Say 'nearest' instead of 'closest' and it bins the wrong block, because my boss rule only knows the word 'closest'." Which one would an engineer trust more?</summary>
+<p>B, by a mile. "Perfectly" makes an engineer suspicious straight away, because nothing is perfect, so either you didn't test it or you're hiding something. B shows that you <em>tested</em> (even beyond the exam), you <em>measured</em>, you <em>understood</em> the failure, and you can explain it. That's exactly what people who hire engineers look for. Honest failures are a strength, not a weakness.</p></details>
 <p>See how grown-up AI work reports results: the <a href="../04-distill-small-models.html#results">"reading the results honestly"</a> section of the distillation module is a good model, with numbers next to what they do and don't prove. And <a href="../08-ai-research-engineer/12-open-source-portfolio.html">the open-source portfolio stage</a> shows how grown-up engineers share projects like yours.</p>
-<p><b>The demo recording.</b> 30 to 60 seconds is plenty. Most computers have a built-in screen recorder. Show: one command working, the cat replan (the log line), the test-set score, and <em>one failure on purpose</em>. Talk over it, or add captions. Then put the recording file (or a GIF) next to your README and link to it.</p>
+<p><b>The demo recording.</b> 30 to 60 seconds is plenty. Most computers have a built-in screen recorder. The easiest way: record <code>python3 my_robot.py --show</code>. Show: one command working, the cat stop and replan, the 12 of 12 exam, and <em>one failure on purpose</em> from your own tests. Talk over it, or add captions. Then put the recording file (or a GIF) next to your README and link to it.</p>
 
 <h3 id="physical">Part B: going physical (optional)</h3>
 <p>You don't need hardware to finish this course. But if you want to see your ideas move, a cheap wheeled robot kit is the next step. Look for one with <b>two motors</b> and an <b>ultrasonic distance sensor</b>. Kits built around a <b>micro:bit</b> (which can run MicroPython, a small version of Python) or an <b>Arduino</b> (usually programmed in C++, which looks different but uses the same ideas) are common, well documented, and used in lots of schools.</p>
@@ -72,13 +73,13 @@ distance    = 343 × 0.0029 ÷ 2
             = 0.497 m   ≈ half a metre      (one Robo-Helper square!)</code></pre>
 <p>Now map each lesson onto the real robot:</p>
 <div class="table-wrap"><table>
-<tr><th>Lesson</th><th>In the simulation</th><th>On a real robot</th></tr>
-<tr><td>L2 Sensors</td><td><code>noisy_reading</code>, <code>average</code></td><td>Take 5 to 10 ultrasonic readings in a row and average them. Real readings jump around, especially off soft or angled things. Lesson 2's maths is exactly why averaging helps.</td></tr>
-<tr><td>L3 Braking</td><td><code>STOP_DATA</code>, <code>fit_line</code>, <code>max_safe_speed</code></td><td>Drive at a few motor power levels, cut the power, and measure with a tape how far it rolls. That's your own <code>STOP_DATA</code>. Fit the line on a laptop, then put the two numbers (w and b) into the robot's code.</td></tr>
-<tr><td>L4–L5 Stop decision</td><td><code>should_stop</code>, <code>safest_threshold</code></td><td>Inputs: smoothed distance and current speed. Start with a simple safe rule, then collect real examples ("should it have stopped?") and train the neuron. Choose a threshold that favours recall: braking for nothing is fine, hitting the wall is not.</td></tr>
-<tr><td>L6 Pathfinding</td><td><code>astar_path</code>, <code>path_to_commands</code></td><td>Use floor tiles (or tape squares on the floor) as your grid. Draw the map, plan with A*, and turn the path into moves: "forward one tile, turn left, forward two tiles".</td></tr>
+<tr><th>Week</th><th>In the simulation</th><th>On a real robot</th></tr>
+<tr><td>Week 2: sensors</td><td><code>noisy_reading</code>, <code>average</code></td><td>Take 5 to 10 ultrasonic readings in a row and average them. Real readings jump around, especially off soft or angled things. Week 2's maths is exactly why averaging helps. (And if your sensor is mounted at an angle, week 9's LoRA idea is how you'd correct it.)</td></tr>
+<tr><td>Week 2: braking</td><td><code>STOP_DATA</code>, <code>fit_line</code>, <code>max_safe_speed</code></td><td>Drive at a few motor power levels, cut the power, and measure with a tape how far it rolls. That's your own <code>STOP_DATA</code>. Fit the line on a laptop, then put the two numbers (w and b) into the robot's code.</td></tr>
+<tr><td>Week 3: stop decision</td><td><code>should_stop</code>, <code>safest_threshold</code></td><td>Inputs: smoothed distance and current speed. Start with a simple safe rule, then collect real examples ("should it have stopped?") and train the neuron. Choose a threshold that favours recall: braking for nothing is fine, hitting the wall is not.</td></tr>
+<tr><td>Week 4: pathfinding</td><td><code>astar_path</code>, <code>path_to_commands</code></td><td>Use floor tiles (or tape squares on the floor) as your grid. Draw the map, plan with A*, and turn the path into moves: "forward one tile, turn left, forward two tiles".</td></tr>
 </table></div>
-<p><b>The big surprise: drift.</b> Tell a real robot "forward one tile" ten times and it won't land exactly ten tiles away, slightly to the left. Wheels slip and motors differ. This is why real robots keep <em>sensing</em> while they move, and correct themselves, instead of trusting the plan blindly. It's the same lesson as Lesson 10, in motors instead of words: <strong>never trust, always check</strong>.</p>
+<p><b>The big surprise: drift.</b> Tell a real robot "forward one tile" ten times and it won't land exactly ten tiles away, slightly to the left. Wheels slip and motors differ. This is why real robots keep <em>sensing</em> while they move, and correct themselves, instead of trusting the plan blindly. It's the same lesson as week 7, in motors instead of words: <strong>never trust, always check</strong>.</p>
 <details><summary>Predict first: your robot plans a 6-tile route along a corridor using only "forward one tile" commands. What's the most likely thing to go wrong?</summary>
 <p>It drifts sideways and bumps a wall, or stops a bit short. Each move is slightly off, and the errors add up over 6 moves. The fix is feedback: use the distance sensor to check the gap to the wall ahead, and stop based on what it <em>measures</em>, not on how many moves you planned.</p></details>
 <p><b>Later: a robot arm.</b> When you're ready for a bigger project, look at <a href="https://github.com/huggingface/lerobot">LeRobot</a>, Hugging Face's open-source robotics library. It supports low-cost robot arms that people build themselves, and lets you teach an arm by showing it what to do, then training a neural network on your demonstrations. Their free <a href="https://huggingface.co/learn/robotics-course">robotics course</a> is a good next step after this one. This is a project for later, with an adult: it needs more money, tools and patience.</p>
@@ -92,25 +93,25 @@ distance    = 343 × 0.0029 ÷ 2
 <li><b>Adult supervision</b> for anything with tools (soldering irons, hot glue guns, craft knives) and for batteries. Rechargeable lithium batteries can get very hot or catch fire if they're squashed, short-circuited or charged the wrong way. Use only the batteries and charger the kit says, and never leave them charging unattended.</li>
 </ul>
 </div>
-<p><b>Ethics, in plain words.</b> Lesson 10's rule still applies: never let AI output control something that moves without checks you wrote. If your robot ever has a camera or microphone, ask people before recording them. And be honest in what you claim, in your README and in conversation. "It works 83% of the time on my test set" is a true sentence. "It understands language" is not.</p>
+<p><b>Ethics, in plain words.</b> Week 7's rule still applies: never let AI output control something that moves without checks you wrote. If your robot ever has a camera or microphone, ask people before recording them. And be honest in what you claim, in your README and in conversation. "It passed 6 of my 8 tests" is a true sentence. "It understands language" is not.</p>
 
 <h3 id="next">Part D: where to go next</h3>
 <ul>
 <li><a href="../17-free-ai-curriculum.html#robotics">Free robotics courses</a>: a checked list of free courses to go deeper into robotics.</li>
 <li><a href="../11-three-book-path.html">Three books and a gym</a>: a longer path through language models, reinforcement learning and building things.</li>
-<li><a href="../06-30u30/index.html">Ilya's 30 papers</a>: the famous reading list. Start with day 1, which is about next-word prediction, the same idea as your Lesson 8.</li>
+<li><a href="../06-30u30/index.html">Ilya's 30 papers</a>: the famous reading list. Start with day 1, which is about next-word prediction, the same idea as your week 5 typo fixer.</li>
 </ul>
 
 <h2 id="play">3. Play with it</h2>
 <div class="card demo">
 <h3>Interactive: README builder</h3>
-<p class="legend">Fill in your own numbers. The README updates as you type and is saved in this browser. Tick each section only when it's true for your project. The honesty check is strict on purpose.</p>
+<p class="legend">Fill in your own robot's name and numbers. The README updates as you type and is saved in this browser. Tick each section only when it's true for your project. The honesty check is strict on purpose: a perfect score on every test means your tests are too easy.</p>
 <label for="nm">Project name</label>
 <input id="nm" type="text" value="Robo-Helper" style="width:100%;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)">
-<label for="score" style="display:block;margin-top:8px">Test-set score (from <code>evaluate()</code>)</label>
-<input id="score" type="text" value="83% (10 of 12 commands)" style="width:100%;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)">
+<label for="score" style="display:block;margin-top:8px">Scores (from <code>python3 my_robot.py --show</code>)</label>
+<input id="score" type="text" value="12 of 12 on the course exam, 6 of 8 on my own tests" style="width:100%;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)">
 <label for="fail" style="display:block;margin-top:8px">Biggest failure, and why</label>
-<input id="fail" type="text" value="'make me a sandwich' is read as stop: the classifier always picks a top intent and can't say 'I don't know'." style="width:100%;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)">
+<input id="fail" type="text" value="'put the block nearest the bin away' bins the green block: my boss rule only knows the word 'closest', so the language brain guesses." style="width:100%;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)">
 <div id="secs" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:4px;margin-top:10px"></div>
 <div class="stats">
   <div class="stat"><div class="k">Sections ready</div><div class="v" id="ready">–</div></div>
@@ -121,26 +122,92 @@ distance    = 343 × 0.0029 ÷ 2
 </div>
 
 <h2 id="homework">4. Homework</h2>
-<p>No Python file this time. You'll make three things, in your <code>project</code> folder.</p>
+<p>First beat the boss (<a href="#add-to-robot">Add it to your robot</a>, below). Then you'll make three things, in your <code>project</code> folder.</p>
 <h3>4.1 Make sure everything passes</h3>
-<p>From the <code>project</code> folder, run <code>python3 check.py all</code>. When every lesson is done, the last line reads <code>Total: 84/84 checks passed</code> (that's the real total for the reference solutions). If anything is red or yellow, fix it first: a README for a broken project is a sad README.</p>
+<p>From the <code>project</code> folder, run <code>python3 check.py robot</code>. With the boss beaten, the last line reads <code>15/15 passed  🎉 lesson complete!</code>. Then run <code>python3 check.py all</code>, which checks every homework file too. With everything done (stretches included), it ends <code>Total: 115/115 checks passed</code> (the real total for the reference solutions). If anything is red, fix it first: a README for a broken project is a sad README. A yellow … just means a stretch or bonus you skipped.</p>
 <h3>4.2 Write <code>README.md</code></h3>
 <p>Use the six questions from Part A as your headings. The builder above gives you a starting draft, but rewrite it in your own words. Keep it short: one screen per section at most.</p>
-<details><summary>Hint 1: the "how to run" section</summary><p>Pretend the reader has never used a terminal. Give the exact commands, in order, in code blocks: <code>cd project/solutions</code> (or <code>homework</code>), then <code>python3 lesson11_robohelper.py</code>, then <code>python3 ../check.py 11</code> from the right folder. Test them yourself in a fresh terminal window.</p></details>
-<details><summary>Hint 2: the results section</summary><p>Say what was tested (12 commands, a fresh robot each time, a surprise at (4, 1)), then the number, then what it does and doesn't prove. "83% on 12 commands" is not "83% in real life". If you did the stretch, show before and after in a small table.</p></details>
-<details><summary>Hint 3: the "what fails" section</summary><p>For each failure: the command, what the robot did, why (in one sentence), and an idea for fixing it. Include at least the sandwich. Good extras: Lesson 10's "hmm what about the blue" becoming a "put", and (if you found it) "find the green block" being classified as "put", which bins the block.</p></details>
+<details><summary>Hint 1: the "how to run" section</summary><p>Pretend the reader has never used a terminal. Give the exact commands, in order, in code blocks: <code>cd project/homework</code>, then <code>python3 my_robot.py</code> (type <code>help</code> for commands, <code>quit</code> to stop), then <code>python3 my_robot.py --show</code> for the showcase, and <code>cd ..</code> then <code>python3 check.py robot</code> for the checks. Test them yourself in a fresh terminal window.</p></details>
+<details><summary>Hint 2: the results section</summary><p>Say what was tested, then the number, then what it does and doesn't prove. The exam: 12 commands, a fresh robot each time, the cat at (4, 1), and the room checked afterwards. Your own tests: how many, and why you chose them. "12 of 12 on 12 commands" is not "12 of 12 in real life". The week-by-week scores (5, 8, 10, 12 out of 12) make a great small table.</p></details>
+<details><summary>Hint 3: the "what fails" section</summary><p>For each failure: the command, what the robot did, why (in one sentence), and an idea for fixing it. Take them from the ✗ lines of your own tests. Real examples from our robot: "put the block nearest the bin away" binned the <em>green</em> block (the boss rule only knows "closest", so the language brain guessed), and "clean up the room except the blue block" binned <em>only</em> the blue one, the exact opposite.</p></details>
 <h3>4.3 Record a demo</h3>
-<p>30–60 seconds of screen recording: one command working, the cat replan, the test score, and one failure on purpose. Save it next to the README and link to it.</p>
+<p>30–60 seconds of screen recording of <code>python3 my_robot.py --show</code>: one command working, the cat stop and replan, the 12 of 12 exam, and one failure on purpose from your own tests. Save it next to the README and link to it.</p>
 <h3>How to check</h3>
 <p>Give your project folder to someone who hasn't seen it (a parent, a friend, a teacher). Don't help them. Can they run it from the README alone in under five minutes? Can they tell you, afterwards, what the robot is bad at? If yes to both, you're done.</p>
 <h3>Stretch</h3>
 <ul>
-<li>With a parent's or guardian's OK, put the project on a public code site such as GitHub. Check there are no secrets in it first (like an API key from Lesson 10's optional file).</li>
-<li>If you have a robot kit: get just the sensor working first. Take 20 readings of a wall at 50 cm, then work out the average and how far the readings spread, exactly like Lesson 2's <code>average_error</code>. Add the numbers to your README.</li>
+<li>With a parent's or guardian's OK, put the project on a public code site such as GitHub. Check there are no secrets in it first. If you set up an API key in week 10, it should only be in <code>~/.zshrc</code>, never in a project file. Search the folder for <code>sk-</code> to be sure.</li>
+<li>If you have a robot kit: get just the sensor working first. Take 20 readings of a wall at 50 cm, then work out the average and how far the readings spread, exactly like week 2's <code>average_error</code>. Add the numbers to your README.</li>
 </ul>
 
-<h2 id="add-to-robot">Add it to your robot</h2>
-<p>Your robot is finished, and you built every clever part of it. Time for its show: see <a href="#so-far">section 6</a>. Write <code>homework/my_tasks.txt</code> and run <code>python3 my_robot.py --show</code>.</p>
+<h2 id="add-to-robot">Add it to your robot: the BOSS</h2>
+<p>Since week 11 your robot's exam has ended the same way:</p>
+<pre><code>  ✗ 'tidy up the room'                             binned ['green block'], wanted ['blue block', 'green block', 'red block']
+  ✗ "put away the block that's closest to the bin" binned nothing, wanted ['blue block']
+  I passed 10 of 12.</code></pre>
+<p>Every brain in the bake-off failed these two. A word-reading brain only sees words. It has never heard "room", and "closest" is about the <em>room</em>, not the words. More training can't fix that. But your robot isn't only a word-reader. It <em>knows</em> where every block is (<code>self.objects</code>), which ones are already binned (<code>self.binned</code>), and where the bin is (<code>find_bin(ROOM)</code>). It doesn't need to understand "closest". It can <strong>measure</strong> it.</p>
+
+<h3>Work it out by hand first</h3>
+<p>The blocks start at red (2, 1), blue (6, 3) and green (1, 5). The bin is at (7, 6). Week 1's <code>manhattan(a, b)</code> is the grid distance: |x1 − x2| + |y1 − y2|.</p>
+<details><summary>Predict first: which block is closest to the bin?</summary>
+<pre><code>red    (2, 1) → (7, 6):  |2 − 7| + |1 − 6| = 5 + 5 = 10
+blue   (6, 3) → (7, 6):  |6 − 7| + |3 − 6| = 1 + 3 =  4   ← smallest
+green  (1, 5) → (7, 6):  |1 − 7| + |5 − 6| = 6 + 1 =  7</code></pre>
+<p>Blue, at 4 squares. That's exactly what the exam wants: <code>wanted ['blue block']</code>.</p></details>
+<details><summary>Predict first: a rule says "if the command contains <em>everything</em>, put every block away". What happens to exam task 6, "bin everything except the green block"?</summary>
+<p>It bins all three, including green: a fail! Task 6 passes today, and your new rule would break it. That's why the rule has a "but not if" part: if the command says <em>except</em> or <em>but</em>, leave it to your language brain, which already gets task 6 right. A new rule must never break an old pass. That's why you re-run the whole exam, not just the new tasks.</p></details>
+
+<h3>Fill in <code>see_and_plan(self, text)</code></h3>
+<p>Read its docstring in <code>my_robot.py</code>. It returns a <em>plan</em> (a list of actions, like your week 6 brain writes), or <code>None</code>:</p>
+<ul>
+<li>the command has the word <b>closest</b> → put away the unbinned block nearest the bin;</li>
+<li>the command has <b>room</b>, <b>everything</b> or <b>all</b>, but <em>not</em> <b>except</b> or <b>but</b> → put away every unbinned block, red, then blue, then green;</li>
+<li>anything else → <code>None</code>, and your language brain handles it as usual.</li>
+</ul>
+<p>An action looks like <code>{"intent": "put", "object": "blue block"}</code>. The provided <code>understand()</code> asks <code>see_and_plan</code> first. If it returns a plan, the robot uses it. If it returns <code>None</code>, the language brain takes over.</p>
+<details><summary>Hint 1</summary><p>Start the method with this import line:</p><pre><code>from lesson01_moving import manhattan</code></pre><p><code>find_bin</code> and <code>ROOM</code> are already imported at the top of <code>my_robot.py</code>.</p></details>
+<details><summary>Hint 2</summary><p>First make two lists. The words: <code>words = text.lower().split()</code>. The blocks still on the floor: <code>left</code> = each of <code>"red block"</code>, <code>"blue block"</code>, <code>"green block"</code> that isn't in <code>self.binned</code>. Then three <code>if</code>s, in the order of the bullets above. For "closest", <code>min</code> with a <code>key</code> finds the block whose distance to the bin is smallest. Check that <code>left</code> isn't empty first.</p></details>
+<details><summary>Hint 3 (fill in the blanks)</summary><pre><code>words = text.lower().split()
+left = [b for b in ("red block", "blue block", "green block") if b not in self.binned]
+if "closest" in words and left:
+    nearest = min(left, key=lambda b: manhattan(self.objects[b], ____))
+    return [{"intent": "put", "object": ____}]
+if any(w in words for w in ("room", "everything", "all")) and not any(w in words for w in ("except", "but")):
+    return [{"intent": "put", "object": b} for b in ____]
+return None</code></pre></details>
+<div class="note"><strong>New Python this time.</strong> <code>min(things, key=...)</code> finds the thing with the smallest <em>score</em>, and <code>lambda b: ...</code> is a tiny one-line function that works out each score. <code>any(...)</code> is True if at least one check is True.
+<pre><code>min(["cat", "elephant", "ox"], key=len)              →  "ox"
+min([5, -9, 2], key=lambda n: abs(n))                →  2
+any(w in ["hi", "there"] for w in ("hello", "hi"))   →  True</code></pre></div>
+<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 12 boss: uses what it sees"</em>. If it's red, the hint tells you which part is wrong, for example <em>"'tidy up the room' should bin all three"</em>, <em>"the block closest to the bin is the blue one"</em> or <em>"'bin everything except the green block' says except: leave it to the language brain (return None)"</em>. All green, and the last line is:</p>
+<pre><code>  15/15 passed  🎉 lesson complete!</code></pre>
+<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output (type <code>reset</code> between the two to put the blocks back):</p>
+<pre><code>Zippy&gt; tidy up the room
+  (I thought for 0.07 ms, so I'd roll 0.07 mm meanwhile.)
+  Something is in the way at (4, 1)! I stopped just in time (stop chance 0.99, my safe threshold 0.17).
+  The red block is in the bin. The blue block is in the bin. The green block is in the bin.
+
+Zippy&gt; put away the block that's closest to the bin
+  (I thought for 0.07 ms, so I'd roll 0.07 mm meanwhile.)
+  Something is in the way at (4, 1)! I stopped just in time (stop chance 0.99, my safe threshold 0.17).
+  The blue block is in the bin.</code></pre>
+<p>Look at the thinking time: 0.07 ms, quicker than the language brain, because a rule that measures doesn't need a neural network. Now the moment you've waited for. Type <code>exam</code>:</p>
+<pre><code>Zippy&gt; exam
+  ✓ 'put the red block in the bin'                 
+  ✓ "where's the green one?"                       
+  ✓ 'make me a sandwich'                           
+  ✓ 'put the red and blue blocks away'             
+  ✓ 'tidy up the room'                             
+  ✓ 'bin everything except the green block'        
+  ✓ "put away the block that's closest to the bin" 
+  ✓ 'put the block away'                           
+  ✓ 'go to the blue block'                         
+  ✓ 'stop'                                         
+  ✓ 'hmm what about the blue'                      
+  ✓ 'put the purple block in the bin'              
+  I passed 12 of 12.</code></pre>
+<p><strong>12 of 12. Boss beaten.</strong> No internet and no API key: just your own code, using what your robot can see.</p>
+<p><b>Is that cheating?</b> No, and it's worth saying why in your README. It's the hybrid from week 11: a simple, fast rule for what the robot can measure, and a learned brain for everything else. Real robots are built like that. But a rule only knows the words you gave it. Say "nearest" instead of "closest" and it doesn't fire. You'll catch that with your own tests in <a href="#so-far">section 6</a>.</p>
 
 <h2 id="real-world">5. Real-world challenge: present it</h2>
 <p>Real engineers explain their work out loud, to people who weren't there. That's a skill, and it gets better with practice.</p>
@@ -151,23 +218,70 @@ distance    = 343 × 0.0029 ÷ 2
 <li>Afterwards, sort the questions: ones you answered well, ones you answered badly, and ones you couldn't answer.</li>
 <li>Add a short FAQ to your README with the best questions and answers. Put the ones you couldn't answer into "What I'd do next".</li>
 </ol>
+<p><b>On your own (20 minutes).</b> No audience tonight? Record yourself giving the 5-minute talk (a phone is fine), then watch it back the next day as if you'd never seen the project. Write down the first five questions a stranger would ask. Answer them in a short FAQ in your README.</p>
 <p><b>What it teaches:</b> other people's questions show you what's unclear, and often what's genuinely missing. Questions like "what happens if the cat moves?" or "can it learn new words?" are real research questions.</p>
 
-<h2 id="so-far">6. Your Robo-Helper so far: the capstone show</h2>
-<p>Twelve weeks ago your robot was an empty file with a name. Now every gap in <code>my_robot.py</code> is filled with code you wrote, and <code>python3 check.py robot</code> says 12/12. Time for its show.</p>
+<h2 id="so-far">6. Your robot's show</h2>
+<p>Twelve weeks ago your robot was an empty file with a name. Look at what <em>you</em> built into it, week by week (it matches the list your robot prints when you type <code>help</code>):</p>
+<div class="table-wrap"><table>
+<tr><th>Week</th><th>What your robot learned</th><th>Try it</th></tr>
+<tr><td>1</td><td>moves with arrows (and in week 1, BUMPed into the cat)</td><td><code>SSS</code></td></tr>
+<tr><td>2</td><td>looks around, and knows its safe speed</td><td><code>look</code></td></tr>
+<tr><td>3</td><td>stops before it bumps into the cat</td><td><code>EEEE</code></td></tr>
+<tr><td>4</td><td>plans routes, and replans round the cat</td><td><code>goto blue</code></td></tr>
+<tr><td>5</td><td>fixes typos and understands sentences, one action at a time</td><td><code>put teh red blok in the bin</code></td></tr>
+<tr><td>6</td><td>writes whole plans, and asks when you're vague</td><td><code>put the block away</code></td></tr>
+<tr><td>7</td><td>checks every action first</td><td><code>json: {"intent": "put", "object": "purple block"}</code></td></tr>
+<tr><td>8</td><td>knows how long it thinks</td><td><code>slowbrain on</code></td></tr>
+<tr><td>9</td><td>has a teacher-trained brain</td><td><code>where's the green one?</code></td></tr>
+<tr><td>10</td><td>can ask Claude (with an adult and a key)</td><td><code>claude: tidy up the room</code></td></tr>
+<tr><td>11</td><td>sits its own exam</td><td><code>exam</code></td></tr>
+<tr><td>12</td><td>picks routes people like, and beats the boss using what it sees</td><td><code>tidy up the room</code></td></tr>
+</table></div>
+<p>Its exam score climbed with it: 5 of 12 with week 5's word counter, 8 of 12 with week 6's tiny LM, 10 of 12 with week 9's teacher, and now 12 of 12. Time for its show.</p>
 <ol>
 <li><b>Write its final exam.</b> In <code>homework</code>, copy <code>my_tasks_example.txt</code> to <code>my_tasks.txt</code>. Write your own tests, one per line: what you'd say, then which blocks should end up in the bin. Include at least two you think it will <em>fail</em>. Good engineers test their robot's weak spots, not just its tricks.</li>
-<li><b>Run the show</b> from <code>homework</code>: <code>python3 my_robot.py --show</code>. It demos every ability you built, sits the 12-task bake-off exam, then your exam.</li>
+<li><b>Run the show.</b> In the terminal, from the <code>homework</code> folder (not inside the robot), type <code>python3 my_robot.py --show</code>. It demos your robot's abilities, sits the 12-task exam, then your exam.</li>
 <li><b>Record it</b> (a screen recording is fine) and use it in your presentation (section 5) and your README.</li>
 </ol>
-<p>Real output from the finished robot, with the example tests (the end of it):</p>
-<pre><code>&gt; exam   [the 12 tasks from the bake-off]
-  ✓ 'put the red block in the bin'
+<p>Real output from the finished robot, with the example tests. It opens with the same start screen as <code>python3 my_robot.py</code>, then demos ten commands, each on a fresh robot (we've left out the rooms it draws):</p>
+<pre><code>*** Zippy: THE SHOWCASE ***
+
+Hello, I am Zippy!
+
+=== Zippy: built up to week 12 ===
   ...
-  ✗ 'tidy up the room'                             binned ['green block'], wanted ['blue block', 'green block', 'red block']
-  ✗ "put away the block that's closest to the bin" binned nothing, wanted ['blue block']
-  ...
-  I passed 10 of 12.
+  Your week-7 capstone (RoboHelper, its simpler twin) passes 83% of its final test.
+
+&gt; EEE
+  Something is in the way at (4, 1)! I stopped just in time (stop chance 0.99, my safe threshold 0.17).
+...
+&gt; where's the green one?
+  (I thought for 0.27 ms, so I'd roll 0.27 mm meanwhile.)
+  The green block is at (1, 5).
+
+&gt; tidy up the room
+  (I thought for 0.07 ms, so I'd roll 0.07 mm meanwhile.)
+  Something is in the way at (4, 1)! I stopped just in time (stop chance 0.99, my safe threshold 0.17).
+  The red block is in the bin. The blue block is in the bin. The green block is in the bin.
+
+&gt; json: {"intent": "launch", "object": "red block"}
+  Sorry, I won't do that: unknown intent 'launch'.
+
+&gt; exam
+  ✓ 'put the red block in the bin'                 
+  ✓ "where's the green one?"                       
+  ✓ 'make me a sandwich'                           
+  ✓ 'put the red and blue blocks away'             
+  ✓ 'tidy up the room'                             
+  ✓ 'bin everything except the green block'        
+  ✓ "put away the block that's closest to the bin" 
+  ✓ 'put the block away'                           
+  ✓ 'go to the blue block'                         
+  ✓ 'stop'                                         
+  ✓ 'hmm what about the blue'                      
+  ✓ 'put the purple block in the bin'              
+  I passed 12 of 12.
 
 YOUR EXAM (my_tasks.txt):
   ✓ 'put the red block in the bin'           binned: red block                      wanted: red block
@@ -177,14 +291,29 @@ YOUR EXAM (my_tasks.txt):
   ✓ 'put teh green blok away'                binned: green block                    wanted: green block
   ✓ 'make me a cup of tea'                   binned: nothing                        wanted: nothing
 
-Robo-Helper passed 6 of 6 of your tests.</code></pre>
-<p>6 of 6 means the example tests were too easy. Write harder ones!</p>
-<p>Robo-Helper is finished: it understands commands (L8–L9), refuses unsafe ones (L10), plans (L6), senses and brakes (L2–L5), replans around surprises, and grades itself (L11). Lessons 12 and 13 showed how bigger models learn what people prefer and adapt cheaply. Now it also has the two things every real project needs: <strong>a README that tells the truth</strong> and <strong>a demo</strong>.</p>
+Zippy passed 6 of 6 of your tests.
+
+*** Zippy: 14 of 14 pieces built, every one of them by you. ***</code></pre>
+<p>That last line counts the pieces in your banner. If you skipped the optional week 10 Claude piece, it says <code>13 of 14</code>, and <code>check.py robot</code> still reaches 15/15.</p>
+<p>6 of 6 means the example tests were too easy. Write harder ones! We added two lines to the end of <code>my_tasks.txt</code>:</p>
+<pre><code>put the block nearest the bin away | blue block
+clean up the room except the blue block | red block, green block</code></pre>
+<p>Real output of <code>--show</code> again (just the new lines and the score):</p>
+<pre><code>  ✗ 'put the block nearest the bin away'     binned: green block                    wanted: blue block
+  ✗ 'clean up the room except the blue block' binned: blue block                     wanted: green block, red block
+
+Zippy passed 6 of 8 of your tests.</code></pre>
+<p>Now you know exactly what to fix next: teach the boss rule the word "nearest", and find out why "except" got flipped. Those two lines go straight into the "What fails" part of your README.</p>
+<div class="card note">
+<p><strong>Your robot is finished.</strong> It moves, senses and brakes (weeks 1 to 3). It plans routes and replans round the cat (week 4). It understands commands, writes plans and asks when you're vague (weeks 5 and 6). It checks every action (week 7), knows how long it thinks (week 8), learned from a teacher (week 9), can ask Claude (week 10), sits its own exam (week 11), picks routes people like, and beats the boss (week 12). <strong>12 of 12, and you wrote every clever part of it.</strong></p>
+<p>Now it also has the two things every real project needs: <strong>a README that tells the truth</strong> and <strong>a demo</strong>.</p>
+</div>
 <p>This is the end of the course. Your robot lives on as the first project you can show off, and, if you build the kit, as the brain of a robot you can actually watch drive across your floor.</p>
 
 <h2 id="mistakes">7. Common mistakes</h2>
 <ul>
-<li><b>Hiding the failures.</b> A README that only shows the good bits reads like an advert. Show the 83% and the 17%.</li>
+<li><b>Hiding the failures.</b> A README that only shows the good bits reads like an advert. Show the 12 of 12 <em>and</em> the ✗ lines from your own tests.</li>
+<li><b>A boss rule that breaks an old pass.</b> If <code>see_and_plan</code> grabs "everything" without checking for "except", exam task 6 bins the green block. Always re-run the whole exam. check.py: <em>"'bin everything except the green block' says except: leave it to the language brain (return None)"</em>.</li>
 <li><b>"How to run" that doesn't run.</b> Test the commands from a fresh terminal, in a fresh copy of the folder.</li>
 <li><b>A ten-minute demo.</b> Nobody watches it. Under a minute, and the best part first.</li>
 <li><b>Testing a real robot on a table.</b> It <em>will</em> drive off the edge one day. Floor only, slow first, off switch in reach.</li>
@@ -194,9 +323,10 @@ Robo-Helper passed 6 of 6 of your tests.</code></pre>
 <h2 id="check">8. Check yourself</h2>
 <details><summary>Name the six questions a README should answer.</summary><p>What is it? Can I run it? How does it work? How well does it work? What fails and why? What would you do next?</p></details>
 <details><summary>An ultrasonic echo comes back after 5.8 ms. How far away is the object?</summary><p>343 × 0.0058 ÷ 2 ≈ 0.99 m. Twice the time, twice the distance: about one metre.</p></details>
-<details><summary>Predict: your real robot plans "forward 4 tiles" and you measure where it stops, five times. Will all five be the same?</summary><p>No. They'll spread out a bit, and probably all lean slightly one way. That's drift plus noise, the real-world version of Lesson 2. Averaging the five shows the typical error, and checking with the sensor while driving fixes it.</p></details>
+<details><summary>Predict: your real robot plans "forward 4 tiles" and you measure where it stops, five times. Will all five be the same?</summary><p>No. They'll spread out a bit, and probably all lean slightly one way. That's drift plus noise, the real-world version of week 2. Averaging the five shows the typical error, and checking with the sensor while driving fixes it.</p></details>
 <details><summary>Why must the off switch be physical, not a button in your code?</summary><p>If the code has a bug or freezes, a software button may not work. A physical switch cuts the power whatever the code is doing.</p></details>
-<details><summary>Which lesson's idea is "keep sensing while you move, don't trust the plan blindly" most like?</summary><p>Lesson 10: never trust, always check. There it was AI output, here it's your own motion plan. Lesson 11's replanning around the cat is the same idea too.</p></details>
+<details><summary>Which week's idea is "keep sensing while you move, don't trust the plan blindly" most like?</summary><p>Week 7: never trust, always check. There it was AI output, here it's your own motion plan. Your robot's stop-and-replan around the cat (weeks 3 and 4) is the same idea too.</p></details>
+<details><summary>Why could <code>see_and_plan</code> beat the two boss tasks when no amount of training on words could?</summary><p>Because it uses what the robot can <em>see</em>: where every block is and where the bin is. "Closest" is a fact about the room, so you measure it with <code>manhattan</code> instead of guessing from words. The language brains only ever saw the sentence.</p></details>
 
 <h2 id="deeper">9. Go deeper (optional)</h2>
 <ul>
@@ -208,10 +338,10 @@ Robo-Helper passed 6 of 6 of your tests.</code></pre>
 </ul>
 
 <nav class="pager">
-  <a href="12-preferences.html"><small>Previous</small>Week 12 · What people prefer</a>
+  <a href="12-preferences.html"><small>Previous</small>Week 12 · Part A: What people prefer</a>
   <a class="next" href="index.html"><small>Next</small>Course hub</a>
 </nav>
-<footer>Build a Robot Brain · Week 12 · Lesson 14</footer>
+<footer>Build a Robot Brain · Week 12 of 12 · Part B</footer>
 </main>
 
 <script>
@@ -233,17 +363,22 @@ try { state = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) {}
 function buildReadme(s) {
   const name = s.nm || 'My robot', on = k => !!(s.ticks || {})[k];
   const L = ['# ' + name, ''];
-  if (on('what')) L.push('A simulated robot that understands commands like "put the red block in the bin", plans a route, stops for surprises and reports how well it works.', '', 'Demo: [demo recording](demo.mp4)', '');
-  if (on('run')) L.push('## How to run it', '', '```', 'cd project/homework', 'python3 lesson11_robohelper.py', 'cd ..', 'python3 check.py all', '```', '');
-  if (on('how')) L.push('## How it works', '', '```', 'command --(word-counting classifier + safety checks)--> action', 'action  --(A* route planner)--> route', 'route   --(distance sensor, braking line, stop-neuron)--> driving', '```', '');
-  if (on('results')) L.push('## Results', '', 'Test set: 12 commands, a fresh robot each time, an unexpected obstacle at (4, 1).', '', 'Score: ' + (s.score || '?'), '');
+  if (on('what')) L.push('A simulated robot that understands commands like "put the red block in the bin", plans a route, stops for the cat and sits its own exam. I built it one piece a week for 12 weeks.', '', 'Demo: [demo recording](demo.mp4)', '');
+  if (on('run')) L.push('## How to run it', '', '```', 'cd project/homework', 'python3 my_robot.py          # talk to it (help, quit)', 'python3 my_robot.py --show   # the showcase and both exams', 'cd ..', 'python3 check.py robot       # one check per week', '```', '');
+  if (on('how')) L.push('## How it works', '', '```', 'command --(typo fixer)--> clean words', 'words   --(see_and_plan, or the teacher-trained language brain)--> plan', 'plan    --(is_safe check on every action)--> actions', 'action  --(nicest route, or A* when something is in the way)--> route', 'route   --(sensor, braking line, stop-neuron)--> driving', '```', '');
+  if (on('results')) L.push('## Results', '', 'Course exam: 12 commands, a fresh robot each time, the cat at (4, 1), the room checked afterwards.', 'My own tests: my_tasks.txt, including ones I expected to fail.', '', 'Score: ' + (s.score || '?'), '');
   if (on('fails')) L.push('## What fails, and why', '', '- ' + (s.fail || '?'), '');
   if (on('next')) L.push("## What I'd do next", '', '- Let the robot say "I don\'t know" when it isn\'t sure.', '');
   if (on('safety')) L.push('## Safety', '', '- Physical off switch, slow speed first, floor only, adult supervision for tools and batteries.', '');
   return L.join('\n');
 }
+function perfect(score) {
+  // every "a of b" / "a/b" is a full marks score, or a 100%: no test ever failed
+  const pairs = [...score.matchAll(/(\d+)\s*(?:of|\/)\s*(\d+)/g)];
+  return /100\s*%/.test(score) || (pairs.length > 0 && pairs.every(m => m[1] === m[2]));
+}
 function honesty(s) {
-  if (/100\s*%/.test(s.score || '')) return ['100%? Check your test set', '--warn'];
+  if (perfect(s.score || '')) return ['Perfect? Add harder tests', '--warn'];
   if (!(s.ticks || {}).fails || !(s.fail || '').trim()) return ['Add a failure', '--fail'];
   if (!(s.ticks || {}).results) return ['Add results', '--fail'];
   return ['Honest', '--pass'];

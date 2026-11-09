@@ -19,8 +19,8 @@ def robot_starter(text):
     """my_robot.py: each week's piece becomes a gap the student fills in, one week at a time."""
     def repl(m):
         ind, week, lessons = m.group("indent"), m.group("week"), m.group("lessons")
-        return (f"{ind}# TODO week {week}: add it to your robot (Lesson {lessons}, 'Add it to your robot'). Read the docstring above.\n"
-                f"{ind}raise NotImplementedError(\"week {week} (Lesson {lessons}). Fill in this gap in my_robot.py\")\n")
+        return (f"{ind}# TODO week {week}: fill in this gap (see 'Add it to your robot' on the week {week} page). Read the docstring above.\n"
+                f"{ind}raise NotImplementedError(\"week {week}. Fill in this gap in my_robot.py\")\n")
     return ROBOT.sub(repl, text)
 
 

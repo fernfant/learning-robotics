@@ -255,3 +255,42 @@ Set up the folder structure, schema (CLAUDE.md), shared styles and the index.
   - Lesson 14's show uses `homework/my_tasks.txt`
   - README updated
 - Also: the course home page exported as a PDF for the user, via headless Chrome, outside the repo.
+
+## [2026-11-10] fix | Everything the three persona swarms found (Maya the careful reader, Leo the impatient gamer, Sam the builder)
+- Reviews: `kid-reviews.md` (101 issues) and `kid-review-summary.md` (top 10, quick wins, builder bugs). Both are kept outside the repo.
+- Code, all tested at every week's state:
+  - Lowercase arrows work. A friendly crash message names the method and line.
+  - Before week 7, bad or unknown actions give an "Uh oh … week 7's safety check" message.
+  - Unknown intents raise ValueError in `do()`. Bonk shows the position.
+  - Week 2 `look` averages 16 noisy readings.
+  - Week 3 shows the stop chance and threshold.
+  - `json:` command, so week 7's safety check is visible.
+  - `slowbrain on` really bumps the cat. Week 8 `think_time` flags when it's too slow, using `fits_budget`.
+  - Week-12 boss gap `see_and_plan`: the exam goes 10/12 → 12/12.
+  - The banner greets via `introduce()`, uses weeks only, and skips the optional week-10 Claude piece.
+  - The showcase opens with the banner and ends with an "N of 14 pieces built" certificate.
+  - `check.py`:
+    - new robot checks: lowercase, the averaged look, safe speed (Part B, yellow), safest threshold (week 3 Part B), json refusal, the boss;
+    - a friendly TypeError hint;
+    - the L11 check now requires the find-the-green-block failure (`==`, not `<=`);
+    - clearer lesson-15 wording.
+  - Starter TODOs say "week N".
+  - Totals: 115/115 on the solutions. The robot passes 0, 1, 3, 5, 6, 8, 9, 10, 11, 12, 13, 15 of 15 checks after weeks 0–9, 11 and 12.
+- Pages, done by 5 helpers with separate file ownership and then a consistency pass:
+  - Home page: a hero "Start the course" box, with the grown-up modules collapsed.
+  - Hub: weeks 1A–12B and a week-by-week robot table from real runs.
+  - Every lesson:
+    - "Week N of 12 · Part A/B" numbering, with lesson numbers only as file names;
+    - "Add it to your robot" sections where Hint 1 gives the exact import line and the last hint is fill-in-the-blank;
+    - "New Python this time" boxes;
+    - "On your own" challenge versions;
+    - changelog notes removed;
+    - false promises of recorded Claude runs removed;
+    - real outputs everywhere.
+  - Lesson 0: a drive-the-robot warm-up and a "How your robot file works" box.
+  - Lesson 15 split: the attention stretch moved to new `15b-attention.html`.
+  - L11: hints now consistent (`==`), and RoboHelper explained as the simpler twin.
+  - L18: fixed the Hint 3 truthy-tuple bug.
+  - L14: the boss section, plus a finale around the learner's own `--show` reaching 12/12.
+  - Quick wins all applied.
+- Not done (needs the user's API key): recorded Claude runs. The pages say Claude's rows appear after a grown-up records them.

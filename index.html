@@ -8,26 +8,41 @@
 </head>
 <body>
 <main>
+<section class="kid" id="start">
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Ages 12+ · 12 weeks · start here</div>
+<h2 style="font-size:1.8rem">Build your own robot brain</h2>
+<p class="big">Build a robot that understands "put the red block in the bin". 12 weeks, basic Python.</p>
+<pre><code>##########
+#Rr.c....#
+#..##....#
+#..#..b..#
+#....##..#
+#g.......#
+#.#....B.#
+##########</code></pre>
+<p class="meta">R = your robot, r b g = blocks, c = the cat, B = the bin. By week 12, your robot does this (shortened from its real output):</p>
+<pre><code>Zippy&gt; put the red and blue blocks away
+  Something is in the way at (4, 1)!
+  I stopped just in time.
+  The red block is in the bin.
+  The blue block is in the bin.</code></pre>
+<p>You write every clever part yourself: moving, sensing, stopping for the cat, planning a route, understanding words. If you can write a Python loop that prints 1 to 10, you're ready.</p>
+<p style="margin:18px 0"><a href="topics/18-robot-brain/index.html" style="display:inline-block;font-size:1.2rem;font-weight:700;padding:12px 24px;border-radius:10px;background:var(--accent);color:var(--bg);text-decoration:none">Start the course →</a></p>
+<p class="meta">After the course, for fun: <a href="topics/21-robot-math.html">robot maths, by playing</a> and <a href="topics/22-vector-fields.html">steering with a field of arrows</a> (both fine after week 4), then <a href="topics/20-from-scratch/index.html">real code from the pros</a> (some installs; ask an adult).</p>
+</section>
+
 <div class="eyebrow">Personal course · living document</div>
 <h1>LLMs &amp; Robotics</h1>
 <p class="lede">A personal course on two connected fields, built from links as they're added. Each module has a summary, deep dives, a self-check and further reading.</p>
 
-<section class="kid" id="start">
-<h2>New here? Start here</h2>
-<p class="big">If you're 12 or older and can write a Python loop that prints 1 to 10, start with <a href="topics/18-robot-brain/index.html">Build a Robot Brain</a> (Module 18).</p>
-<p>You'll build a robot brain step by step over 12 weeks. Every lesson says what your robot can do so far, and what it learns next. Then, for fun:</p>
-<ol>
-<li><a href="topics/18-robot-brain/index.html"><b>Module 18: Build a Robot Brain</b></a>, the main course. Start at week 1 and follow the Next buttons.</li>
-<li><a href="topics/21-robot-math.html"><b>Module 21: robot maths, by playing</b></a>, after week 4.</li>
-<li><a href="topics/22-vector-fields.html"><b>Module 22: steering with a field of arrows</b></a>, after week 4.</li>
-<li><a href="topics/20-from-scratch/index.html"><b>Module 20: real code from the pros</b></a>, after you finish the course (some installs; ask an adult).</li>
-</ol>
-<p>The other modules are notes for grown-ups and for later. Each still opens with a Start-here box you can read any time.</p>
-</section>
-
 <div class="card"><p style="margin:0"><span class="track llm">LLM</span> how large language models are built, trained, evaluated and served. &nbsp; <span class="track robo">Robotics</span> how robots perceive, decide and act. &nbsp; <span class="track both">LLM + Robotics</span> shared foundations, or ideas that carry across both. Robot foundation models (VLAs) are built on LLM backbones, so the two tracks keep meeting.</p></div>
 <p><a href="sources.html"><strong>Sources &amp; summaries →</strong></a> every link added, its summary, the primary sources behind it, saved files and all external references.</p>
 <p class="meta">22 modules (109 pages) · last updated 2026-11-09</p>
+
+<h2 id="grown-ups">For grown-ups and later</h2>
+<p>Notes on LLMs and robotics for grown-ups, and for later once you've finished the robot course. Each module still opens with a Start-here box you can read any time.</p>
+<details id="all-modules">
+<summary>Show all 22 modules, the summaries and the concept map</summary>
 
 <h2>Modules</h2>
 <!-- MODULES: newest at the bottom; keep numbering sequential -->
@@ -170,7 +185,7 @@
 <a class="card module" href="topics/18-robot-brain/index.html">
   <div class="n">18 · our own course</div>
   <h3><span class="track both">LLM + Robotics</span>Build a Robot Brain: 12 weeks, from zero to a robot that understands you (ages 12+, start here)</h3>
-  <p>Our own first-principles course, built from everything in modules 01–17. One lesson a week for 12 weeks, covering robot basics <em>and</em> inference engineering. A learner with basic Python builds <strong>Robo-Helper</strong>, a simulated robot that understands "put the red block in the bin", plans with A*, stops safely for surprises, and is honestly evaluated (83%). Then they build a tiny neural language model from zero, measure latency, tokens and cost, speed brains up (caching, quantising, distilling, LoRA), plug in Claude as a planner and as a tool-using agent, and race every brain on the same 12 tasks in a simulator with replays. Every lesson has to make the robot measurably better: <code>progress.py</code> shows each one's gain, and the brain the learner builds climbs from 5/12 (word counter) to 8/12 (a tiny LM that writes whole plans) to 10/12 (distilled from a teacher, still 10/12 at 4 bits in 1.4 KB). Extras: attention (how Transformers read), an AI model as judge, and an MCP server so any AI app can drive the robot. Every lesson has a browser playground, real Python homework marked by <code>check.py</code> (100 checks; reference solutions included), hint ladders, and a real-world challenge away from the screen.</p>
+  <p>Our own first-principles course, built from everything in modules 01–17. One lesson a week for 12 weeks, covering robot basics <em>and</em> inference engineering. A learner with basic Python builds <strong>Robo-Helper</strong>, a simulated robot that understands "put the red block in the bin", plans with A*, stops safely for surprises, and is honestly evaluated (83%). Then they build a tiny neural language model from zero, measure latency, tokens and cost, speed brains up (caching, quantising, distilling, LoRA), plug in Claude as a planner and as a tool-using agent, and race every brain on the same 12 tasks in a simulator with replays. Every lesson has to make the robot measurably better: <code>progress.py</code> shows each one's gain, and the brain the learner builds climbs from 5/12 (word counter) to 8/12 (a tiny LM that writes whole plans) to 10/12 (distilled from a teacher, still 10/12 at 4 bits in 1.4 KB). Extras: attention (how Transformers read), an AI model as judge, and an MCP server so any AI app can drive the robot. The learner's own robot reaches 12/12 in week 12 by using what it sees. Every lesson has a browser playground, real Python homework marked by <code>check.py</code> (115 checks; reference solutions included), hint ladders, and a real-world challenge away from the screen.</p>
   <span class="tag">course</span><span class="tag">hands-on</span><span class="tag">first principles</span><span class="tag">inference</span><span class="tag">agents</span><span class="tag">RLHF</span><span class="tag">LoRA</span><span class="tag">beginner-friendly</span>
   <p class="meta">Source: written for this course · Nov 2026</p>
 </a>
@@ -303,6 +318,8 @@
 <tr><td>Red teaming &amp; contamination-aware evals, benchmark saturation</td><td>01, 08, 19</td></tr>
 <tr><td>Paper reproduction &amp; honest public write-ups</td><td>04, 06, 08</td></tr>
 </table></div>
+
+</details>
 
 <footer>Sources are kept in <code>sources/</code>. The change history is in <code>log.md</code>.</footer>
 </main>

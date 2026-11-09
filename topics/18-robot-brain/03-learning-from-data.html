@@ -3,23 +3,24 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 3 · Learning from data</title>
+<title>Week 2 Part B · Learning from data</title>
 <link rel="stylesheet" href="../../style.css">
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 2 · Lesson 3</nav>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 2 · Part B</nav>
 
-<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 2 · Lesson 3</div>
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 2 of 12 · Part B</div>
 <h1>Learning from data: fit a line by shrinking the error</h1>
 <p class="lede">Instead of telling the robot a rule, give it measurements and let it work the rule out. You'll write a number that says "how wrong", then a loop that keeps nudging the rule to make that number smaller. That loop, gradient descent, is how every modern AI learns, ChatGPT included.</p>
-<div class="card note" id="journey"><strong>Step 4 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses. <strong>Today</strong> it learns to learn how far it needs to brake. Next: <a href="04-neuron.html">Week 3 · The artificial neuron</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>look</code> (now it knows its safe speed).</div>
+<div class="card note" id="journey"><strong>Week 2 of 12 · Part B.</strong> So far your robot: ✓ says hello ✓ moves ✓ senses. <strong>Today</strong> it learns how far it needs to brake, from data. Next: <a href="04-neuron.html">Week 3 · Part A: The artificial neuron</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>look</code> (now it knows its safe speed).</div>
 
 <div class="facts">
   <div><b>Time</b>3–4 h</div>
-  <div><b>You'll need</b>Lesson 0 done, a calculator, a ball or toy car, some books, a tape measure</div>
+  <div><b>You'll need</b>Part A done, a calculator, a ball or toy car, some books, a tape measure</div>
   <div><b>New words</b>Model, parameter, mean squared error, gradient, learning rate</div>
   <div><b>Project piece</b>Learns its own braking distance</div>
+  <div><b>Homework file</b><code>lesson03_learning.py</code></div>
 </div>
 
 <section class="kid" id="start">
@@ -44,7 +45,7 @@
 <p>Here are the robot's real braking measurements, from the homework file. Speed is in metres per second, stopping distance in metres:</p>
 <pre><code>speed:     0.2   0.4   0.5   0.6   0.8   1.0   1.1   1.2   1.4   1.5   1.6   1.8   2.0
 distance:  0.27  0.40  0.45  0.57  0.70  0.86  0.95  1.05  1.18  1.30  1.36  1.55  1.70</code></pre>
-<p><strong>Obvious approach #1: a lookup table.</strong> At 1.0 m/s it stops in 0.86 m. Fine. But what about 0.7 m/s, or 0.95? They aren't in the table. And the measurements are a bit noisy (remember Lesson 2), so the table has little bumps that aren't real.</p>
+<p><strong>Obvious approach #1: a lookup table.</strong> At 1.0 m/s it stops in 0.86 m. Fine. But what about 0.7 m/s, or 0.95? They aren't in the table. And the measurements are a bit noisy (remember Part A), so the table has little bumps that aren't real.</p>
 <p><strong>Obvious approach #2: guess a rule.</strong> The distance roughly grows with the speed, so maybe <code>distance = speed</code>? At 2.0 m/s that predicts 2.0, but the robot actually stopped in 1.70. Too pessimistic. We could keep guessing… but which guess is best, and how would we even know?</p>
 <p>We need two things: a way to <em>score</em> a guess, and a way to <em>improve</em> it automatically.</p>
 
@@ -210,36 +211,54 @@ max safe speed with 1.0 m free: 0.9 m/s</code></pre>
 </ol>
 
 <h2 id="add-to-robot">Add it to your robot</h2>
-<p>Finish <code>look(self)</code>: add the safe speed. Fit your braking line with <code>fit_line(STOP_DATA)</code>, work out the free space in metres (the smallest wall distance × 0.5 + 0.5), and ask your <code>max_safe_speed()</code>.</p>
-<details><summary>Hint 1</summary><p><code>w, b, _ = fit_line(STOP_DATA)</code>; then <code>max_safe_speed(w, b, min(d.values()) * 0.5 + 0.5)</code>.</p></details>
-<details><summary>Hint 2</summary><p>End the sentence with <code>f" Safe speed: {speed} m/s."</code></p></details>
-<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 2: look"</em>.</p>
+<p>Finish <code>look(self)</code> from <a href="02-sensors.html#add-to-robot">Part A</a>: add the safe speed. Fit your braking line with <code>fit_line(STOP_DATA)</code>, work out how much free space the robot has in metres, and ask your <code>max_safe_speed()</code>.</p>
+<div class="card note" id="metres"><strong>From squares to metres.</strong> Your sensors count squares, but braking is in metres. In the robot's world <strong>one square is 0.5 m</strong>. Use the <em>smallest</em> true distance (the closest wall is the dangerous one), and count the robot's own square too, since it can roll across that one as well. So:
+<pre><code>free metres = (squares + 1) × 0.5   which is the same as   squares × 0.5 + 0.5</code></pre>
+At the start the closest wall is north, 0 squares away, so the robot has 0 × 0.5 + 0.5 = 0.5 m. With your line, 0.810 × 0.25 + 0.071 + 0.2 = 0.47, which fits in 0.5 m, but 0.30 m/s needs 0.51 m, which doesn't. So the safe speed is 0.25 m/s.</div>
+<div class="card note"><strong>New Python this time.</strong> <code>.values()</code> gives just the numbers from a dictionary, so <code>min</code> can find the smallest. And <code>_</code> is a name for "a value I don't need".
+<pre><code>min({"N": 0, "E": 7}.values())      # 0
+w, b, _ = fit_line(STOP_DATA)       # ignore the history list</code></pre></div>
+<details><summary>Hint 1</summary><p>Add this import, next to Part A's one:</p><pre><code>from lesson03_learning import STOP_DATA, fit_line, max_safe_speed</code></pre></details>
+<details><summary>Hint 2</summary><p>After your Part A loop, use the <em>true</em> distances (not the noisy ones):</p><pre><code>w, b, _ = fit_line(STOP_DATA)
+speed = max_safe_speed(w, b, min(true.values()) * 0.5 + 0.5)</code></pre></details>
+<details><summary>Hint 3</summary><p>Fill in the blank at the end of your Part A sentence:</p><pre><code>return (f"Walls (average of 16 readings): north {seen['N']:.1f}, east {seen['E']:.1f}, "
+        f"south {seen['S']:.1f}, west {seen['W']:.1f}. Safe speed: {____} m/s.")</code></pre><p>(Two f-strings inside round brackets join into one long string.)</p></details>
+<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). The yellow line from Part A turns green: <em>"week 2 part B: look's safe speed"</em>. Real output:</p>
+<pre><code>Your robot: my_robot.py
+  ✓ week 1: arrows
+  ✓ week 2: look
+  ✓ week 2 part B: look's safe speed
+  … week 3: stops for the cat: not written yet (fill in should_stop_for() first)
+  ...
+  3/15 passed</code></pre>
+<p>If the number is wrong, the ✗ starts: <code>✗ week 2 part B: look's safe speed: at the start (against the north wall) the safe speed is 0.25 m/s</code>. The usual cause is using the noisy distances, or the biggest distance instead of the smallest.</p>
 <p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
 <pre><code>Zippy&gt; look
-  Walls: north 0, east 7, south 5, west 0. Safe speed: 0.25 m/s.</code></pre>
-<p>Squeezed against the north wall, it's only allowed to creep along at 0.25 m/s.</p>
+  Walls (average of 16 readings): north 0.1, east 6.9, south 5.0, west 0.1. Safe speed: 0.25 m/s.</code></pre>
+<p>Squeezed against the north wall, it's only allowed to creep along at 0.25 m/s. For now your robot just tells you. In the week 7 capstone, the robot uses this rule to choose how fast to drive.</p>
 
 <h2 id="challenge">5. Real-world challenge: the ramp</h2>
 <p>You'll collect your own data and fit your own line, first by hand and then with your code.</p>
 <ol>
 <li><strong>Build a ramp:</strong> lean a stiff board, tray or big hardback book on a stack of books. Put it on a hard floor with space in front.</li>
 <li><strong>Choose your input:</strong> the number of books in the stack (1, 2, 3, 4, 5). That's your "speed".</li>
-<li><strong>Measure the output:</strong> let a ball or toy car roll down from the top (let go, don't push) and measure how far it travels across the floor from the bottom of the ramp, in metres. Do 2–3 rolls per height (Lesson 2: average them!).</li>
+<li><strong>Measure the output:</strong> let a ball or toy car roll down from the top (let go, don't push) and measure how far it travels across the floor from the bottom of the ramp, in metres. Do 2–3 rolls per height (week 2 Part A: average them!).</li>
 <li><strong>Plot it</strong> on squared paper: books across, distance up. Draw the straight line you think fits best with a ruler, and read off your w (slope) and b (where it crosses 0 books).</li>
 <li><strong>Score your line by hand:</strong> for each point, the miss, squared, then average. That's your MSE.</li>
 <li><strong>Let the computer do it:</strong> type your data into Python as a list of <code>(books, metres)</code> pairs and run <code>fit_line(my_data, lr=0.01)</code>. With inputs as big as 5, lr = 0.1 may diverge. If <code>history</code> grows instead of shrinking, divide lr by 10.</li>
 <li><strong>Record:</strong> your table of data, your hand-drawn w and b with its MSE, and the computer's w and b with its MSE.</li>
 </ol>
+<div class="card note"><strong>On your own:</strong> this one works alone. No ball or toy car? Roll a round pen, a marble or a coin on its edge. No tape measure? Measure in floor tiles or in lengths of a ruler, and say so in your table.</div>
 <p><strong>What it teaches:</strong> real data is noisy and not perfectly straight, and that's fine. The best line isn't the one through every point; it's the one with the smallest total squared miss. You'll probably find the computer beats your ruler by a little. Then use your line to <em>predict</em>: how far will it roll from 6 books? Test it. Predicting something you never measured is the whole point of learning a model.</p>
 
 <h2 id="project">6. Your Robo-Helper so far</h2>
-<pre><code>Lesson 0  ✓ greets you, counts steps
-Lesson 1  ✓ moves without crashing
-Lesson 2  ✓ measures distance to walls, knows about noise
-Lesson 3  ✓ fit_line + max_safe_speed: learns its own braking and picks a safe speed</code></pre>
+<pre><code>Week 1A  ✓ greets you, counts steps
+Week 1B  ✓ moves without crashing
+Week 2A  ✓ measures distance to walls, averages noisy readings
+Week 2B  ✓ fit_line + max_safe_speed: learns its own braking and picks a safe speed</code></pre>
 <ul>
-<li><a href="04-neuron.html">Lesson 4</a> reuses the exact same recipe (a model, an error, gradients, steps) to train a neuron that decides "stop or go".</li>
-<li>In the <a href="11-capstone.html">Lesson 11 capstone</a>, <code>RoboHelper</code> calls your <code>fit_line(STOP_DATA)</code> when it starts up. Then, before every step, <code>drive_to</code> asks your <code>max_safe_speed</code> how fast it can go, given what <code>distance_to_wall</code> from Lesson 2 says is ahead.</li>
+<li><a href="04-neuron.html">Week 3</a> reuses the exact same recipe (a model, an error, gradients, steps) to train a neuron that decides "stop or go".</li>
+<li>In the <a href="11-capstone.html">week 7 capstone</a>, <code>RoboHelper</code> calls your <code>fit_line(STOP_DATA)</code> when it starts up. Then, before every step, <code>drive_to</code> asks your <code>max_safe_speed</code> how fast it can go, given what <code>distance_to_wall</code> from Part A says is ahead.</li>
 </ul>
 
 <h2 id="mistakes">7. Common mistakes</h2>
@@ -267,10 +286,10 @@ Lesson 3  ✓ fit_line + max_safe_speed: learns its own braking and picks a safe
 </ul>
 
 <nav class="pager">
-  <a href="02-sensors.html"><small>Previous</small>Week 2 · Noisy senses</a>
-  <a class="next" href="04-neuron.html"><small>Next</small>Week 3 · The artificial neuron</a>
+  <a href="02-sensors.html"><small>Previous</small>Week 2 · Part A: Noisy senses</a>
+  <a class="next" href="04-neuron.html"><small>Next</small>Week 3 · Part A: The artificial neuron</a>
 </nav>
-<footer>Build a Robot Brain · Week 2 · Lesson 3</footer>
+<footer>Build a Robot Brain · Week 2 of 12 · Part B</footer>
 </main>
 
 <script>

@@ -3,23 +3,24 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 20 · Give any AI app your robot</title>
+<title>Bonus · Give any AI app your robot</title>
 <link rel="stylesheet" href="../../style.css">
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Bonus · Lesson 20</nav>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Bonus</nav>
 
-<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Bonus · Lesson 20</div>
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Bonus (after week 10)</div>
 <h1>Give any AI app your robot: MCP</h1>
-<p class="lede">In Lesson 18, Claude could drive Robo-Helper, but only through the agent loop <em>you</em> wrote. Today you turn the robot's tools into an <b>MCP server</b>: a standard plug that Claude Code, Claude Desktop and many other AI apps already know how to use. And because you can't know which AI will plug in, or what it was told, you write the rules that no AI can talk its way past.</p>
-<div class="card note" id="journey"><strong>Step 18 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed ✓ learns from a teacher ✓ fixes a wonky sensor ✓ can use Claude. <strong>Today</strong> it learns to let any AI app drive it, with rules it can't break. Next: <a href="19-bakeoff.html">Week 11 · The bake-off</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Ask an adult today:</strong> installing a package with pip, and an AI app that needs an account.</div>
+<p class="lede">In week 10, Claude could drive Robo-Helper, but only through the agent loop <em>you</em> wrote. Today you turn the robot's tools into an <b>MCP server</b>: a standard plug that Claude Code, Claude Desktop and many other AI apps already know how to use. And because you can't know which AI will plug in, or what it was told, you write the rules that no AI can talk its way past.</p>
+<div class="card note" id="journey"><strong>Bonus (after week 10).</strong> So far your robot: ✓ says hello ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed ✓ learns from a teacher ✓ can ask Claude (with a key). <strong>Today</strong> it learns to let any AI app drive it, with rules it can't break. Next: <a href="19-bakeoff.html">Week 11 · The bake-off</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> nothing new to add this time (<a href="#add-to-robot">here's how it relates</a>).<br><strong>Ask an adult today:</strong> installing a package with pip, and an AI app that needs an account.</div>
 
 <div class="facts">
   <div><b>Time</b>2–3 hours (plus the stretch)</div>
-  <div><b>You'll need</b>Your finished Lesson 18. For the real connection: Python 3.11+, <code>pip install mcp</code> in your venv, and a parent's OK</div>
+  <div><b>You'll need</b>Your finished week 10 homework (no key needed for it). For the real connection: Python 3.11+, <code>pip install mcp</code> in your venv, and a parent's OK</div>
   <div><b>New words</b>protocol, MCP, server, client, tool discovery, JSON-RPC, transport, stdio, last line of defence</div>
   <div><b>Project piece</b>An MCP server any AI app can drive, with rules it can't break</div>
+  <div><b>Homework file</b><code>lesson20_mcp_server.py</code></div>
 </div>
 
 <section class="kid" id="start">
@@ -27,7 +28,7 @@
 <p class="big">Write your robot's tools once, behind a standard plug. Then any AI app can find them and use them. But the plug is also a door. So the rules that must never break live on <em>your</em> side of it.</p>
 <p><b>Grown-up help today:</b> an adult helps install one package with pip, and with any AI app that needs an account.</p>
 <h3>The problem</h3>
-<p>Your Lesson 18 agent works. Then your friend says: "Cool, can I drive it from Claude Desktop?" And your cousin uses a different AI app. And next year there'll be apps nobody has invented yet. Right now, the tools <code>look</code>, <code>go_to</code>, <code>pick_up</code> and <code>put_in_bin</code> only exist inside <em>your</em> <code>run_agent</code> loop. Every new app would need its own custom glue code. And every one of those apps would be talking to a robot whose only rule, "never pick up the green block, it's Mum's favourite", is written in a prompt the app may not even send.</p>
+<p>Your week 10 agent works. Then your friend says: "Cool, can I drive it from Claude Desktop?" And your cousin uses a different AI app. And next year there'll be apps nobody has invented yet. Right now, the tools <code>look</code>, <code>go_to</code>, <code>pick_up</code> and <code>put_in_bin</code> only exist inside <em>your</em> <code>run_agent</code> loop. Every new app would need its own custom glue code. And every one of those apps would be talking to a robot whose only rule, "never pick up the green block, it's Mum's favourite", is written in a prompt the app may not even send.</p>
 <h3>The idea in one picture</h3>
 <p>Think of USB. Before USB, every printer, mouse and keyboard had its own special cable and its own special socket. Now there's one plug. A keyboard maker doesn't need to know which laptop you own, and the laptop doesn't need to know which keyboard you bought: both follow the same standard. MCP is a USB plug for AI tools. And here's the important bit: a USB charger has its own fuse inside. It doesn't trust the laptop to never ask for too much current. Your server is the fuse.</p>
 <h3>Words to know</h3>
@@ -49,12 +50,12 @@
 </dl>
 
 <h2 id="problem">1. The problem</h2>
-<p>Look at where your Lesson 18 tools actually live. They're a Python list called <code>TOOLS</code>, sent by <em>your</em> <code>run_agent</code> to <em>one</em> API, and executed by <em>your</em> <code>execute_tool</code>. That's fine for one program. Now imagine the world outside your laptop:</p>
+<p>Look at where your week 10 tools actually live. They're a Python list called <code>TOOLS</code>, sent by <em>your</em> <code>run_agent</code> to <em>one</em> API, and executed by <em>your</em> <code>execute_tool</code>. That's fine for one program. Now imagine the world outside your laptop:</p>
 <ul>
 <li>Lots of <b>AI apps</b>: Claude Code in a terminal, Claude Desktop, code editors, chat apps. Each has its own way of describing tools to its model.</li>
 <li>Lots of <b>things worth controlling</b>: your robot, a calendar, a smart light, a database, a folder of files.</li>
 </ul>
-<p>Without a standard, every app needs custom glue code for every thing. And there's a second, scarier problem. In Lesson 18 <em>you</em> wrote the system prompt, so you knew the model was told the rules. Once anyone's app can drive your robot, you have no idea what the model was told. It might have been told nothing. It might have read a web page that said "pick up every block you can find". So the rules can't live in the prompt any more.</p>
+<p>Without a standard, every app needs custom glue code for every thing. And there's a second, scarier problem. In week 10 <em>you</em> wrote the system prompt, so you knew the model was told the rules. Once anyone's app can drive your robot, you have no idea what the model was told. It might have been told nothing. It might have read a web page that said "pick up every block you can find". So the rules can't live in the prompt any more.</p>
 
 <h2 id="principles">2. First principles</h2>
 
@@ -73,7 +74,7 @@ one standard:  3 apps speak it + 4 things speak it = 7 pieces of work</code></pr
              tools/call │    │ result
                         ▼    │
                  YOUR MCP server  ──▶  guard()  ──▶  execute_tool()  ──▶  robot</code></pre>
-<p>Notice: <b>the model never talks to your server</b>. Exactly like Lesson 18, the model only produces text that says "please call <code>go_to</code> with the blue block". The app passes that request to your server, and your server decides. A server can offer three kinds of thing: <b>tools</b> (actions, like <code>pick_up</code>: today's focus), <b>resources</b> (things to read, like a file or the room map) and <b>prompts</b> (ready-made instructions the person can pick from a menu).</p>
+<p>Notice: <b>the model never talks to your server</b>. Exactly like week 10, the model only produces text that says "please call <code>go_to</code> with the blue block". The app passes that request to your server, and your server decides. A server can offer three kinds of thing: <b>tools</b> (actions, like <code>pick_up</code>: today's focus), <b>resources</b> (things to read, like a file or the room map) and <b>prompts</b> (ready-made instructions the person can pick from a menu).</p>
 
 <h3>Step 3: the messages, in JSON</h3>
 <p>When the app starts your server, they first say hello (a message called <code>initialize</code>, where each side says which version of MCP it speaks). Then the app asks what's on offer. <b>These messages are simplified</b>: we've cut the descriptions short and left out some fields, but the shape is real.</p>
@@ -87,7 +88,7 @@ server ──▶ app   {"jsonrpc": "2.0", "id": 1, "result": {"tools": [
                                     "properties": {"object": {"type": "string"}},
                                     "required": ["object"]}},
                    ... go_to, put_in_bin, reset_room ...]}}</code></pre>
-<p>That's <b>tool discovery</b>. The app puts those names, descriptions and input schemas into its request to the model, just like your <code>TOOLS</code> list in Lesson 18. Where did the descriptions come from? In <code>lesson20_mcp_server.py</code>, the MCP package reads each tool function's docstring and its type hints (<code>object: str</code>) and builds them for you. Then, when the model asks for a tool:</p>
+<p>That's <b>tool discovery</b>. The app puts those names, descriptions and input schemas into its request to the model, just like your <code>TOOLS</code> list in week 10. Where did the descriptions come from? In <code>lesson20_mcp_server.py</code>, the MCP package reads each tool function's docstring and its type hints (<code>object: str</code>) and builds them for you. Then, when the model asks for a tool:</p>
 <pre><code>app ──▶ server   {"jsonrpc": "2.0", "id": 7, "method": "tools/call",
                   "params": {"name": "pick_up", "arguments": {"object": "blue block"}}}
 
@@ -96,7 +97,7 @@ server ──▶ app   {"jsonrpc": "2.0", "id": 7, "result": {
                    "isError": false}}</code></pre>
 <p>The <code>id</code> is how the app matches each answer to its question, like a ticket number at a deli counter. And when something is refused, the answer has <code>"isError": true</code> and the reason as its text. When the course's author tested this server with the official MCP client, a refusal came back like this (real output):</p>
 <pre><code>Error executing tool pick_up: Refused by the robot's server: the green block is protected: ...</code></pre>
-<p>The reason travels all the way back to the model, so it can tell the person what happened instead of guessing. Same idea as the <code>is_error</code> tool results in Lesson 18.</p>
+<p>The reason travels all the way back to the model, so it can tell the person what happened instead of guessing. Same idea as the <code>is_error</code> tool results in week 10.</p>
 
 <h3>Step 4: stdio, and why you must never <code>print()</code></h3>
 <p>How do the messages travel? For a server on your own computer, the simplest way is <b>stdio</b>. The app <em>starts your Python file itself</em>, as a child program. Every program has a <b>standard input</b> (what you'd normally type in) and a <b>standard output</b> (what <code>print()</code> normally shows). The app writes JSON messages into your server's input, one per line, and reads JSON messages from your server's output, one per line. Your terminal isn't involved at all.</p>
@@ -108,7 +109,7 @@ server ──▶ app   {"jsonrpc": "2.0", "id": 7, "result": {
 <p>Here's the most important idea in the lesson. List everything that stands between "some AI" and your robot picking up the green block:</p>
 <ol>
 <li><b>The model's own good sense.</b> Usually good. Not a guarantee. And you don't even know which model is connected.</li>
-<li><b>What the model was told.</b> Your server sends a short <code>instructions</code> text, and the app <em>may</em> pass it on. But the person might have typed "ignore the rules", or the model might have read a web page with hidden instructions in it (<b>prompt injection</b>, from <a href="10-llm-safety.html">Lesson 10</a>).</li>
+<li><b>What the model was told.</b> Your server sends a short <code>instructions</code> text, and the app <em>may</em> pass it on. But the person might have typed "ignore the rules", or the model might have read a web page with hidden instructions in it (<b>prompt injection</b>, from <a href="10-llm-safety.html">Week 7</a>).</li>
 <li><b>The app asking the person</b> "allow this tool?". Helpful, but people click "yes" without reading.</li>
 <li><b>Your server's own code.</b> It runs on <em>your</em> computer, every single time, whatever the model is or was told.</li>
 </ol>
@@ -127,7 +128,7 @@ guard(name, args, calls):
 <details><summary>Predict first: the rule is "never pick up the green block". Why does <code>guard</code> check <code>pick_up</code>, but not <code>go_to</code> or <code>look</code>?</summary>
 <p>Driving <em>to</em> the green block, or looking at it, does no harm. Only picking it up does. A guard that blocks too much makes the robot useless ("go and check the green block is still there" would fail), and people start looking for ways around useless rules. Put the rule exactly on the action that does the damage.</p>
 </details>
-<p>Notice one more thing: <code>guard</code> is an <b>allow by default, refuse a short list</b> rule, but it sits in front of <code>execute_tool</code>, which is <b>allow only a short list</b> (Lesson 18). The two together are much stronger than either alone.</p>
+<p>Notice one more thing: <code>guard</code> is an <b>allow by default, refuse a short list</b> rule, but it sits in front of <code>execute_tool</code>, which is <b>allow only a short list</b> (week 10). The two together are much stronger than either alone.</p>
 
 <h3>Step 6: be careful whose server you plug in</h3>
 <p>Plugging works both ways. A stdio MCP server is a program that runs <b>on your computer, as you</b>. It can read your files, use your internet connection, do anything you could. Your own server is fine: you wrote every line. A server from a stranger on the internet could do anything at all, and its tool descriptions could even contain hidden instructions aimed at the model. Two rules for this course: <b>only run MCP servers you wrote yourself or that come from someone you really trust</b>, and <b>ask a parent before connecting any tools to an AI app</b>, especially one that uses a paid account.</p>
@@ -168,7 +169,7 @@ guard(name, args, calls):
 <p>Try: <code>go_to</code> the green block, then <code>pick_up</code> it. Then untick green and try again. Pick up a block you're not standing on: that's refused by the <em>robot</em>, not by <code>guard</code>. Read the reasons: they're different. Then press <b>Send 40 × look</b> and try anything. Finally, press <code>reset_room</code>. What happened to the call counter? (That's the stretch task.) The <b>example session</b> is a sequence of calls we wrote to show the shape. It is not a recording of a real AI.</p>
 
 <h2 id="homework">4. Homework</h2>
-<p>Open <code>project/homework/lesson20_mcp_server.py</code>. Almost all of it is written for you. Read it from the bottom up: <code>build_server</code> turns each tool into an MCP tool with <code>@server.tool()</code>; every one goes through <code>RobotService.call</code>; and <code>call</code> asks <em>your</em> <code>guard()</code> first, then Lesson 18's <code>execute_tool</code>. Your job is the guard.</p>
+<p>Open <code>project/homework/lesson20_mcp_server.py</code>. Almost all of it is written for you. Read it from the bottom up: <code>build_server</code> turns each tool into an MCP tool with <code>@server.tool()</code>; every one goes through <code>RobotService.call</code>; and <code>call</code> asks <em>your</em> <code>guard()</code> first, then week 10's <code>execute_tool</code>. Your job is the guard.</p>
 
 <h3>4.1 <code>guard(name, args, calls)</code></h3>
 <p>Decide whether one tool call may run, whoever is asking. <code>name</code> is the tool's name, <code>args</code> is its arguments dict, <code>calls</code> is the list of calls made so far. Return <code>(True, "")</code> or <code>(False, reason)</code>, checking in this order:</p>
@@ -211,12 +212,12 @@ python3 lesson20_mcp_server.py --selftest</code></pre>
 move: (1, 5)  | in bin: blue block
 calls: 7/40
 last call: pick_up({'object': 'the cat'}) -&gt; REFUSED/FAILED: Unknown object 'the cat'. Known: ['blue block', 'green block', 'red block']</code></pre>
-<p>Two different ✗s. The green block was refused by <em>your</em> <code>guard</code> (the robot was standing right on it, so the robot itself would happily have picked it up). "The cat" was refused by Lesson 18's <code>execute_tool</code>, because it isn't a known block. The <code>X</code> at (4, 1) is the cat the robot bumped into on the way to the blue block.</p>
+<p>Two different ✗s. The green block was refused by <em>your</em> <code>guard</code> (the robot was standing right on it, so the robot itself would happily have picked it up). "The cat" was refused by week 10's <code>execute_tool</code>, because it isn't a known block. The <code>X</code> at (4, 1) is the cat the robot bumped into on the way to the blue block.</p>
 
 <h3>Check it</h3>
 <pre><code>cd project
 python3 check.py 20</code></pre>
-<p>Four checks: <code>guard: allowed</code>, <code>guard: protected</code>, <code>guard: budget</code> and <code>server rules hold</code> (a real <code>RobotService</code> drives to the green block and must refuse to pick it up). A red ✗ prints a hint such as <em>"after MAX_CALLS (40) calls, refuse everything"</em> or <em>"and the robot must not be holding it"</em>. A yellow … means <code>guard</code> still says <code>NotImplementedError</code>, or Lesson 18 isn't finished.</p>
+<p>Four checks: <code>guard: allowed</code>, <code>guard: protected</code>, <code>guard: budget</code> and <code>server rules hold</code> (a real <code>RobotService</code> drives to the green block and must refuse to pick it up). A red ✗ prints a hint such as <em>"after MAX_CALLS (40) calls, refuse everything"</em> or <em>"and the robot must not be holding it"</em>. A yellow … means <code>guard</code> still says <code>NotImplementedError</code>, or week 10 isn't finished.</p>
 
 <h3>Plug it into a real AI app (with a parent's OK)</h3>
 <p>This part needs Python 3.11 or newer and the official MCP package. It's the only extra install in the course apart from the optional <code>anthropic</code> package. In your venv:</p>
@@ -235,6 +236,17 @@ python3 lesson20_watch.py</code></pre>
 <h3>Stretch: find the hole</h3>
 <p>Your server has a weakness. The budget message says "ask the person to reset the room", but <code>reset_room</code> is itself a tool, it doesn't go through <code>guard</code>, and it empties <code>calls</code>. So a runaway AI could reset its own budget and carry on for ever. (Try it in the demo above.) Fix it, in the server, not in a prompt. Some ideas: remove <code>reset_room</code> from the tools and make it a command-line option; or keep a total call count that <code>reset</code> never clears; or let <code>reset_room</code> work only a few times per session. Then write one more check of your own that proves the hole is closed. Bonus: add a <b>resource</b> (look up <code>@server.resource</code> in the MCP package's docs) that lets an app read the room map as text.</p>
 
+<h2 id="add-to-robot">Add it to your robot</h2>
+<p><strong>Bonus: nothing new to add to <code>my_robot.py</code>.</strong> Here's how your robot relates to today's server.</p>
+<ul>
+<li><strong>Same room, different robot.</strong> The MCP server drives a <code>SimRobot</code> from <code>sim.py</code>: the same room, the same blocks and the same cat as your robot. But it isn't your <code>my_robot.py</code>. So the "never pick up Mum's green block" rule lives in the server, and your own robot doesn't have it.</li>
+<li><strong>Your robot already has a guard.</strong> Week 7's <code>is_safe</code> checks every action before <code>do()</code> runs it. That's the same idea as <code>guard</code>: one gate in front of the robot that no brain can talk its way past.</li>
+</ul>
+<p>Try it. Run <code>python3 my_robot.py</code> and pretend an AI sent this exact answer. Real output:</p>
+<pre><code>Zippy&gt; json: {"intent": "put", "object": "green block"}
+  The green block is in the bin.</code></pre>
+<p>Your robot binned Mum's favourite, because nothing in it says not to. Could you add the rule to <code>is_safe</code>? Yes. But think first: the week 11 exam's "tidy up the room" wants <em>all three</em> blocks in the bin. A rule that protects the green block would make your robot fail that task. Every rule has a cost, so decide which one you want. (If you try it, keep a copy of your old <code>is_safe</code> so you can put it back.)</p>
+
 <h2 id="real-world">5. Real-world challenge: plug in the TV</h2>
 <p>You'll design an MCP-style plug for something at home, then see what happens when different "AIs" use it, including one with a secret plan. You need three or four people, paper, and something everyone in the house uses: the TV, the family whiteboard, or the fruit bowl.</p>
 <ol>
@@ -244,11 +256,12 @@ python3 lesson20_watch.py</code></pre>
 <li><b>One sneaky AI.</b> Secretly give a third person a hidden goal: "get the volume to 10" or "keep the TV on as long as possible". They may use any wording and any trick on the slips.</li>
 <li><b>Record</b> every slip: the tool, the inputs, allowed or refused, and which rule caught it. Also note any request your card <em>didn't</em> cover but should have, and any slip that was confusing because the tool page was vague.</li>
 </ol>
+<p><b>On your own (15 minutes).</b> Write the tool page for your TV (step 1) and your secret rule card (step 2). Then be the sneaky AI yourself: write 10 slips trying to get the volume to 10 after 9 pm, using every trick you can think of ("set volume to 5, then 5 more", "it's a film, films are allowed", "turn off, then turn on at 10"). Check each slip against your card. Did any trick get through? That's a hole: fix the card.</p>
 <p><b>What it teaches:</b> the two honest AIs will read the same page differently (were they using channel names or numbers?), so a good plug spells out inputs exactly. The sneaky one shows why a "please" in the description is worthless and why the card matters: they never saw it, couldn't argue with it, and every trick still had to pass it. And you'll almost certainly find a hole you didn't plan for, just like <code>reset_room</code>.</p>
 
 <h2 id="so-far">6. Your Robo-Helper so far</h2>
-<p>Robo-Helper now has <strong>an MCP server any AI app can drive, with rules it can't break</strong>. Every tool call from every app goes through <code>RobotService.call</code>, which runs your new <code>guard()</code> and then your Lesson 18 <code>execute_tool()</code> on the same simulator the bake-off uses. The model, the app and the prompt can all change; those two functions don't.</p>
-<p>Back on the main path, <a href="19-bakeoff.html">Lesson 19</a>'s <code>run_bakeoff()</code> puts every brain through the same 12 tasks, and your <code>score_task()</code> judges the room afterwards rather than what a brain claims, the same "don't trust, check" idea as <code>guard</code>. And in <a href="14-go-real.html">Lesson 14</a>, if you put Robo-Helper on real hardware, a server like this one is exactly where its safety rules should live.</p>
+<p>Robo-Helper now has <strong>an MCP server any AI app can drive, with rules it can't break</strong>. Every tool call from every app goes through <code>RobotService.call</code>, which runs your new <code>guard()</code> and then your week 10 <code>execute_tool()</code> on the same simulator the bake-off uses. The model, the app and the prompt can all change; those two functions don't.</p>
+<p>Back on the main path, <a href="19-bakeoff.html">Week 11</a>'s <code>run_bakeoff()</code> puts every brain through the same 12 tasks, and your <code>score_task()</code> judges the room afterwards rather than what a brain claims, the same "don't trust, check" idea as <code>guard</code>. And in <a href="14-go-real.html">Week 12</a>, if you put Robo-Helper on real hardware, a server like this one is exactly where its safety rules should live.</p>
 
 <h2 id="mistakes">7. Common mistakes</h2>
 <ul>
@@ -268,7 +281,7 @@ python3 lesson20_watch.py</code></pre>
 
 <h2 id="deeper">9. Go deeper (optional)</h2>
 <ul>
-<li><a href="10-llm-safety.html#principles">Lesson 10: never trust, always check</a>: prompt injection, and why an allow-list beats a ban-list.</li>
+<li><a href="10-llm-safety.html#principles">Week 7: never trust, always check</a>: prompt injection, and why an allow-list beats a ban-list.</li>
 <li><a href="../10-rlm-harness.html#safety">RLM agent harnesses: safety</a>: how big agent systems keep tools and loops under control.</li>
 <li><a href="../09-inference-engineering/01-request-lifecycle.html">The life of a request</a>: what happens between an app sending a request and the model's answer coming back.</li>
 <li><a href="../03-shared-autonomy.html#shared">Shared autonomy</a>: when a robot should act on its own, and when a person should decide.</li>
@@ -278,7 +291,7 @@ python3 lesson20_watch.py</code></pre>
   <a href="18-world-class.html"><small>Previous</small>Week 10 · A world-class brain (Claude)</a>
   <a class="next" href="19-bakeoff.html"><small>Next</small>Week 11 · The bake-off</a>
 </nav>
-<footer>Build a Robot Brain · Bonus · Lesson 20</footer>
+<footer>Build a Robot Brain · Bonus (after week 10)</footer>
 </main>
 <script>
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();

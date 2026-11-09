@@ -3,21 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 9 · Understanding commands</title>
+<title>Week 5 · Understanding commands</title>
 <link rel="stylesheet" href="../../style.css">
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 5 · Lesson 9</nav>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 5 of 12 · Part B</nav>
 
-<div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 5 · Lesson 9</div>
+<div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 5 of 12 · Part B</div>
 <h1>Understanding commands: a word-counting classifier</h1>
 <p class="lede">People say the same thing in a hundred ways. Instead of writing a rule for each one, let the robot learn from examples which words go with which request. Then look hard at where it gets things wrong.</p>
-<div class="card note" id="journey"><strong>Step 10 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos. <strong>Today</strong> it learns to understand what you ask, one action at a time. Next: <a href="15-tiny-lm.html">Week 6 · A tiny language model</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>put the red block in the bin</code>.</div>
+<div class="card note" id="journey"><strong>Week 5 of 12 · Part B.</strong> So far your robot: ✓ says hello ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ fixes typos. <strong>Today</strong> it learns to understand what you ask, one action at a time. Next: <a href="15-tiny-lm.html">Week 6 · A tiny language model</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>put the red block in the bin</code>.</div>
 
 <div class="facts">
   <div><b>Time</b>2–4 hours</div>
-  <div><b>You'll need</b>Python 3, your Lesson 8 <code>tokenize</code>, a notebook, and a few patient people</div>
+  <div><b>You'll need</b>Python 3, your Part A <code>tokenize</code>, a notebook (and, if you can, a few patient people)</div>
   <div><b>New words</b>intent, slot, classifier, training set, test set, accuracy, smoothing, log</div>
   <div><b>Project piece</b>Understands what you ask</div>
 </div>
@@ -38,7 +38,7 @@
 <dt>Slot</dt><dd>The detail that fills in the intent. Here: which object, like <code>"red block"</code>.</dd>
 <dt>Classifier</dt><dd>A program that puts things into one of a fixed set of groups.</dd>
 <dt>Training set</dt><dd>Examples with the right answer, used to learn. Ours has 34.</dd>
-<dt>Test set</dt><dd>Different examples, kept aside, used only to check. Ours has 12. (You met this idea in <a href="05-evaluation.html">Lesson 5</a>.)</dd>
+<dt>Test set</dt><dd>Different examples, kept aside, used only to check. Ours has 12. (You met this idea in <a href="05-evaluation.html">week 3</a>.)</dd>
 <dt>Accuracy</dt><dd>The fraction of test examples it gets right. 11 out of 12 ≈ 0.92.</dd>
 <dt>Smoothing</dt><dd>Adding 1 to every count so a word you've never seen doesn't wreck the score.</dd>
 <dt>Log</dt><dd>A maths function that turns tiny numbers like 0.000003 into friendly ones like −12.7. Bigger is still better.</dd>
@@ -57,12 +57,13 @@
 <p><strong>The better idea:</strong> collect examples with the right answers, and let the program learn which words point to which intent.</p>
 
 <h2 id="principles">2. First principles</h2>
+<p class="legend">Want to play first? <a href="#play">Try the demo</a>: type a command and watch the robot guess. Then come back here to see how it works.</p>
 
 <h3>Step 1: split the job in two</h3>
 <p>"Put the <u>red</u> block in the bin" has two parts. The <strong>intent</strong> (put) is the hard bit: many words, many phrasings. The <strong>slot</strong> (red block) is easy in our room, because there are only three objects and each has a different colour. So for the slot we <em>can</em> use a simple rule: look for "red", "blue" or "green". The rest of the lesson is about the intent.</p>
 
 <h3>Step 2: count words per intent</h3>
-<p>Go through all 34 training examples. Tokenize each one with your Lesson 8 <code>tokenize</code>, and keep a tally of how often each word appears in each intent. Here's part of the real table:</p>
+<p>Go through all 34 training examples. Tokenize each one with your Part A <code>tokenize</code>, and keep a tally of how often each word appears in each intent. Here's part of the real table:</p>
 <div class="table-wrap"><table>
 <tr><th>word</th><th>put</th><th>go</th><th>find</th><th>stop</th></tr>
 <tr><td>bin</td><td class="num">4</td><td class="num">0</td><td class="num">0</td><td class="num">0</td></tr>
@@ -76,7 +77,7 @@
 <p>Already you can see the clues: "bin" means put, "where" means find. And "the" is everywhere, so it tells you very little.</p>
 
 <h3>Step 3: from counts to chances</h3>
-<p>Raw counts aren't fair. Put has 61 words in total and stop has only 15, so put would win just by being longer. So we use a fraction: how often does this word appear, <em>out of all the words</em> in that intent? "the" is 14 out of 61 in put (0.23) and 8 out of 44 in go (0.18). That's the same move as Lesson 8: counts divided by a total.</p>
+<p>Raw counts aren't fair. Put has 61 words in total and stop has only 15, so put would win just by being longer. So we use a fraction: how often does this word appear, <em>out of all the words</em> in that intent? "the" is 14 out of 61 in put (0.23) and 8 out of 44 in go (0.18). That's the same move as Part A: counts divided by a total.</p>
 <p>We also include how common each intent is overall (the <em>prior</em>). Put has 10 of the 34 examples, so before reading any words, P(put) = 10 / 34 ≈ 0.29. The others are 8 / 34 ≈ 0.24.</p>
 
 <h3>Step 4: multiply the clues</h3>
@@ -84,6 +85,8 @@
 <pre><code>score(put) = P(put) × P(word1 in put) × P(word2 in put) × ...</code></pre>
 <p>This pretends each word is an independent clue, which isn't really true ("in" and "bin" often come together). That simplification is why it's called <strong>Naive Bayes</strong>. Naive, but it works surprisingly well.</p>
 
+<p><strong>Two fixes, in one line each:</strong> a word the robot has never seen with an intent gets a tiny score, not zero (Step 5). And because multiplying lots of tiny numbers gives numbers too small for a computer, we add up <em>logs</em> instead, so every score is a negative number and the one <strong>closest to 0</strong> wins (Step 6). Open the box for how the maths really works. The homework uses its formula, but you don't need to follow every number.</p>
+<details><summary>How the maths really works: Steps 5 and 6</summary>
 <h3>Step 5: the zero problem, fixed by adding 1</h3>
 <p>Take the command "stop". In the put examples, "stop" appears 0 times. So P(stop in put) = 0 / 61 = 0, and the whole put score becomes 0. Fine here. But now take "please stop right now". If even <em>one</em> word was never seen with stop, stop's score would become 0 too, however many other clues point to it. One missing word shouldn't destroy everything.</p>
 <p>The fix is called <strong>add-one smoothing</strong>: pretend you saw every word once more than you did. To keep it fair, add the number of different words we know (the vocabulary, 52 words) to the bottom:</p>
@@ -101,6 +104,8 @@ stop:   8/34 × (6 + 1)/(15 + 52)  =  0.235 × 0.1045   =  0.0246    ← about 1
 </ul>
 <p>The real program prints exactly these: for "stop" the scores are put −5.95, go −6.01, find −6.05, stop −3.71.</p>
 
+</details>
+
 <h3>Step 7: test it on sentences it never saw</h3>
 <p>We keep 12 commands in <code>TEST</code> that the model never trains on. It gets 11 right: accuracy ≈ 0.92. The one it misses is <code>"locate the blue block"</code>. It says put. Why? "locate" appeared only once in training, while "the", "blue" and "block" all appear a lot in put examples. The scores are put −13.62, find −13.65: it lost by a hair.</p>
 
@@ -108,7 +113,7 @@ stop:   8/34 × (6 + 1)/(15 + 52)  =  0.235 × 0.1045   =  0.0246    ← about 1
 <p>The program also tries a few extra commands. Here's one:</p>
 <pre><code>"where's the green one?"</code></pre>
 <details><summary>Predict first: which intent will it pick? "where" is a strong find word…</summary>
-<p>It picks <strong>put</strong>. Wrong! And here's the detective work. Our tokenizer from Lesson 8 keeps <code>"where's"</code> as <em>one</em> token. The training data has "where" five times but never "where's". To the model, "where's" is a brand-new word that means nothing. So the only clues left are "the", "green" and "one", and those appear most in put examples:</p>
+<p>It picks <strong>put</strong>. Wrong! And here's the detective work. Our tokenizer from Part A keeps <code>"where's"</code> as <em>one</em> token. The training data has "where" five times but never "where's". To the model, "where's" is a brand-new word that means nothing. So the only clues left are "the", "green" and "one", and those appear most in put examples:</p>
 <pre><code>             prior  where's   the    green   one     total
 put   (log)  −1.22   −4.73   −2.02   −3.34  −3.63   −14.94   ← winner
 go    (log)  −1.45   −4.56   −2.37   −3.47  −3.47   −15.31
@@ -118,7 +123,7 @@ stop  (log)  −1.45   −4.20   −4.20   −4.20  −4.20   −18.27</code></p
 </details>
 <p>This is how real machine-learning engineers spend much of their time: not admiring the score, but reading the failures one by one and asking <em>why</em>. Each failure points to a fix: more training examples, a better tokenizer, or a different model. You'll try one fix in the Stretch.</p>
 
-<div class="note"><strong>No "I don't know" button.</strong> Our classifier <em>always</em> picks one of its four intents. Type "what is the weather" and it confidently says find. Type "hello robot" and it says stop. It has no way to say "that's not a command I understand". Keep this in mind: in <a href="11-capstone.html">Lesson 11</a> the full robot runs into exactly this problem.</div>
+<div class="note"><strong>No "I don't know" button.</strong> Our classifier <em>always</em> picks one of its four intents. Type "what is the weather" and it confidently says find. Type "hello robot" and it says stop. It has no way to say "that's not a command I understand". Keep this in mind: in <a href="11-capstone.html">week 7's capstone</a> the full robot runs into exactly this problem.</div>
 
 <h2 id="play">3. Play with it</h2>
 <div class="card demo">
@@ -145,7 +150,7 @@ stop  (log)  −1.45   −4.20   −4.20   −4.20  −4.20   −18.27</code></p
 </div>
 
 <h2 id="homework">4. Homework</h2>
-<p>Open <code>homework/lesson09_commands.py</code>. <code>TRAIN</code>, <code>TEST</code> and <code>COLOURS</code> are written for you, and it imports <code>tokenize</code> from <em>your</em> Lesson 8, so finish that first. Write six functions, in order.</p>
+<p>Open <code>homework/lesson09_commands.py</code>. <code>TRAIN</code>, <code>TEST</code> and <code>COLOURS</code> are written for you, and it imports <code>tokenize</code> from <em>your</em> Part A file (<code>lesson08_words.py</code>), so finish that first. Write six functions, in order.</p>
 
 <h3>4.1 <code>train_intent_model(examples)</code></h3>
 <p>Count words per intent (Step 2). Return a dictionary with three parts: <code>"word_counts"</code> (intent → {word: count}), <code>"intent_counts"</code> (intent → number of examples), and <code>"vocab"</code> (a set of every word seen).</p>
@@ -202,7 +207,7 @@ mistakes: [('locate the blue block', 'find', 'put')]</code></pre>
 <h3>Check it</h3>
 <pre><code>cd ..
 python3 check.py 9</code></pre>
-<p>Five checks. Green ✓ = passed, red ✗ = read the hint, yellow <code>…</code> = not written yet. Two real hints:</p>
+<p>Five checks for your six functions (<code>intent_scores</code> is tested through <code>predict_intent</code>). Green ✓ = passed, red ✗ = read the hint, yellow <code>…</code> = not written yet. Two real hints:</p>
 <ul>
 <li><code>✗ train_intent_model: there are 8 'stop' examples in TRAIN</code>. You're probably counting <em>words</em> instead of <em>examples</em> in <code>intent_counts</code>. Add 1 per example, not per word.</li>
 <li><code>✗ test accuracy: test accuracy should be at least 0.8 (got …)</code>, with your own accuracy in the brackets. Something is upside down in the scoring. A common cause is using <code>min</code> instead of <code>max</code>, or forgetting the <code>+ 1</code>.</li>
@@ -210,21 +215,64 @@ python3 check.py 9</code></pre>
 
 <h3>Stretch</h3>
 <ul>
-<li><strong>Fix the "where's" bug.</strong> Add <code>("where's the red block", "find")</code> and <code>("where's the blue one", "find")</code> to <code>TRAIN</code> and run again. Does "where's the green one?" become find? What happens to test accuracy? (You can try it first in the demo checkbox.) Then think: is it honest to keep adding examples until the test score is perfect? (Lesson 5 says: careful. If you tune to the test set, it stops being a fair test. Real teams keep a <em>second</em> test set they look at rarely.)</li>
+<li><strong>Fix the "where's" bug.</strong> Add <code>("where's the red block", "find")</code> and <code>("where's the blue one", "find")</code> to <code>TRAIN</code> and run again. Does "where's the green one?" become find? What happens to test accuracy? (You can try it first in the demo checkbox.) Then think: is it honest to keep adding examples until the test score is perfect? (Week 3 says: careful. If you tune to the test set, it stops being a fair test. Real teams keep a <em>second</em> test set they look at rarely.)</li>
 <li>Another fix: before tokenizing, replace <code>"'s"</code> with <code>" is"</code>. Which is better, and what could go wrong ("the robot's arm")?</li>
 <li>Add an <code>"unknown"</code> answer: if the best score is below some number, return <code>"unknown"</code>. Try commands like "what is the weather". Where would you put the cut-off?</li>
 </ul>
 
 <h2 id="add-to-robot">Add it to your robot</h2>
-<p>Two gaps. <code>understand_words(self, text)</code> turns a sentence into one action with your <code>parse_command()</code>. <code>do(self, action)</code> carries it out: stop, find, go, or put (drive to the block, then to the bin).</p>
-<details><summary>Hint 1</summary><p><code>understand_words</code> returns a <em>list</em> with one action: <code>[parse_command(CACHE["words"], text)]</code>.</p></details>
-<details><summary>Hint 2</summary><p>In <code>do</code>, "put" is just two <code>goto</code>s: <code>msg = self.goto(self.objects[obj]) or self.goto(find_bin(ROOM))</code>. An empty message means it worked.</p></details>
-<details><summary>Hint 3</summary><p>After binning: <code>self.binned.add(obj)</code> and <code>self.objects[obj] = find_bin(ROOM)</code>.</p></details>
-<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 5: understands and does"</em>.</p>
+<p>Two gaps in <code>my_robot.py</code>:</p>
+<ol>
+<li><code>understand_words(self, text)</code> turns a sentence into a list with <strong>one</strong> action, using your <code>parse_command()</code>. Train the word counter once and keep it in <code>CACHE["words"]</code>.</li>
+<li><code>do(self, action)</code> carries out one action, like <code>{"intent": "put", "object": "red block"}</code>, and returns what the robot says. The docstring lists all four: stop, find, go, and put (drive to the block, then to the bin). Its last line covers everything else: an intent it doesn't know, like "launch", raises a <code>ValueError</code>.</li>
+</ol>
+<div class="card note"><strong>New Python this time: <code>x or y</code>.</strong> <code>or</code> gives back the first value that isn't empty. An empty string <code>""</code> counts as "nothing", so <code>or</code> skips it:
+<pre><code>"" or "I'm next to it."           # → "I'm next to it."
+"BUMP!" or "I'm next to it."      # → "BUMP!"</code></pre>
+<p>Your <code>goto</code> returns <code>""</code> when it arrives, or a message when it can't. So <code>self.goto(spot) or "I'm next to it."</code> means "if the trip worked, say I'm next to it; if not, say why". Python doesn't even run the right-hand side if the left one isn't empty.</p></div>
+<details><summary>Hint 1</summary><p>Start <code>understand_words</code> with this import:</p>
+<pre><code>from lesson09_commands import TRAIN, train_intent_model, parse_command</code></pre>
+<p>Train once with <code>CACHE["words"] = train_intent_model(TRAIN)</code>, then return a <em>list</em> with one action: <code>[parse_command(CACHE["words"], text)]</code>. <code>do</code> needs no import: <code>find_bin</code> and <code>ROOM</code> are already at the top of the file.</p></details>
+<details><summary>Hint 2</summary><p>In <code>do</code>, start with <code>intent, obj = action["intent"], action["object"]</code>. Then one <code>if</code> per intent. "put" is two <code>goto</code>s. With plain <code>if</code>s:</p>
+<pre><code>msg = self.goto(self.objects[obj])     # drive to the block
+if msg:
+    return msg                         # something went wrong
+msg = self.goto(find_bin(ROOM))        # then to the bin
+if msg:
+    return msg</code></pre>
+<p>Pro move: <code>msg = self.goto(self.objects[obj]) or self.goto(find_bin(ROOM))</code> does the same in one line. The second <code>goto</code> only runs if the first one returned <code>""</code>.</p></details>
+<details><summary>Hint 3</summary><p>Fill in the blanks in <code>do</code>:</p>
+<pre><code>intent, obj = action["intent"], action["object"]
+if intent == "stop":
+    return ____
+if intent == "find":
+    if obj in self.binned:
+        return f"The {obj} is in the bin."
+    return f"The {obj} is at {____}."
+if intent == "go":
+    return self.goto(self.objects[obj]) or f"I'm next to the {obj}."
+if intent != "put":
+    raise ValueError(f"I don't know how to {intent!r}")
+if obj in self.binned:
+    return f"The {obj} is already in the bin."
+msg = self.goto(____) or self.goto(find_bin(ROOM))
+if msg:
+    return msg
+self.binned.add(obj)
+self.objects[obj] = ____
+return f"The {obj} is in the bin."</code></pre></details>
+<p>Check it: <code>cd ..</code> back to <code>project</code>, then <code>python3 check.py robot</code>. Your new check is <em>"week 5: understands and does"</em>.</p>
 <p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
 <pre><code>Zippy&gt; put the red and blue blocks away
-  The red block is in the bin.</code></pre>
+  (I think you meant: 'put the red and blue block away')
+  The red block is in the bin.
+Zippy&gt; put the purple block in the bin
+  Uh oh! I tried to do {'intent': 'put', 'object': None} and crashed (KeyError: None). Your code is fine: it's a bad action. Week 7's safety check will stop bad actions before they reach do().
+Zippy&gt; where is the green block
+  The green block is at (1, 5).</code></pre>
 <p>It understands you now, but only one action at a time, so the blue block stays out. Next week fixes that.</p>
+<p>The first line is your Part A typo fixer. It only knows the 52 words in the example commands, so it "fixes" the real word "blocks" to "block". The brain still gets it right.</p>
+<p>And the purple block? There's no purple block, so <code>extract_object</code> finds no colour and the action has <code>'object': None</code>. Your <code>do</code> looks up <code>self.objects[None]</code> and crashes. The provided code catches the crash and says "Uh oh!". That's not a bug in your code: <code>do</code> trusts every action it's given. In week 7 you'll add a safety check that refuses bad actions <em>before</em> they reach <code>do</code>.</p>
 
 <h2 id="challenge">5. Real-world challenge: collect real commands</h2>
 <p>Your training set was written by one person. Real people talk differently. Let's find out how differently.</p>
@@ -235,14 +283,15 @@ python3 check.py 9</code></pre>
 <li>Add them as a new list in a copy of your file, say <code>REAL_TEST</code>, and run <code>test_accuracy(model, REAL_TEST)</code>. Print the mistakes the same way the file does.</li>
 <li>For each mistake, write one line: <em>why</em> did it fail? (Unseen word? Contraction? Too polite? Two intents in one sentence?)</li>
 </ol>
+<p><strong>On your own (no people needed):</strong> be the real user yourself. Write 10 commands the way <em>you</em> would really say them, without looking at the training data first: (a) to (d) above, two or three each, with contractions, slang and "please". Then do steps 3 to 5 with your 10. You can also type them straight into your robot and see what it does.</p>
 <p><strong>Record:</strong> the commands, your predictions, the real accuracy, and your "why" list. <strong>What it should teach you:</strong> a model scored on test data from the same person who wrote the training data looks better than it really is. Real users find the gaps fast. Is your real accuracy lower than 0.92? Most people's is.</p>
 
 <h2 id="project">6. Your Robo-Helper so far</h2>
 <p>Robo-Helper can now understand what you ask. <code>parse_command</code> turns "get rid of the red block" into <code>{"intent": "put", "object": "red block"}</code>, a neat little dictionary the rest of the robot can act on.</p>
 <p>It's used twice later on:</p>
 <ul>
-<li>In <a href="10-llm-safety.html">Lesson 10</a>, a real LLM tries to understand commands. When its reply is broken or unsafe, <code>safe_parse</code> falls back to <em>your</em> <code>parse_command</code>. Your simple model becomes the safety net.</li>
-<li>In <a href="11-capstone.html">Lesson 11</a>, <code>RoboHelper</code> trains your model in its <code>__init__</code> with <code>train_intent_model(TRAIN)</code>, and its <code>parse</code> method calls <code>parse_command</code> for every command you type. Then <code>astar_path</code> from Lesson 6 drives it there. Remember the missing "I don't know": the capstone has to deal with that.</li>
+<li>In <a href="10-llm-safety.html">week 7</a>, a real LLM tries to understand commands. When its reply is broken or unsafe, <code>safe_parse</code> falls back to <em>your</em> <code>parse_command</code>. Your simple model becomes the safety net.</li>
+<li>In <a href="11-capstone.html">week 7's capstone</a>, <code>RoboHelper</code> trains your model in its <code>__init__</code> with <code>train_intent_model(TRAIN)</code>, and its <code>parse</code> method calls <code>parse_command</code> for every command you type. Then <code>astar_path</code> from week 4 drives it there. Remember the missing "I don't know": the capstone has to deal with that.</li>
 </ul>
 
 <h2 id="mistakes">7. Common mistakes</h2>
@@ -266,14 +315,14 @@ python3 check.py 9</code></pre>
 <li><a href="../01-decision-model-evals.html">LLM evals with decision models</a>: thresholds, trade-offs and calibration. How professionals decide whether a model is good enough, beyond one accuracy number.</li>
 <li><a href="../06-30u30/13-attention.html">30u30 Day 13: Attention</a>: modern models don't treat words as independent clues. Attention lets every word look at every other word.</li>
 <li><a href="../07-post-training.html">Post-training</a>: how big LLMs are taught to follow instructions, which is the grown-up version of understanding commands.</li>
-<li><a href="../10-rlm-harness.html">Agent harnesses</a>: the code wrapped around a language model that runs it, checks it and steers it. Lesson 10 builds a tiny one.</li>
+<li><a href="../10-rlm-harness.html">Agent harnesses</a>: the code wrapped around a language model that runs it, checks it and steers it. Week 7 builds a tiny one.</li>
 </ul>
 
 <nav class="pager">
-  <a href="08-words-as-numbers.html"><small>Previous</small>Week 5 · Words as numbers</a>
+  <a href="08-words-as-numbers.html"><small>Previous</small>Week 5 · Part A: Words as numbers</a>
   <a class="next" href="15-tiny-lm.html"><small>Next</small>Week 6 · A tiny language model</a>
 </nav>
-<footer>Build a Robot Brain · Week 5 · Lesson 9</footer>
+<footer>Build a Robot Brain · Week 5 of 12 · Part B (homework file: lesson09_commands.py)</footer>
 </main>
 
 <script>

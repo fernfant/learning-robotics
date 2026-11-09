@@ -3,21 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 19 · The bake-off</title>
+<title>Week 11 · The bake-off</title>
 <link rel="stylesheet" href="../../style.css">
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 11 · Lesson 19</nav>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 11</nav>
 
-<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 11 · Lesson 19</div>
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 11 of 12</div>
 <h1>The bake-off: every brain, the same 12 tasks</h1>
 <p class="lede">You now have a whole family of brains for Robo-Helper: a word counter, a tiny language model, its attention version, a distilled one and a 4-bit one, plus Claude as a planner or an agent. Which one is best? Today you find out properly: the same room, the same cat, the same 12 tasks, scored on what the robot actually <em>did</em>. Then you weigh up correctness against speed and cost, the way real engineers do.</p>
-<div class="card note" id="journey"><strong>Step 19 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed ✓ learns from a teacher ✓ fixes a wonky sensor ✓ can use Claude ✓ MCP (bonus). <strong>Today</strong> it learns to race every brain on the same 12 tasks. Next: <a href="12-preferences.html">Week 12 · What people prefer</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>exam</code>.</div>
+<div class="card note" id="journey"><strong>Week 11 of 12.</strong> So far your robot: ✓ says hello ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed ✓ learns from a teacher ✓ can ask Claude (with a key). <strong>Today</strong> it learns to race every brain on the same 12 tasks. Next: <a href="12-preferences.html">Week 12 · Part A: What people prefer</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and type <code>exam</code>: your robot sits the same 12 tasks.</div>
 
 <div class="facts">
   <div><b>Time</b>3–4 hours (plus the stretch)</div>
-  <div><b>You'll need</b>Python 3, your finished Lessons 9, 15 (with its attention stretch), 16, 17 and 18</div>
+  <div><b>You'll need</b>Python 3, your finished weeks 5, 6 (with its attention stretch), 8, 9 and 10</div>
+  <div><b>Homework file</b><code>lesson19_bakeoff.py</code> (and <code>lesson19_judge.py</code> for Stretch 2)</div>
   <div><b>New words</b>benchmark, behaviour-level check, scorecard, failure category, trade-off, hybrid system, replay</div>
   <div><b>Project piece</b>A scorecard: 5 → 8 → 10/12 across the brains you built</div>
 </div>
@@ -43,11 +44,11 @@
 <h3 id="more-words">More words you'll meet below</h3>
 <dl>
 <dt>Hybrid system</dt><dd>A design that uses different brains for different jobs, such as a fast local one for reflexes and a big one for hard thinking.</dd>
-<dt>Scorecard numbers</dt><dd>Each scorecard holds p50 and p95 (from <a href="16-speed.html">Lesson 16</a>) and the cost in dollars.</dd>
+<dt>Scorecard numbers</dt><dd>Each scorecard holds p50 and p95 (from <a href="16-speed.html">Week 8</a>) and the cost in dollars.</dd>
 </dl>
 
 <h2 id="problem">1. The problem</h2>
-<p>In Lesson 11 you tested one brain on 12 commands and checked whether <code>result["ok"]</code> was true and which blocks were binned. Now there are several brains, built in completely different ways. One replies with one action, another writes a whole plan, another calls tools ten times. Some ask questions. They don't even produce the same kind of output.</p>
+<p>In week 7 you tested one brain on 12 commands and checked whether <code>result["ok"]</code> was true and which blocks were binned. Now there are several brains, built in completely different ways. One replies with one action, another writes a whole plan, another calls tools ten times. Some ask questions. They don't even produce the same kind of output.</p>
 <p>So what can you compare? Only one thing is the same for all of them: <strong>the robot and the room</strong>. Every brain drives the same <code>SimRobot</code>, starting at (1, 1), with the cat hiding at (4, 1). So the fair question is: after the brain has finished, is the room in the state the person wanted?</p>
 <p>And then a second question that real products always face: if two brains both get it right, but one takes a fraction of a millisecond and runs on your laptop, while the other needs the internet and costs money for every command, which do you ship?</p>
 
@@ -78,7 +79,7 @@
 <tr><td>4</td><td>put the red and blue blocks away</td><td>bins red and blue</td></tr>
 <tr><td>5</td><td>tidy up the room</td><td>bins all three</td></tr>
 <tr><td>6</td><td>bin everything except the green block</td><td>bins red and blue</td></tr>
-<tr><td>7</td><td>put away the block that's closest to the bin</td><td>bins only blue (4 squares away, from Lesson 18)</td></tr>
+<tr><td>7</td><td>put away the block that's closest to the bin</td><td>bins only blue (4 squares from the bin; red is 10, green is 7)</td></tr>
 <tr><td>8</td><td>put the block away</td><td>bins nothing, stays still, asks a question</td></tr>
 <tr><td>9</td><td>go to the blue block</td><td>bins nothing, ends at (6, 3)</td></tr>
 <tr><td>10</td><td>stop</td><td>bins nothing, stays still</td></tr>
@@ -105,7 +106,8 @@ check 4: "says"?  check 5: "asks"?           not in this task, skip
 </details>
 
 <h3>Step 5: the real results, and what they mean</h3>
-<p>Here's the real result of <code>python3 lesson19_bakeoff.py</code>, with the five brains you built yourself:</p>
+<p>Here's the real result of <code>python3 lesson19_bakeoff.py</code>, with the five brains you built yourself. Don't peek yet!</p>
+<details><summary>Predict first: which brain passes the most tasks, and which tasks does <em>every</em> brain fail? Write down your guess, then open the real results.</summary>
 <div class="table-wrap"><table>
 <tr><th>Task</th><th>words</th><th>tiny LM</th><th>attention</th><th>distilled</th><th>4-bit</th></tr>
 <tr><td>1. put the red block in the bin</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
@@ -122,34 +124,35 @@ check 4: "says"?  check 5: "asks"?           not in this task, skip
 <tr><td>12. put the purple block in the bin</td><td>✓ refused</td><td>✓ asked</td><td>✓ asked</td><td>✓ asked</td><td>✓ asked</td></tr>
 <tr><td><b>Passed</b></td><td><b>5/12</b></td><td><b>8/12</b></td><td><b>8/12</b></td><td><b>10/12</b></td><td><b>10/12</b></td></tr>
 </table></div>
+</details>
 <p>Each brain you built made the robot better, and you can see exactly where. A score alone tells you little. Group the failures by <em>cause</em> (failure categories), and the picture gets sharp:</p>
 <ul>
-<li><b>One action only</b> (tasks 4, 6, and 8's question). The word counter outputs exactly one <code>{"intent", "object"}</code>, so "two blocks", "everything except" and "which one?" can't even be expressed. Lesson 15 fixed this by changing the <em>output format</em>: the tiny LM writes a whole plan, or <code>ask</code>.</li>
-<li><b>Hears the wrong intent</b> (tasks 2, 11). "where's" and "what about" weren't in the templates the tiny LM and the attention model learned from, so they guess "put" (or, for the tiny LM on task 2, write a plan that makes no sense). Lesson 17's distillation fixed this: the teacher's labels included "where's the red one" and friends, and the distilled brain now answers instead of binning.</li>
+<li><b>One action only</b> (tasks 4, 6, and 8's question). The word counter outputs exactly one <code>{"intent", "object"}</code>, so "two blocks", "everything except" and "which one?" can't even be expressed. Week 6 fixed this by changing the <em>output format</em>: the tiny LM writes a whole plan, or <code>ask</code>.</li>
+<li><b>Hears the wrong intent</b> (tasks 2, 11). "where's" and "what about" weren't in the templates the tiny LM and the attention model learned from, so they guess "put" (or, for the tiny LM on task 2, write a plan that makes no sense). Week 9's distillation fixed this: the teacher's labels included "where's the red one" and friends, and the distilled brain now answers instead of binning.</li>
 <li><b>An unseen word</b> (task 5). "room" is a word none of the small brains has ever seen. They ignore it, and what's left, "tidy up the", is vague. The attention model asks which block. The others guess: the tiny LM bins red and blue, and the distilled and 4-bit brains bin only green.</li>
-<li><b>No idea where things are</b> (task 7). "Closest" needs the room. No language-only model ever sees <code>robot.look()</code>, so no amount of training on words can fix it. That's what week 10's Claude, with the whole room in its prompt, is for.</li>
+<li><b>No idea where things are</b> (task 7). "Closest" needs the room. No language-only model ever sees <code>robot.look()</code>, so no amount of training on words can fix it. That's what week 10's Claude, with the whole room in its prompt, is for. And it's coming for your own robot too: in week 12 you fill in a <strong>boss gap</strong> that uses what your robot can see, and its exam reaches 12/12.</li>
 </ul>
 <p>Notice: more (and better) training examples fixed "hears the wrong intent". They could never have fixed "one action only": that needed a new output format. And task 7 needs a brain that can see the room. Knowing which kind of failure you have tells you what to do next. Squeezing the distilled brain to 4 bits didn't cost a single task.</p>
 
 <h3>Step 6: the scorecard (correct, fast, cheap)</h3>
-<p><code>scorecard</code> squeezes one brain's 12 rows into five numbers, using Lesson 16's <code>summarize</code> (p50 and p95) and <code>cost_usd</code>. Practise on the small example from <code>check.py</code>: three tasks, thinking times 1, 2 and 3 seconds, 1,000 input tokens each, no output tokens, and the first two passed.</p>
+<p><code>scorecard</code> squeezes one brain's 12 rows into five numbers, using week 8's <code>summarize</code> (p50 and p95) and <code>cost_usd</code>. Practise on the small example from <code>check.py</code>: three tasks, thinking times 1, 2 and 3 seconds, 1,000 input tokens each, no output tokens, and the first two passed.</p>
 <pre><code>passed = 2, total = 3
 p50: sorted [1, 2, 3], position ceil(0.50 × 3) − 1 = 2 − 1 = 1  → 2.0 s
 p95: position ceil(0.95 × 3) − 1 = 3 − 1 = 2                    → 3.0 s
 cost: 3,000 / 1,000,000 × $4 + 0 × $20                          = $0.012</code></pre>
-<p>Now the real scorecard from our run. Times change every run and depend on your computer. They're bigger than in <a href="16-speed.html">Lesson 16</a> because each time covers the whole <code>act()</code> call, including the typo fixer, the safety checks and driving the robot, not just the model. The word counter's p95 is the biggest here, which is a reminder that 12 timings make a jumpy p95.</p>
+<p>Now the real scorecard from our run. Times change every run and depend on your computer. They're bigger than in <a href="16-speed.html">Week 8</a> because each time covers the whole <code>act()</code> call, including the typo fixer, the safety checks and driving the robot, not just the model. The word counter's p95 is the biggest here, which is a reminder that 12 timings make a jumpy p95.</p>
 <div class="table-wrap"><table>
 <tr><th>Brain</th><th>Passed</th><th>Thinking p50</th><th>Thinking p95</th><th>Cost for all 12</th><th>Needs internet?</th></tr>
-<tr><td>words (Lesson 9)</td><td>5/12</td><td>0.22 ms</td><td>2.93 ms</td><td>$0.000</td><td>no</td></tr>
-<tr><td>tiny LM (Lesson 15)</td><td>8/12</td><td>0.51 ms</td><td>0.74 ms</td><td>$0.000</td><td>no</td></tr>
-<tr><td>attention (Lesson 15 stretch)</td><td>8/12</td><td>0.50 ms</td><td>0.74 ms</td><td>$0.000</td><td>no</td></tr>
-<tr><td>distilled (Lesson 17)</td><td>10/12</td><td>0.50 ms</td><td>1.05 ms</td><td>$0.000</td><td>no</td></tr>
-<tr><td>tinylm-4bit (Lesson 17)</td><td>10/12</td><td>0.39 ms</td><td>0.67 ms</td><td>$0.000</td><td>no</td></tr>
+<tr><td>words (week 5)</td><td>5/12</td><td>0.22 ms</td><td>2.93 ms</td><td>$0.000</td><td>no</td></tr>
+<tr><td>tiny LM (week 6)</td><td>8/12</td><td>0.51 ms</td><td>0.74 ms</td><td>$0.000</td><td>no</td></tr>
+<tr><td>attention (week 6 stretch)</td><td>8/12</td><td>0.50 ms</td><td>0.74 ms</td><td>$0.000</td><td>no</td></tr>
+<tr><td>distilled (week 9)</td><td>10/12</td><td>0.50 ms</td><td>1.05 ms</td><td>$0.000</td><td>no</td></tr>
+<tr><td>tinylm-4bit (week 9)</td><td>10/12</td><td>0.39 ms</td><td>0.67 ms</td><td>$0.000</td><td>no</td></tr>
 <!-- CLAUDE-RESULTS -->
-<tr><td>Claude planner</td><td colspan="4">from your run of <code>planner</code> or <code>planner-replay</code></td><td>yes (or a recording)</td></tr>
-<tr><td>Claude agent</td><td colspan="4">from your run of <code>agent</code> or <code>agent-replay</code></td><td>yes (or a recording)</td></tr>
+<tr><td>Claude planner</td><td colspan="4">Claude's rows appear here after a grown-up records them with an API key (see <a href="18-world-class.html">week 10</a>).</td><td>yes</td></tr>
+<tr><td>Claude agent</td><td colspan="4">Claude's rows appear here after a grown-up records them with an API key (see <a href="18-world-class.html">week 10</a>).</td><td>yes</td></tr>
 </table></div>
-<p>Remember Lesson 16's <em>thinking distance</em>: at 1 metre per second, a robot that keeps moving while its brain thinks travels 1 metre for every second of thinking. Our local brains think for a few thousandths of a second at most. A world-class model has to send your request across the internet and run a huge network on it, so expect its column to be measured in a very different unit. Fill in the real numbers from your own run, or from the recordings.</p>
+<p>Remember week 8's <em>thinking distance</em>: at 1 metre per second, a robot that keeps moving while its brain thinks travels 1 metre for every second of thinking. Our local brains think for a few thousandths of a second at most. A world-class model has to send your request across the internet and run a huge network on it, so expect its column to be measured in a very different unit. If an adult has set up a key, run Claude yourself and fill in the real numbers.</p>
 <!-- CLAUDE-RESULTS -->
 <details><summary>Predict first: a brain passes 12/12 but its p95 thinking time is several seconds. Would you let it handle "stop"?</summary>
 <p>No. "Stop" is exactly the command where waiting is dangerous. If the robot keeps rolling while the request travels to a data centre and back, the correct answer arrives too late. Correctness and speed are separate scores, and for some tasks speed <em>is</em> part of being correct.</p>
@@ -166,7 +169,7 @@ a command arrives:
     otherwise                             → ask the world-class planner
                                             → validate_plan (Lesson 18)  → act
     no internet, or no answer in time?    → "Sorry, I didn't catch that." (don't guess)</code></pre>
-<p>Your body works the same way. Touch a hot pan and your hand jerks back before your brain has even noticed: a fast, simple reflex. Deciding what to cook for dinner takes the slow, clever part. And Lesson 17 showed one more trick: <em>distil</em> a teacher's answers into a small local brain, so more commands can be handled fast and free over time. With just 24 careful labels it took the small brain from 8/12 to 10/12.</p>
+<p>Your body works the same way. Touch a hot pan and your hand jerks back before your brain has even noticed: a fast, simple reflex. Deciding what to cook for dinner takes the slow, clever part. And week 9 showed one more trick: <em>distil</em> a teacher's answers into a small local brain, so more commands can be handled fast and free over time. With just 24 careful labels it took the small brain from 8/12 to 10/12.</p>
 
 <h2 id="play">3. Play with it</h2>
 <div class="card demo">
@@ -213,7 +216,7 @@ task.get("asks") and not reply.strip().endswith("?") → False, "should ask a qu
 
 <h3>4.2 <code>scorecard(rows)</code></h3>
 <p><code>rows</code> is one brain's list of <code>{"passed", "seconds", "tokens_in", "tokens_out"}</code>. Return <code>{"passed", "total", "p50", "p95", "cost"}</code>. Example: the check.py rows from Step 6 → <code>{"passed": 2, "total": 3, "p50": 2.0, "p95": 3.0, "cost": 0.012}</code>.</p>
-<details><summary>Hint 1</summary><p>You already wrote the hard parts in Lesson 16. They're imported at the top: <code>summarize</code> and <code>cost_usd</code>.</p></details>
+<details><summary>Hint 1</summary><p>You already wrote the hard parts in week 8. They're imported at the top: <code>summarize</code> and <code>cost_usd</code>.</p></details>
 <details><summary>Hint 2</summary><p><code>summarize</code> wants a list of seconds: build it with a list comprehension. <code>True</code> counts as 1 in Python, so <code>sum(r["passed"] for r in rows)</code> counts the passes. Add up all the input tokens and all the output tokens <em>first</em>, then call <code>cost_usd</code> once.</p></details>
 <details><summary>Hint 3</summary><pre><code>s = summarize([seconds of each row])
 return {"passed": number of rows that passed, "total": len(rows),
@@ -265,7 +268,7 @@ Traces saved to /.../project/homework/traces/bakeoff.json      (your full path; 
   distilled task  7: binned nothing, wanted ['blue block']   (reply: 'Which block do you mean: red, blue or green?')
   tinylm-4bit task  5: binned ['green block'], wanted ['blue block', 'green block', 'red block']   (reply: 'The green block is in the bin.')
   tinylm-4bit task  7: binned nothing, wanted ['blue block']   (reply: 'Which block do you mean: red, blue or green?')</code></pre>
-<p>With no names, <code>python3 lesson19_bakeoff.py</code> tries seven brains: your five, plus <code>planner-replay</code> and <code>agent-replay</code>. If the Claude recordings aren't in <code>recordings/</code> yet, you'll see <em>skipping planner (Claude, recorded): (no recording for this command)</em> and the same for the agent (at the top and bottom of the output above), and the table shows just your five. To run only some brains, name them: <code>python3 lesson19_bakeoff.py words distilled</code>. With a key, add <code>planner</code> and <code>agent</code> to the list to run Claude live.</p>
+<p>With no names, <code>python3 lesson19_bakeoff.py</code> tries seven brains: your five, plus <code>planner-replay</code> and <code>agent-replay</code>. There are no Claude recordings yet (they appear after a grown-up records them with an API key, see week 10), so you'll see <em>skipping planner (Claude, recorded): (no recording for this command)</em> and the same for the agent (at the top and bottom of the output above), and the table shows just your five. To run only some brains, name them: <code>python3 lesson19_bakeoff.py words distilled</code>. With a key, add <code>planner</code> and <code>agent</code> to the list to run Claude live.</p>
 <!-- CLAUDE-RESULTS -->
 <p>To watch one brain do one task in the terminal: <code>python3 lesson19_bakeoff.py --watch tinylm 5</code>. It ends with:</p>
 <pre><code>[tinylm (Lesson 15)] 'tidy up the room' -&gt; 'The red block is in the bin. The blue block is in the bin.'   (False, "binned ['blue block', 'red block'], wanted ['blue block', 'green block', 'red block']")</code></pre>
@@ -274,12 +277,13 @@ Traces saved to /.../project/homework/traces/bakeoff.json      (your full path; 
 <h3>Check it</h3>
 <pre><code>cd project
 python3 check.py 19</code></pre>
-<p>Four checks: <code>score_task: binned</code>, <code>score_task: still / at</code>, <code>score_task: says / asks</code> and <code>scorecard</code>. A red ✗ gives a hint like <em>"an EXTRA block binned -&gt; fail"</em> or <em>"tokens 3,000 in and 0 out cost $0.012"</em>. Yellow … means a function isn't written yet, or Lesson 16 or 18 isn't finished.</p>
+<p>Four checks: <code>score_task: binned</code>, <code>score_task: still / at</code>, <code>score_task: says / asks</code> and <code>scorecard</code>. A red ✗ gives a hint like <em>"an EXTRA block binned -&gt; fail"</em> or <em>"tokens 3,000 in and 0 out cost $0.012"</em>. Yellow … means a function isn't written yet, or week 8 or week 10 isn't finished.</p>
 
 <h3>Stretch: build the hybrid brain</h3>
-<p>Write a <code>HybridBrain</code> class in a new file (copy the shape of <code>WordsBrain</code> in <code>brains.py</code>: a <code>name</code> and an <code>act(robot, command)</code> method). If the word counter's top intent is "stop", or it wins by a big margin (use <code>intent_scores</code> from Lesson 9, like the Lesson 11 stretch), let <code>WordsBrain</code> handle it. Otherwise hand the command to <code>get_brain("planner-replay")</code> (or <code>"planner"</code> with a key). Score it with <code>run_bakeoff</code> by adding it to <code>get_brain</code> in your copy. Does it keep "stop" instant <em>and</em> get the hard tasks right? Then add three tasks of your own to <code>TASKS</code>, with checks written before you run them.</p>
+<p>Write a <code>HybridBrain</code> class in a new file (copy the shape of <code>WordsBrain</code> in <code>brains.py</code>: a <code>name</code> and an <code>act(robot, command)</code> method). If the word counter's top intent is "stop", or it wins by a big margin (use <code>intent_scores</code> from week 5, like week 7's capstone stretch), let <code>WordsBrain</code> handle it. Otherwise hand the command to <code>get_brain("planner-replay")</code> (or <code>"planner"</code> with a key). Score it with <code>run_bakeoff</code> by adding it to <code>get_brain</code> in your copy. Does it keep "stop" instant <em>and</em> get the hard tasks right? Then add three tasks of your own to <code>TASKS</code>, with checks written before you run them.</p>
 
 <h3 id="judge">Stretch 2: an AI model as the judge</h3>
+<div class="note"><strong>Fully optional, and long.</strong> This stretch is about statistics: how to tell if a judge, or a score, can be trusted. It isn't part of the week, and your robot doesn't need it. Happy with your race? Skip straight to <a href="#add-to-robot">Add it to your robot</a>.</div>
 <p>Our bake-off checks are <em>exact</em>: we look in the bin, at where the robot ended up, at whether it asked a question. That only works because our world is tiny. Now imagine grading an essay, a chat reply or a summary. There's no bin to look in. So companies often ask <em>another</em> AI model to grade the answer. That's called <strong>LLM-as-a-judge</strong>. Judges are useful, and also dangerous. This stretch shows you both.</p>
 
 <h4>Rule 1: measure the judge against checks you trust</h4>
@@ -310,7 +314,7 @@ distilled (Lesson 17): exact checks pass 10/12
 <li><strong>Kappa</strong> (Cohen's kappa): how much better the judge agrees than a guesser with the same pass rate would by luck. 0 means no better than guessing, 1 means perfect. Below 0 means worse than guessing. The usual bar before you let a judge make decisions is about 0.6. Our rule judge scores 0.21, 0.14 and <strong>−0.12</strong>.</li>
 </ul>
 <p>The distilled brain shows the trap at its worst. The rule judge agrees with the exact checks on 75% of its tasks, which sounds good. But a lazy judge that says "pass" to everything agrees on 83%, because the brain passes 10 of 12. The better your robot gets, the easier it is for a useless judge to look good, and only kappa gives it away.</p>
-<p>Module 19's article found exactly this with a real AI judge on 60 support replies: 60% agreement sounded fine, but "always pass" would have scored 57%, and kappa was only 0.15 (<a href="../19-evals-field-guide.html#judge">Module 19</a>).</p>
+<p>A grown-up article on this site, <a href="../19-evals-field-guide.html#judge">the evals field guide</a>, found exactly this with a real AI judge on 60 support replies: 60% agreement sounded fine, but "always pass" would have scored 57%, and kappa was only 0.15.</p>
 
 <h4>Give the judge the evidence</h4>
 <p>The fix is the one from Step 1: show the judge what actually happened in the room, not just what the robot said. Your <code>evidence_text</code> turns a run's recorded frames into one sentence, and <code>judge_prompt</code> adds it to the prompt. Here's the real example the file prints:</p>
@@ -324,6 +328,7 @@ Did the robot do the right thing? A correct robot does exactly what was asked, r
 
 <h4>Asking Claude to judge</h4>
 <p><code>ask_judge</code> (provided) sends the prompt to Claude with a short system prompt ("a strict, fair judge") and asks for <strong>structured output</strong>: JSON that must match a schema with exactly two fields, <code>verdict</code> (<code>"pass"</code> or <code>"fail"</code>) and <code>reason</code>. Forcing a schema means your code can read the verdict without guessing what a sentence meant. With an API key, <code>python3 lesson19_judge.py record</code> asks Claude to judge every run twice, once reply-only and once with the evidence, and saves the verdicts to <code>recordings/judge.json</code>. After that, the plain <code>python3 lesson19_judge.py</code> adds two more agreement lines per brain.</p>
+<p>Claude's rows appear here after a grown-up records them with an API key (see week 10).</p>
 <!-- CLAUDE-RESULTS -->
 <p>Whatever the numbers turn out to be, the question to ask is the same: how much does the evidence line change the agreement, and on which tasks does even the evidence-reading judge still disagree with the exact checks?</p>
 
@@ -390,16 +395,36 @@ Did the robot do the right thing? A correct robot does exactly what was asked, r
 
 <h2 id="add-to-robot">Add it to your robot</h2>
 <p>Fill in <code>exam(self)</code>: your robot sits the 12 bake-off tasks. Make a fresh robot for each task and mark it with your <code>score_task()</code>.</p>
-<details><summary>Hint 1</summary><p><code>robot = Robot(quiet=True)</code>, then <code>ok, why = score_task(task, robot, {"reply": robot.command(task["command"])})</code>.</p></details>
-<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 11: exam"</em>.</p>
+<details><summary>Hint 1</summary><p>Start the method with this import line:</p><pre><code>from lesson19_bakeoff import TASKS, score_task</code></pre></details>
+<details><summary>Hint 2</summary><p>Count passes in <code>passed = 0</code>. Loop <code>for task in TASKS:</code>. Inside the loop, make a fresh robot for each task with <code>robot = Robot(quiet=True)</code>, so every task starts from the same room. Give it the command, then mark the room with <code>score_task</code>. After the loop, return the sentence.</p></details>
+<details><summary>Hint 3 (fill in the blanks)</summary><pre><code>passed = 0
+for task in TASKS:
+    robot = Robot(quiet=True)
+    ok, why = score_task(task, robot, {"reply": robot.command(____)})
+    passed += ok
+    if not self.quiet:
+        print(f"  {'✓' if ok else '✗'} {task['command']!r:46} {'' if ok else why}")
+return f"I passed {____} of {len(TASKS)}."</code></pre></details>
+<div class="note"><strong>New Python this time.</strong> <code>True</code> counts as 1 and <code>False</code> as 0, so <code>passed += ok</code> adds one for every pass. <code>a if test else b</code> picks one of two values in a single line. And <code>{x!r:46}</code> in an f-string prints <code>x</code> with its quotes, padded to 46 characters so the columns line up.
+<pre><code>passed = 0; passed += True; passed += False    # passed is now 1
+print(f"{'✓' if 3 > 2 else '✗'} {'hi'!r:6}|")   # ✓ 'hi'  |</code></pre></div>
+<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 11: exam"</em>. If it's red, the hint says <em>"your robot should pass at least 8 of the 12 tasks"</em>.</p>
 <p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
 <pre><code>Zippy&gt; exam
-  ✓ 'put the red block in the bin'
-  ...
-  ✗ 'tidy up the room'                             binned ['green block'], ...
+  ✓ 'put the red block in the bin'                 
+  ✓ "where's the green one?"                       
+  ✓ 'make me a sandwich'                           
+  ✓ 'put the red and blue blocks away'             
+  ✗ 'tidy up the room'                             binned ['green block'], wanted ['blue block', 'green block', 'red block']
+  ✓ 'bin everything except the green block'        
   ✗ "put away the block that's closest to the bin" binned nothing, wanted ['blue block']
-  ...
+  ✓ 'put the block away'                           
+  ✓ 'go to the blue block'                         
+  ✓ 'stop'                                         
+  ✓ 'hmm what about the blue'                      
+  ✓ 'put the purple block in the bin'              
   I passed 10 of 12.</code></pre>
+<p>10 of 12, the same as the best brain in the race, because your robot <em>has</em> that brain inside it. The two ✗ are the "needs to see the room" tasks. They won't stay red: in week 12 you fill in the boss gap, and this same exam reaches <strong>12 of 12</strong>.</p>
 
 <h2 id="real-world">5. Real-world challenge: the family tidy-up bake-off</h2>
 <p>Run a real bake-off with people as the brains. You need 3 small objects (say a sock, a pen and a toy), a box as the bin, index cards, a stopwatch (a phone is fine) and two or three "contestants".</p>
@@ -411,6 +436,7 @@ Did the robot do the right thing? A correct robot does exactly what was asked, r
 <li><b>Judge the room, not the words.</b> Use only the rule on the back of the card. Record ✓/✗, the reason, and the time, in a table like the one in Step 5.</li>
 <li><b>Work out the scorecard</b>: passes out of 8, and the median thinking time (sort the times, take the middle).</li>
 </ol>
+<p><b>On your own (20 minutes).</b> Be the word-counter yourself. Write the 8 cards and their pass rules first. Then play every card twice: once as the strict word counter (act on the first object word you see, never ask), and once as yourself. Time each go with a phone. Which cards did the strict version fail? Are they the same tasks our word counter failed?</p>
 <p><b>What it teaches:</b> the strict word-counter human is the fastest and fails exactly the tasks our word counter failed. Normal humans are slower but ask "which pen?". Writing the rules first stops you being generous to the contestant you like. And you'll notice how often you want to judge by what someone <em>says</em> instead of what they did.</p>
 
 <h2 id="so-far">6. Your Robo-Helper so far</h2>
@@ -418,7 +444,7 @@ Did the robot do the right thing? A correct robot does exactly what was asked, r
 <p><strong>What this adds to your robot.</strong> Proof, not opinions. Row 19 of <code>python3 progress.py --solutions</code> measured: <em>"the same 12 tasks for every brain: words 5/12, tinylm 8/12, distilled 10/12"</em>. The word counter gets 5 tasks right, the tiny LM 8 and the distilled brain 10. But is a new brain really better, or just lucky? With only 12 tasks you can't always tell. The error-bar check above says: the distilled brain beats the word counter on 5 tasks and loses on none, so that win is real. The tiny LM's win over the word counter is too close to call.</p>
 </div>
 <p>Robo-Helper now has <strong>a scorecard and replays of every brain</strong>. <code>score_task</code> judges any brain by its behaviour, <code>scorecard</code> adds speed and cost, and <code>run_bakeoff</code> saves every frame to <code>traces/bakeoff.json</code> for the replay viewer.</p>
-<p>Next week, <a href="12-preferences.html">Lesson 12</a> asks a harder question that the bake-off can't: when several answers are all "correct", which one do people actually <em>prefer</em>? Then in <a href="14-go-real.html">Lesson 14</a> your bake-off table and a replay become the centrepiece of your project README and demo.</p>
+<p>Next week (week 12), <a href="12-preferences.html">Part A</a> asks a harder question that the bake-off can't: when several answers are all "correct", which one do people actually <em>prefer</em>? Then in <a href="14-go-real.html">Part B</a> your robot fights the boss, its exam reaches 12/12, and its <code>--show</code> becomes the centrepiece of your project README and demo.</p>
 
 <h2 id="mistakes">7. Common mistakes</h2>
 <ul>
@@ -434,7 +460,7 @@ Did the robot do the right thing? A correct robot does exactly what was asked, r
 <details><summary>Why does every brain get a fresh robot for every task?</summary><p>So every run starts from the same room. If task 1 binned the red block, task 4 would start with a different room for one brain than another, and the comparison would no longer be fair.</p></details>
 <details><summary>Predict: a brain answers "stop" to every single command. What does it score?</summary><p>It never moves and bins nothing, so it passes every task whose only rules are "bins nothing" and "stays still": 3 (sandwich), 10 (stop), 11 (hmm…) and 12 (purple). That's 4/12, only one behind the word counter! It fails 2 (no "(1, 5)") and 8 (no question). A score only means something next to the tasks behind it.</p></details>
 <details><summary>Why are "one action only" failures worse news than "heard the wrong intent" failures?</summary><p>More training data can fix wrong intents. But a brain that can only output one action can never do "the red and blue blocks", however well it's trained. You'd have to change its output format, like the planner's list of actions.</p></details>
-<details><summary>For "where's the green one?", the attention model wrote <code>put green</code>, and the action passed Lesson 10's safety check. Was the safety check broken?</summary><p>No. It did its job: it checks that an action is allowed and about a real block. "Put the green block in the bin" is both. Safety checks catch impossible and dangerous actions; only an evaluation like the bake-off catches allowed-but-wrong ones.</p></details>
+<details><summary>For "where's the green one?", the attention model wrote <code>put green</code>, and the action passed week 7's safety check. Was the safety check broken?</summary><p>No. It did its job: it checks that an action is allowed and about a real block. "Put the green block in the bin" is both. Safety checks catch impossible and dangerous actions; only an evaluation like the bake-off catches allowed-but-wrong ones.</p></details>
 <details><summary>Give one reason a real robot would keep a fast local brain even if a world-class model passed every task.</summary><p>Reflexes like "stop" can't wait for the internet; the robot must still work when the Wi-Fi drops; and every request to a big model costs money and time.</p></details>
 
 <h2 id="deeper">9. Go deeper (optional)</h2>
@@ -448,9 +474,9 @@ Did the robot do the right thing? A correct robot does exactly what was asked, r
 
 <nav class="pager">
   <a href="20-mcp.html"><small>Previous</small>Bonus · Any AI app can drive it (MCP)</a>
-  <a class="next" href="12-preferences.html"><small>Next</small>Week 12 · What people prefer</a>
+  <a class="next" href="12-preferences.html"><small>Next</small>Week 12 · Part A: What people prefer</a>
 </nav>
-<footer>Build a Robot Brain · Week 11 · Lesson 19</footer>
+<footer>Build a Robot Brain · Week 11 of 12</footer>
 </main>
 <script>
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
