@@ -1,4 +1,4 @@
-"""Lesson 20 (bonus, after week 10): give ANY AI app your robot, with MCP.
+"""Lesson 20 (bonus, after week 15): give ANY AI app your robot, with MCP.
 
 In Lesson 18 the tools (look, go_to, pick_up, put_in_bin) only worked inside our own agent loop.
 MCP (the Model Context Protocol) is a standard plug: write the tools ONCE as an MCP server, and any

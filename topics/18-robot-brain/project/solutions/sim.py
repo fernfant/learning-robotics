@@ -1,5 +1,5 @@
 """The simulator: runs Robo-Helper with any "brain" and records everything it does.
-Provided for you (no TODOs). Used from Week 7 (after the capstone) onwards.
+Provided for you (no TODOs). Used from Week 10 (after the capstone) onwards.
 
     python3 sim.py "put the red and blue blocks away"            (default brain: word counter)
     python3 sim.py "tidy the room" --brain tinylm --watch         (watch it move, frame by frame)

@@ -134,7 +134,7 @@ if __name__ == "__main__":
     for _ in range(3):
         print("->", generate(counts, "the", 12, rng))
 
-    print("\nFixing typos with the robot's command words (from week 5's command examples):")
+    print("\nFixing typos with the robot's command words (from week 7's command examples):")
     from lesson09_commands import TRAIN
     cmd_counts = count_bigrams(tokenize(" . ".join(t for t, _ in TRAIN)))
     fixed = 0

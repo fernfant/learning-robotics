@@ -46,6 +46,9 @@ def main():
             continue
         target.write_text(out)
         print(f"wrote homework/{f.name}")
+    if (SRC / "data").exists() and not (DST / "data").exists():
+        shutil.copytree(SRC / "data", DST / "data")
+        print("wrote homework/data/ (real sensor recordings)")
     for f in sorted(SRC.glob("*.txt")):
         if not (DST / f.name).exists():
             shutil.copy(f, DST / f.name)

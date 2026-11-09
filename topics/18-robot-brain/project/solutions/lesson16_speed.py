@@ -1,4 +1,4 @@
-"""Lesson 16 (Week 8): inference engineering, part 1. How fast is a brain, and what does it cost?
+"""Lesson 16 (Week 13): inference engineering, part 1. How fast is a brain, and what does it cost?
 
 "Inference" = USING a trained model (as opposed to training it). Every time Robo-Helper hears a
 command, its brain runs inference. Inference engineers measure four things:
@@ -127,7 +127,7 @@ if __name__ == "__main__":
         try:
             small.append(get_brain(n))
         except NotImplementedError:
-            print(f"({n}: not built yet: it comes with the week 6 stretch or week 9)")
+            print(f"({n}: not built yet: it comes with the week 8 stretch or week 14)")
     words = get_brain("words")
     thinkers = [(words, lambda: parse_command(words.model, command))] + [(b, (lambda b: lambda: b.model.generate(command))(b)) for b in small]
     for brain, think in thinkers:

@@ -8,7 +8,7 @@ Every lesson adds one real piece, written by you.
 
 - A computer with **Python 3.8 or newer**. Check by typing `python3 --version` in a terminal.
 - No extra packages. Everything uses only Python's standard library.
-- (Optional, weeks 10–11) an Anthropic API key, to use Claude as the robot's brain. Ask a parent or guardian, since it costs a
+- (Optional, weeks 15–15) an Anthropic API key, to use Claude as the robot's brain. Ask a parent or guardian, since it costs a
   little money (the whole bake-off is about a dollar). Without a key you replay **recorded real runs**, so nothing is blocked.
   Set it up like this (once):
 
@@ -29,7 +29,7 @@ project/
   make_starters.py  (for teachers: rebuilds homework/ from solutions/)
 ```
 
-## Running the robot with different brains (from week 7)
+## Running the robot with different brains (from week 10)
 
 ```
 cd solutions        (or homework, once your lessons are done)
@@ -72,7 +72,7 @@ what you just built to your robot. Until you fill a gap, the robot says "I can't
 ```
 cd homework
 python3 my_robot.py              (talk to your robot)
-python3 my_robot.py --show       (week 12: the capstone show, with a demo, the 12-task exam and your own tests in my_tasks.txt)
+python3 my_robot.py --show       (week 16: the capstone show, with a demo, the 12-task exam and your own tests in my_tasks.txt)
 cd ..
 python3 check.py robot           (checks each piece of YOUR robot)
 ```

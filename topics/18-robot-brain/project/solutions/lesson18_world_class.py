@@ -1,4 +1,4 @@
-"""Lesson 18 (Week 10): a world-class brain over the internet.
+"""Lesson 18 (Week 15): a world-class brain over the internet.
 
 Two ways to use a big model (Claude) as Robo-Helper's brain:
 

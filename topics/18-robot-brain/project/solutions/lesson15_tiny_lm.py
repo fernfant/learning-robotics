@@ -1,4 +1,4 @@
-"""Lesson 15 (Week 6): a tiny neural language model, built from zero, that writes PLANS.
+"""Lesson 15 (Week 8): a tiny neural language model, built from zero, that writes PLANS.
 
 Lesson 9's word counter picks ONE action. It can never do "put the red and blue blocks away",
 "tidy up everything", "everything except the green one", or say "which block?" when you're vague.

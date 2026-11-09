@@ -1,4 +1,4 @@
-"""Lesson 19 (Week 11): the bake-off. Every brain, the same 12 tasks, the same room, the same cat.
+"""Lesson 19 (Week 15): the bake-off. Every brain, the same 12 tasks, the same room, the same cat.
 
 You built brains from zero (word counter, tiny language model) and plugged in a world-class one
 (Claude as planner, Claude as agent). Which is best? It depends what you measure:
@@ -86,7 +86,7 @@ def run_bakeoff(brain_names, tasks=TASKS):
         try:
             brain = get_brain(name)
         except NotImplementedError:
-            print(f"  ({name}: not built yet: it comes with the week 6 stretch or week 9, so it sits this one out)")
+            print(f"  ({name}: not built yet: it comes with the week 8 stretch or week 14, so it sits this one out)")
             continue
         rows, runs = [], []
         for task in tasks:

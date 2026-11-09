@@ -3,11 +3,11 @@
     brain.act(robot, command) -> {"reply": str, "seconds": float, "tokens_in": int, "tokens_out": int}
 
 Brains, in the order you build them (each one should make the robot better at something you can measure):
-  words       Lesson 9's word counter: one action per command (week 5)
-  tinylm      Lesson 15's tiny language model: writes whole plans, asks when unsure (week 6)
-  attention   the same model with attention (week 6 stretch)
-  distilled   the attention model re-trained with a teacher's labels on new phrasings (week 9)
-  tinylm-4bit the distilled model squeezed to 4-bit numbers: 1/8 of the size (week 9)
+  words       Lesson 9's word counter: one action per command (week 7)
+  tinylm      Lesson 15's tiny language model: writes whole plans, asks when unsure (week 8)
+  attention   the same model with attention (week 8 stretch)
+  distilled   the attention model re-trained with a teacher's labels on new phrasings (week 14)
+  tinylm-4bit the distilled model squeezed to 4-bit numbers: 1/8 of the size (week 14)
   local     a small open model running on your own computer via Ollama (optional, illustrative)
   planner   a world-class model (Claude) that writes a whole checked plan        (needs an API key)
   agent     a world-class model (Claude) that uses robot tools step by step       (needs an API key)

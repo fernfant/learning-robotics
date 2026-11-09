@@ -1,4 +1,4 @@
-"""Lesson 17 (Week 9): inference engineering, part 2. Making brains cheaper and faster.
+"""Lesson 17 (Week 14): inference engineering, part 2. Making brains cheaper and faster.
 
 Three tricks every AI company uses:
 
@@ -180,7 +180,7 @@ if __name__ == "__main__":
         try:
             return sum(score_task(t, *run_brain(brain, t["command"], surprises=t.get("surprises", (CAT,))))[0] for t in TASKS)
         except NotImplementedError:
-            return "?"   # needs Lesson 19's score_task (week 11): run ../progress.py for the robot score now
+            return "?"   # needs Lesson 19's score_task (week 15): run ../progress.py for the robot score now
 
     model = best_student()
     n = count_weights(model)
