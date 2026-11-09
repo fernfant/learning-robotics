@@ -212,3 +212,18 @@ Set up the folder structure, schema (CLAUDE.md), shared styles and the index.
   - A sofa wall: gradient alone reaches 2/11 (9.8 m); with swirl, 11/11 (11.2 m). Straight line is 8 m.
 - Interactive demo of the fields and robot runs. Checked in node: identical counts and average lengths to the Python.
 - Fix, course-wide: `style.css` had no `pre` rule, so long output lines made pages wider than the screen. Added `pre { overflow-x: auto; max-width: 100%; }`. Module 22 checked in the browser: page width now equals the viewport.
+
+## [2026-11-10] enhance | Module 18 for a 12-year-old: a clear path, and one robot that grows every week
+- An independent "12-year-old" review found the home page hid the course: it was the 18th card, labelled "ages 15+". It also found that from week 6, lessons referred forward to things not yet built, contradicted each other (week 10 said the tiny LM can't do two blocks), and piled up adult jargon.
+- Fixes:
+  - home: a start-here banner (Module 18, then 21 and 22 after week 4, then 20 after the course)
+  - "ages 12+" with honest weekly timing and install notes
+  - every lesson opens with a "Step N of 21 · so far your robot… · today… · next…" strip, plus "ask an adult today" notes (00, 14, 18, 20)
+  - pagers labelled by week and topic
+  - forward references removed, bridges added at the jumps, hard kid boxes simplified (grade 3–5)
+- New `project/my_robot.py`: the learner's own named robot, built only from the lessons they've finished.
+  - It detects each ability by running their code: moves, senses, brakes, stops, routes, typos, words, plans, safety, the whole RoboHelper with its test score, speed, teacher, Claude (with a key), exam, taste.
+  - Commands: arrows, `look`, `goto`, sentences, `exam`, `claude:`, with an animated room.
+  - Tested by simulating homework at weeks 1, 3, 4, 5, 6 and 7. Week 1 bumps the cat, week 3 stops in time, week 4 replans, week 5 bins one block only, week 6 bins both, week 7 shows its capstone score (83%).
+  - `--show` is the week-12 capstone: a demo of every ability, then the 12-task exam (10/12), then the learner's own tests from `my_tasks.txt` (example provided). About 10 s.
+- Pages: hub ("Your robot, week by week" table with real output), each lesson's strip (a "try this on your robot" line), Lesson 11 (your assembled robot's score), Lesson 14 (the capstone show, with real output). README updated. check.py 100/100; 112 pages validated.
