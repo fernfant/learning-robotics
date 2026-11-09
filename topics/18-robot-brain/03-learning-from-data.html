@@ -13,7 +13,7 @@
 <div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 2 · Lesson 3</div>
 <h1>Learning from data: fit a line by shrinking the error</h1>
 <p class="lede">Instead of telling the robot a rule, give it measurements and let it work the rule out. You'll write a number that says "how wrong", then a loop that keeps nudging the rule to make that number smaller. That loop, gradient descent, is how every modern AI learns, ChatGPT included.</p>
-<div class="card note" id="journey"><strong>Step 4 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses. <strong>Today</strong> it learns to learn how far it needs to brake. Next: <a href="04-neuron.html">Week 3 · The artificial neuron</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, run <code>python3 my_robot.py</code> and try <code>look</code> (now it knows its safe speed).</div>
+<div class="card note" id="journey"><strong>Step 4 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses. <strong>Today</strong> it learns to learn how far it needs to brake. Next: <a href="04-neuron.html">Week 3 · The artificial neuron</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>look</code> (now it knows its safe speed).</div>
 
 <div class="facts">
   <div><b>Time</b>3–4 h</div>
@@ -208,6 +208,16 @@ max safe speed with 1.0 m free: 0.9 m/s</code></pre>
 <li>Print <code>history[0]</code>, <code>history[9]</code>, <code>history[99]</code> and <code>history[-1]</code>. Real values: 0.3259, 0.0158, 0.00052, 0.00036. Where does most of the learning happen?</li>
 <li>Write <code>fit_line_until(data, lr, tol)</code> that stops as soon as the error improves by less than <code>tol</code> in one step, and returns how many steps it took. Compare lr = 0.01, 0.1 and 0.3.</li>
 </ol>
+
+<h2 id="add-to-robot">Add it to your robot</h2>
+<p>Finish <code>look(self)</code>: add the safe speed. Fit your braking line with <code>fit_line(STOP_DATA)</code>, work out the free space in metres (the smallest wall distance × 0.5 + 0.5), and ask your <code>max_safe_speed()</code>.</p>
+<details><summary>Hint 1</summary><p><code>w, b, _ = fit_line(STOP_DATA)</code>; then <code>max_safe_speed(w, b, min(d.values()) * 0.5 + 0.5)</code>.</p></details>
+<details><summary>Hint 2</summary><p>End the sentence with <code>f" Safe speed: {speed} m/s."</code></p></details>
+<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 2: look"</em>.</p>
+<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
+<pre><code>Zippy&gt; look
+  Walls: north 0, east 7, south 5, west 0. Safe speed: 0.25 m/s.</code></pre>
+<p>Squeezed against the north wall, it's only allowed to creep along at 0.25 m/s.</p>
 
 <h2 id="challenge">5. Real-world challenge: the ramp</h2>
 <p>You'll collect your own data and fit your own line, first by hand and then with your code.</p>

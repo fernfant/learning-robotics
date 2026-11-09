@@ -227,3 +227,31 @@ Set up the folder structure, schema (CLAUDE.md), shared styles and the index.
   - Tested by simulating homework at weeks 1, 3, 4, 5, 6 and 7. Week 1 bumps the cat, week 3 stops in time, week 4 replans, week 5 bins one block only, week 6 bins both, week 7 shows its capstone score (83%).
   - `--show` is the week-12 capstone: a demo of every ability, then the 12-task exam (10/12), then the learner's own tests from `my_tasks.txt` (example provided). About 10 s.
 - Pages: hub ("Your robot, week by week" table with real output), each lesson's strip (a "try this on your robot" line), Lesson 11 (your assembled robot's score), Lesson 14 (the capstone show, with real output). README updated. check.py 100/100; 112 pages validated.
+
+## [2026-11-10] enhance | Module 18: the learner builds their own robot, one gap a week
+- The user asked whether a 12-year-old would really feel they're building something step by step. Honest answer: no. They filled in functions in separate files, and the robot was put together for them (except in the week-7 capstone).
+- `my_robot.py` is now the learner's own file: `homework/my_robot.py`, with the worked version in `solutions/`.
+  - It starts with the robot's name, the room and the provided glue (drawing, typing loop, showcase).
+  - It has one gap per week, 13 methods in all: arrows (1), look (2), should_stop_for (3), route + goto (4), clean + understand_words + do (5), understand_plans (6), is_safe (7), think_time (8), teacher_brain (9), ask_claude (10, optional), exam (11), nicest_route (12).
+  - Each gap is written in simple code that calls the learner's lesson functions.
+  - Until a gap is filled, the robot says "I can't do that yet: week N". Built pieces are detected from the source (the TODO is gone).
+- `make_starters.py` turns `# BEGIN ROBOT week=N lessons=X` blocks into TODO gaps and copies `my_tasks_example.txt`.
+- `check.py robot` drives the learner's robot, with 12 week-labelled checks (112/112 on the solutions; 0/12 on blank homework).
+- Tested by building the kid's file with gaps filled up to each week. Robot checks passed: week 1 → 1, week 3 → 3, week 4 → 4, week 5 → 6, week 6 → 7, week 7 → 8, week 9 → 10. Behaviour week by week:
+  - week 1 bumps into the cat
+  - week 3 stops for it
+  - week 4 goes round it
+  - week 5 puts away one block
+  - week 6 puts away both
+  - week 7 shows the capstone score
+  - week 8 reports its thinking time
+  - week 9 understands "where's"
+- `--show` (the week-12 capstone) scores 10/12 on the exam and 6/6 on the example tests.
+- Pages:
+  - every lesson has an "Add it to your robot" section: the task, a hint ladder, its check name, real output
+  - the journey strips link to it
+  - the hub section is rewritten ("Your robot, built by you")
+  - Lesson 11 explains its capstone is the same robot, written as a class
+  - Lesson 14's show uses `homework/my_tasks.txt`
+  - README updated
+- Also: the course home page exported as a PDF for the user, via headless Chrome, outside the repo.

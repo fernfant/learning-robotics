@@ -13,7 +13,7 @@
 <div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 5 · Lesson 8</div>
 <h1>Words as numbers: a tiny next-word model</h1>
 <p class="lede">Count which word follows which, turn the counts into chances, and roll a die. That's a language model. It's tiny and a bit silly, and it's the great-great-grandparent of ChatGPT. Then you'll give it a real job on the robot: fixing typos in your commands, the way your phone keyboard does.</p>
-<div class="card note" id="journey"><strong>Step 9 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus). <strong>Today</strong> it learns to turn words into numbers, and fix typos in what you type. Next: <a href="09-understanding-commands.html">Week 5 · Understanding commands</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, run <code>python3 my_robot.py</code> and try <code>put teh red blok in the bin</code> once lesson 9 is done too.</div>
+<div class="card note" id="journey"><strong>Step 9 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus). <strong>Today</strong> it learns to turn words into numbers, and fix typos in what you type. Next: <a href="09-understanding-commands.html">Week 5 · Understanding commands</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>put teh red blok in the bin</code> once lesson 9 is done too.</div>
 
 <div class="facts">
   <div><b>Time</b>3–4 hours</div>
@@ -302,6 +302,17 @@ python3 check.py 8</code></pre>
 <li>Build a <strong>trigram</strong> model: count which word follows each <em>pair</em> of words (key <code>("the", "robot")</code>). Are the sentences less wandering? What goes wrong with only 66 tokens of training text?</li>
 <li>Add a <code>greedy</code> option that always picks the most likely word. What happens to the output?</li>
 </ul>
+
+<h2 id="add-to-robot">Add it to your robot</h2>
+<p>Fill in <code>clean(self, text)</code>: run every command through your typo fixer before the robot reads it. Its word counts come from the words your robot knows (Lesson 9's training commands).</p>
+<details><summary>Hint 1</summary><p><code>CACHE["counts"] = count_bigrams(tokenize(" . ".join(words)))</code>, where <code>words</code> are the commands in <code>TRAIN</code>.</p></details>
+<details><summary>Hint 2</summary><p>Then <code>return fix_typos(text, CACHE["counts"])</code>. The provided <code>command()</code> prints "I think you meant…" for you.</p></details>
+<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 5: fixes typos"</em>.</p>
+<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
+<pre><code>Zippy&gt; put teh red blok in the bin
+  (I think you meant: 'put the red block in the bin')
+  The red block is in the bin.</code></pre>
+<p>It works once Lesson 9's piece is in too (later this week).</p>
 
 <h2 id="challenge">5. Real-world challenge: a language model in a cup</h2>
 <p>You'll train and run a bigram model by hand on your own writing.</p>

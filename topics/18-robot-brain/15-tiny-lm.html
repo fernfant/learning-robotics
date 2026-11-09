@@ -13,7 +13,7 @@
 <div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 6 · Lesson 15</div>
 <h1>A tiny language model, built from zero</h1>
 <p class="lede">Lesson 8 counted which word comes next. Lesson 9 counted words to sort commands into piles. Now you'll build a small neural network that learns its own numbers for every word, reads your whole command, and <em>writes</em> a whole plan one word at a time: "put the red and blue blocks away" becomes <code>put red blue</code>. That loop is the beating heart of every LLM, including Claude.</p>
-<div class="card note" id="journey"><strong>Step 11 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands. <strong>Today</strong> it learns to write whole plans, and ask when you're vague. Next: <a href="10-llm-safety.html">Week 7 · Using a real AI safely</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, run <code>python3 my_robot.py</code> and try <code>put the red and blue blocks away</code>.</div>
+<div class="card note" id="journey"><strong>Step 11 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands. <strong>Today</strong> it learns to write whole plans, and ask when you're vague. Next: <a href="10-llm-safety.html">Week 7 · Using a real AI safely</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>put the red and blue blocks away</code>.</div>
 
 <div class="facts">
   <div><b>Time</b>3–4 hours</div>
@@ -440,6 +440,17 @@ plain average                                           ≈ [0.500, 0.833]</code
 <details><summary>Hint 3</summary><p><code>scores</code> = for each <code>k</code> in <code>keys</code>: <code>dot(query, k) / math.sqrt(E)</code>. <code>weights = softmax(scores)</code>. <code>context</code> = for each <code>i</code> in <code>range(E)</code>: the sum of <code>w * k[i]</code> over <code>zip(weights, keys)</code>. Return both.</p></details>
 <p>Run it with <code>python3 lesson15_attention.py</code> (it trains six models, so give it a few minutes) and you should see the outputs above. Check it with <code>python3 check.py 15a</code>: three checks, <code>attend: equal scores</code>, <code>attend: focus</code> and <code>attention model learns</code> (it must write <code>['put', 'red']</code> for "put the red block in the bin" and get at least 85% of held-out plans). Two real hints: <em>"a query of zeros scores every word 0, so the weights are equal (0.5, 0.5)"</em> and <em>"the weights must add up to 1"</em>.</p>
 <p>Want the full story? <a href="../06-30u30/13-attention.html#core">30u30 Day 13: Attention</a> explains queries, keys and values, and why we divide by √E.</p>
+
+<h2 id="add-to-robot">Add it to your robot</h2>
+<p>Fill in <code>understand_plans(self, text)</code>: your language model writes a whole plan (<code>self.brain()</code> trains it once), and your <code>words_to_plan()</code> turns the words into actions. Once this gap is filled, your robot uses it instead of the word counter.</p>
+<details><summary>Hint 1</summary><p><code>plan = words_to_plan(self.brain().generate(text))</code>.</p></details>
+<details><summary>Hint 2</summary><p>Handle the three special answers: <code>None</code> (nonsense), <code>"ask"</code> (return a question) and <code>"none"</code> (not a robot job). Otherwise return the plan.</p></details>
+<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 6: plans"</em>.</p>
+<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
+<pre><code>Zippy&gt; put the red and blue blocks away
+  (Training my language brain. About 10-20 seconds, once...)
+  The red block is in the bin. The blue block is in the bin.</code></pre>
+<p>Same command as last week. Now both blocks go in the bin, because your robot writes a whole plan.</p>
 
 <h2 id="challenge">5. Real-world challenge: be the language model</h2>
 <p>You'll play the model, with a friend or family member, and measure your own loss and your own hallucinations. You need 10 coins (or beans, or Lego bricks), paper and a pencil.</p>

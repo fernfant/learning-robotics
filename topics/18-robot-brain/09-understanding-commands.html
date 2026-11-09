@@ -13,7 +13,7 @@
 <div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 5 · Lesson 9</div>
 <h1>Understanding commands: a word-counting classifier</h1>
 <p class="lede">People say the same thing in a hundred ways. Instead of writing a rule for each one, let the robot learn from examples which words go with which request. Then look hard at where it gets things wrong.</p>
-<div class="card note" id="journey"><strong>Step 10 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos. <strong>Today</strong> it learns to understand what you ask, one action at a time. Next: <a href="15-tiny-lm.html">Week 6 · A tiny language model</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, run <code>python3 my_robot.py</code> and try <code>put the red block in the bin</code>.</div>
+<div class="card note" id="journey"><strong>Step 10 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos. <strong>Today</strong> it learns to understand what you ask, one action at a time. Next: <a href="15-tiny-lm.html">Week 6 · A tiny language model</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>put the red block in the bin</code>.</div>
 
 <div class="facts">
   <div><b>Time</b>2–4 hours</div>
@@ -214,6 +214,17 @@ python3 check.py 9</code></pre>
 <li>Another fix: before tokenizing, replace <code>"'s"</code> with <code>" is"</code>. Which is better, and what could go wrong ("the robot's arm")?</li>
 <li>Add an <code>"unknown"</code> answer: if the best score is below some number, return <code>"unknown"</code>. Try commands like "what is the weather". Where would you put the cut-off?</li>
 </ul>
+
+<h2 id="add-to-robot">Add it to your robot</h2>
+<p>Two gaps. <code>understand_words(self, text)</code> turns a sentence into one action with your <code>parse_command()</code>. <code>do(self, action)</code> carries it out: stop, find, go, or put (drive to the block, then to the bin).</p>
+<details><summary>Hint 1</summary><p><code>understand_words</code> returns a <em>list</em> with one action: <code>[parse_command(CACHE["words"], text)]</code>.</p></details>
+<details><summary>Hint 2</summary><p>In <code>do</code>, "put" is just two <code>goto</code>s: <code>msg = self.goto(self.objects[obj]) or self.goto(find_bin(ROOM))</code>. An empty message means it worked.</p></details>
+<details><summary>Hint 3</summary><p>After binning: <code>self.binned.add(obj)</code> and <code>self.objects[obj] = find_bin(ROOM)</code>.</p></details>
+<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 5: understands and does"</em>.</p>
+<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
+<pre><code>Zippy&gt; put the red and blue blocks away
+  The red block is in the bin.</code></pre>
+<p>It understands you now, but only one action at a time, so the blue block stays out. Next week fixes that.</p>
 
 <h2 id="challenge">5. Real-world challenge: collect real commands</h2>
 <p>Your training set was written by one person. Real people talk differently. Let's find out how differently.</p>

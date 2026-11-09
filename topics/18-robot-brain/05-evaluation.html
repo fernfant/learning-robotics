@@ -13,7 +13,7 @@
 <div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 3 · Lesson 5</div>
 <h1>Is it any good? Honest testing, precision and recall</h1>
 <p class="lede">Your stop-detector says it's 96% accurate. On what? Against which mistakes? This lesson is about testing a model honestly, counting the right kinds of mistakes, and choosing a threshold so the robot almost never fails to stop when it should.</p>
-<div class="card note" id="journey"><strong>Step 6 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop. <strong>Today</strong> it learns to prove its stop decisions are safe. Next: <a href="06-pathfinding.html">Week 4 · Finding the way</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, run <code>python3 my_robot.py</code> and try <code>EEEE</code>: it stops just in time.</div>
+<div class="card note" id="journey"><strong>Step 6 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop. <strong>Today</strong> it learns to prove its stop decisions are safe. Next: <a href="06-pathfinding.html">Week 4 · Finding the way</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>EEEE</code>: it stops just in time.</div>
 
 <div class="facts">
   <div><b>Time</b>2–3 hours, plus the challenge</div>
@@ -206,6 +206,14 @@ python3 check.py 5</code></pre>
 <li>Try different seeds for <code>random.Random(...)</code> in the main block. How much does TEST accuracy wobble from split to split? That wobble is why one test score is never the whole truth.</li>
 <li>Write <code>f1(tp, fp, fn, tn)</code> = 2 × precision × recall / (precision + recall). Which threshold has the best F1? Is it a safe one?</li>
 </ul>
+
+<h2 id="add-to-robot">Add it to your robot</h2>
+<p>Improve <code>should_stop_for</code>: replace the 0.5 threshold with your <code>safest_threshold(w, b, data)</code>, so the robot catches at least 97% of obstacles.</p>
+<details><summary>Hint 1</summary><p>Store all three in the cache: <code>CACHE["stop"] = (w, b, safest_threshold(w, b, data))</code>.</p></details>
+<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 3: stops for the cat"</em>.</p>
+<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
+<pre><code>Zippy&gt; EEEE
+  Something is in the way at (4, 1)! I stopped just in time.</code></pre>
 
 <h2 id="challenge">5. Real-world challenge: test a friend's "will it cross?" calls</h2>
 <p>You'll measure a human detector's precision and recall, then change its threshold by changing the instructions.</p>

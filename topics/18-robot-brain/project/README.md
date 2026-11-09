@@ -64,15 +64,18 @@ course Module 21 (`topics/21-robot-math.html`) links an interactive explainer fo
 `python3 bonus_vector_fields.py` steers the robot with a field of arrows (gradient, divergence, curl; course Module 22):
 following the gradient alone gets stuck behind a sofa from 9 of 11 starts, adding a swirl reaches the goal from all 11.
 
-## YOUR robot: my_robot.py
+## YOUR robot: homework/my_robot.py (you build it)
+
+One file, one gap per week. Every lesson ends with "Add it to your robot": you write the few lines that connect
+what you just built to your robot. Until you fill a gap, the robot says "I can't do that yet".
 
 ```
-python3 my_robot.py              (your robot, built only from the lessons you've finished: run it every week)
+cd homework
+python3 my_robot.py              (talk to your robot)
 python3 my_robot.py --show       (week 12: the capstone show, with a demo, the 12-task exam and your own tests in my_tasks.txt)
+cd ..
+python3 check.py robot           (checks each piece of YOUR robot)
 ```
-
-Name it the first time you run it. Week 1 it can only follow arrows (and walks into the cat). By week 12 it understands
-sentences, writes plans, stops for the cat, checks itself, learns from a teacher and picks the routes people like.
 
 ## Your robot's report card
 

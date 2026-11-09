@@ -13,7 +13,7 @@
 <div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 7 · Lesson 10</div>
 <h1>Using a real LLM safely: never trust, always check</h1>
 <p class="lede">Last week you built your own tiny AI. Real ones are much bigger, and they can be confidently wrong. Today you build the guard that checks every answer before the robot moves. No real AI is called today; we use pretend replies. A big language model understands messy commands far better than your word-counter. It also sometimes chats, rambles, invents things, or sneaks in extra instructions. Today you build the bouncer that stands between the AI and the robot's wheels.</p>
-<div class="card note" id="journey"><strong>Step 12 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans. <strong>Today</strong> it learns to check every AI answer before it moves. Next: <a href="11-capstone.html">Week 7 · Capstone: the whole robot</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, run <code>python3 my_robot.py</code> and try <code>put the purple block in the bin</code>.</div>
+<div class="card note" id="journey"><strong>Step 12 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans. <strong>Today</strong> it learns to check every AI answer before it moves. Next: <a href="11-capstone.html">Week 7 · Capstone: the whole robot</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>put the purple block in the bin</code>.</div>
 
 <div class="facts">
   <div><b>Time</b>2–3 hours</div>
@@ -219,6 +219,11 @@ python3 check.py 10</code></pre>
 <li>Write three new nasty replies of your own and add them to <code>MOCK_REPLIES</code>: a reply where the JSON is a list (<code>[...]</code>), one where <code>"object"</code> is a number, and one with the keys in a different order. Predict each result before running.</li>
 <li>Line 7 above bothers you? Good. Can you think of a rule that would make the robot refuse vague commands instead of guessing? (You'll get the chance to build one in Lesson 11.)</li>
 </ul>
+
+<h2 id="add-to-robot">Add it to your robot</h2>
+<p>Fill in <code>is_safe(self, action)</code>: your <code>validate_action()</code> checks every action before the robot moves. Once it's filled, the provided <code>command()</code> refuses anything unsafe.</p>
+<details><summary>Hint 1</summary><p>It's one line: <code>return validate_action(action, set(self.objects))</code>.</p></details>
+<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 7: safety"</em>.</p>
 
 <h2 id="real-world">5. Real-world challenge: be the bouncer</h2>
 <p>You'll play the robot, and someone else plays a slightly dodgy AI. You need a friend or family member, 10 small pieces of paper, and three objects on a table (say a cup, a pen and a spoon).</p>

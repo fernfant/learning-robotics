@@ -13,7 +13,7 @@
 <div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 1 · Lesson 0</div>
 <h1>Setup, and your first algorithm</h1>
 <p class="lede">Get Python running on your computer, meet the robot's room, and write your first two functions. On the way you'll learn the most important idea in all of computing: an algorithm is a list of exact steps.</p>
-<div class="card note" id="journey"><strong>Step 1 of 21.</strong> Your robot starts from nothing. <strong>Today</strong> it learns to run your first robot program. Next: <a href="01-coordinates.html">Week 1 · Moving on a grid</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> run <code>python3 my_robot.py</code> and give your robot a name. It can't do anything yet; every lesson adds a piece.<br><strong>Ask an adult today:</strong> installing Python (you may need an admin password).</div>
+<div class="card note" id="journey"><strong>Step 1 of 21.</strong> Your robot starts from nothing. <strong>Today</strong> it learns to run your first robot program. Next: <a href="01-coordinates.html">Week 1 · Moving on a grid</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> open <code>homework/my_robot.py</code>, give your robot a name, and run it. It can't do anything yet: every week <em>you</em> add a piece.<br><strong>Ask an adult today:</strong> installing Python (you may need an admin password).</div>
 
 <div class="facts">
   <div><b>Time</b>1.5–3 h (setup is most of it)</div>
@@ -250,6 +250,18 @@ Steps to wall: 3</code></pre>
 
 <h3>Stretch</h3>
 <p>Write <code>steps_to_wall_left(start_x, wall_x)</code> where the wall is on the <em>left</em> (so <code>wall_x</code> is smaller than <code>start_x</code>) and the robot walks left. Trace <code>steps_to_wall_left(6, 2)</code> on paper first. (The checker doesn't test this one; test it yourself with <code>print</code>.)</p>
+
+<h2 id="add-to-robot">Add it to your robot</h2>
+<p>Your robot is a file you'll build yourself, one piece a week: <code>homework/my_robot.py</code>. Open it now. At the top, change <code>NAME = "Robo-Helper"</code> to your robot's own name. Then run it:</p>
+<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
+<pre><code>cd homework
+python3 my_robot.py
+
+=== Zippy: built up to week 0 ===
+  · week  1 (lesson    1): moves with arrows (EESS)
+  ...
+  Next gap to fill: week 1, the arrows() method in my_robot.py.</code></pre>
+<p>Every gap in the file is marked <code># TODO week N</code>. Until you fill it, your robot politely says "I can't do that yet".</p>
 
 <h2 id="challenge">5. Real-world challenge: the literal friend</h2>
 <p>You'll feel what it's like to be a programmer whose computer does exactly what you wrote.</p>

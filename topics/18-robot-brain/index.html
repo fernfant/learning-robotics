@@ -24,7 +24,7 @@
 <li><b>Play.</b> A small interactive demo in your browser to poke at the idea.</li>
 <li><b>Homework.</b> You write the real Python code, and <code>check.py</code> marks it.</li>
 <li><b>Real-world challenge.</b> Try the idea on something real: your phone, a ramp, a friend.</li>
-<li><b>Your robot.</b> Run <code>python3 my_robot.py</code>: your robot, built only from the code you've finished, can now do one new thing. Try it.</li>
+<li><b>Add it to your robot.</b> Fill this week's gap in <em>your</em> robot file, <code>my_robot.py</code>, then run it: it can do one new thing.</li>
 </ol>
 <h3>What you need to know already</h3>
 <p>Very basic Python: variables, <code>if</code>, <code>for</code> loops, and functions. If you can write a loop that prints 1 to 10, you're ready. Lesson 0 helps you set up.</p>
@@ -113,22 +113,22 @@ wk4 A* planning ─┘          (the capstone)
              wk10 world-class brain: Claude planner + agent
              wk11 bake-off: every brain, same tasks ──► wk12 preferences + show it off</code></pre>
 
-<h2 id="my-robot">Your robot, week by week: <code>my_robot.py</code></h2>
-<p>From week 1 you have <strong>one robot</strong>, and it's yours: you give it a name, and it's built <em>only</em> from the code you've finished. Run <code>python3 my_robot.py</code> after every lesson. It lists what it can do, says what's new since last time, and lets you type commands while it drives around the room. Nothing in it is magic: every ability is one of your lesson files. Skip a lesson and the robot can't do that thing yet.</p>
-<p>Here is the same robot at different weeks. This is real output (with the worked solutions copied in up to that week):</p>
+<h2 id="my-robot">Your robot, built by you: <code>my_robot.py</code></h2>
+<p>From week 1 you have <strong>one robot</strong>, and you build it. It's a single file, <code>homework/my_robot.py</code>, with your robot's name at the top and one gap for each week. Every lesson ends with <a href="01-coordinates.html#add-to-robot">"Add it to your robot"</a>: you write the 5–20 lines that connect what you just learned to your robot. Week 1, the arrow keys. Week 3, checking for the cat before every step. Week 5, turning sentences into actions. Week 6, plugging in the language brain you wrote, and so on. Until a gap is filled, your robot politely says "I can't do that yet".</p>
+<p>Only the boring parts are provided: drawing the room, the typing loop and the showcase. Everything that makes it clever is your code. <code>python3 check.py robot</code> drives <em>your</em> robot and checks each piece (1 of 12 after week 1, 12 of 12 at the end), and <code>solutions/my_robot.py</code> is there if you're really stuck.</p>
+<p>Here is the same robot at different weeks: real output, with the gaps filled up to that week.</p>
 <div class="table-wrap"><table>
 <tr><th>After week</th><th>You type</th><th>Your robot</th></tr>
-<tr><td>1 (moving)</td><td><code>EEEE</code></td><td>BUMP! I walked into the cat. (I can't sense things that aren't on the map yet: weeks 2-3.)</td></tr>
-<tr><td>3 (senses, brakes, decides to stop)</td><td><code>EEEE</code></td><td>Something is in the way at (4, 1)! I stopped just in time.</td></tr>
-<tr><td>4 (route planning)</td><td><code>goto blue</code></td><td>Something is in the way at (4, 1)! Stopping and planning a new route. I'm at (6, 3).</td></tr>
-<tr><td>5 (words)</td><td><code>put the red and blue blocks away</code></td><td>The red block is in the bin. <em>(only one: it can do one action at a time)</em></td></tr>
-<tr><td>6 (tiny language model)</td><td><code>put the red and blue blocks away</code></td><td>The red block is in the bin. The blue block is in the bin.</td></tr>
-<tr><td>7 (safety, capstone)</td><td><em>(the start screen)</em></td><td>✓ is a whole robot YOU assembled (your RoboHelper), tested end to end: it passes 83% of its final test</td></tr>
-<tr><td>8 (speed)</td><td><em>any sentence</em></td><td>(I thought for 0.15 ms, so at 1 m/s I'd roll 0.15 mm meanwhile)</td></tr>
-<tr><td>11 (bake-off)</td><td><code>exam</code></td><td>…✗ 'tidy up the room' … ✗ "put away the block that's closest to the bin" … I passed 10 of 12.</td></tr>
-<tr><td>12 (the capstone show)</td><td><code>python3 my_robot.py --show</code></td><td>A demo of every ability, the 12-task exam, then <strong>your own exam</strong> (tests you write in <code>my_tasks.txt</code>): "passed 6 of 6 of your tests."</td></tr>
+<tr><td>1 (arrows)</td><td><code>EEEE</code></td><td>BUMP! I walked into the cat. (I can't sense things that aren't on the map: add week 3.)</td></tr>
+<tr><td>3 (stop check)</td><td><code>EEEE</code></td><td>Something is in the way at (4, 1)! I stopped just in time.</td></tr>
+<tr><td>4 (route, goto)</td><td><code>goto blue</code></td><td>Something is in the way at (4, 1)! I stopped just in time. Planning a new route. I'm at (6, 3).</td></tr>
+<tr><td>5 (words, do)</td><td><code>put the red and blue blocks away</code></td><td>The red block is in the bin. <em>(only one: it does one action at a time)</em></td></tr>
+<tr><td>6 (plans)</td><td><code>put the red and blue blocks away</code></td><td>The red block is in the bin. The blue block is in the bin.</td></tr>
+<tr><td>7 (safety, capstone)</td><td><em>(start screen)</em></td><td>Your capstone RoboHelper (Lesson 11) passes 83% of its final test.</td></tr>
+<tr><td>8 (think time)</td><td><em>any sentence</em></td><td>(I thought for 0.24 ms, so I'd roll 0.24 mm meanwhile.)</td></tr>
+<tr><td>11 (exam)</td><td><code>exam</code></td><td>…✗ 'tidy up the room' … ✗ "put away the block that's closest to the bin" … I passed 10 of 12.</td></tr>
+<tr><td>12 (the show)</td><td><code>python3 my_robot.py --show</code></td><td>A demo of everything, the 12-task exam, then <strong>your own exam</strong> from <code>my_tasks.txt</code>.</td></tr>
 </table></div>
-<p class="meta">Week 10 adds <code>claude: tidy up the room</code> if a grown-up sets up an API key. <code>python3 my_robot.py --solutions</code> shows the finished robot, if you want to see where you're heading.</p>
 
 <h2 id="report-card">Your robot's report card</h2>
 <p>Every lesson has to make Robo-Helper better at something you can measure. Run <code>python3 progress.py</code> from <code>project/</code> after any lesson. It runs <em>your</em> code, and rows you haven't built yet say "not built yet". This is the real output with every lesson finished (<code>--solutions</code>):</p>

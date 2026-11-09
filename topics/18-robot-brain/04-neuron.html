@@ -13,7 +13,7 @@
 <div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 3 · Lesson 4</div>
 <h1>The artificial neuron: should the robot stop?</h1>
 <p class="lede">Two sensor numbers go in, one "how sure am I that I must stop?" comes out. You'll build the neuron from a simple weighted vote, find out why it needs a squash, and then let it learn its own weights with the same trick you used in Lesson 3.</p>
-<div class="card note" id="journey"><strong>Step 5 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance. <strong>Today</strong> it learns to decide by itself when to stop. Next: <a href="05-evaluation.html">Week 3 · Honest testing</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, run <code>python3 my_robot.py</code> and try <code>EEEE</code> once lesson 5 is done too: it stops before the cat.</div>
+<div class="card note" id="journey"><strong>Step 5 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance. <strong>Today</strong> it learns to decide by itself when to stop. Next: <a href="05-evaluation.html">Week 3 · Honest testing</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>EEEE</code> once lesson 5 is done too: it stops before the cat.</div>
 
 <div class="facts">
   <div><b>Time</b>2–3 hours, plus the challenge</div>
@@ -210,6 +210,16 @@ python3 check.py 4</code></pre>
 <li>Try <code>lr=0.5</code> and <code>lr=0.001</code>. Which one gets to good weights faster? Does either misbehave?</li>
 <li>Add a third input, the robot's own speed, set to random noise. Does training learn to give it a weight near 0? (It should: useless clues get ignored.)</li>
 </ul>
+
+<h2 id="add-to-robot">Add it to your robot</h2>
+<p>Fill in <code>should_stop_for(self, square)</code>: something is 0.5 m ahead and the robot is doing 0.5 m/s. Train <em>your</em> neuron and ask it: stop or not? (For now use the threshold 0.5; Lesson 5 picks a safer one.)</p>
+<details><summary>Hint 1</summary><p>Train once and keep it: <code>if "stop" not in CACHE: CACHE["stop"] = ...</code></p></details>
+<details><summary>Hint 2</summary><p><code>data = make_obstacle_data(450, random.Random(0))</code>, <code>w, b = train_neuron(data)</code>, then <code>return should_stop(w, b, (0.5, 0.5), threshold)</code>.</p></details>
+<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 3: stops for the cat"</em>.</p>
+<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
+<pre><code>Zippy&gt; EEEE
+  Something is in the way at (4, 1)! I stopped just in time.</code></pre>
+<p>Same command as week 1. This time your robot sees the cat and stops one square before it.</p>
 
 <h2 id="challenge">5. Real-world challenge: be a neuron for a week</h2>
 <p>Train a neuron on your own decisions, by hand, with paper.</p>

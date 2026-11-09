@@ -13,7 +13,7 @@
 <div class="eyebrow"><span class="track robo">Robotics</span>Build a Robot Brain · Week 2 · Lesson 2</div>
 <h1>Noisy senses: measuring, noise and averaging</h1>
 <p class="lede">Real robots never know exactly where the wall is. Their sensors wobble. You'll build a distance sensor, add realistic wobble to it, and discover a simple trick that makes it more accurate: measure several times and average.</p>
-<div class="card note" id="journey"><strong>Step 3 of 21.</strong> So far your robot: ✓ runs code ✓ moves. <strong>Today</strong> it learns to measure distances, even with a wobbly sensor. Next: <a href="03-learning-from-data.html">Week 2 · Learning from data</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, run <code>python3 my_robot.py</code> and try <code>look</code>.</div>
+<div class="card note" id="journey"><strong>Step 3 of 21.</strong> So far your robot: ✓ runs code ✓ moves. <strong>Today</strong> it learns to measure distances, even with a wobbly sensor. Next: <a href="03-learning-from-data.html">Week 2 · Learning from data</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>look</code>.</div>
 
 <div class="facts">
   <div><b>Time</b>2–3 h</div>
@@ -185,6 +185,15 @@ average of 64 readings -> typical error 0.056</code></pre>
 
 <h3>Stretch</h3>
 <p>Real sensors sometimes glitch badly: one reading in 20 is totally wrong (say, 0). Write <code>glitchy_reading</code> that does that, and see how much it ruins the average. Then write <code>median(values)</code> (sort the list, take the middle one) and compare. Which is more robust to glitches, mean or median? Robot engineers use both.</p>
+
+<h2 id="add-to-robot">Add it to your robot</h2>
+<p>Fill in <code>look(self)</code>: use your <code>distance_to_wall()</code> for N, E, S and W and say what the sensors see. (The safe-speed part comes in Lesson 3, this week.)</p>
+<details><summary>Hint 1</summary><p><code>d = {k: distance_to_wall(ROOM, self.pos, k) for k in "NESW"}</code> gives all four at once.</p></details>
+<details><summary>Hint 2</summary><p>Return <code>f"Walls: north {d['N']}, east {d['E']}, south {d['S']}, west {d['W']}."</code>, then add the speed after Lesson 3.</p></details>
+<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 2: look"</em>.</p>
+<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
+<pre><code>Zippy&gt; look
+  Walls: north 0, east 7, south 5, west 0. Safe speed: 0.25 m/s.</code></pre>
 
 <h2 id="challenge">5. Real-world challenge: the corridor census</h2>
 <p>You'll be the noisy sensor, and see averaging work with your own eyes.</p>

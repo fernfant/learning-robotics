@@ -13,7 +13,7 @@
 <div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 12 · Lesson 12</div>
 <h1>Learning what people prefer: reinforcement learning from human feedback, by hand</h1>
 <p class="lede">Why does this come last? Every brain you built can now do the job. The last question is how to do it the way <em>people</em> like. That's also how chatbots are taught their manners. Nobody can write down the rule for "the best route". But anyone can look at two routes and say "that one". This lesson turns those quick answers into a reward the robot can learn from. It's the same recipe that turned raw language models into helpful chat assistants.</p>
-<div class="card note" id="journey"><strong>Step 20 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed ✓ learns from a teacher ✓ fixes a wonky sensor ✓ can use Claude ✓ MCP (bonus) ✓ has a scorecard. <strong>Today</strong> it learns to pick the routes people like best. Next: <a href="14-go-real.html">Week 12 · Going real</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, run <code>python3 my_robot.py</code> and try <code>goto bin</code>: now it picks the route people like.</div>
+<div class="card note" id="journey"><strong>Step 20 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed ✓ learns from a teacher ✓ fixes a wonky sensor ✓ can use Claude ✓ MCP (bonus) ✓ has a scorecard. <strong>Today</strong> it learns to pick the routes people like best. Next: <a href="14-go-real.html">Week 12 · Going real</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>goto bin</code>: now it picks the route people like.</div>
 
 <div class="facts">
   <div><b>Time</b>2–3 hours</div>
@@ -277,6 +277,13 @@ python3 check.py 12</code></pre>
 <li>How many comparisons do you need? Try 10, 20, 50 and 150 training comparisons and print the learned taste each time.</li>
 <li>Plug it into Robo-Helper: in a copy of <code>lesson11_robohelper.py</code>, make <code>drive_to</code> use <code>best_route</code> instead of the plain A* path when there are no surprises.</li>
 </ul>
+
+<h2 id="add-to-robot">Add it to your robot</h2>
+<p>Fill in <code>nicest_route(self, target)</code>: learn people's taste with your reward model, then pick the candidate route they'd like best. The provided <code>plan_route()</code> uses it whenever nothing is blocked.</p>
+<details><summary>Hint 1</summary><p>Learn the taste once, from routes between the start and the bin: <code>CACHE["taste"] = train_reward_model(collect_comparisons(...))</code>.</p></details>
+<details><summary>Hint 2</summary><p>Then <code>best_route(CACHE["taste"], ROOM, candidate_routes(ROOM, self.pos, target))</code>.</p></details>
+<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 12: nicer routes"</em>.</p>
+<p>From the start to the bin it now picks a route with 1 turn instead of 3, and fewer squares brushing the walls.</p>
 
 <h2 id="challenge">5. Real-world challenge: learn a real person's taste</h2>
 <p>You'll do RLHF on a real human, with paper.</p>

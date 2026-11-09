@@ -3,6 +3,7 @@
     python3 check.py 3        check lesson 3
     python3 check.py all      check every lesson
     python3 check.py 15a      check a stretch (15a attention, 19a AI judge)
+    python3 check.py robot    check YOUR robot (my_robot.py): one check per week's piece
     python3 check.py 3 --solutions   check the reference solutions instead (for teachers)
 
 Run it from the project folder (the one that contains this file).
@@ -446,6 +447,53 @@ def lesson20(m):
     ]
 
 
+def robot(m):
+    """Your own robot (my_robot.py): one check per piece you add, week by week."""
+    R = m.Robot
+    bin_ = m.find_bin(m.ROOM)
+
+    def need(*names):
+        for n in names:
+            if not m.built(getattr(R, n)):
+                raise NotImplementedError(f"fill in {n}() first")
+
+    def fresh(cmd):
+        r = R(quiet=True)
+        return r, r.command(cmd)
+
+    def unsafe():
+        r = R(quiet=True)
+        r.understand = lambda t: [{"intent": "put", "object": "purple block"}]
+        return r, r.command("put the purple block in the bin")
+
+    def nicer():
+        from lesson06_paths import astar_path
+        from lesson12_preferences import route_features
+        r = R(quiet=True)
+        return route_features(m.ROOM, r.nicest_route(bin_)), route_features(m.ROOM, astar_path(m.ROOM, m.ROBOT_START, bin_)[0])
+
+    return [
+        ("week 1: arrows", lambda: (need("arrows"), (lambda a, b: [expect(a[0].pos == (1, 4), f"'SSS' from (1, 1) should end at (1, 4), ended at {a[0].pos}"),
+                                                                   expect("Bonk" in b[1], f"'N' from (1, 1) hits the wall: the reply should say Bonk, got {b[1]!r}")])(fresh("SSS"), fresh("N")))),
+        ("week 2: look", lambda: (need("look"), (lambda r: [expect("north 0, east 7, south 5, west 0" in r[1], f"at the start: north 0, east 7, south 5, west 0; got {r[1]!r}"),
+                                                            expect("Safe speed" in r[1], "also say the safe speed (Lesson 3)")])(fresh("look")))),
+        ("week 3: stops for the cat", lambda: (need("arrows", "should_stop_for"), (lambda r: [expect("stopped just in time" in r[1], f"'EEEE' drives at the cat: it should stop in time, got {r[1]!r}"),
+                                                                                             expect(r[0].pos == (3, 1), f"it should stop at (3, 1), right before the cat at (4, 1); it's at {r[0].pos}")])(fresh("EEEE")))),
+        ("week 4: goto", lambda: (need("route", "goto", "should_stop_for"), (lambda r: expect(r[0].pos == (6, 3), f"'goto blue' should end at the blue block (6, 3) after going round the cat; ended at {r[0].pos} ({r[1]!r})"))(fresh("goto blue")))),
+        ("week 5: fixes typos", lambda: (need("clean"), expect(R(quiet=True).clean("put teh red blok in the bin") == "put the red block in the bin", "clean('put teh red blok in the bin') should give 'put the red block in the bin'"))),
+        ("week 5: understands and does", lambda: (need("understand_words", "do", "goto"), (lambda a, b: [expect(a[0].binned == {"red block"}, f"'put the red block in the bin' should bin the red block; binned {a[0].binned}"),
+                                                                                                         expect("(1, 5)" in b[1], f"'where is the green block' should say (1, 5); got {b[1]!r}")])(fresh("put the red block in the bin"), fresh("where is the green block")))),
+        ("week 6: plans", lambda: (need("understand_plans", "do", "goto"), (lambda a, b: [expect(a[0].binned == {"red block", "blue block"}, f"'put the red and blue blocks away' should bin both; binned {a[0].binned}"),
+                                                                                         expect(b[1].strip().endswith("?"), f"'put the block away' is vague: it should ask a question; got {b[1]!r}")])(fresh("put the red and blue blocks away"), fresh("put the block away")))),
+        ("week 7: safety", lambda: (need("is_safe"), (lambda r: [expect(r[1].startswith("Sorry"), f"an unsafe action (the purple block) must be refused; got {r[1]!r}"),
+                                                                 expect(r[0].pos == m.ROBOT_START, "and the robot must not move")])(unsafe()))),
+        ("week 8: think_time", lambda: (need("think_time", "understand_words"), (lambda t: expect("I thought for" in t and "mm" in t, f"think_time should say 'I thought for ... ms ... mm'; got {t!r}"))(R(quiet=True).think_time("stop")))),
+        ("week 9: teacher brain", lambda: (need("teacher_brain", "understand_plans"), (lambda r: expect("(1, 5)" in r[1], f"with the teacher's labels it should understand \"where's the green one?\" and say (1, 5); got {r[1]!r}"))(fresh("where's the green one?")))),
+        ("week 11: exam", lambda: (need("exam", "understand_plans"), (lambda t: expect(int(t.split()[2]) >= 8, f"your robot should pass at least 8 of the 12 tasks; {t!r}"))(R(quiet=True).exam()))),
+        ("week 12: nicer routes", lambda: (need("nicest_route"), (lambda f: expect(f[0][2] < f[1][2], f"the nicest route to the bin should have fewer turns than A*'s; got {f[0]} vs {f[1]}"))(nicer()))),
+    ]
+
+
 LESSONS = {
     0: ("lesson00_hello", lesson00), 1: ("lesson01_moving", lesson01), 2: ("lesson02_sensors", lesson02),
     3: ("lesson03_learning", lesson03), 4: ("lesson04_neuron", lesson04), 5: ("lesson05_evaluate", lesson05),
@@ -455,12 +503,13 @@ LESSONS = {
     15: ("lesson15_tiny_lm", lesson15), 16: ("lesson16_speed", lesson16), 17: ("lesson17_faster", lesson17),
     18: ("lesson18_world_class", lesson18), 19: ("lesson19_bakeoff", lesson19),
     "15a": ("lesson15_attention", lesson15a), "19a": ("lesson19_judge", lesson19a), 20: ("lesson20_mcp_server", lesson20),
+    "robot": ("my_robot", robot),
 }
 
 
 def run(n):
     name, tests_for = LESSONS[n]
-    print(f"\nLesson {n}: {name}.py")
+    print(f"\n{'Your robot' if n == 'robot' else 'Lesson ' + str(n)}: {name}.py")
     try:
         module = importlib.import_module(name)
     except NotImplementedError as e:

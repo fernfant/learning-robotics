@@ -13,7 +13,7 @@
 <div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 9 · Lesson 17</div>
 <h1>Faster and cheaper: caching, quantising and distilling</h1>
 <p class="lede">Last lesson you put a stopwatch and a price tag on every brain. Big brains are smart but slow and pricey; small brains are fast and free but make more mistakes. Every AI company in the world uses three tricks to get closer to "smart <em>and</em> fast". Today you build all three, and find the catch in each one.</p>
-<div class="card note" id="journey"><strong>Step 15 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed. <strong>Today</strong> it learns to learn from a teacher, then shrink to 1/8 the size. Next: <a href="13-lora.html">Week 9 · Fine-tuning and LoRA</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, run <code>python3 my_robot.py</code> and try <code>hmm what about the blue</code> (its new teacher-trained brain).</div>
+<div class="card note" id="journey"><strong>Step 15 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed. <strong>Today</strong> it learns to learn from a teacher, then shrink to 1/8 the size. Next: <a href="13-lora.html">Week 9 · Fine-tuning and LoRA</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>hmm what about the blue</code> (its new teacher-trained brain).</div>
 
 <div class="facts">
   <div><b>Time</b>2–3 hours</div>
@@ -270,6 +270,15 @@ python3 check.py 17</code></pre>
 <li>Count how many of the 2,702 numbers become exactly 0 at each bit width.</li>
 <li>Make a "noisy teacher": the careful human, but with 4 of the 24 labels deliberately wrong. Train the student with <code>train_attn_lm(extra)</code> and compare hard-6 and the robot score. How many wrong labels does it take to do worse than no teacher?</li>
 </ul>
+
+<h2 id="add-to-robot">Add it to your robot</h2>
+<p>Fill in <code>teacher_brain(self)</code>: train a smarter language brain on a teacher's labels, with your <code>distill_examples()</code>. Once it's filled, <code>self.brain()</code> uses it.</p>
+<details><summary>Hint 1</summary><p>One line: <code>return best_student(distill_examples(UNLABELLED, best_teacher()))</code>.</p></details>
+<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 9: teacher brain"</em>.</p>
+<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
+<pre><code>Zippy&gt; where's the green one?
+  The green block is at (1, 5).</code></pre>
+<p>Before the teacher, your robot didn't understand "where's".</p>
 
 <h2 id="challenge">5. Real-world challenge: rounding and remembering, at home</h2>
 <p><strong>Part A: quantise your house.</strong></p>

@@ -13,7 +13,7 @@
 <div class="eyebrow"><span class="track robo">Robotics</span>Build a Robot Brain · Week 1 · Lesson 1</div>
 <h1>Where am I? Coordinates and moving on a grid</h1>
 <p class="lede">Before a robot can go anywhere, it needs a way to say where it is. Two numbers do the job. Moving becomes adding, walls become a check, and "how far?" becomes a tiny formula.</p>
-<div class="card note" id="journey"><strong>Step 2 of 21.</strong> So far your robot: ✓ runs code. <strong>Today</strong> it learns to move around the room. Next: <a href="02-sensors.html">Week 2 · Noisy senses</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, run <code>python3 my_robot.py</code> and try <code>EEEE</code> (watch out for the cat!).</div>
+<div class="card note" id="journey"><strong>Step 2 of 21.</strong> So far your robot: ✓ runs code. <strong>Today</strong> it learns to move around the room. Next: <a href="02-sensors.html">Week 2 · Noisy senses</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>EEEE</code> (watch out for the cat!).</div>
 
 <div class="facts">
   <div><b>Time</b>2–3 h</div>
@@ -205,6 +205,17 @@ Ended at (5, 3) | distance to red block: 5</code></pre>
 
 <h3>Stretch</h3>
 <p>Write <code>commands_to(start, goal)</code> that returns a command string that walks straight to the goal, ignoring walls: first all the E or W steps, then all the N or S steps. Check that <code>len(commands_to(a, b)) == manhattan(a, b)</code> for a few pairs. Then run it through <code>follow</code> from (1, 1) to the bin at (7, 6) and count how many bumps it gets. (Not checked by <code>check.py</code>.)</p>
+
+<h2 id="add-to-robot">Add it to your robot</h2>
+<p>Fill in <code>arrows(self, text)</code> in <code>my_robot.py</code>: for each letter, use <em>your</em> <code>safe_move()</code> to spot walls and <code>move()</code> to find the next square, then hand that square to <code>self.step()</code> (provided), which moves the robot and draws it.</p>
+<details><summary>Hint 1</summary><p>Start with <code>from lesson01_moving import move, safe_move</code> inside the method.</p></details>
+<details><summary>Hint 2</summary><p>If <code>safe_move(ROOM, self.pos, d) == self.pos</code>, the robot would hit a wall: return <code>"Bonk! A wall."</code></p></details>
+<details><summary>Hint 3</summary><p><code>result = self.step(move(self.pos, d))</code>. If <code>result != "moved"</code>, return <code>self.step_message(result, move(self.pos, d))</code>. After the loop, return <code>f"I'm at {self.pos}."</code></p></details>
+<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 1: arrows"</em>.</p>
+<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
+<pre><code>Zippy&gt; EEEE
+  BUMP! I walked into the cat. (I can't sense things that aren't on the map: add week 3.)</code></pre>
+<p>Your robot walks straight into the cat. It can't sense it yet: that's week 3.</p>
 
 <h2 id="challenge">5. Real-world challenge: map your room</h2>
 <ol>

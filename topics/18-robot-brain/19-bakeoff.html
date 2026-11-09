@@ -13,7 +13,7 @@
 <div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 11 · Lesson 19</div>
 <h1>The bake-off: every brain, the same 12 tasks</h1>
 <p class="lede">You now have a whole family of brains for Robo-Helper: a word counter, a tiny language model, its attention version, a distilled one and a 4-bit one, plus Claude as a planner or an agent. Which one is best? Today you find out properly: the same room, the same cat, the same 12 tasks, scored on what the robot actually <em>did</em>. Then you weigh up correctness against speed and cost, the way real engineers do.</p>
-<div class="card note" id="journey"><strong>Step 19 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed ✓ learns from a teacher ✓ fixes a wonky sensor ✓ can use Claude ✓ MCP (bonus). <strong>Today</strong> it learns to race every brain on the same 12 tasks. Next: <a href="12-preferences.html">Week 12 · What people prefer</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, run <code>python3 my_robot.py</code> and try <code>exam</code>.</div>
+<div class="card note" id="journey"><strong>Step 19 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed ✓ learns from a teacher ✓ fixes a wonky sensor ✓ can use Claude ✓ MCP (bonus). <strong>Today</strong> it learns to race every brain on the same 12 tasks. Next: <a href="12-preferences.html">Week 12 · What people prefer</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>exam</code>.</div>
 
 <div class="facts">
   <div><b>Time</b>3–4 hours (plus the stretch)</div>
@@ -387,6 +387,19 @@ Did the robot do the right thing? A correct robot does exactly what was asked, r
 <details><summary>Hint 1</summary><p>One round: <code>sum(rng.choice(results) for _ in results) / len(results)</code>. Do it inside a list comprehension over <code>range(rounds)</code>, then <code>sorted(...)</code>.</p></details>
 <details><summary>Hint 2</summary><p>It works for differences too: <code>[1, 0, 0, -1, ...]</code> (brain A minus brain B on each task) gives the paired error bar. That's how the "paired" line is made.</p></details>
 <p>Check with <code>python3 check.py 19a</code>: six checks. Real hints: <em>"no evidence given -&gt; no evidence line"</em>, <em>"a judge that always says pass gets kappa 0, even though it agrees 75% of the time"</em> and <em>"with only 12 tasks the error bar should be wide (more than 30 points)"</em>.</p>
+
+<h2 id="add-to-robot">Add it to your robot</h2>
+<p>Fill in <code>exam(self)</code>: your robot sits the 12 bake-off tasks. Make a fresh robot for each task and mark it with your <code>score_task()</code>.</p>
+<details><summary>Hint 1</summary><p><code>robot = Robot(quiet=True)</code>, then <code>ok, why = score_task(task, robot, {"reply": robot.command(task["command"])})</code>.</p></details>
+<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 11: exam"</em>.</p>
+<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
+<pre><code>Zippy&gt; exam
+  ✓ 'put the red block in the bin'
+  ...
+  ✗ 'tidy up the room'                             binned ['green block'], ...
+  ✗ "put away the block that's closest to the bin" binned nothing, wanted ['blue block']
+  ...
+  I passed 10 of 12.</code></pre>
 
 <h2 id="real-world">5. Real-world challenge: the family tidy-up bake-off</h2>
 <p>Run a real bake-off with people as the brains. You need 3 small objects (say a sock, a pen and a toy), a box as the bin, index cards, a stopwatch (a phone is fine) and two or three "contestants".</p>

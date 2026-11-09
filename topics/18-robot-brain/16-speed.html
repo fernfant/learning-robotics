@@ -13,7 +13,7 @@
 <div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 8 · Lesson 16</div>
 <h1>How fast is a brain? Latency, tokens and cost</h1>
 <p class="lede">The robot works. Weeks 8–11 ask: how fast is its brain, how much does it cost, and which brain is best? You've built three kinds of brain for Robo-Helper, and in week 10 it gets a world-class one over the internet. Before you trust any of them, you need two numbers you can't see by reading the code: how long it takes to answer, and what each answer costs. This lesson is the start of inference engineering (inference means a brain answering, not learning): measuring brains like an engineer, not like a fan.</p>
-<div class="card note" id="journey"><strong>Step 14 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot. <strong>Today</strong> it learns to measure how long each brain thinks, and how far it rolls meanwhile. Next: <a href="17-faster.html">Week 9 · Faster and cheaper</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, run <code>python3 my_robot.py</code> and try any sentence: it tells you how long it thought.</div>
+<div class="card note" id="journey"><strong>Step 14 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot. <strong>Today</strong> it learns to measure how long each brain thinks, and how far it rolls meanwhile. Next: <a href="17-faster.html">Week 9 · Faster and cheaper</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try any sentence: it tells you how long it thought.</div>
 
 <div class="facts">
   <div><b>Time</b>2–3 hours</div>
@@ -269,6 +269,16 @@ python3 check.py 16</code></pre>
 <li>Add a <code>p99</code> to <code>summarize</code>. With 20 timings, what position is it? Is that a sensible thing to report?</li>
 <li>If you have an API key: call <code>measure_stream</code> 10 times and print TTFT, total, and <code>tokens_per_second</code>. Then <code>summarize</code> the totals.</li>
 </ul>
+
+<h2 id="add-to-robot">Add it to your robot</h2>
+<p>Fill in <code>think_time(self, text)</code>: time how long <code>self.understand(text)</code> takes with your <code>time_it()</code> and <code>summarize()</code>, and how far the robot rolls meanwhile with <code>thinking_distance()</code>.</p>
+<details><summary>Hint 1</summary><p><code>p50 = summarize(time_it(lambda: self.understand(text), 5))["p50"]</code> (that's seconds).</p></details>
+<details><summary>Hint 2</summary><p>Multiply by 1000 for milliseconds; <code>thinking_distance(p50)</code> gives metres, so multiply that by 1000 for millimetres too.</p></details>
+<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 8: think_time"</em>.</p>
+<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
+<pre><code>Zippy&gt; put the red block in the bin
+  (I thought for 0.24 ms, so I'd roll 0.24 mm meanwhile.)
+  ...</code></pre>
 
 <h2 id="challenge">5. Real-world challenge: measure your own brain's latency</h2>
 <p>You are a brain too. Let's find your p50 and p95, and see if you fit the 0.2 s stop budget.</p>
