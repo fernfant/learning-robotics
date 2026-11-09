@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 07 · The Coffee Automaton</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 07</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Unit 1 · The foundations · Day 07</div>
+<h1>Quantifying the Rise and Fall of Complexity in Closed Systems: The Coffee Automaton</h1>
+<p class="lede">Simulate cream mixing into coffee, blur the picture, and compress it. Entropy climbs steadily. The compressed size of the blurred picture rises, peaks and falls.</p>
+
+<div class="facts">
+  <div><b>Authors</b>Scott Aaronson, Sean M. Carroll, Lauren Ouellette</div>
+  <div><b>Year / venue</b>2014 · arXiv (1405.6903)</div>
+  <div><b>Core idea</b>Apparent complexity = compressed size of a coarse-grained state</div>
+  <div><b>Study time</b>2–3 h</div>
+</div>
+<p class="meta">Original: <a href="https://arxiv.org/abs/1405.6903">arXiv:1405.6903</a> · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/07_coffee_automaton">30u30 Day 7</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Scientists simulated milk mixing into coffee on a grid of pixels and showed that, measured the right way, how complicated it looks rises and then falls.</p>
+
+<h3>Think of it like this</h3>
+<p>Squint at a photo of milky coffee from across the room. You stop seeing every tiny speck, and only see the big shapes: milky parts, dark parts and swirly in-between parts. Now imagine zipping that blurry picture. At the start and the end the blurry picture is boring and zips small. In the middle, with all the swirls, it zips bigger.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Make a grid of squares: white (milk) on top, black (coffee) on the bottom.</li>
+<li>Again and again, pick two neighbouring squares at random and swap them if they are different colours.</li>
+<li>Zip the sharp picture to measure how mixed it is. This number keeps going up.</li>
+<li>Blur the picture into three shades (milk, coffee, mixed) and zip that. This number goes up, then comes back down.</li>
+<li>Repeat with bigger grids to see how the peak grows.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Robots build blurry maps of the world, made of little squares marked "free", "blocked" or "not sure". Choosing how big those squares are is the same choice as the blur size here. Too small and the map is full of noise. Too big and a chair leg disappears.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Put a drop of food colouring in a glass of still water and watch for a few minutes. Draw it at the start, after one minute and at the end. Which drawing took you the longest?</li>
+<li>In the demo further down, press <b>Play</b> and watch the entropy line (mess) climb while the complexity line rises and falls. Then set the <b>Grain size g</b> slider to 3 and play again. With too little blur, the random specks count as "complexity" and the complexity line stays high.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Simulation</dt><dd>A computer model that acts out a process step by step.</dd>
+<dt>Pixel</dt><dd>One small square of a picture.</dd>
+<dt>Coarse-graining</dt><dd>Blurring a picture so only the big shapes are left.</dd>
+<dt>Compressor</dt><dd>A program like zip that shrinks files by spotting patterns.</dd>
+<dt>Entropy</dt><dd>How mixed-up or random something is.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>This is the empirical follow-up to <a href="06-complexodynamics.html">Day 06</a>. The authors build a 2D grid of cream (1) and coffee (0) cells, cream on top, and let particles mix by random local moves. Entropy is estimated as the gzip size of the exact grid. "Apparent complexity" is the gzip size of a smoothed, three-level version of the grid. In the interacting model, apparent complexity rises then falls, and its peak grows linearly with the grid's side length. In a non-interacting model, a refined measurement shows it stays low, which they also prove. It's a careful first experiment, with honest caveats about what a compressor can and can't show.</p>
+</div>
+<ul>
+<li><strong>Interacting model:</strong> one particle per cell. Each step, a random adjacent pair of different cells swaps.</li>
+<li><strong>Non-interacting model:</strong> cream particles take independent random walks and can share cells.</li>
+<li><strong>Measures:</strong> entropy ≈ compressed size of the fine grid. Complexity ≈ compressed size of the coarse-grained grid.</li>
+<li><strong>Scaling:</strong> maximum entropy grows with n² (the number of cells), maximum complexity roughly with n, and time to the complexity peak roughly with n².</li>
+<li><strong>Caveat:</strong> compressors give only upper bounds. Showing complexity truly gets large needs a lower bound, which nobody has.</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<p>Pick a smoothing function <code>f</code> that throws away "incidental" detail. Then measure entropy on the raw state and complexity on the smoothed one:</p>
+<pre><code>entropy(x)             ≈ |gzip(x)|
+apparent complexity(x) ≈ |gzip(f(x))|
+
+f(x)[i,j] = threshold( mean of x over the g×g square centred at (i,j) )
+            → 3 levels: mostly coffee / mixed / mostly cream</code></pre>
+<ul>
+<li><code>x</code>: the n×n grid of 0s and 1s, the microstate.</li>
+<li><code>g</code>: grain size. Larger g blurs more. It is chosen experimentally.</li>
+<li><code>threshold</code>: buckets the average into three values so tiny fluctuations don't count as structure.</li>
+<li><code>|gzip(·)|</code>: compressed file size, a computable upper bound on Kolmogorov complexity.</li>
+</ul>
+<p>The paper links this back to theory. The coarse-grained image <code>f(x)</code> defines the set of all microstates that blur to the same picture. That is a model set S in the sense of sophistication, so apparent complexity is a heavily resource-bounded version of it.</p>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>Run it yourself</h3>
+<div class="card demo">
+<h3>Interactive: the coffee automaton</h3>
+<p class="legend">48×48 interacting model, seeded. Each step picks a random cell and a random neighbour and swaps them if they differ, a slight variant of the paper's rule. Left: fine grid. Middle: coarse-grained, 3 levels. Right: <b class="f">entropy</b> (LZ78 size of the fine grid) and <b style="color:var(--accent)">apparent complexity</b> (LZ78 size of the coarse grid), each scaled to its own maximum.</p>
+<canvas id="cup" width="700" height="220" aria-label="Coffee automaton grid, its coarse-grained version, and curves of entropy and complexity over time"></canvas>
+<p><button id="play" type="button">Play</button> <button id="reset" type="button">Reset</button></p>
+<label for="g">Grain size g (changing it restarts): <span id="gv" class="num"></span></label>
+<input id="g" type="range" min="3" max="11" step="2" value="7">
+<div class="stats">
+  <div class="stat"><div class="k">Steps</div><div class="v" id="st">–</div></div>
+  <div class="stat"><div class="k">Entropy (bits)</div><div class="v" id="en">–</div></div>
+  <div class="stat"><div class="k">Complexity (bits)</div><div class="v" id="cx">–</div></div>
+</div>
+</div>
+<p>Try g = 3: the blur is too fine, random fluctuations survive the threshold, and "complexity" stays high long after mixing. The paper's appendix makes this precise for the non-interacting case: the grain must grow like √(log n) for fluctuations to average out. The choice of blur is not a detail.</p>
+
+<h3>Thresholding artefacts and the adjusted measure</h3>
+<p>With three buckets, a smooth gradient from cream to coffee will always have a row sitting near a bucket boundary. Tiny fluctuations make that row flicker between two levels, and the compressor counts the flicker as structure. The authors' fix: use seven levels, and let each cell move one level towards the majority value of its row. With this adjustment, the interacting model still shows the rise and fall. The non-interacting model's complexity is flattened to a low value, matching their proof that its coarse-grained state is always simple to describe: given n and t, you can compute the expected picture, and with a big enough grain nothing deviates from it.</p>
+
+<h3>What they tried and dropped</h3>
+<ul>
+<li><strong>OSCR</strong>, a two-part-code compressor designed to estimate sophistication directly, gave noisy results with no trend. They suspect it failed because it ignores the 2D layout.</li>
+<li><strong>A diff-based two-part code</strong> (coarse picture plus corrections) suffered representation artefacts, so they measured the fine grid directly instead.</li>
+<li><strong>Light-cone complexity</strong> (Shalizi and colleagues), the mutual information between a point's past and future, is discussed as future work.</li>
+</ul>
+
+<h3>Limits</h3>
+<p>Every number here is an upper bound. A compressor can prove something is simple, never that it is complex. The blur and the thresholds encode human judgement about what counts as "interesting", which the authors acknowledge. And a cellular automaton is a long way from real fluid dynamics.</p>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>The link is methodological, not direct.</strong> No robot needs a complextropy meter. What carries over is how to measure structure in messy state.</li>
+<li><strong>Coarse-graining is a design choice.</strong> Occupancy grids, voxel maps and downsampled images all pick a grain size. Too fine and the map is full of noise. Too coarse and obstacles vanish. The demo's grain slider is the same trade-off.</li>
+<li><strong>Compression as a quick signal.</strong> Compressed size of a sensor log or a segmented image is a cheap, label-free way to spot where the "interesting" moments are, such as contact events, for data curation.</li>
+<li><strong>Interaction creates structure.</strong> The independent-particle model never gets complex. The model where particles block each other does. Robots in clutter, with contacts and constraints, live in the interacting regime, and that's why their state is hard to summarise.</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Read Sections 1–6 of the paper (about 1 h). Skim Section 2's tour of complexity measures, and read the short appendix proof.</li>
+<li>In the 30u30 Day 7 folder, read <code>implementation.py</code> and run <code>train_minimal.py</code> to reproduce the rise-and-fall curves.</li>
+<li>Do the exercises: coarse-graining, interacting vs non-interacting models, scaling with grid size, adjusted coarse-graining, and comparing compressors.</li>
+<li>Check the scaling claim yourself: run three grid sizes and plot peak complexity against side length.</li>
+<li>Stretch: replace gzip with a small learned model (for example a PixelCNN-style predictor) and use its log-loss as the code length.</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>Why compress the coarse-grained grid rather than the fine one to measure complexity?</summary><p>The fine grid's compressed size tracks randomness, so it just keeps rising like entropy. Blurring removes the random detail and leaves the large-scale structure, which is what "interesting" means here.</p></details>
+<details><summary>Why does the non-interacting model stay simple?</summary><p>Each particle walks independently, so the expected density depends only on row and time and can be computed from n and t. With a large enough grain, the actual coarse picture matches that expectation with high probability.</p></details>
+<details><summary>What problem does thresholding cause, and how did they fix it?</summary><p>Rows near a bucket boundary flicker between levels and look like structure. They used seven levels and let cells move one level towards their row's majority value.</p></details>
+<details><summary>How do maximum entropy and maximum complexity scale with grid side n?</summary><p>Maximum entropy grows like n² (number of cells). Maximum complexity grows roughly linearly in n, since structure develops along one dimension, the cream–coffee boundary.</p></details>
+<details><summary>Why can't simulation alone prove the system becomes complex?</summary><p>Compressors give upper bounds on complexity. Proving a state is complex needs a lower bound, which the paper leaves as an open problem.</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/1405.6903">The original paper</a>, and Aaronson's <a href="https://scottaaronson.blog/?p=762">2011 post</a> that proposed it</li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/07_coffee_automaton">30u30 Day 7</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Next: <a href="08-alexnet.html">Day 08, ImageNet Classification with Deep CNNs (AlexNet)</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="06-complexodynamics.html"><small>Previous</small>Day 06 · Complexodynamics</a>
+  <a class="next" href="08-alexnet.html"><small>Next</small>Day 08 · AlexNet</a>
+</nav>
+<footer>Module 06 · Day 07 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('cup'), ctx = cv.getContext('2d');
+const gIn = document.getElementById('g'), playBtn = document.getElementById('play');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const N = 48, STEPS = 6e6, PER = 30000, PX = 3;
+let grid, coarseG, hist, steps, rand, running = false;
+
+function rng(s) { return () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+function lz(arr) {   // LZ78 phrase count × bits per phrase
+  const d = new Set(); let w = '', c = 0;
+  for (const v of arr) { const k = w + v; if (d.has(k)) w = k; else { d.add(k); c++; w = ''; } }
+  if (w) c++;
+  return c * (Math.ceil(Math.log2(c + 1)) + 1);
+}
+
+function coarse(a, g) {
+  const out = new Uint8Array(N * N), h = g >> 1;
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+    let m = 0, c = 0;
+    for (let di = -h; di <= h; di++) for (let dj = -h; dj <= h; dj++) {
+      const y = i + di, x = j + dj;
+      if (y < 0 || x < 0 || y >= N || x >= N) continue;
+      m += a[y * N + x]; c++;
+    }
+    const v = m / c; out[i * N + j] = v < 1 / 3 ? 0 : v > 2 / 3 ? 2 : 1;
+  }
+  return out;
+}
+
+function measure() {
+  coarseG = coarse(grid, +gIn.value);
+  hist.push([steps, lz(grid), lz(coarseG)]);
+}
+
+function reset() {
+  rand = rng(7); steps = 0; hist = [];
+  grid = new Uint8Array(N * N); for (let i = 0; i < N * N / 2; i++) grid[i] = 1;   // cream on top
+  measure(); draw();
+}
+
+function advance(k) {
+  for (let s = 0; s < k; s++) {
+    const i = rand() * N | 0, j = rand() * N | 0, d = rand() * 4 | 0;
+    const i2 = i + (d === 0) - (d === 1), j2 = j + (d === 2) - (d === 3);
+    if (i2 < 0 || i2 >= N || j2 < 0 || j2 >= N) continue;
+    const p = i * N + j, q = i2 * N + j2;
+    if (grid[p] !== grid[q]) { const t = grid[p]; grid[p] = grid[q]; grid[q] = t; }
+  }
+  steps += k;
+}
+
+function draw() {
+  const W = cv.width, H = cv.height, S = N * PX, top = 30;
+  ctx.clearRect(0, 0, W, H); ctx.font = '12px sans-serif';
+  const shades = [css('--fg'), css('--muted'), css('--card')];
+  ctx.strokeStyle = css('--line'); ctx.strokeRect(4.5, top - 0.5, S + 1, S + 1); ctx.strokeRect(S + 16.5, top - 0.5, S + 1, S + 1);
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+    ctx.fillStyle = grid[i * N + j] ? shades[2] : shades[0]; ctx.fillRect(5 + j * PX, top + i * PX, PX, PX);
+    ctx.fillStyle = shades[coarseG[i * N + j]]; ctx.fillRect(S + 17 + j * PX, top + i * PX, PX, PX);
+  }
+  ctx.fillStyle = css('--muted'); ctx.textAlign = 'center';
+  ctx.fillText('fine', 5 + S / 2, top - 8); ctx.fillText('coarse', S + 17 + S / 2, top - 8);
+  // plot
+  const L = 2 * S + 40, R = 10, T = 10, B = 22;
+  const px = s => L + (W - L - R) * s / STEPS;
+  ctx.strokeStyle = css('--line'); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(L, T); ctx.lineTo(L, H - B); ctx.lineTo(W - R, H - B); ctx.stroke();
+  ctx.fillText('time →', (L + W) / 2, H - 6);
+  [[1, css('--fail')], [2, css('--accent')]].forEach(([c, col]) => {
+    const mx = Math.max(...hist.map(h => h[c])), py = v => T + (H - T - B) * (1 - v / mx);
+    ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.beginPath();
+    hist.forEach((h, i) => i ? ctx.lineTo(px(h[0]), py(h[c])) : ctx.moveTo(px(h[0]), py(h[c])));
+    ctx.stroke();
+  });
+  const last = hist[hist.length - 1];
+  document.getElementById('st').textContent = (steps / 1e6).toFixed(2) + 'M';
+  document.getElementById('en').textContent = last[1];
+  document.getElementById('cx').textContent = last[2];
+  document.getElementById('gv').textContent = gIn.value;
+}
+
+function loop() {
+  if (!running) return;
+  advance(PER); measure(); draw();
+  if (steps >= STEPS) { running = false; playBtn.textContent = 'Play'; return; }
+  requestAnimationFrame(loop);
+}
+playBtn.onclick = () => {
+  if (steps >= STEPS) reset();
+  running = !running; playBtn.textContent = running ? 'Pause' : 'Play';
+  if (running) requestAnimationFrame(loop);
+};
+document.getElementById('reset').onclick = () => { running = false; playBtn.textContent = 'Play'; reset(); };
+gIn.oninput = () => { running = false; playBtn.textContent = 'Play'; reset(); };
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+reset();
+</script>
+</body>
+</html>

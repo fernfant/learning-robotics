@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stage 04 · Synthetic data</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 08 · Research-engineer roadmap</a> › Stage 04</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 08 · Stage 04</div>
+<h1>Synthetic data &amp; curation pipelines</h1>
+<p class="lede">Use a strong model to write training data, use a checker to throw away the bad part, and train a smaller model on what survives. The generator is the easy bit. The checker, the diversity and the bookkeeping decide whether the result is any good.</p>
+
+<div class="facts">
+  <div><b>Prerequisites</b>Fine-tuning a small model (<a href="../04-distill-small-models.html">Module 04</a>), SFT basics (<a href="../07-post-training.html#sft">Module 07</a>), Python scripting</div>
+  <div><b>Time</b>15–25 h (reading 5–6 h, laptop pipeline 8–12 h, write-up 2–3 h)</div>
+  <div><b>Hardware</b>Laptop for the pipeline logic · Colab GPU (T4 or better) to generate with and fine-tune a ~0.5–1.5B model · API budget or a multi-GPU node for the full 50,000-trace version</div>
+  <div><b>Key papers</b>Wang et al. 2022 (Self-Instruct) · Xu et al. 2023 (Evol-Instruct) · Zelikman et al. 2022 (STaR) · Yuan et al. 2023 (RFT) · Gunasekar et al. 2023 (phi-1) · Shumailov et al. 2023 (model collapse)</div>
+</div>
+<p class="meta">Source: Suraj Sharma, <a href="https://x.com/suraj_sharma14/status/2112876560629825734">X post</a>, stage 4</p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Instead of collecting more writing from people, you ask a clever AI to write practice examples, check them, keep only the good ones, and use those to teach a smaller AI.</p>
+
+<h3>Think of it like this</h3>
+<p>Imagine a teacher making a revision book. She writes lots of maths questions and asks a strong student to solve each one, showing the working. Then she checks every answer with the answer key. Wrong ones go in the bin. Right ones go in the book. A younger student then studies from the book. The book is only as good as the checking. If the teacher's answer key has mistakes, wrong working ends up in the book, and the younger student learns those mistakes too.</p>
+
+<h3>How it works</h3>
+<ol>
+<li><b>Make questions:</b> start with a few examples and ask a big AI to invent many more, harder and more varied ones.</li>
+<li><b>Make answers:</b> the big AI answers each question several times, showing its working.</li>
+<li><b>Check:</b> a checker (a calculator, a test, or another AI) marks each answer right or wrong.</li>
+<li><b>Clean up:</b> throw out wrong answers, near-copies, and anything that leaks the test questions.</li>
+<li><b>Teach:</b> train a smaller AI on the answers that survived, then test it on questions it has never seen.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Robots have the same problem with even less data: nobody has millions of hours of robot videos. So engineers make "synthetic" robot data in computer simulations, or let a robot try a task many times and keep only the attempts that worked. It's the same recipe: make lots, check, keep the good ones.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Roll two dice 20 times and write each pair as a multiplication question. A friend answers each one in two seconds. You check with a calculator and keep only the right ones. Now play again, but this time the "checker" is a third friend who checks just by looking and sometimes says "looks fine". How many wrong answers sneak into the kept pile?</li>
+<li>In the demo below, set <b>Generator pass rate</b> low (like 10%) and move <b>Verifier false-pass rate</b> from 0% to 10%. Watch how quickly the share of wrong examples in your kept data climbs.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Synthetic data</dt><dd>Training examples written by a computer, not collected from people.</dd>
+<dt>Verifier</dt><dd>A checker that says whether an answer is right.</dd>
+<dt>Rejection sampling</dt><dd>Make many attempts, throw away the ones that fail the check.</dd>
+<dt>Trace</dt><dd>The step-by-step working that leads to an answer.</dd>
+<dt>Model collapse</dt><dd>When models trained on other models' output slowly lose variety and rare knowledge.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version. On a first read, skim the headings, try the demo, and read the reality check.</p>
+
+<h2 id="covers">1. What this stage covers</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>A synthetic-data pipeline has four parts: <strong>prompts</strong> (where the questions come from and how diverse they are), <strong>generation</strong> (a stronger model writes answers or reasoning traces, usually several per prompt), <strong>filtering</strong> (a verifier, a judge model, dedup and decontamination) and <strong>training</strong> (SFT on the survivors, then honest evaluation). The core maths is simple base-rate arithmetic. The fraction of wrong examples in your kept data depends on the generator's pass rate and the verifier's false-pass rate, and it gets worse fast when the generator is weak. Where answers can be checked exactly (maths, code, logic), this works very well. Where they can't, quality depends on judge models with their own biases.</p>
+</div>
+<ul>
+<li><strong>Learn:</strong> Self-Instruct, evolutionary prompting (Evol-Instruct), rejection sampling, and using frontier models to generate and filter training data.</li>
+<li><strong>Practice:</strong> generate 50,000 complex logic traces with a strong reasoning model, filter them with a verifier, and train a smaller model on the survivors.</li>
+<li><strong>Why (the post's claim):</strong> high-quality human text is running out, so curating synthetic data is "the ultimate moat". Section 4 tests that claim.</li>
+</ul>
+
+<h2 id="concepts">2. Concepts, explained</h2>
+
+<h3 id="self-instruct">Self-Instruct: bootstrapping instructions from a seed set</h3>
+<p>Self-Instruct (Wang et al., 2022) starts from a small pool of human-written seed tasks (175 in the paper). Each round, it samples a few tasks from the pool as in-context examples and asks the model for new instructions, then for inputs and outputs. Before a new task joins the pool, filters remove invalid outputs and near-duplicates: a new instruction is rejected if its ROUGE-L overlap with any existing one is too high. The pool grows, and later rounds draw on generated tasks too. Fine-tuning vanilla GPT-3 on the result gave a 33% absolute gain on Super-NaturalInstructions, close to InstructGPT-001.</p>
+<pre><code>pool = seed_tasks
+repeat:
+    examples  = sample(pool, k)                       # mix of seed and generated
+    new_tasks = LM("write new tasks like these", examples)
+    new_tasks = [t for t in new_tasks
+                 if valid(t) and max_rougeL(t, pool) &lt; threshold]
+    pool += new_tasks</code></pre>
+<p>The lesson that carries over: <strong>diversity filtering is part of generation</strong>. Without the similarity check, the pool fills with paraphrases of the seeds.</p>
+
+<h3 id="evol">Evolutionary prompting: Evol-Instruct</h3>
+<p>Self-Instruct's tasks tend to be easy. Evol-Instruct (Xu et al., 2023, the WizardLM paper) "evolves" each instruction by asking an LLM to rewrite it. <em>In-depth</em> evolution makes it harder: add a constraint, require more reasoning steps, make the input more complex. <em>In-breadth</em> evolution writes a new instruction on a related but different topic. An elimination step discards evolutions that failed (for example, the rewrite didn't add anything, or the model couldn't answer it). Repeating this for several rounds produces a mix of difficulty levels. The authors fine-tuned LLaMA on the mix and, in their human evaluations, preferred its outputs on the hardest instructions over ChatGPT's.</p>
+<p>The general idea is a genetic algorithm over prompts: mutate, test, keep the fit ones. "Fit" here means the instruction is still well-posed and answerable, not just longer.</p>
+
+<h3 id="rejection">Rejection sampling: STaR and RFT</h3>
+<p>For tasks with a checkable answer, sample several solutions per problem and keep only the correct ones.</p>
+<ul>
+<li><strong>STaR</strong> (Zelikman et al., 2022): the model writes a rationale and answer for each question. Keep rationales that reach the right answer. For questions it gets wrong, show it the correct answer and ask it to write a rationale that leads there ("rationalisation"). Fine-tune on all kept rationales and repeat.</li>
+<li><strong>Rejection-sampling fine-tuning (RFT)</strong> (Yuan et al., 2023): sample many reasoning paths from a supervised model on maths problems, keep the correct ones, deduplicate, and fine-tune on them. They found that more <em>distinct</em> correct reasoning paths helped more than more copies of similar ones.</li>
+</ul>
+<p>The arithmetic of a filter. Let <code>p</code> be the generator's pass rate, <code>TPR</code> the chance the verifier accepts a correct trace, and <code>FPR</code> the chance it accepts a wrong one:</p>
+<pre><code>yield      = p·TPR + (1 − p)·FPR                  # fraction of generations you keep
+precision  = p·TPR / yield                       # fraction of kept data that is correct
+generations needed for N survivors  =  N / yield
+
+example: p = 0.10, TPR = 0.90, FPR = 0.05
+  yield = 0.09 + 0.045 = 0.135     precision = 0.09 / 0.135 ≈ 0.67   → one kept trace in three is wrong</code></pre>
+<p>That's the base-rate trap. A verifier that looks "95% accurate" still lets lots of garbage through when most generations are wrong. Two fixes: make the verifier stricter (exact checks, unit tests), or make the generator better on the problems you pick (don't feed it problems far above its level).</p>
+
+<div class="card demo">
+<h3>Interactive: rejection-sampling yield vs. verifier quality</h3>
+<p class="legend">x axis: generator pass rate p. Solid (accent): precision, the share of kept traces that are actually correct. Dashed (muted): yield, the share of generations kept. The dot marks your chosen p. Target: 50,000 survivors, as in the post.</p>
+<canvas id="rc" width="700" height="240" aria-label="Precision and yield of rejection sampling against generator pass rate"></canvas>
+<label for="pp">Generator pass rate p: <span id="ppv" class="num"></span></label>
+<input id="pp" type="range" min="0.01" max="0.9" step="0.01" value="0.3">
+<label for="tp">Verifier true-pass rate (TPR): <span id="tpv" class="num"></span></label>
+<input id="tp" type="range" min="0.5" max="1" step="0.01" value="0.95">
+<label for="fp">Verifier false-pass rate (FPR): <span id="fpv" class="num"></span></label>
+<input id="fp" type="range" min="0" max="0.3" step="0.005" value="0.05">
+<label for="kk">Samples per problem k: <span id="kkv" class="num"></span></label>
+<input id="kk" type="range" min="1" max="16" step="1" value="4">
+<div class="stats">
+  <div class="stat"><div class="k">Yield</div><div class="v" id="yy">–</div></div>
+  <div class="stat"><div class="k">Wrong among kept</div><div class="v" id="ww">–</div></div>
+  <div class="stat"><div class="k">Generations for 50k</div><div class="v" id="gg">–</div></div>
+  <div class="stat"><div class="k">Problems with ≥1 correct kept</div><div class="v" id="cc">–</div></div>
+</div>
+<p class="meta">Try this: p = 0.10, TPR = 0.90, FPR = 0.05 gives the worked example above, about a third of kept traces wrong. Set FPR to 0 (an exact checker) and precision goes to 100%. The last stat assumes every problem has the same pass rate. Real problems vary, so hard ones are covered far less often than this number suggests.</p>
+</div>
+
+<h3 id="frontier">Using frontier models to generate and filter</h3>
+<p>The most common pipeline in 2026 is distillation through data: a large "teacher" writes answers or reasoning traces, a filter keeps the good ones, a smaller "student" is fine-tuned on them. Three levers matter:</p>
+<ul>
+<li><strong>What you ask for.</strong> phi-1 (Gunasekar et al., 2023) trained a 1.3B code model on about 6B tokens of filtered "textbook quality" web data plus about 1B tokens of synthetic textbooks and exercises written by GPT-3.5, and reached 50.6% pass@1 on HumanEval. The point: carefully designed synthetic data can stand in for a lot of raw web data, for a narrow domain.</li>
+<li><strong>How you filter when there's no exact checker.</strong> An LLM judge scores helpfulness, correctness or style. Judges have known biases (length, position, self-preference), so calibrate them against a few hundred human labels first. <a href="../01-decision-model-evals.html">Module 01</a> covers judge calibration.</li>
+<li><strong>Curation beyond correctness.</strong> Near-duplicate removal (MinHash or embeddings), diversity sampling across topics and difficulty, and <strong>decontamination</strong>: drop anything with heavy n-gram overlap with your evaluation sets. Synthetic data generated by a model that saw the benchmark can leak it.</li>
+</ul>
+<p><strong>The risk: model collapse.</strong> Shumailov et al. (2023) showed that training each generation of model on the previous generation's output makes the tails of the original distribution disappear: rare facts, unusual styles, minority cases. The practical defences are to keep real data in the mix, filter for diversity, and avoid training repeatedly on your own model's unfiltered output.</p>
+
+<h2 id="practice">3. The practice project</h2>
+
+<h3>(a) Laptop / Colab version: verified logic traces for a 0.5B student</h3>
+<p>Pick a task where the verifier is exact and free, so you can study the pipeline without arguing about judges. Programmatically generated puzzles are ideal: you know the answer by construction.</p>
+<ol>
+<li><strong>Problems:</strong> write a generator for multi-step puzzles with a known answer, with a difficulty knob (e.g. chained arithmetic with 3–8 steps, or "who sits where" constraint puzzles solved by brute force). Make 3,000 train and 500 held-out test problems, with different random seeds.</li>
+<li><strong>Teacher:</strong> a 1.5–7B instruct model on Colab (with a fast inference library), or a modest API budget for a few thousand calls to a stronger model. Sample k = 4 traces per problem at temperature ~0.8, asking for working then a final line <code>ANSWER: …</code>.</li>
+<li><strong>Verify and curate:</strong> parse the final answer, check it exactly, drop traces with no parsable answer, deduplicate identical traces, cap at 2 kept traces per problem.</li>
+<li><strong>Student:</strong> fine-tune a ~0.5B model (LoRA is fine) on the survivors. Train a second student on <em>unfiltered</em> traces with the same token budget as the control.</li>
+<li><strong>Measure:</strong> yield per difficulty level; held-out accuracy of the base student, the unfiltered student and the filtered student; accuracy by difficulty level. Report all three numbers, not just the best one.</li>
+</ol>
+<pre><code>import random, re
+
+def make_problem(rng, steps):
+    x = rng.randint(1, 20); text = f"Start with {x}."
+    for _ in range(steps):
+        op, n = rng.choice("+-*"), rng.randint(2, 9)
+        text += f" Then {'add' if op == '+' else 'subtract' if op == '-' else 'multiply by'} {n}."
+        x = x + n if op == "+" else x - n if op == "-" else x * n
+    return {"q": text + " What is the result?", "a": x, "steps": steps}
+
+def verify(trace, answer):
+    m = re.search(r"ANSWER:\s*(-?\d+)", trace)
+    return m is not None and int(m.group(1)) == answer
+
+def curate(problems, sample, k=4, keep=2):
+    out, stats = [], {"gen": 0, "kept": 0}
+    for p in problems:
+        traces = {sample(p["q"]) for _ in range(k)}   # set = exact dedup
+        stats["gen"] += k
+        good = [t for t in traces if verify(t, p["a"])][:keep]
+        stats["kept"] += len(good)
+        out += [{"prompt": p["q"], "completion": t, "steps": p["steps"]} for t in good]
+    return out, stats
+
+rng = random.Random(0)
+train = [make_problem(rng, rng.randint(3, 8)) for _ in range(3000)]</code></pre>
+<p>What to expect: the yield will fall as the number of steps grows, so the kept data will be skewed toward easy problems. That skew is the most useful thing to notice. If the filtered student improves mostly on easy problems, try oversampling hard problems (larger k) or the STaR-style "rationalise from the correct answer" trick for the ones that never pass.</p>
+
+<h3>(b) The full version from the post</h3>
+<p>50,000 complex logic traces from a heavy reasoning model, verified, then used to train a smaller model. Points to plan for:</p>
+<ul>
+<li><strong>Generation cost is dominated by trace length.</strong> Reasoning traces are often thousands of tokens. At, say, 3,000 output tokens per attempt and a 30% yield, 50,000 survivors needs about 167,000 attempts and about 500M output tokens. Multiply by your provider's output price before you start, or plan for days of a multi-GPU node with an open reasoning model.</li>
+<li><strong>The verifier is the project.</strong> "Logic traces" only works at scale if the final answer is machine-checkable (puzzles with unique solutions, maths with numeric answers, code with tests). If you rely on an LLM judge, measure its false-pass rate on a labelled sample, then use the demo's arithmetic.</li>
+<li><strong>Student training:</strong> LoRA/QLoRA fine-tuning of a ~7B student on 50k traces fits on one 80 GB GPU. Full fine-tuning needs several. Long traces mean long sequences, so watch memory.</li>
+<li><strong>Terms of use:</strong> some model providers restrict using their outputs to train competing models. Check before you build on one.</li>
+</ul>
+
+<h3>(c) Pitfalls</h3>
+<ul>
+<li><strong>Easy-problem bias.</strong> Rejection sampling keeps what the teacher already does well. Track yield per difficulty bucket.</li>
+<li><strong>Right answer, wrong reasoning.</strong> An outcome check passes traces that guess or get lucky. Multiple-choice tasks are the worst case. Prefer answers with a large space of possible values.</li>
+<li><strong>Contamination.</strong> If your problems resemble a public benchmark, run an n-gram overlap check before reporting results on it.</li>
+<li><strong>Duplicates.</strong> Near-identical traces inflate the dataset without adding information. RFT found distinct reasoning paths matter more than count.</li>
+<li><strong>No control.</strong> Without the unfiltered-trace baseline and the base model, you can't tell whether filtering helped or the extra training did.</li>
+</ul>
+
+<h2 id="reality">4. Reality check</h2>
+<div class="card note">
+<p><strong>The post's claim: human text is running out, so curating synthetic data is "the ultimate moat".</strong> Directionally right, overstated.</p>
+<ul>
+<li><strong>True:</strong> Villalobos et al. (2022) projected that, if trends continue, training sets would reach the size of the public stock of human text between about 2026 and 2032. Synthetic data is now a standard part of post-training and increasingly of pre-training.</li>
+<li><strong>True:</strong> where answers are verifiable, synthetic data plus a good verifier works very well. That's why reasoning gains have been biggest in maths and code.</li>
+<li><strong>Overstated:</strong> "mathematically curate" makes it sound solved. The maths of filtering is simple; the hard parts are building a verifier for open-ended tasks, keeping diversity, and avoiding collapse.</li>
+<li><strong>"Ultimate moat" is debatable.</strong> Many recipes and datasets are public, and a pipeline built on a third-party teacher is only as unique as your prompts and verifiers. The durable advantages tend to be proprietary verifiers, real user or robot data, and the evaluation discipline to tell what helped.</li>
+</ul>
+</div>
+
+<h2 id="course">5. In this course</h2>
+<ul>
+<li><a href="../04-distill-small-models.html#distill">Module 04 · teacher → student</a>: distilling a big model into a small one, the same pipeline shape as this stage.</li>
+<li><a href="../04-distill-small-models.html#eval">Module 04 · evaluation that doesn't fool you</a> and <a href="../04-distill-small-models.html#pitfalls">its pitfalls</a>: honest splits and leakage checks for your student.</li>
+<li><a href="../07-post-training.html#sft">Module 07 · SFT</a> and <a href="../07-post-training.html#rlvr">RLVR verifiers</a>: where synthetic traces enter post-training, and how verifiers also drive RL.</li>
+<li><a href="../01-decision-model-evals.html">Module 01 · LLM evals &amp; calibration</a>: calibrating an LLM judge before you trust it as a filter.</li>
+<li><a href="../05-trillion-scale-architecture.html#length">Module 05 · length</a>: Kimi K3 synthesises long-context tasks that can only be solved by combining scattered information.</li>
+<li><a href="../06-30u30/25-scaling-laws.html">06 Day 25 · Scaling laws</a>: why data, not just parameters, limits scaling.</li>
+</ul>
+
+<h2 id="robotics">6. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Simulation is robotics' synthetic data.</strong> Randomised sim scenes, objects and physics produce training data no one could collect by hand. The same questions apply: is it diverse enough, and how far is it from the real distribution?</li>
+<li><strong>Rejection sampling = keeping successful rollouts.</strong> Run a policy (or a scripted planner) many times, keep only episodes a success detector accepts, and train on those. The success detector is the verifier, and its false positives poison the data exactly as in the demo.</li>
+<li><strong>Frontier models as labellers.</strong> Vision-language models can write instructions or captions for robot episodes, which turns unlabelled logs into language-conditioned training data. Treat their labels like a judge's: check a sample.</li>
+<li><strong>Collapse has a robot version.</strong> Training only on your own policy's filtered successes narrows behaviour to what it already does. Keep human demonstrations in the mix.</li>
+</ul>
+</div>
+
+<h2 id="check">7. Self-check</h2>
+<details><summary>Why does Self-Instruct reject new instructions with high ROUGE-L overlap with the pool?</summary><p>To keep diversity. Without it the pool fills with paraphrases of the seed tasks, and the fine-tuned model sees many copies of the same few skills.</p></details>
+<details><summary>Generator pass rate 0.1, verifier TPR 0.9, FPR 0.05. What fraction of kept traces is wrong?</summary><p>Yield = 0.1·0.9 + 0.9·0.05 = 0.135. Correct kept = 0.09. Precision ≈ 0.67, so about one in three kept traces is wrong.</p></details>
+<details><summary>What does STaR do with questions the model gets wrong?</summary><p>It gives the model the correct answer as a hint and asks for a rationale that reaches it ("rationalisation"), then trains on rationales that lead to the right answer, so hard questions aren't simply dropped.</p></details>
+<details><summary>Why is rejection sampling biased toward easy problems, and what can you do about it?</summary><p>Easy problems pass more often, so they contribute more survivors. Track yield by difficulty, sample more attempts for hard problems, cap survivors per problem, or use hints/rationalisation for problems that never pass.</p></details>
+<details><summary>What is model collapse, and how do you guard against it?</summary><p>Repeatedly training on generated data loses the tails of the original distribution. Keep real data in the mix, filter for diversity, and avoid recursive training on unfiltered self-generated output.</p></details>
+<details><summary>Why is an exact verifier worth more than a bigger teacher?</summary><p>An exact verifier drives the false-pass rate to zero, so kept data is clean whatever the teacher's pass rate. A bigger teacher only raises the pass rate, and a leaky verifier still lets errors through.</p></details>
+
+<h2 id="courses">8. Courses &amp; content</h2>
+<div class="table-wrap"><table>
+<tr><th>Resource</th><th>Type</th><th>Use it for</th></tr>
+<tr><td><a href="https://github.com/huggingface/smol-course">Hugging Face smol-course · Synthetic Data unit</a></td><td>Course (free)</td><td>Generating synthetic datasets for a domain</td></tr>
+<tr><td><a href="https://huggingface.co/blog/cosmopedia">Cosmopedia: how to create large-scale synthetic data</a></td><td>Case study</td><td>Prompt design, diversity and dedup for a large synthetic pre-training set</td></tr>
+<tr><td><a href="https://distilabel.argilla.io/">distilabel</a></td><td>Library + docs</td><td>Pipelines for generating, judging and filtering synthetic data</td></tr>
+<tr><td><a href="https://github.com/karpathy/nanochat">Karpathy · nanochat</a></td><td>Code (free)</td><td>How synthetic and curated data feed the later training stages</td></tr>
+</table></div>
+<p>Start with the smol-course synthetic data unit: it's short, hands-on and sized for small models, which matches the laptop project. Read Cosmopedia next for how diversity is handled at scale.</p>
+<p class="meta"><a href="index.html#courses">Full course map for all 12 stages →</a></p>
+
+<h2 id="papers">9. Papers &amp; docs</h2>
+<ul>
+<li>Wang et al. (2022), <a href="https://arxiv.org/abs/2212.10560">Self-Instruct: Aligning Language Models with Self-Generated Instructions</a></li>
+<li>Xu et al. (2023), <a href="https://arxiv.org/abs/2304.12244">WizardLM: Empowering Large Pre-Trained Language Models to Follow Complex Instructions</a> (Evol-Instruct)</li>
+<li>Zelikman, Wu, Mu &amp; Goodman (2022), <a href="https://arxiv.org/abs/2203.14465">STaR: Bootstrapping Reasoning With Reasoning</a></li>
+<li>Yuan et al. (2023), <a href="https://arxiv.org/abs/2308.01825">Scaling Relationship on Learning Mathematical Reasoning with Large Language Models</a> (RFT)</li>
+<li>Gunasekar et al. (2023), <a href="https://arxiv.org/abs/2306.11644">Textbooks Are All You Need</a> (phi-1)</li>
+<li>Shumailov et al. (2023), <a href="https://arxiv.org/abs/2305.17493">The Curse of Recursion: Training on Generated Data Makes Models Forget</a></li>
+<li>Villalobos et al. (2022), <a href="https://arxiv.org/abs/2211.04325">Will we run out of data? Limits of LLM scaling based on human-generated data</a></li>
+<li><a href="https://distilabel.argilla.io/">distilabel documentation</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="03-beyond-transformers.html"><small>Previous</small>Stage 03 · Next-gen architectures</a>
+  <a class="next" href="05-alignment-preference.html"><small>Next</small>Stage 05 · Alignment &amp; preference optimisation</a>
+</nav>
+<footer>Module 08 · Stage 04 · written for this course from the source post and primary papers.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('rc'), ctx = cv.getContext('2d');
+const pIn = document.getElementById('pp'), tIn = document.getElementById('tp'), fIn = document.getElementById('fp'), kIn = document.getElementById('kk');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const N = 50000;
+const yieldOf = (p, tpr, fpr) => p * tpr + (1 - p) * fpr;
+const precOf = (p, tpr, fpr) => { const y = yieldOf(p, tpr, fpr); return y ? p * tpr / y : 0; };
+// chance a problem gets at least one correct trace accepted in k tries (same p for every problem)
+const cover = (p, tpr, k) => 1 - Math.pow(1 - p * tpr, k);
+const fmt = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'k' : Math.round(n) + '';
+
+function draw() {
+  const p = +pIn.value, tpr = +tIn.value, fpr = +fIn.value, k = +kIn.value;
+  document.getElementById('ppv').textContent = p.toFixed(2);
+  document.getElementById('tpv').textContent = tpr.toFixed(2);
+  document.getElementById('fpv').textContent = fpr.toFixed(3);
+  document.getElementById('kkv').textContent = k;
+  const W = cv.width, H = cv.height, L = 40, B = 26, top = 12;
+  const px = v => L + v * (W - L - 10), py = v => H - B - v * (H - B - top);
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = css('--line'); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(L, py(0)); ctx.lineTo(W - 10, py(0)); ctx.moveTo(L, py(0)); ctx.lineTo(L, py(1)); ctx.stroke();
+  ctx.font = '12px sans-serif'; ctx.fillStyle = css('--muted');
+  ctx.textAlign = 'right'; [0, 0.5, 1].forEach(v => ctx.fillText(v.toFixed(1), L - 6, py(v) + 4));
+  ctx.textAlign = 'center'; [0, 0.25, 0.5, 0.75, 1].forEach(v => ctx.fillText(v, px(v), H - 8));
+  const line = (f, col, dash) => {
+    ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.setLineDash(dash); ctx.beginPath();
+    for (let i = 1; i <= 200; i++) { const v = i / 200; i > 1 ? ctx.lineTo(px(v), py(f(v))) : ctx.moveTo(px(v), py(f(v))); }
+    ctx.stroke(); ctx.setLineDash([]);
+  };
+  line(v => yieldOf(v, tpr, fpr), css('--muted'), [6, 5]);
+  line(v => precOf(v, tpr, fpr), css('--accent'), []);
+  const prec = precOf(p, tpr, fpr), y = yieldOf(p, tpr, fpr);
+  ctx.fillStyle = prec >= 0.95 ? css('--pass') : css('--fail');
+  ctx.beginPath(); ctx.arc(px(p), py(prec), 6, 0, 7); ctx.fill();
+  document.getElementById('yy').textContent = (100 * y).toFixed(1) + '%';
+  document.getElementById('ww').textContent = (100 * (1 - prec)).toFixed(1) + '%';
+  document.getElementById('gg').textContent = fmt(N / y);
+  document.getElementById('cc').textContent = (100 * cover(p, tpr, k)).toFixed(1) + '%';
+}
+pIn.oninput = tIn.oninput = fIn.oninput = kIn.oninput = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

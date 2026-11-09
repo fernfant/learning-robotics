@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 12 · Dropout</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 12</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Unit 2 · Deep learning explosion · Day 12</div>
+<h1>Dropout: A Simple Way to Prevent Neural Networks from Overfitting</h1>
+<p class="lede">Randomly switch off half the neurons on every training step. Each neuron learns to be useful on its own, and the trained network behaves like an average of exponentially many smaller ones.</p>
+
+<div class="facts">
+  <div><b>Authors</b>Nitish Srivastava, Geoffrey Hinton, Alex Krizhevsky, Ilya Sutskever, Ruslan Salakhutdinov</div>
+  <div><b>Year / venue</b>2014 · JMLR 15</div>
+  <div><b>Core idea</b>Random thinning as model averaging</div>
+  <div><b>Study time</b>2–4 h</div>
+</div>
+<p class="meta">Original: <a href="https://jmlr.org/papers/v15/srivastava14a.html">jmlr.org</a> · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/12_dropout">30u30 Day 12</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">If a network has to learn while random parts of it are switched off, it stops relying on any one part and does better on new examples.</p>
+
+<h3>Think of it like this</h3>
+<p>Think of a football team that trains with random players sitting out every practice. Nobody can rely on the one star player always being there, so everyone learns to play well with whoever is on the pitch. On match day the whole team plays, and it's stronger for it.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>During training, every time the network sees an example, it flips a coin for each unit (a tiny part of the network).</li>
+<li>Units that lose the coin flip are switched off for that example.</li>
+<li>The network learns with whatever units are left.</li>
+<li>Next example, new coin flips, so a different set of units is switched off.</li>
+<li>When the training is finished, all units are switched on, and their outputs are turned down a bit to make up for it.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot often learns from only a few hundred demonstrations, so it can easily memorise them instead of really learning. Dropout helps stop that. Also, if you leave dropout on and ask the robot's network the same question several times, the answers spread out when it is unsure. A robot can use that as a sign to slow down or ask for help.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Try a familiar task with one "unit" switched off. For example, catch a ball with one eye closed, or tie your shoes without looking. You get better at using what you have left.</li>
+<li>In the demo further down, move the <b>Keep probability p</b> slider and click <b>Resample masks</b> a few times. The grey dots are switched-off units. Watch the green line settle onto the dashed line as more masks are averaged.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Unit (neuron)</dt><dd>One small piece of a neural network that passes a number along.</dd>
+<dt>Overfitting</dt><dd>Memorising the training examples instead of learning what works on new ones.</dd>
+<dt>Dropout</dt><dd>Randomly switching off units during training.</dd>
+<dt>Keep probability</dt><dd>The chance that a unit stays switched on.</dd>
+<dt>Uncertainty</dt><dd>How unsure the network is about its answer.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Averaging many separately trained networks reduces overfitting, but it's too slow to train and to run. Dropout gets most of the benefit inside a single network. During training, each unit is kept with probability <code>p</code> and otherwise zeroed, with a fresh random mask for every example. A network with <code>n</code> units becomes a family of 2ⁿ "thinned" networks that all share weights. At test time you use the full network with weights scaled by <code>p</code>, which approximates averaging the whole family. The journal paper shows gains in vision, speech, text and genetics. The method had already helped AlexNet win ImageNet (<a href="08-alexnet.html">Day 08</a>).</p>
+</div>
+<ul>
+<li><strong>Note the convention:</strong> in this paper <code>p</code> is the probability of <em>keeping</em> a unit. Typical values are 0.5 for hidden units and 0.8 for inputs. PyTorch's <code>p</code> is the probability of <em>dropping</em>.</li>
+<li><strong>MNIST:</strong> error fell from 1.60% (standard net) to 1.35% with dropout, 1.25% with ReLUs, and 1.06% with a max-norm weight constraint added. A 2-layer net with 8192 units per layer reached 0.95%.</li>
+<li><strong>CIFAR-10:</strong> 14.98% → 14.32% with dropout in the FC layers, and 12.61% with dropout in all layers. On CIFAR-100: 43.48% → 37.20%.</li>
+<li><strong>Weight scaling is a good approximation.</strong> On MNIST, averaging about 50 sampled thinned nets matched it.</li>
+<li><strong>Cost:</strong> training typically takes 2–3 times longer, because the gradients are noisy.</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<p>For layer <code>l</code> with outputs <code>y⁽ˡ⁾</code>, a standard network computes <code>z = W·y + b</code>, then <code>y⁽ˡ⁺¹⁾ = f(z)</code>. With dropout:</p>
+<pre><code>r_j ~ Bernoulli(p)                 # 1 = keep, 0 = drop; fresh for every example
+ỹ   = r ⊙ y                        # thinned outputs
+z   = W · ỹ + b
+y'  = f(z)
+
+test time:  W_test = p · W          # no sampling, scaled weights</code></pre>
+<ul>
+<li><code>r</code> is a vector of independent coin flips, one per unit. <code>⊙</code> is element-wise multiplication.</li>
+<li>Gradients flow only through kept units. A dropped unit's outgoing weights get zero gradient from that example.</li>
+<li>The test-time scaling makes each unit's expected input equal to what it saw in training. For a linear unit that equality is exact. With nonlinearities it's an approximation to the geometric mean of the thinned networks' predictions.</li>
+<li>Modern libraries use <strong>inverted dropout</strong>: divide by <code>p</code> during training and leave test time alone. The two are equivalent in expectation.</li>
+</ul>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>Seeing the masks and the averaging</h3>
+<div class="card demo">
+<h3>Interactive: one hidden layer under dropout</h3>
+<p class="legend">Left: a 64-unit hidden layer, with dropped units greyed out. Right: a linear unit that reads this layer. The line shows the running average of its output over k sampled masks, converging to the weight-scaled value (dashed).</p>
+<canvas id="drop" width="700" height="220" aria-label="Dropout mask grid and Monte Carlo average converging to the weight-scaled output"></canvas>
+<label for="p">Keep probability p: <span id="pv" class="num"></span></label>
+<input id="p" type="range" min="0.1" max="1" step="0.05" value="0.5">
+<button id="re">Resample masks</button>
+<div class="stats">
+  <div class="stat"><div class="k">Units kept now</div><div class="v" id="kept">–</div></div>
+  <div class="stat"><div class="k">Weight-scaled</div><div class="v" id="ws">–</div></div>
+  <div class="stat"><div class="k">MC avg, k=200</div><div class="v" id="mc">–</div></div>
+</div>
+</div>
+<p>Each mask is a different thinned network. Their average output lands on <code>p·w·y</code>, the weight-scaled answer, because the unit is linear. Drag p towards 1 and the masks stop doing anything. Drag it low and single samples get very noisy. That noise is both the regulariser and the reason training is slower.</p>
+
+<h3>Why it works: three views</h3>
+<ul>
+<li><strong>Cheap ensembling.</strong> Every training step trains a different subnetwork, and all of them share parameters. Weight scaling then averages them at no extra cost.</li>
+<li><strong>Breaking co-adaptation.</strong> A unit can't rely on particular partners being present, so it has to learn features that are useful on their own. The paper's autoencoder filters look like clean strokes and edges with dropout, and like noise without it. Hidden activations also became sparser.</li>
+<li><strong>Noise as a penalty.</strong> For linear regression with dropout on the inputs, the expected loss equals ridge regression in which each weight's penalty is scaled by how much its input feature varies. Dropout is a data-dependent L2 penalty in that case.</li>
+</ul>
+<p>The paper adds a practical tip: combine dropout with a max-norm constraint (cap each unit's incoming weight vector at norm <code>c</code>). That allows high learning rates without weights blowing up. Its motivating analogy comes from evolution, where sexual reproduction breaks up co-adapted genes.</p>
+
+<h3>Limitations, and what came after</h3>
+<ul>
+<li><strong>Slower training</strong> (2–3×), and dropout rate is one more hyperparameter.</li>
+<li><strong>Don't drop shortcut paths.</strong> <a href="10-resnet-identity-mappings.html">Day 10</a> found that dropout on a ResNet shortcut stopped training from converging.</li>
+<li><strong>Less used in conv nets.</strong> ResNet (<a href="09-resnet.html">Day 09</a>) used batch norm and no dropout. Dropping single pixels in a feature map does little because neighbours are correlated. Variants such as spatial dropout drop whole channels instead.</li>
+<li><strong>For RNNs,</strong> dropout works on the non-recurrent connections. See <a href="03-rnn-regularization.html">Day 03</a>.</li>
+<li><strong>MC dropout.</strong> Later work (Gal and Ghahramani, 2016) kept dropout on at test time and read the spread of many passes as model uncertainty. This paper's Section 7.5 already compares sampled averaging with weight scaling.</li>
+</ul>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Small robot datasets overfit.</strong> A few hundred demonstrations is common in imitation learning. Dropout in the policy head is a standard, cheap regulariser there, alongside augmentation.</li>
+<li><strong>MC dropout gives a cheap uncertainty signal.</strong> Run the policy or perception model several times with dropout on. A large spread means "I haven't seen this", which can trigger a slow-down, a safe stop or a request for help (<a href="../03-shared-autonomy.html">Module 03</a>). Check calibration before trusting it, as in <a href="../01-decision-model-evals.html#calibration">Module 01</a>.</li>
+<li><strong>That uncertainty costs latency.</strong> Ten stochastic passes cost ten times the compute. On a robot you may run them only on the small head, or batch them on the GPU.</li>
+<li><strong>Sensor dropout builds robustness.</strong> Randomly blanking whole input modalities (a camera, the wrist force sensor) during training teaches a policy to cope when a sensor fails or gets occluded. It is the same idea applied to inputs.</li>
+<li><strong>Classic bug: forgetting eval mode.</strong> A deployed model left in training mode gives random outputs every control cycle.</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Read Sections 1–5 and 7 of the paper (about 1.5 h). Skim the RBM section. Keep track of which <code>p</code> convention is in use.</li>
+<li>In the 30u30 Day 12 folder, read <code>implementation.py</code>. Compare the naive (scale at test) and inverted (scale at train) versions, then the spatial, DropConnect, DropBlock and MC-dropout variants. Run <code>train_minimal.py</code>.</li>
+<li>Work through <code>notebook.ipynb</code>, then the exercises: dropout from scratch, a rate sweep, spatial dropout, Monte Carlo dropout and a comparison with other regularisers.</li>
+<li>Check that the forward pass in train mode has the same mean as eval mode, averaged over many masks. That is the demo above in code.</li>
+<li>Stretch: train a small regressor on robot-like data (for example joint angles to end-effector position) and plot MC-dropout spread inside and outside the training range.</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>In this paper, what does p = 0.8 on the inputs mean?</summary><p>Each input unit is <em>kept</em> with probability 0.8, so 20% are dropped. In PyTorch you would write <code>Dropout(0.2)</code>.</p></details>
+<details><summary>Why scale weights by p at test time?</summary><p>During training a unit is present only a fraction p of the time. Scaling by p makes the expected input to the next layer at test time match what it saw in training.</p></details>
+<details><summary>How many thinned networks does a net with n droppable units define?</summary><p>2ⁿ. Each one shares weights with the others, and most are never sampled even once.</p></details>
+<details><summary>Why does dropout slow training?</summary><p>Every example trains a different random subnetwork, so gradients are noisy and not exactly the gradients of the final network.</p></details>
+<details><summary>How do you get an uncertainty estimate from a dropout network?</summary><p>Keep dropout on at inference, run several forward passes and look at the spread of the outputs (MC dropout). Calibrate it before relying on it.</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://jmlr.org/papers/v15/srivastava14a.html">The original paper</a> (JMLR 2014)</li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/12_dropout">30u30 Day 12</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Next: <a href="13-attention.html">Day 13, Attention Is All You Need</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="11-dilated-convolutions.html"><small>Previous</small>Day 11 · Dilated Convolutions</a>
+  <a class="next" href="13-attention.html"><small>Next</small>Day 13 · Attention Is All You Need</a>
+</nav>
+<footer>Module 06 · Day 12 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('drop'), ctx = cv.getContext('2d'), pIn = document.getElementById('p');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const N = 64, K = 200;
+
+function rng(seed) {
+  return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+const R0 = rng(7);
+const y = Array.from({ length: N }, () => R0() * 2);          // hidden activations (ReLU-like, ≥ 0)
+const w = Array.from({ length: N }, () => R0() * 2 - 0.6);     // weights of the reading unit
+let seed = 1;
+
+function sample(p, s) {
+  const R = rng(s), masks = [], run = [];
+  let sum = 0;
+  for (let k = 0; k < K; k++) {
+    const m = y.map(() => R() < p ? 1 : 0);
+    sum += m.reduce((a, r, j) => a + r * w[j] * y[j], 0);
+    masks.push(m); run.push(sum / (k + 1));
+  }
+  return { mask: masks[0], run, scaled: p * y.reduce((a, v, j) => a + w[j] * v, 0) };
+}
+
+function draw() {
+  const p = +pIn.value, { mask, run, scaled } = sample(p, seed);
+  document.getElementById('pv').textContent = p.toFixed(2);
+  const W = cv.width, H = cv.height, cs = 24, gx = 10, gy = (H - 8 * cs) / 2;
+  ctx.clearRect(0, 0, W, H);
+  mask.forEach((m, i) => {
+    ctx.fillStyle = m ? css('--accent') : css('--line');
+    ctx.beginPath(); ctx.arc(gx + (i % 8) * cs + cs / 2, gy + Math.floor(i / 8) * cs + cs / 2, cs * 0.36, 0, 2 * Math.PI); ctx.fill();
+  });
+  // running Monte Carlo average vs weight-scaled value
+  const x0 = 230, x1 = W - 16, y0 = 16, y1 = H - 24;
+  const lo = Math.min(scaled, ...run) - 1, hi = Math.max(scaled, ...run) + 1;
+  const X = k => x0 + k / (K - 1) * (x1 - x0), Y = v => y1 - (v - lo) / (hi - lo) * (y1 - y0);
+  ctx.strokeStyle = css('--muted'); ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(x0, Y(scaled)); ctx.lineTo(x1, Y(scaled)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = css('--pass'); ctx.lineWidth = 2; ctx.beginPath();
+  run.forEach((v, k) => k ? ctx.lineTo(X(k), Y(v)) : ctx.moveTo(X(k), Y(v)));
+  ctx.stroke();
+  ctx.fillStyle = css('--muted'); ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('masks sampled k →', (x0 + x1) / 2, H - 6);
+  document.getElementById('kept').textContent = mask.reduce((a, b) => a + b) + ' / ' + N;
+  document.getElementById('ws').textContent = scaled.toFixed(2);
+  document.getElementById('mc').textContent = run[K - 1].toFixed(2);
+}
+pIn.oninput = draw;
+document.getElementById('re').onclick = () => { seed++; draw(); };
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

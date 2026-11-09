@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 16 · How fast is a brain?</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 8 · Lesson 16</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 8 · Lesson 16</div>
+<h1>How fast is a brain? Latency, tokens and cost</h1>
+<p class="lede">You've built three kinds of brain for Robo-Helper, and next week it gets a world-class one over the internet. Before you trust any of them, you need two numbers you can't see by reading the code: how long it takes to answer, and what each answer costs. This lesson is the start of inference engineering: measuring brains like an engineer, not like a fan.</p>
+
+<div class="facts">
+  <div><b>Time</b>2–3 hours</div>
+  <div><b>You'll need</b>Python 3, your finished Lessons 9 and 15, a 30 cm ruler, a friend, paper and a pencil</div>
+  <div><b>New words</b>inference, latency, median (p50), percentile, p95, tail, mean, TTFT, streaming, throughput, token, latency budget</div>
+  <div><b>Project piece</b>A stopwatch and a price tag for every brain</div>
+</div>
+
+<section class="kid" id="start">
+<h2>Start here</h2>
+<p class="big">A brain is only useful if it answers in time: time it many times, judge it by its slow answers, not its average, and count what every answer costs in tokens.</p>
+
+<h3>The problem</h3>
+<p>Robo-Helper is rolling across the kitchen at 1 metre per second. A cat strolls out from under the table, 1 metre ahead. You shout "stop!". The words go to the robot's brain, and the brain thinks. If it thinks for 0.01 seconds, the robot moves 1 cm and stops. If it thinks for 2 seconds, the robot has gone 2 metres, straight through where the cat was. Same robot, same command, same correct answer. The only difference is <em>how long the answer took</em>.</p>
+
+<h3>The idea in one picture</h3>
+<p>Think about a school bus. Most days it's 2 minutes late. One day in twenty it's 15 minutes late. If someone asks "how late is the bus?", the honest answer isn't the average (about 3 minutes, which never actually happens). It's "usually 2 minutes, but on bad days 15". And if you have an exam, you plan for the bad day. Engineers measure brains the same way: the usual answer time (p50) and the bad-day time (p95).</p>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Inference</dt><dd>Using a trained model to get an answer. Training happens once, in the workshop. Inference happens every time the robot hears a command.</dd>
+<dt>Latency</dt><dd>How long one answer takes, from asking to getting it. Measured in seconds (s) or milliseconds (ms, thousandths of a second).</dd>
+<dt>Mean</dt><dd>The ordinary average: add everything up, divide by how many.</dd>
+<dt>Median (p50)</dt><dd>The middle value once you sort them: half the answers were faster, half slower. "The usual time."</dd>
+<dt>Percentile, p95</dt><dd>p95 is the time that 95% of answers beat. Only 1 in 20 is slower. "The bad-day time."</dd>
+<dt>Tail</dt><dd>The slow answers at the far end of the list. "Tail latency" means p95 or p99.</dd>
+<dt>Token</dt><dd>The chunk of text an LLM reads and writes: a short word, or a piece of a longer one.</dd>
+<dt>TTFT</dt><dd>Time To First Token: how long until the first piece of the answer arrives.</dd>
+<dt>Streaming</dt><dd>Sending the answer piece by piece as it's written, instead of all at the end.</dd>
+<dt>Throughput</dt><dd>How many tokens per second come out once the answer is flowing.</dd>
+<dt>Latency budget</dt><dd>The longest you can afford to wait. For "stop!", ours is 0.2 s.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full lesson: the ideas built from nothing, a demo where you watch the robot drive while its brain thinks, your homework, and a reaction-time challenge with a ruler.</p>
+
+<h2 id="problem">1. The problem</h2>
+<p>By now Robo-Helper can have several different brains:</p>
+<ul>
+<li><strong>words</strong>: Lesson 9's word counter. It counts words and picks the intent with the best score.</li>
+<li><strong>tinylm</strong>: Lesson 15's tiny language model. About 2,700 numbers, writes its plan word by word.</li>
+<li><strong>attention</strong>: the same model with attention (the Lesson 15 stretch). It works out which words to look at again for every word it writes.</li>
+<li><strong>tinylm-4bit</strong>: a sneak preview of next lesson. The attention model, taught extra phrasings and then squeezed to 4-bit numbers.</li>
+<li><strong>a world-class model over the internet</strong> (Claude), coming in Lesson 18. Billions of numbers, on computers far away. It can plan a whole tidy-up, but your question has to travel there and the answer has to travel back.</li>
+</ul>
+<p>Which one should drive the robot? "The smartest" sounds right, until you remember the cat. You need to know how fast each one is. So let's measure.</p>
+<p><strong>Obvious idea 1: time it once.</strong> Start a stopwatch, ask, stop the stopwatch. But computers are busy doing many things at once. The first call is often slower (the program is still "warming up": loading things into memory). An internet answer might hit a slow moment on the network. One measurement is one roll of the dice.</p>
+<p><strong>Obvious idea 2: time it many times and take the average.</strong> Better, but still a trap. Here are four timings, in seconds: <code>1, 2, 3, 100</code>. The average is <code>(1 + 2 + 3 + 100) / 4 = 26.5</code>. Not a single answer took anything like 26.5 seconds. The average hides both the usual case (about 2) and the scary case (100). We need better numbers.</p>
+
+<h2 id="principles">2. First principles</h2>
+
+<h3>Step 1: training versus inference</h3>
+<p>So far most of our lessons were about <strong>training</strong>: showing a model examples and nudging its numbers (Lessons 3, 4, 15). Training happens once, and it can be slow. Nobody minds if it takes all night.</p>
+<p><strong>Inference</strong> is the other half: the trained model, sitting still, being <em>used</em>. Every time someone says "put the red block in the bin", the brain runs inference once. A robot (or a chatbot with millions of users) runs inference again and again, forever. So most of the money and most of the waiting in AI is spent on inference, not training. <strong>Inference engineering</strong> is the job of making it fast, cheap and reliable. That's this lesson and the next.</p>
+
+<h3>Step 2: a precise stopwatch</h3>
+<p>Python has a very precise stopwatch: <code>time.perf_counter()</code>. It returns a number of seconds since some starting moment. The number itself means nothing; the <em>difference</em> between two readings is what you want:</p>
+<pre><code>start = time.perf_counter()
+do_the_thing()
+seconds = time.perf_counter() - start</code></pre>
+<p>Our word counter thinks for about <strong>0.000012 seconds</strong>. That's 0.012 milliseconds, or 12 microseconds. A school stopwatch could never see that. <code>perf_counter</code> can.</p>
+
+<h3>Step 3: measure many times, then sort</h3>
+<p>Here are 10 timings of an imaginary internet brain, in seconds. (These are made-up practice numbers, so you can work with a pen.)</p>
+<pre><code>1.2  1.1  1.3  1.2  4.8  1.1  1.2  1.4  1.2  1.3</code></pre>
+<p>First, sort them. Then number the positions from 0, like a Python list:</p>
+<pre><code>position:  0    1    2    3    4    5    6    7    8    9
+sorted:    1.1  1.1  1.2  1.2  1.2  1.2  1.3  1.3  1.4  4.8</code></pre>
+<p>The <strong>mean</strong> is the total divided by 10: <code>15.8 / 10 = 1.58</code> s. The <strong>percentile</strong> rule we'll use (it's called "nearest rank") says: the p-th percentile of n values is the one at position</p>
+<pre><code>position = ceil(p / 100 × n) − 1         (and never less than 0)</code></pre>
+<p><code>ceil</code> means "round <em>up</em> to a whole number": ceil(2.1) = 3, ceil(5) = 5. So:</p>
+<pre><code>p50: ceil(0.50 × 10) − 1 = 5 − 1 = 4     → sorted[4] = 1.2 s
+p95: ceil(0.95 × 10) − 1 = 10 − 1 = 9    → sorted[9] = 4.8 s</code></pre>
+<p>The usual answer takes 1.2 s. The bad-day answer takes 4.8 s. And the mean, 1.58 s, describes neither.</p>
+<details><summary>Predict first: what's the p90 of those 10 timings? And the p100?</summary>
+<p>p90: ceil(0.90 × 10) − 1 = 9 − 1 = 8, so <code>sorted[8] = 1.4</code> s. p100: ceil(10) − 1 = 9, so <code>4.8</code> s: the 100th percentile is always the slowest one. Notice how p90 and p95 are wildly different here: with only 10 timings, p95 is just "the worst one". That's why the homework times things 20 or 200 times.</p>
+</details>
+
+<h3>Step 4: why the slow answers matter most</h3>
+<p>p95 means "1 in 20 answers is slower than this". That sounds rare. But a robot that hears 100 commands a day gets about <strong>5 slow answers every day</strong>. If any of those is "stop!", the cat doesn't care that the <em>average</em> was fine.</p>
+<p>So the rule for a latency budget is: <strong>a brain fits only if its p95 fits</strong>. Big companies go further and watch p99 (1 in 100) or even p99.9, because with millions of users, "rare" happens every second.</p>
+<div class="note"><strong>Why averages lie.</strong> One very slow answer drags the mean up, so the mean looks worse than the usual case. Lots of fast answers drag it down, so it looks better than the bad case. It's in the middle of nowhere. Always report p50 <em>and</em> p95.</div>
+
+<h3>Step 5: a robot moves while it thinks</h3>
+<p>For a chatbot, a slow answer is annoying. For a robot, it's distance. If the robot keeps moving while the brain thinks:</p>
+<pre><code>distance = seconds × speed
+0.000013 s × 1 m/s = 0.000013 m = 0.013 mm      (word counter, p95)
+1.5 s      × 1 m/s = 1.5 m                      (an internet brain, made-up)
+1.5 s      × 0.5 m/s = 0.75 m                   (same brain, robot driving at half speed)</code></pre>
+<p>The robot has two choices while the brain thinks, and both cost something. It can <strong>keep moving</strong> (and travel blind), or it can <strong>freeze</strong> (and waste time standing still, so a 10-step tidy-up with a 5-second brain spends 50 seconds frozen).</p>
+
+<h3>Step 6: the 0.2-second rule, and why robots have layers</h3>
+<p>Our budget: the robot must react to "stop!" within <strong>0.2 seconds</strong>. That's about how fast a person reacts (you'll measure yours in the challenge).</p>
+<details><summary>Predict first: the word counter's p95 is 0.013 ms. The tiny LM's is 0.317 ms. An internet brain's p95 is (say) 3 s. Which fit the 0.2 s budget?</summary>
+<p>The word counter and tiny LM fit easily: 0.317 ms is 0.000317 s, more than 600 times under budget. The internet brain doesn't come close. Even if it was usually fast, one network hiccup and it's out. <strong>That's why safety reflexes must stay local</strong>, on the robot itself, never waiting for the internet.</p>
+</details>
+<p>Real robots are built in <strong>layers</strong>, fast at the bottom and smart at the top:</p>
+<ul>
+<li><strong>Reflexes</strong> (microseconds to milliseconds): a bumper switch, the "stop" word, the stop-neuron from Lesson 4. Always on the robot. Never skipped.</li>
+<li><strong>A small local brain</strong> (milliseconds): our word counter or tiny LM. Good enough for "go to the red block".</li>
+<li><strong>A big brain far away</strong> (seconds): plans the whole tidy-up, handles "the blue one, no wait, the green one". Its plan is checked (Lesson 10) and the reflexes still watch while it runs.</li>
+</ul>
+<p>Self-driving cars and warehouse robots work like this: a fast controller keeps them safe many times a second, and a slower planner decides where to go. The big brain plans; the small brains react.</p>
+
+<h3>Step 7: tokens, streaming and TTFT</h3>
+<p>An LLM doesn't read letters or whole words. It reads and writes <strong>tokens</strong>: chunks of text from a fixed list it learned. Common short words are usually one token ("the", "red"); long or rare words get split into pieces. A rough rule for English is about 4 letters per token, so 100 words is roughly 130 tokens. (It's only a rule of thumb: every model has its own token list.)</p>
+<p>Lesson 15's tiny LM showed you the core loop: predict the next word, add it, repeat. A big LLM does exactly that, one token at a time. So instead of waiting for the whole answer, the server can <strong>stream</strong> it: send each token the moment it's written. That splits the waiting into two parts:</p>
+<pre><code>ask ──────────── first token ── token ── token ── … ── last token
+    |←── TTFT ──→|←────────── the rest of the answer ──────────→|
+    |←──────────────────────── total time ─────────────────────→|</code></pre>
+<p><strong>TTFT</strong> (time to first token) includes the trip over the internet, waiting in line at the server, reading your whole question, and (for models like Claude that think before answering) the thinking. After the first token, the speed is the <strong>throughput</strong>:</p>
+<pre><code>tokens per second = (tokens_out − 1) / (total − TTFT)
+101 tokens, 3 s total, first token after 1 s:   (101 − 1) / (3 − 1) = 100 / 2 = 50 tokens/s</code></pre>
+<p>Why minus 1? The first token arrived <em>at</em> TTFT. The other 100 arrived during the remaining 2 seconds.</p>
+<details><summary>Predict first: 201 tokens, 5 s total, TTFT 1 s. Throughput? And what if TTFT equals the total time?</summary>
+<p>(201 − 1) / (5 − 1) = 200 / 4 = <strong>50 tokens/s</strong>. If TTFT equals total, the whole answer came at once: there's no time left to divide by (dividing by zero would crash), so we say 0.0.</p>
+</details>
+<p>For a chatbot, a short TTFT makes it <em>feel</em> fast: you start reading straight away. For a robot, streaming can help too: it can start on step 1 of a plan while steps 2 to 10 are still being written. But it can't stop for the cat any sooner.</p>
+
+<h3>Step 8: the price tag</h3>
+<p>Internet models charge per token, priced per <strong>million</strong> tokens, and writing costs more than reading. For claude-opus-5-5:</p>
+<pre><code>input (what you send):    $4  per 1,000,000 tokens
+output (what it writes):  $20 per 1,000,000 tokens
+
+one command, 1,000 tokens in and 200 out:
+  1,000 / 1,000,000 × $4  = $0.004
+    200 / 1,000,000 × $20 = $0.004
+  total                   = $0.008       (less than a penny)
+
+1,000 commands a day      = $8 a day</code></pre>
+<p>Two surprises. First: why 1,000 tokens in, for an 8-word command? Because every request also sends the instructions ("you are a robot, here are your tools, here are the rules") and a description of the room. That gets re-sent <em>every single time</em>. Second: output costs 5× more than input, so a chatty answer costs more than a long question. Lesson 17 attacks both.</p>
+<details><summary>Predict first: a million tokens in and nothing out. How much?</summary>
+<p>$4. That's what "per million" means. A million tokens is roughly 750,000 words: about ten long novels.</p>
+</details>
+
+<h3>Step 9: the real numbers, on our computer</h3>
+<p>Running <code>lesson16_speed.py</code> times each local brain 200 times on "put the red block in the bin":</p>
+<pre><code>words (Lesson 9)                p50 0.012 ms   p95 0.013 ms   robot travels 0.01 mm while thinking
+tinylm (Lesson 15)              p50 0.269 ms   p95 0.317 ms   robot travels 0.32 mm while thinking
+attention (Lesson 15 stretch)   p50 0.323 ms   p95 0.384 ms   robot travels 0.38 mm while thinking
+tinylm-4bit (Lesson 17)         p50 0.362 ms   p95 0.372 ms   robot travels 0.37 mm while thinking</code></pre>
+<p>The tiny LM is about 25× slower than the word counter, because it does thousands of multiplications instead of a few dozen look-ups. Attention is a little slower again, because it works out a fresh set of weights for every word it writes. But all of them are hundreds of times inside the 0.2 s budget. Notice how close p50 and p95 are: a small program on your own computer is very <em>consistent</em>. Internet brains have a much longer tail, because there are many more places to get stuck (your Wi-Fi, the internet, the queue at the server, how long the model decides to think).</p>
+<p>One surprise: the 4-bit brain is no faster than the attention model it came from (in this run it was even a little slower, which is just noise). In our Python, Lesson 17's 4-bit copy still keeps its rounded numbers as ordinary decimals, so it does exactly the same sums. It's 8× smaller to store, but speed only comes when the computer does the maths with small whole numbers, which needs special hardware or libraries. Measure; don't assume.</p>
+<p>When real recorded runs of Claude as the planner and the agent are added, their p50, p95, travel distance and cost for 12 commands go here.</p>
+<!-- CLAUDE-RESULTS -->
+<p>Until then, the demo below lets you try values for the internet brain and see what they would mean. They are not measurements.</p>
+
+<h2 id="play">3. Play with it</h2>
+<div class="card demo">
+<h3>Interactive: the slow tail and the cat</h3>
+<p class="legend">Top: 100 (or however many you pick) timings of an internet brain. These are <b>try values</b> drawn from the sliders, not measurements. Each dot is one answer. Lines show the <b>mean</b>, <b>p50</b> and <b>p95</b>, worked out with exactly the same nearest-rank rule as <code>percentile()</code> in the Python. Bottom: three robots drive at 1 m/s towards a cat 1 m ahead while their brain thinks for its p95 time. The word counter and tiny LM use the real p95s measured above.</p>
+<canvas id="spdcv" width="700" height="380" style="width:100%;height:auto" aria-label="Dot plot of simulated answer times with mean, p50 and p95 lines, and a timeline of three robots driving towards a cat while their brains think"></canvas>
+<p><label for="spdMed">Usual answer time of the internet brain (try values): <b id="spdMedV"></b></label><input type="range" id="spdMed" min="0.1" max="4" step="0.1" value="1.2"></p>
+<p><label for="spdTail">How often an answer is very slow (×4): <b id="spdTailV"></b></label><input type="range" id="spdTail" min="0" max="25" step="1" value="6"></p>
+<p>
+<label for="spdN">Timings:</label>
+<select id="spdN"><option>5</option><option>20</option><option selected>100</option><option>200</option></select>
+<button id="spdNew">New random day</button>
+<button id="spdGo">Drive!</button>
+</p>
+<div class="stats">
+  <div class="stat"><div class="k">p50</div><div class="v" id="spdP50">–</div></div>
+  <div class="stat"><div class="k">p95</div><div class="v" id="spdP95">–</div></div>
+  <div class="stat"><div class="k">Mean</div><div class="v" id="spdMean">–</div></div>
+  <div class="stat"><div class="k">Travels in p95</div><div class="v" id="spdDist">–</div></div>
+  <div class="stat"><div class="k">Fits 0.2 s?</div><div class="v" id="spdFit">–</div></div>
+</div>
+<p><label for="spdIn">Tokens in:</label> <input type="number" id="spdIn" value="1000" min="0" step="100" style="width:7em">
+<label for="spdOut">Tokens out:</label> <input type="number" id="spdOut" value="200" min="0" step="50" style="width:7em">
+<label for="spdDay">Commands a day:</label> <input type="number" id="spdDay" value="100" min="0" step="10" style="width:6em"></p>
+<div class="stats">
+  <div class="stat"><div class="k">Cost per command</div><div class="v" id="spdCost">–</div></div>
+  <div class="stat"><div class="k">Cost per day</div><div class="v" id="spdCostDay">–</div></div>
+  <div class="stat"><div class="k">Time frozen per day (p50)</div><div class="v" id="spdFrozen">–</div></div>
+</div>
+<p class="legend">Things to try: set "very slow" to 0 and see p50, p95 and mean land together. Now push it to 10%: p50 barely moves, the mean creeps up, and p95 jumps. Pick 5 timings and press "New random day" a few times: p95 is just "the worst one" and jumps around wildly, which is why we time things many times. Then find the slowest usual time for which the internet robot still stops before the cat. Does it ever fit the 0.2 s budget?</p>
+</div>
+
+<h2 id="homework">4. Homework</h2>
+<p>Open <code>homework/lesson16_speed.py</code>. It needs your finished Lesson 9 (the word counter) and Lesson 15 (the tiny LM), because the bottom of the file times them. It also times the attention stretch and Lesson 17's 4-bit brain. Until you've built those, it skips their rows. Already written for you: <code>measure_stream</code>, which times a real streamed answer from Claude (only used if you have an API key), and <code>load_recorded_seconds</code>, which reads recorded real runs. Write these seven functions, in order.</p>
+
+<h3>4.1 <code>time_it(fn, repeats=20)</code></h3>
+<p>Call <code>fn()</code> <code>repeats</code> times, timing each call on its own. Return the list of times in seconds. Example: <code>time_it(lambda: sum(range(1000)), 5)</code> → a list of 5 small numbers, like <code>[2.1e-05, 1.4e-05, 1.3e-05, 1.3e-05, 1.3e-05]</code> (yours will differ; notice the first one is often the slowest).</p>
+<details><summary>Hint 1</summary><p>You need one stopwatch reading before <em>each</em> call and one after it, not one around the whole loop.</p></details>
+<details><summary>Hint 2</summary><p>Make an empty list. Loop <code>repeats</code> times (<code>for _ in range(repeats)</code>: the <code>_</code> means "I don't need the counter").</p></details>
+<details><summary>Hint 3</summary><p>Inside the loop: <code>start = time.perf_counter()</code>, then <code>fn()</code>, then append <code>time.perf_counter() - start</code> to the list. Return the list after the loop.</p></details>
+
+<h3>4.2 <code>percentile(values, p)</code></h3>
+<p>The nearest-rank percentile from Step 3. Examples: <code>percentile([5, 1, 3, 2, 4], 50)</code> → sorted <code>[1, 2, 3, 4, 5]</code>, position ceil(2.5) − 1 = 2 → <code>3</code>. And <code>percentile([7], 50)</code> → <code>7</code>.</p>
+<details><summary>Hint 1</summary><p>Sort first. Use <code>sorted(values)</code>, which makes a new sorted list and leaves the caller's list alone.</p></details>
+<details><summary>Hint 2</summary><p><code>math.ceil</code> rounds up. The position is <code>math.ceil(p / 100 * len(s)) - 1</code>. What happens for p = 0? The position would be −1, which in Python means "the last one". Wrong! That's why the docstring says "at least position 0".</p></details>
+<details><summary>Hint 3</summary><p><code>s = sorted(values)</code>, then return <code>s[max(0, math.ceil(p / 100 * len(s)) - 1)]</code>.</p></details>
+
+<h3>4.3 <code>summarize(seconds)</code></h3>
+<p>Return a dictionary with three numbers. Example: <code>summarize([1, 2, 3, 100])</code> → <code>{"p50": 2, "p95": 100, "mean": 26.5}</code>. (Check p50 by hand: ceil(0.5 × 4) − 1 = 1 → sorted[1] = 2.)</p>
+<details><summary>Hint 1</summary><p>You've already written the hard part. Use your <code>percentile</code> twice.</p></details>
+<details><summary>Hint 2</summary><p>The file imports <code>statistics</code>; <code>statistics.mean(seconds)</code> gives the mean.</p></details>
+<details><summary>Hint 3</summary><p>Return <code>{"p50": percentile(seconds, 50), "p95": percentile(seconds, 95), "mean": statistics.mean(seconds)}</code>.</p></details>
+
+<h3>4.4 <code>tokens_per_second(tokens_out, seconds_total, ttft)</code></h3>
+<p>Throughput after the first token (Step 7). Example: <code>tokens_per_second(101, 3.0, 1.0)</code> → <code>50.0</code>. And <code>tokens_per_second(1, 1.0, 1.0)</code> → <code>0.0</code>.</p>
+<details><summary>Hint 1</summary><p>Two cases. Deal with "no time left" first.</p></details>
+<details><summary>Hint 2</summary><p>If <code>seconds_total - ttft</code> is 0 or less, return <code>0.0</code>.</p></details>
+<details><summary>Hint 3</summary><p>Otherwise return <code>(tokens_out - 1) / (seconds_total - ttft)</code>.</p></details>
+
+<h3>4.5 <code>cost_usd(tokens_in, tokens_out, price=PRICE_PER_MTOK)</code></h3>
+<p>Dollars for one answer (Step 8). Example: <code>cost_usd(1000, 200)</code> → <code>0.008</code>. <code>cost_usd(1_000_000, 0)</code> → <code>4.0</code>.</p>
+<details><summary>Hint 1</summary><p><code>price</code> is a dictionary: <code>price["input"]</code> is 4.00 and <code>price["output"]</code> is 20.00, in dollars per <em>million</em> tokens.</p></details>
+<details><summary>Hint 2</summary><p>Turn tokens into "millions of tokens" first: divide by <code>1e6</code> (that's 1,000,000 written short).</p></details>
+<details><summary>Hint 3</summary><p>Return <code>tokens_in / 1e6 * price["input"] + tokens_out / 1e6 * price["output"]</code>.</p></details>
+
+<h3>4.6 <code>thinking_distance(seconds, speed=ROBOT_SPEED)</code> and 4.7 <code>fits_budget(summary, budget_seconds)</code></h3>
+<p><code>thinking_distance(2.5)</code> → <code>2.5</code> metres (at 1 m/s); <code>thinking_distance(2, speed=0.5)</code> → <code>1.0</code>. <code>fits_budget({"p50": 0.1, "p95": 0.3}, 0.2)</code> → <code>False</code>, even though the usual answer is fast. <code>fits_budget({"p50": 0.1, "p95": 0.2}, 0.2)</code> → <code>True</code>.</p>
+<details><summary>Hint 1</summary><p>Distance = time × speed (Step 5). A budget is judged on the slow answers (Step 4).</p></details>
+<details><summary>Hint 2</summary><p><code>summary</code> is the dictionary from <code>summarize</code>. Which key holds the slow answers?</p></details>
+<details><summary>Hint 3</summary><p><code>return seconds * speed</code>, and <code>return summary["p95"] &lt;= budget_seconds</code> (equal to the budget still fits).</p></details>
+
+<h3>Run it</h3>
+<pre><code>cd homework
+python3 lesson16_speed.py</code></pre>
+<p>What you should see (this is the real output of the reference solution; your milliseconds will be different, because your computer is different):</p>
+<pre><code>Timing each brain's THINKING on 'put the red block in the bin' (200 runs)
+
+brain                                 p50        p95  robot travels while thinking
+words (Lesson 9)                  0.012ms    0.013ms  0.01 mm
+tinylm (Lesson 15)                0.269ms    0.317ms  0.32 mm
+attention (Lesson 15 stretch)     0.323ms    0.384ms  0.38 mm
+tinylm-4bit (Lesson 17)           0.362ms    0.372ms  0.37 mm
+planner (Claude)              no recordings yet (see brains.py record)
+agent (Claude)                no recordings yet (see brains.py record)
+
+Budget: the robot must react to a 'stop!' within 0.2 s.
+Which brains could you trust with that? Which could still plan a whole tidy-up?</code></pre>
+<p>Answer those last two questions in a comment at the bottom of your file. (Hint: Step 6.)</p>
+
+<h3>Check it</h3>
+<pre><code>cd ..
+python3 check.py 16</code></pre>
+<p>A green ✓ means that part passed. A red ✗ comes with a hint, for example:</p>
+<ul>
+<li><code>✗ percentile: one value: it's every percentile</code>: your position probably came out as −1 or 1 for a one-item list. Use <code>max(0, …)</code> and remember to subtract 1.</li>
+<li><code>✗ thinking_distance + fits_budget: p95 0.3 s doesn't fit a 0.2 s budget, even if p50 does</code>: you're judging the budget by the usual answer. Judge it by the slow ones.</li>
+</ul>
+<p>All green shows <code>6/6 passed</code>.</p>
+
+<h3>Stretch</h3>
+<ul>
+<li>Time the word counter with <code>repeats=5</code> and print every timing. Is the first one slower? Now time it 2,000 times and compare the p95 with 200 times. Which do you trust more?</li>
+<li>Time the tiny LM on a long command (repeat "the red block" 20 times in one sentence). Does latency grow with the length of the command? Why? (Look at <code>read</code> in Lesson 15.)</li>
+<li>Add a <code>p99</code> to <code>summarize</code>. With 20 timings, what position is it? Is that a sensible thing to report?</li>
+<li>If you have an API key: call <code>measure_stream</code> 10 times and print TTFT, total, and <code>tokens_per_second</code>. Then <code>summarize</code> the totals.</li>
+</ul>
+
+<h2 id="challenge">5. Real-world challenge: measure your own brain's latency</h2>
+<p>You are a brain too. Let's find your p50 and p95, and see if you fit the 0.2 s stop budget.</p>
+<p><strong>Part A: the ruler drop (reaction time).</strong></p>
+<ol>
+<li>A friend holds a 30 cm ruler vertically, with the 0 mark at the bottom, between your open thumb and finger (not touching).</li>
+<li>Without warning, they let go. You catch it as fast as you can. Write down the centimetre mark where your fingers caught it.</li>
+<li>Do it <strong>20 times</strong>. Write every number down, including the bad ones. A miss counts as 30+.</li>
+<li>Turn each distance into time. Things fall faster and faster, so the rule is <code>time = √(2 × distance ÷ 9.8)</code> with distance in metres. Or use this table:
+<pre><code>caught at:  5 cm   10 cm   15 cm   20 cm   25 cm   30 cm
+time:       0.10 s 0.14 s  0.18 s  0.20 s  0.23 s  0.25 s</code></pre></li>
+<li>Sort your 20 times. Your p50 is position ceil(0.5 × 20) − 1 = 9 (the 10th smallest). Your p95 is position ceil(0.95 × 20) − 1 = 18 (the 19th smallest). Work out the mean too.</li>
+<li>Now do 20 more while <strong>distracted</strong>: your friend asks you maths questions, or you count backwards from 100 in sevens. Work out p50 and p95 again.</li>
+</ol>
+<p><strong>Part B: time to first token.</strong> Ask a friend "name ten animals" and use a phone stopwatch with laps. Press lap at the first animal and at the last. TTFT = time to the first animal. Throughput = 9 ÷ (total − TTFT) animals per second. Try a harder question ("name ten countries in Africa"). Which grows more: TTFT or total?</p>
+<p><strong>What to record:</strong> both sets of 20 times sorted, p50, p95 and mean for each, and the animal timings.</p>
+<p><strong>What it should teach you:</strong> distraction barely moves your p50 but stretches your tail, just like a busy computer or a busy server. Your p95 is probably close to the 0.2 s budget, and that's with a <em>local</em> brain (yours) and no internet. Harder questions mostly add to the "thinking before the first word" time, just like an LLM that thinks before it writes.</p>
+
+<h2 id="project">6. Your Robo-Helper so far</h2>
+<div class="card note">
+<p><strong>What this adds to your robot.</strong> Before this lesson, nobody knew how long the robot's brain took, so nobody knew whether it could stop in time. Now it does. Row 16 of <code>python3 progress.py --solutions</code> measured: <em>"tiny LM p95 0.3 ms = 0.3 mm rolled while thinking"</em> on "put the red and blue blocks away". That's more than 600 times inside the 0.2 s stop budget. (Your number will differ: it depends on your computer and how busy it is.)</p>
+</div>
+<p>Robo-Helper now has a <strong>stopwatch and a price tag</strong>. <code>time_it</code> and <code>summarize</code> give any brain a p50 and p95; <code>thinking_distance</code> turns that into metres; <code>fits_budget</code> says yes or no for a safety budget; <code>cost_usd</code> says what each answer costs.</p>
+<p>These get used for real later. In <a href="19-bakeoff.html">Lesson 19</a>, the bake-off runs every brain on the same 12 tasks, and its <code>scorecard()</code> function calls your <code>summarize()</code> and <code>cost_usd()</code> to report each brain's p50, p95 and total cost side by side. Before that, <a href="17-faster.html">Lesson 17</a> uses this lesson's way of thinking to make the brains cheaper and faster, and <a href="18-world-class.html">Lesson 18</a> puts a world-class brain in charge of planning while the fast local layers keep watch.</p>
+
+<h2 id="mistakes">7. Common mistakes</h2>
+<ul>
+<li><strong>Timing the whole loop instead of each call</strong>, so you get one number instead of a list. Checker hint: <em>"time_it(fn, 5) should return 5 timings"</em>.</li>
+<li><strong>Forgetting to sort</strong>, or getting the position off by one. The nearest-rank position is <code>ceil(p / 100 × n) − 1</code>, never below 0. Checker hint: <em>"95th percentile of 1..100 is 95"</em>.</li>
+<li><strong>Judging a budget by the mean or p50.</strong> The cat meets your slow answers. Checker hint: <em>"p95 0.3 s doesn't fit a 0.2 s budget, even if p50 does"</em>.</li>
+<li><strong>Forgetting "per million".</strong> Multiplying 1,000 tokens by $4 gives $4,000 instead of $0.004. Checker hint: <em>"a million input tokens cost $4"</em>.</li>
+<li><strong>Dividing by zero in <code>tokens_per_second</code></strong> when the whole answer arrived at once. Checker hint: <em>"no time after the first token -&gt; 0.0"</em>.</li>
+</ul>
+
+<h2 id="check">8. Check yourself</h2>
+<details><summary>Predict: what does <code>summarize([0.2, 0.1, 0.1, 0.3, 0.1])</code> return?</summary><p>Sorted: <code>[0.1, 0.1, 0.1, 0.2, 0.3]</code>. p50: ceil(2.5) − 1 = 2 → 0.1. p95: ceil(4.75) − 1 = 4 → 0.3. Mean: 0.8 / 5 = 0.16. So <code>{"p50": 0.1, "p95": 0.3, "mean": 0.16}</code>. The usual answer is 0.1 s, but the slow one fails a 0.2 s budget.</p></details>
+<details><summary>What's the difference between training and inference, and which one does a robot do every time you speak to it?</summary><p>Training adjusts the model's numbers using examples, once, ahead of time. Inference uses the finished model to answer. The robot runs inference on every command.</p></details>
+<details><summary>A brain has p50 = 0.05 s and p95 = 0.4 s. Can it handle "stop!" with a 0.2 s budget? Why might its p95 be so much bigger than its p50?</summary><p>No: 1 in 20 answers takes longer than 0.2 s, and the budget is judged by p95. A long tail usually means the brain sometimes waits on something else: the network, a busy server, other programs on the computer, or a model that occasionally thinks much longer.</p></details>
+<details><summary>An answer has 51 tokens, TTFT 2 s and total 4.5 s. What's the throughput, and which part of the wait would streaming help with?</summary><p>(51 − 1) / (4.5 − 2) = 50 / 2.5 = 20 tokens/s. Streaming lets you see the first token after 2 s instead of 4.5 s. It doesn't make the total shorter.</p></details>
+<details><summary>500 tokens in and 500 out. What does it cost, and which half is more expensive?</summary><p>In: 500 / 1,000,000 × $4 = $0.002. Out: 500 / 1,000,000 × $20 = $0.01. Total $0.012. The output is 5× more expensive.</p></details>
+
+<h2 id="deeper">9. Go deeper (optional)</h2>
+<ul>
+<li><a href="../09-inference-engineering/index.html">Inference engineering</a>: the grown-up version of this lesson, as 10 pages and 25 interview-style problems.</li>
+<li><a href="../09-inference-engineering/01-request-lifecycle.html#p1">What happens between a request arriving and the first token leaving</a>: everything hiding inside TTFT.</li>
+<li><a href="../09-inference-engineering/05-latency.html#p17">"Your p99 latency is 10× your p50. Diagnose it"</a>: where long tails come from, and how engineers hunt them down.</li>
+<li><a href="../04-distill-small-models.html#latency">Latency is a safety number</a>: why robots need small, fast models, and a preview of Lesson 17.</li>
+<li><a href="../15-inference-engineering-companion.html#why-robotics">Inference engineering companion: why it matters for robotics</a>.</li>
+</ul>
+
+<nav class="pager">
+  <a href="11-capstone.html"><small>Previous</small>Week 7 · Lesson 11 · Capstone: Robo-Helper</a>
+  <a class="next" href="17-faster.html"><small>Next</small>Week 9 · Lesson 17 · Faster and cheaper</a>
+</nav>
+<footer>Build a Robot Brain · Week 8 · Lesson 16</footer>
+</main>
+
+<script>
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+// the same rules as lesson16_speed.py
+const ROBOT_SPEED = 1.0, BUDGET = 0.2, PRICE_PER_MTOK = { input: 4.0, output: 20.0 };
+function percentile(values, p) {
+  const s = [...values].sort((a, b) => a - b);
+  return s[Math.max(0, Math.ceil(p / 100 * s.length) - 1)];
+}
+const mean = v => v.reduce((a, b) => a + b, 0) / v.length;
+const summarize = sec => ({ p50: percentile(sec, 50), p95: percentile(sec, 95), mean: mean(sec) });
+const tokensPerSecond = (out, total, ttft) => total - ttft <= 0 ? 0.0 : (out - 1) / (total - ttft);
+const costUsd = (tin, tout, price = PRICE_PER_MTOK) => tin / 1e6 * price.input + tout / 1e6 * price.output;
+const thinkingDistance = (s, speed = ROBOT_SPEED) => s * speed;
+const fitsBudget = (sum, budget) => sum.p95 <= budget;
+
+// the real p95s measured by lesson16_speed.py on our computer (seconds)
+const REAL = [{ name: 'words (Lesson 9)', p95: 0.000013 }, { name: 'tinylm (Lesson 15)', p95: 0.000317 }];
+const CAT_AT = 1.0;   // metres ahead
+
+// seeded random numbers, so the same sliders always give the same "day"
+function mulberry32(a) {
+  return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+// try values: usual time with a little wobble, and sometimes a 4x slow answer
+function tryTimings(n, usual, tailPct, seed) {
+  const r = mulberry32(seed), out = [];
+  for (let i = 0; i < n; i++) {
+    const g = Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(2 * Math.PI * r());
+    let t = usual * Math.exp(0.15 * g);
+    if (r() * 100 < tailPct) t *= 4;
+    out.push(t);
+  }
+  return out;
+}
+const fmtS = s => s < 0.001 ? (s * 1000).toFixed(3) + ' ms' : s.toFixed(2) + ' s';
+const fmtM = m => m < 0.01 ? (m * 1000).toFixed(2) + ' mm' : m.toFixed(2) + ' m';
+
+if (typeof document !== 'undefined') {
+  const cv = document.getElementById('spdcv'), ctx = cv.getContext('2d');
+  const $ = id => document.getElementById(id);
+  let seed = 1, times = [], sum, anim = null;
+
+  function compute() {
+    times = tryTimings(+$('spdN').value, +$('spdMed').value, +$('spdTail').value, seed);
+    sum = summarize(times);
+  }
+  function vline(x, y0, y1, col, label, ly, dash) {
+    ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.setLineDash(dash ? [5, 4] : []);
+    ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = col; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(label, x, ly);
+  }
+  function draw(tNow) {
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    const L = 40, R = 680, fg = css('--fg'), muted = css('--muted'), line = css('--line');
+    // top: dot plot of timings
+    const xmax = Math.max(...times, BUDGET) * 1.08, X = s => L + (R - L) * s / xmax, base = 150;
+    ctx.strokeStyle = line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(L, base); ctx.lineTo(R, base); ctx.stroke();
+    ctx.fillStyle = muted; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+    const step = xmax > 8 ? 2 : xmax > 3 ? 1 : xmax > 1 ? 0.5 : 0.1;
+    for (let s = 0; s <= xmax; s += step) ctx.fillText(s.toFixed(step < 1 ? 1 : 0) + ' s', X(s), base + 14);
+    const cols = times.map(t => Math.round(X(t) / 7)), tall = {};
+    cols.forEach(c => tall[c] = (tall[c] || 0) + 1);
+    const dy = Math.min(7, 82 / Math.max(...Object.values(tall))), stacks = {};
+    ctx.fillStyle = css('--pass');
+    for (const col of cols) {
+      const k = stacks[col] = (stacks[col] || 0) + 1;
+      ctx.beginPath(); ctx.arc(col * 7, base - 4 - (k - 1) * dy, 3, 0, 2 * Math.PI); ctx.fill();
+    }
+    vline(X(BUDGET), 30, base, css('--warn'), '0.2 s budget', 22, true);
+    vline(X(sum.mean), 40, base, muted, 'mean', 36, true);
+    vline(X(sum.p50), 52, base, css('--accent'), 'p50', 48);
+    vline(X(sum.p95), 52, base, css('--fail'), 'p95', 48);
+    // bottom: three robots driving towards a cat while thinking
+    const lanes = [...REAL, { name: 'internet brain (try values)', p95: sum.p95 }];
+    const MMAX = 3, MX = m => 200 + (R - 200) * Math.min(m, MMAX) / MMAX, top = 205;
+    ctx.fillStyle = fg; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('Driving at 1 m/s while the brain thinks for its p95 time', L, 188);
+    ctx.font = '11px sans-serif'; ctx.fillStyle = muted; ctx.textAlign = 'center';
+    for (let m = 0; m <= MMAX; m += 0.5) ctx.fillText(m + ' m', MX(m), top + 3 * 50 + 6);
+    const catX = MX(CAT_AT);
+    ctx.strokeStyle = css('--fail'); ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(catX, top - 6); ctx.lineTo(catX, top + 140); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = css('--fail'); ctx.fillText('cat', catX, top - 10);
+    lanes.forEach((ln, i) => {
+      const y = top + i * 50 + 20, t = tNow === undefined ? ln.p95 : Math.min(tNow, ln.p95);
+      const d = thinkingDistance(t), hit = d >= CAT_AT;
+      ctx.fillStyle = fg; ctx.textAlign = 'left'; ctx.font = '12px sans-serif'; ctx.fillText(ln.name, L - 30, y - 6);
+      ctx.fillStyle = muted; ctx.font = '11px sans-serif'; ctx.fillText('p95 ' + fmtS(ln.p95) + ' → ' + fmtM(thinkingDistance(ln.p95)), L - 30, y + 10);
+      ctx.strokeStyle = line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(MX(0), y); ctx.lineTo(R, y); ctx.stroke();
+      ctx.fillStyle = hit ? css('--fail') : css('--accent'); ctx.globalAlpha = 0.35;
+      ctx.fillRect(MX(0), y - 5, Math.max(1, MX(d) - MX(0)), 10); ctx.globalAlpha = 1;
+      ctx.fillRect(MX(d) - 6, y - 8, 12, 16);
+      if (d > MMAX) { ctx.fillStyle = css('--fail'); ctx.textAlign = 'right'; ctx.fillText('→ ' + fmtM(d), R, y - 12); }
+    });
+  }
+  function update() {
+    compute();
+    $('spdMedV').textContent = (+$('spdMed').value).toFixed(1) + ' s';
+    $('spdTailV').textContent = $('spdTail').value + '% of answers';
+    $('spdP50').textContent = fmtS(sum.p50); $('spdP95').textContent = fmtS(sum.p95); $('spdMean').textContent = fmtS(sum.mean);
+    $('spdDist').textContent = fmtM(thinkingDistance(sum.p95));
+    $('spdFit').textContent = fitsBudget(sum, BUDGET) ? 'yes' : 'no';
+    const c = costUsd(+$('spdIn').value, +$('spdOut').value), day = +$('spdDay').value;
+    $('spdCost').textContent = '$' + c.toFixed(4); $('spdCostDay').textContent = '$' + (c * day).toFixed(2);
+    $('spdFrozen').textContent = Math.round(sum.p50 * day) + ' s';
+    draw();
+  }
+  function drive() {
+    if (anim) cancelAnimationFrame(anim);
+    const t0 = performance.now();
+    const frame = now => { const t = (now - t0) / 1000; draw(t); if (t < sum.p95) anim = requestAnimationFrame(frame); else anim = null; };
+    anim = requestAnimationFrame(frame);
+  }
+  ['spdMed', 'spdTail', 'spdN', 'spdIn', 'spdOut', 'spdDay'].forEach(id => $(id).addEventListener('input', update));
+  $('spdNew').onclick = () => { seed++; update(); };
+  $('spdGo').onclick = drive;
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => draw());
+  update();
+} else {
+  module.exports = { percentile, summarize, tokensPerSecond, costUsd, thinkingDistance, fitsBudget, tryTimings };
+}
+</script>
+</body>
+</html>

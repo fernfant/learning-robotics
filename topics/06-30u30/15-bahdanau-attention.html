@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 15 · Bahdanau Attention</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 15</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Unit 3 · The Transformer era · Day 15</div>
+<h1>Neural Machine Translation by Jointly Learning to Align and Translate</h1>
+<p class="lede">Stop squeezing a whole sentence into one vector. Let the decoder look back at every source word, and learn where to look.</p>
+
+<div class="facts">
+  <div><b>Authors</b>Dzmitry Bahdanau, KyungHyun Cho, Yoshua Bengio</div>
+  <div><b>Year / venue</b>2014 arXiv · ICLR 2015</div>
+  <div><b>Core idea</b>Learned soft alignment (attention)</div>
+  <div><b>Study time</b>3–4 h</div>
+</div>
+<p class="meta">Original: <a href="https://arxiv.org/abs/1409.0473">arXiv:1409.0473</a> · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/15_bahdanau_attention">30u30 Day 15</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Instead of squeezing a whole sentence into one memory before translating it, the computer looks back at the original words each time it writes a new word.</p>
+
+<h3>Think of it like this</h3>
+<p>Picture translating a long sentence for homework. You could try to memorise the whole sentence, cover it, and then write the translation. That gets hard fast with long sentences. Or you could keep the sentence in front of you and run your finger along it, glancing back at the part you need for each word you write. This paper taught computers to use the finger.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>The computer reads the sentence and makes a note for each word. Each note also knows a bit about the words before and after it.</li>
+<li>Before writing the next translated word, it gives each original word a score: how useful is this word right now?</li>
+<li>The scores are turned into shares that add up to 100%.</li>
+<li>It blends the notes using those shares, and uses the blend to choose the next word.</li>
+<li>Then it repeats for the next word. The shares can be drawn as a grid that shows which word matched which.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Tell a robot "put the red block left of the bowl". While it decides where to move, it should focus on "red block" first and "left of the bowl" later. Modern robots that follow spoken instructions use this kind of attention to link words to actions.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Take a short sentence in a language you are learning. Translate it while pointing at the original word you are using for each new word. Did your finger ever jump backwards? (In French, "European Economic Area" comes out in the opposite order.)</li>
+<li>In the demo further down, click a row of the grid, such as "zone", to see which English word it looks at most. Then move the <b>Score scale</b> slider: low makes the focus blurry, high makes it sharp.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Translation</dt><dd>Turning a sentence in one language into another.</dd>
+<dt>Encoder and decoder</dt><dd>The part that reads the sentence and the part that writes the answer.</dd>
+<dt>Attention weights</dt><dd>The shares that say how much to focus on each word. They add up to 100%.</dd>
+<dt>Alignment</dt><dd>Which original word matches which translated word.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>The 2014 encoder–decoder translators read a source sentence into one fixed-length vector and generated the translation from it. The authors suspected that vector was the bottleneck, especially for long sentences. Their model, RNNsearch, keeps one vector per source word and, before producing each target word, computes a fresh weighted average of them. The weights come from a small network trained jointly with everything else. This is the attention mechanism that the Transformer (<a href="13-attention.html">Day 13</a>) later kept and built on.</p>
+</div>
+<ul>
+<li><strong>Encoder:</strong> a bidirectional RNN. Each source word gets an "annotation" that concatenates a forward and a backward state.</li>
+<li><strong>Alignment model:</strong> a one-hidden-layer network scores how well each annotation fits the decoder's current state. Softmax turns scores into weights.</li>
+<li><strong>Context:</strong> each target word gets its own context vector, the weighted sum of annotations.</li>
+<li><strong>Result:</strong> on WMT'14 English→French, RNNsearch-50 scored 26.75 BLEU against 17.82 for the plain encoder–decoder, and held up on long sentences where the baseline collapsed.</li>
+<li><strong>Bonus:</strong> the weights form an alignment matrix you can plot and read.</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<p>Source words <code>x_1 … x_T</code>, target words <code>y_1 … y_m</code>. For target step <em>i</em>:</p>
+<pre><code>h_j  = [ h→_j ; h←_j ]                          # annotation of source word j
+e_ij = v_aᵀ · tanh( W_a · s_{i−1} + U_a · h_j )  # alignment score
+α_ij = exp(e_ij) / Σ_k exp(e_ik)                 # attention weights, sum to 1
+c_i  = Σ_j α_ij · h_j                             # context for this step
+s_i  = f( s_{i−1}, y_{i−1}, c_i )                # decoder state update
+p(y_i | y_&lt;i, x) = g( y_{i−1}, s_i, c_i )</code></pre>
+<ul>
+<li><code>h→_j</code> summarises words 1..j, <code>h←_j</code> words j..T. Together the annotation describes the whole sentence, centred on word j.</li>
+<li><code>s_{i−1}</code> is the decoder's state just before it emits word i: "what I've written so far and what I need next".</li>
+<li><code>W_a</code>, <code>U_a</code>, <code>v_a</code> are learned. This is <strong>additive</strong> attention: project both vectors, add, squash, reduce to one number. <code>U_a·h_j</code> doesn't depend on i, so it is computed once per sentence.</li>
+<li><code>α_ij</code> is a soft alignment: the probability that target word i lines up with source word j. <code>c_i</code> is the expected annotation under that distribution.</li>
+<li><code>f</code> is a gated recurrent unit and <code>g</code> a small output network with a maxout layer. Everything, alignment included, is trained end to end on translation loss.</li>
+</ul>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>The fixed-vector bottleneck, measured</h3>
+<p>The paper trained each model twice, on sentences up to 30 and up to 50 words. On the full test set (BLEU):</p>
+<ul>
+<li>RNNencdec-30: 13.93 · RNNsearch-30: 21.50</li>
+<li>RNNencdec-50: 17.82 · RNNsearch-50: 26.75 (28.45 when trained much longer)</li>
+</ul>
+<p>Even RNNsearch-30 beat RNNencdec-50, a model trained on longer sentences. Restricted to sentences with no unknown words, the long-trained RNNsearch reached 36.15, above the phrase-based Moses system's 35.63. The baseline's score dropped sharply as sentences got longer. RNNsearch's barely moved. Setup for scale: 1000 hidden units, a 30,000-word vocabulary per language, about 5 days of training per model.</p>
+
+<h3>Reading an alignment</h3>
+<p>Each row of the α matrix is one target word, each column one source word. English→French is mostly monotonic, so the mass sits near the diagonal. The interesting cells are the exceptions. The paper's example: "European Economic Area" becomes "zone économique européenne", and the model jumps to <em>Area</em> for <em>zone</em>, then steps backwards. And because alignment is soft, "the man" → "l' homme" can look at both English words when choosing <em>l'</em>, which depends on the noun that follows.</p>
+<div class="card demo">
+<h3>Interactive: an alignment matrix</h3>
+<p class="legend">Illustrative scores, hand-set to mimic the shape of the paper's Figure 3(a), not a trained model. Weights are computed with the real softmax. Click a row to see that target word's weights. The slider scales all scores: low = blurry, high = near-hard alignment.</p>
+<canvas id="al" width="700" height="220" aria-label="Alignment matrix between an English sentence and its French translation"></canvas>
+<label for="sh">Score scale: <span id="shv" class="num"></span></label>
+<input id="sh" type="range" min="0.2" max="6" step="0.1" value="2">
+<div class="stats">
+  <div class="stat"><div class="k">Target word</div><div class="v" id="tw">–</div></div>
+  <div class="stat"><div class="k">Top source word</div><div class="v" id="ts">–</div></div>
+  <div class="stat"><div class="k">Its weight</div><div class="v" id="tp">–</div></div>
+  <div class="stat"><div class="k">Row sum</div><div class="v" id="rs">–</div></div>
+</div>
+</div>
+
+<h3>Additive vs dot-product, and what came next</h3>
+<p>Bahdanau's score is a tiny MLP. Later work, and the Transformer, replaced it with a dot product <code>q·k</code>, which is just a matrix multiply and much faster on GPUs. The Transformer paper notes the two perform similarly for small key widths, and that additive wins over <em>unscaled</em> dot product for large widths. That gap is why they added the 1/√d_k scaling. The other leap was to let the source attend to itself (self-attention) and to drop the RNN entirely. <a href="18-pointer-networks.html">Day 18</a> takes the opposite turn: it uses these same additive weights as the <em>output</em>.</p>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Language-conditioned control is a translation problem.</strong> "Put the red block left of the bowl" must map to a sequence of actions. Cross-attention from the action decoder to instruction tokens, the direct descendant of this paper, is how VLA policies ground words in behaviour.</li>
+<li><strong>Attention over the observation, not a summary of it.</strong> Compressing a camera image into one global vector loses the small object you need to grasp. Letting the policy attend to spatial feature locations per step keeps that detail, exactly as RNNsearch keeps per-word annotations.</li>
+<li><strong>Alignments are a debugging tool.</strong> Plotting which image regions or instruction words an action attended to is a quick sanity check for a learned policy, with the usual caveat that attention weights are a hint, not a proof of reasoning.</li>
+<li><strong>Demonstration alignment.</strong> Matching a robot's execution to a human demonstration of a different speed is the same soft-alignment problem: monotonic most of the time, with the occasional jump.</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Read sections 2–3 for the model and section 5 for results. Then read Appendix A for the exact equations, including the alignment network's shape.</li>
+<li>In the 30u30 Day 15 folder, read <code>implementation.py</code>, focusing on the attention module, then run <code>train_minimal.py</code>.</li>
+<li>Use <code>visualization.py</code> or <code>notebook.ipynb</code> to plot your own alignment matrices. Check every row sums to 1.</li>
+<li>Do exercises 1–5 in order. Compare against <code>solutions/</code> only after a real attempt.</li>
+<li>Stretch: swap the additive score for a scaled dot product and compare speed and quality.</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>What bottleneck does the paper remove?</summary><p>The single fixed-length vector that summarised the whole source sentence. RNNsearch keeps one annotation per source word and builds a new context for every target word.</p></details>
+<details><summary>Why is the encoder bidirectional?</summary><p>So each annotation carries context from both sides of its word. A forward-only state for word j would know nothing about the words after it.</p></details>
+<details><summary>Which decoder state is used to score the alignment for word i, and why?</summary><p>s_{i−1}, the state before emitting word i. The context must be computed before the word is chosen, so it can only depend on what came before.</p></details>
+<details><summary>What makes the attention "soft", and why does that help?</summary><p>Weights are a softmax distribution, not a hard choice of one source word. This keeps everything differentiable, and it lets one target word draw on several source words, like "l'" depending on both "the" and "man".</p></details>
+<details><summary>Which part can be precomputed once per sentence?</summary><p>U_a·h_j, since the annotations don't depend on the target step.</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/1409.0473">The original paper</a> (arXiv; published at ICLR 2015)</li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/15_bahdanau_attention">30u30 Day 15</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Next: <a href="16-order-matters.html">Day 16, Order Matters: Sequence to Sequence for Sets</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="14-annotated-transformer.html"><small>Previous</small>Day 14 · The Annotated Transformer</a>
+  <a class="next" href="16-order-matters.html"><small>Next</small>Day 16 · Order Matters</a>
+</nav>
+<footer>Module 06 · Day 15 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('al'), ctx = cv.getContext('2d'), shIn = document.getElementById('sh');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const SRC = ['The', 'agreement', 'on', 'the', 'European', 'Economic', 'Area', 'was', 'signed', 'in', 'August', '1992', '.'];
+const TGT = ["L'", 'accord', 'sur', 'la', 'zone', 'économique', 'européenne', 'a', 'été', 'signé', 'en', 'août', '1992', '.'];
+// hand-set centre of attention (source index) for each target word
+const CEN = [0.3, 1, 2, 3, 6, 5, 4, 7, 7.4, 8, 9, 10, 11, 12];
+let sel = 4;
+
+function weights(scale) {
+  return CEN.map(c => {
+    const z = SRC.map((_, j) => -scale * (j - c) ** 2), m = Math.max(...z), e = z.map(v => Math.exp(v - m)), s = e.reduce((a, b) => a + b);
+    return e.map(v => v / s);
+  });
+}
+
+function draw() {
+  const sc = +shIn.value, A = weights(sc);
+  document.getElementById('shv').textContent = sc.toFixed(1);
+  const W = cv.width, H = cv.height, L = 78, T = 4, cw = (W - L - 4) / SRC.length, ch = (H - T - 4) / TGT.length;
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '11px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  A.forEach((row, i) => {
+    ctx.fillStyle = i === sel ? css('--accent') : css('--muted');
+    ctx.fillText(TGT[i], L - 6, T + i * ch + ch / 2);
+    row.forEach((v, j) => {
+      ctx.globalAlpha = Math.max(v, 0.03);
+      ctx.fillStyle = css('--accent');
+      ctx.fillRect(L + j * cw + 1, T + i * ch + 1, cw - 2, ch - 2);
+    });
+    ctx.globalAlpha = 1;
+  });
+  ctx.strokeStyle = css('--fg'); ctx.strokeRect(L, T + sel * ch, W - L - 4, ch);
+  ctx.textAlign = 'center'; ctx.fillStyle = css('--fg');
+  const row = A[sel], top = row.indexOf(Math.max(...row));
+  ctx.fillText(SRC[top], L + top * cw + cw / 2, T + sel * ch + ch / 2);
+  document.getElementById('tw').textContent = TGT[sel];
+  document.getElementById('ts').textContent = SRC[top];
+  document.getElementById('tp').textContent = (row[top] * 100).toFixed(0) + '%';
+  document.getElementById('rs').textContent = row.reduce((a, b) => a + b).toFixed(3);
+}
+cv.addEventListener('click', ev => {
+  const r = cv.getBoundingClientRect(), y = (ev.clientY - r.top) * cv.height / r.height;
+  sel = Math.min(TGT.length - 1, Math.max(0, Math.floor((y - 4) / ((cv.height - 8) / TGT.length))));
+  draw();
+});
+shIn.oninput = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

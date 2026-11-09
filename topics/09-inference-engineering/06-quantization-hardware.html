@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inference · Quantisation and GPUs</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 09 · Inference engineering</a> › Page 06</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 09 · Problems 11–12</div>
+<h1>Quantisation and choosing GPUs</h1>
+<p class="lede">Two problems that are really one: how many bytes each weight takes, and how fast a GPU can move those bytes. Pick a number format, prove it didn't break the model, then pick the hardware with arithmetic instead of brand loyalty.</p>
+
+<div class="facts">
+  <div><b>Problems covered</b>11 (FP8 vs INT8 vs INT4 vs NVFP4, and measuring the loss), 12 (H100 vs H200 vs B200 vs L40S)</div>
+  <div><b>Interview level</b>Mid to senior. Senior candidates are expected to bring an evaluation protocol and a cost model.</div>
+  <div><b>Key ideas</b>Bytes per weight · scale granularity · outliers · weight-only vs weights-and-activations · eval noise · bandwidth per dollar · memory fit and max batch</div>
+  <div><b>Time to prep</b>3–4 h: 1 h formats, 1 h evaluation, 1–2 h GPU arithmetic and the demo</div>
+</div>
+<p class="meta">Source: <a href="https://x.com/vishalsingh2972/status/2113830444722741637">Vishal Singh's post listing 25 inference-engineering interview problems</a> · saved in <code>sources/09-vishal-inference-25.md</code></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">A model is billions of numbers. Writing each number with fewer digits makes the model smaller and faster, as long as you check it still gives good answers. Then you pick the computer whose memory is big enough and fast enough for the job.</p>
+
+<h3>Think of it like this</h3>
+<p>Imagine moving house with a delivery van. Your stuff is the model. You can pack each item in a big padded box (16-bit numbers), a smaller box (8-bit) or squash it into a tiny pouch (4-bit). Smaller packing means fewer trips and a smaller van, but squash a lamp too hard and it breaks. Clever packers put a label on every small bundle saying how big the things inside really are, so they unpack correctly. Choosing the van is the second question: a bigger van holds more, a faster van finishes sooner, and a cheap van might be fine if your stuff is small.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Each weight is normally stored as a 16-bit number. Quantisation stores it in 8 or 4 bits instead.</li>
+<li>A "scale" number stored next to a group of weights says how to stretch the small numbers back to their real size.</li>
+<li>Smaller groups, each with its own scale, make fewer mistakes but cost a little extra memory.</li>
+<li>You test the squashed model against the original on the same questions, and accept it only if the drop is smaller than the normal noise.</li>
+<li>Then you check which GPU can hold the model plus its notes (the KV cache) and read it fast enough.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot's computer has a small memory and a slow memory bus compared with a data-centre GPU. A model that answers in 10 ms in the cloud can take ten times longer on the robot. Quantising to 4 or 8 bits is often the difference between a model that fits on board and reacts in time, and one that doesn't.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Write the numbers 0.12, 0.5, 0.71 and 9.6 using only whole numbers from −7 to 7, after choosing one "multiply by" label for all four. Then try again with a separate label for the small three and for 9.6. Which version keeps the small numbers?</li>
+<li>In the demo below, pick a <b>GPU</b>, a <b>Model</b> and a <b>Weight precision</b>. Watch whether it fits, and how the <b>Batch</b> changes the time per token. Try <b>GPUs per replica</b> to split a big model.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Quantisation</dt><dd>Storing numbers with fewer bits, plus scales to recover their size.</dd>
+<dt>Scale (block scale)</dt><dd>A multiplier shared by a group of values.</dd>
+<dt>HBM</dt><dd>High-bandwidth memory: the fast memory stacked next to a data-centre GPU.</dd>
+<dt>Memory bandwidth</dt><dd>How many bytes per second the GPU can read from its memory.</dd>
+<dt>SXM / PCIe</dt><dd>Two ways a GPU plugs into a server. SXM boards allow more power and fast NVLink between GPUs; PCIe cards fit ordinary slots.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="p11">Problem 11 · FP8 vs INT8 vs INT4 vs NVFP4: pick one and measure the loss</h2>
+<p><strong>What the interviewer is testing:</strong> whether you know what each format actually stores, why outliers decide what works, which hardware runs which format natively, and whether you can design an evaluation that tells a real quality drop from noise.</p>
+
+<h3>The concepts</h3>
+<p><strong>Integer formats.</strong> Map a real value x to an integer with a scale s, and back:</p>
+<pre><code>symmetric INT-b:   q = clamp(round(x / s), −(2^(b−1) − 1), 2^(b−1) − 1)
+                   x̂ = s × q,     s = max|x| / (2^(b−1) − 1)
+INT8: q ∈ [−127, 127]      INT4: q ∈ [−7, 7]
+
+granularity of s:  per tensor  →  per channel (row)  →  per group (e.g. 128 values)</code></pre>
+<p>Integer steps are evenly spaced, so one large value forces a large scale and crushes the small ones. Example: a group holding 0.05, 0.3, −0.2 and one outlier of 20, in INT8 per tensor. s = 20/127 = 0.157, so 0.05 rounds to 0 and 0.3 becomes 0.31. Activations in large LLMs have exactly this pattern: a few channels with values far larger than the rest. LLM.int8() (Dettmers et al., 2022) keeps those channels in 16 bits. SmoothQuant (Xiao et al., 2023) moves the difficulty from activations into weights with a per-channel rescaling, so both can use INT8.</p>
+<p><strong>Floating-point formats.</strong> FP8 comes in two variants (Micikevicius et al., 2022): E4M3 (4 exponent bits, 3 mantissa bits, max ±448), used for weights and activations in inference, and E5M2 (more range, max ±57,344), mostly for gradients. Floating-point steps are fine near zero and coarse for big values, which suits bell-shaped weight distributions and tolerates outliers better than INT8 at the same bit count.</p>
+<p><strong>INT4 weight-only.</strong> GPTQ (Frantar et al., 2022) quantises weights one column at a time and uses second-order information to compensate for the error in the remaining columns. AWQ (Lin et al., 2023) protects the small share of weight channels that see large activations by scaling them before rounding. Both usually use groups of 128 with a 16-bit scale, so the real cost is 4 + 16/128 = 4.125 bits per weight. Activations stay in 16 bits, so the matrix multiply still runs at 16-bit speed. The gain is in bytes moved, which is what limits decode.</p>
+<p><strong>NVFP4.</strong> According to NVIDIA's Blackwell documentation, NVFP4 stores each value as E2M1 (1 sign, 2 exponent, 1 mantissa bit, so values from about −6 to 6). Every block of 16 values shares an FP8 E4M3 scale, and each tensor also has one FP32 scale. That's about 4.5 bits per value. NVIDIA describes it as roughly 3.5× smaller than FP16 and 1.8× smaller than FP8. MXFP4, the OCP format, uses 32-value blocks with a power-of-two scale. NVFP4's smaller blocks and fractional scales are meant to cut the rounding error. Blackwell tensor cores run it natively.</p>
+<pre><code>NVFP4:   x̂ = s_tensor (FP32) × s_block (E4M3, one per 16 values) × q (E2M1)
+bits per value ≈ 4 + 8/16 = 4.5   (plus one FP32 per tensor)</code></pre>
+
+<div class="table-wrap"><table>
+<tr><th>Format</th><th>Bits per weight (incl. scales)</th><th>What's quantised</th><th>Native tensor-core support (per NVIDIA spec pages)</th><th>Typical quality risk</th></tr>
+<tr><td>BF16</td><td>16</td><td>Baseline</td><td>All four GPUs</td><td>None (reference)</td></tr>
+<tr><td>FP8 (E4M3)</td><td>≈8</td><td>Weights + activations (W8A8), often KV cache too</td><td>H100, H200, B200, L40S</td><td>Low with per-channel weight and per-token activation scales</td></tr>
+<tr><td>INT8</td><td>≈8</td><td>W8A8 (needs outlier handling) or weight-only</td><td>All four</td><td>Low for weight-only; W8A8 needs SmoothQuant-style tricks</td></tr>
+<tr><td>INT4 (GPTQ/AWQ, g128)</td><td>≈4.125</td><td>Weights only; matmul in 16-bit</td><td>Runs via dequantising kernels; the gain is bandwidth</td><td>Moderate; larger models tolerate it better; check reasoning and long-context tasks</td></tr>
+<tr><td>NVFP4</td><td>≈4.5</td><td>Weights, and optionally activations</td><td>B200 (Blackwell); H100, H200 and L40S tables list no FP4 rate</td><td>NVIDIA reports ≤1% drop vs FP8 on DeepSeek-R1-0528; verify on your model</td></tr>
+</table></div>
+
+<h3>Worked answer with real numbers</h3>
+<p>Assumptions: a Llama-3-70B-shaped model (nominal 70B parameters, 80 layers, 8 KV heads, head dim 128), batch 1, decode bandwidth floor = weight bytes ÷ HBM bandwidth (ignores KV and overhead). Bandwidths from NVIDIA's spec tables: H100 SXM 3.35 TB/s, H200 SXM 4.8 TB/s.</p>
+<pre><code>format     weight bytes            fits on one…            floor/token H100 SXM   H200 SXM
+BF16       70e9 × 2     = 140 GB   nothing below B200      (needs 2+ GPUs)        29.2 ms*
+FP8/INT8   70e9 × 1     =  70 GB   H100 80 GB (barely)     20.9 ms                14.6 ms
+NVFP4      70e9 × 4.5/8 =  39 GB   any of them             (no native FP4)        (no native FP4)
+INT4 g128  70e9 × 4.125/8 = 36 GB  L40S 48 GB (barely)     10.8 ms                 7.5 ms
+
+* 140 GB on a 141 GB H200 leaves almost nothing for the KV cache: not deployable.</code></pre>
+<p>Going from BF16 to FP8 halves the bytes and therefore roughly halves the decode floor. It also frees memory for a bigger batch, so throughput gains are often larger than 2×. Going to 4 bits halves the bytes again.</p>
+<p><strong>My pick, and the measurement plan.</strong> On H100 or H200, pick FP8 W8A8 (per-channel weight scales, dynamic per-token activation scales), with FP8 KV cache as a separate, later step. It is natively supported, well supported in vLLM, SGLang and TensorRT-LLM, and usually close to lossless. On B200, evaluate NVFP4 for weights, because it buys another ~1.8× in memory over FP8. Measure the loss like this:</p>
+<ol>
+<li><strong>Freeze the baseline:</strong> same engine, same prompts, greedy decoding (temperature 0) for deterministic tasks.</li>
+<li><strong>Cheap signal first:</strong> perplexity on held-out text, and the KL divergence between baseline and quantised next-token distributions. These catch broken quantisation fast, but small perplexity changes don't map cleanly to task quality.</li>
+<li><strong>Task evals:</strong> knowledge (MMLU-style), maths (GSM8K-style), code, long-context retrieval, and your own production eval set. Quantisation damage often shows up first in maths, code and long contexts.</li>
+<li><strong>Know the noise:</strong> standard error of an accuracy is √(p(1−p)/n). MMLU has 14,042 test questions: at 70% accuracy the SE is 0.39 points, so a 95% interval is about ±0.8 points. GSM8K has 1,319: at 80% the SE is 1.1 points, about ±2.2. A 1-point drop on GSM8K is inside the noise. Use paired comparisons on the same questions, or a bootstrap, before you claim a difference.</li>
+<li><strong>Set the gate in advance,</strong> for example "no task drops more than 1 point absolute beyond noise, and the production eval's win rate against baseline is at least 48%". Then measure the payoff: tokens/s, ITL at p99, max batch, memory.</li>
+</ol>
+
+<h3>Trade-offs</h3>
+<div class="table-wrap"><table>
+<tr><th>Choice</th><th>Gain</th><th>Cost</th></tr>
+<tr><td>FP8 W8A8</td><td>≈2× fewer bytes, 2× the dense tensor rate of BF16 on Hopper</td><td>Needs Hopper, Ada or Blackwell; calibration of activation scales</td></tr>
+<tr><td>INT8 weight-only</td><td>≈2× fewer bytes, runs on any recent GPU</td><td>No compute speedup; matmul in 16-bit</td></tr>
+<tr><td>INT4 weight-only</td><td>≈3.9× fewer bytes; fits big models on small GPUs</td><td>Higher quality risk; kernel quality varies; can be compute-bound at large batch because of dequantisation</td></tr>
+<tr><td>NVFP4</td><td>≈3.5× fewer bytes than FP16; native FP4 math on Blackwell</td><td>Blackwell only; newer tooling; verify per model; quantisation-aware training may be needed for small models</td></tr>
+<tr><td>Finer groups (16 vs 128)</td><td>Lower error</td><td>More scale overhead (0.5 vs 0.125 bits per value)</td></tr>
+</table></div>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>Decode is bandwidth-bound, so bits per weight translate almost directly into tokens per second and into how many users fit. On Hopper I'd pick FP8 W8A8 with per-channel weight and per-token activation scales: it's native, about 2× fewer bytes and usually near-lossless. INT4 weight-only and NVFP4 roughly halve the bytes again, and NVFP4 runs natively on Blackwell, but the risk is higher, so they need stronger evidence. I'd measure the loss with perplexity and KL as smoke tests, then paired task evals including maths, code, long-context and our own traffic, with confidence intervals so I don't mistake noise for loss. I'd set the acceptance gate before looking at results, then report the speed and memory gains alongside.</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Calling INT4 weight-only "4× faster". It moves fewer bytes, but the math still runs in 16-bit, and at large batch dequantisation can become the bottleneck.</li>
+<li>Judging quality by perplexity alone. Perplexity can barely move while maths or long-context retrieval drops.</li>
+<li>Ignoring eval noise. A 1-point change on a 1,319-question benchmark is not evidence.</li>
+<li>Forgetting that the KV cache and activations are separate decisions from weight precision.</li>
+</ul>
+
+<h2 id="p12">Problem 12 · Pick GPUs for a workload: H100 vs H200 vs B200 vs L40S</h2>
+<p><strong>What the interviewer is testing:</strong> whether you start from the workload (model size, precision, context, latency target, traffic) and turn specs into memory fit, max batch, latency floor and cost per token, rather than quoting peak FLOPS.</p>
+
+<h3>The specs, with the form factor behind each number</h3>
+<p>All figures are from NVIDIA's product pages (fetched October 2026). NVIDIA quotes tensor-core rates <em>with sparsity</em>; the dense rate, which is what LLM inference normally gets, is half. SXM and PCIe versions of the same chip differ, so the form factor matters.</p>
+<div class="table-wrap"><table>
+<tr><th>GPU (form factor)</th><th>Memory</th><th>Bandwidth</th><th>FP8 dense (sparse)</th><th>FP4</th><th>GPU-to-GPU link</th><th>Max power</th></tr>
+<tr><td>H100 SXM (HGX/DGX boards)</td><td>80 GB</td><td>3.35 TB/s</td><td>1,979 (3,958) TFLOPS</td><td>Not listed</td><td>NVLink 900 GB/s</td><td>Up to 700 W</td></tr>
+<tr><td>H100 NVL (PCIe, dual-slot)</td><td>94 GB</td><td>3.9 TB/s</td><td>≈1,671 (3,341) TFLOPS</td><td>Not listed</td><td>NVLink bridge 600 GB/s</td><td>350–400 W</td></tr>
+<tr><td>H200 SXM (HGX boards)</td><td>141 GB HBM3e</td><td>4.8 TB/s</td><td>1,979 (3,958) TFLOPS</td><td>Not listed</td><td>NVLink 900 GB/s</td><td>Up to 700 W</td></tr>
+<tr><td>H200 NVL (PCIe, dual-slot)</td><td>141 GB HBM3e</td><td>4.8 TB/s</td><td>≈1,671 (3,341) TFLOPS</td><td>Not listed</td><td>2- or 4-way NVLink bridge, 900 GB/s</td><td>Up to 600 W</td></tr>
+<tr><td>B200 (HGX/DGX B200: 8× Blackwell SXM), per GPU*</td><td>180 GB HBM3e</td><td>8 TB/s</td><td>4,500 (9,000) TFLOPS</td><td>9 PFLOPS dense</td><td>NVLink 1.8 TB/s</td><td>System ~14.3 kW (DGX)</td></tr>
+<tr><td>L40S (PCIe Gen4, dual-slot, passive)</td><td>48 GB GDDR6</td><td>864 GB/s</td><td>733 (1,466) TFLOPS</td><td>Not listed</td><td>None (no NVLink, no MIG)</td><td>350 W</td></tr>
+</table></div>
+<p class="meta">*NVIDIA publishes B200 figures per 8-GPU system: DGX B200 lists 1,440 GB total and 64 TB/s of HBM3e bandwidth; HGX B200 lists 72 PFLOPS FP8 (sparse) and 72 PFLOPS FP4 (dense). The per-GPU numbers above are those totals divided by 8. NVIDIA's NVFP4 blog gives the same 9 PFLOPS dense for the B200's smallest format. Sources: <a href="https://www.nvidia.com/en-us/data-center/h100/">H100</a>, <a href="https://www.nvidia.com/en-us/data-center/h200/">H200</a>, <a href="https://www.nvidia.com/en-us/data-center/dgx-b200/">DGX B200</a>, <a href="https://www.nvidia.com/en-us/data-center/hgx/">HGX</a>, <a href="https://www.nvidia.com/en-us/data-center/l40s/">L40S</a>.</p>
+
+<h3>The concepts</h3>
+<pre><code>fits?        W/n + KV_seq × B/n + overhead  ≤  HBM per GPU
+max batch    B_max = ⌊(usable HBM × n − W) / KV_seq⌋
+ITL floor    t_step = (W + B × KV_seq) / (n × BW)          (decode, ignores comms)
+prefill      t_prefill ≈ 2 × params × prompt_tokens / (achieved FLOPS × n)
+cost         $ per M tokens = ($/GPU-h × n) / (tokens/s × 3,600) × 10⁶
+
+decode-heavy work: compare $/h ÷ TB/s       prefill-heavy work: compare $/h ÷ dense TFLOPS</code></pre>
+
+<h3>Worked answer with real numbers</h3>
+<p>Workload: a 70B-shaped model in FP8 (70 GB of weights), FP8 KV cache, 4,096 tokens of context per sequence, batch 64. KV per sequence = 2 × 80 × 8 × 128 × 4,096 × 1 B = 671 MB. Assumptions: 90% of HBM is usable (the rest goes to activations and the runtime), the bandwidth floor is reached exactly, and tensor-parallel communication is free. All three flatter the GPUs, the last one especially for PCIe cards. Hourly prices are <strong>assumptions</strong> for illustration only (H100 $2.50, H200 $3.50, B200 $6.00, L40S $1.20 per GPU-hour). Real prices vary widely by provider, contract and month.</p>
+<pre><code>config          usable−W    max batch   ITL floor @B=64   tokens/s (all GPUs)   $/M tokens (assumed price)
+1× H100 SXM       2.0 GB          2     doesn't fit B=64          –                    –
+2× H100 SXM      74.0 GB        110     16.9 ms                 3,796                0.37
+1× H200 SXM      56.9 GB         84     23.5 ms                 2,720                0.36
+1× B200 FP8      92.0 GB        137     14.1 ms                 4,533                0.37
+1× B200 NVFP4   122.6 GB        182     10.3 ms                 6,219                0.27
+4× L40S          102.8 GB       153     32.7 ms + PCIe comms    1,958                0.68
+
+example row, 1× H200: (70 + 64 × 0.671) GB / 4.8 TB/s = 112.9 / 4.8 = 23.5 ms
+                      64 / 0.0235 s = 2,720 tokens/s
+                      $3.50 / (2,720 × 3,600) × 10⁶ = $0.36 per M tokens</code></pre>
+<p>What this shows:</p>
+<ul>
+<li><strong>Memory decides the count before speed does.</strong> One H100 can't hold a 70B FP8 model plus a useful cache. One H200 can, which is its main selling point: it has the same compute as the H100, with 1.76× the memory and 1.43× the bandwidth.</li>
+<li><strong>Cost per token tracks $/h ÷ bandwidth for decode.</strong> At the assumed prices, H100, H200 and B200 land within a few percent of each other, because their price per TB/s is similar (0.75, 0.73, 0.75). The ranking flips with small price changes, so use your own quotes.</li>
+<li><strong>B200's extra lever is FP4.</strong> NVFP4 cuts the weight bytes from 70 to 39 GB, so the same GPU is about 27% cheaper per token in this model, if the quality gate passes.</li>
+<li><strong>L40S loses on big models.</strong> 864 GB/s per card, no NVLink, and tensor parallelism over PCIe Gen4 make 70B expensive and slow. Its case is small models, PCIe-only data centres, lower power and price, and mixed vision or graphics workloads. A rule of thumb: for decode it only matches an H100 per token if it costs less than 1/3.9 of the H100's price, since 3.35 / 0.864 ≈ 3.9.</li>
+</ul>
+<p>Second workload, to show the other side: an 8B model in FP8 with 2K context. One L40S fits it with room for 262 sequences. At batch 64 the floor is 19.2 ms per token and 3,333 tokens/s, about $0.10 per M tokens at the assumed $1.20/h. That's acceptable for a 50 ms ITL target, and it runs in ordinary PCIe servers. An H100 is faster (5.0 ms, about $0.05 per M at the assumed price), so the L40S wins only if H100s are scarce, the price gap is wider, or power and rack limits rule.</p>
+
+<h3>Trade-offs</h3>
+<div class="table-wrap"><table>
+<tr><th>GPU</th><th>Pick it when</th><th>Avoid it when</th></tr>
+<tr><td>H100 SXM</td><td>Mature software, wide availability, models that fit in 80 GB per GPU or split well over NVLink</td><td>Long contexts or big batches on 70B+, where 80 GB forces extra GPUs</td></tr>
+<tr><td>H200 SXM</td><td>Same software as H100 but 141 GB and 4.8 TB/s: 70B on one GPU, long contexts, bigger batches</td><td>Compute-bound prefill-heavy work, where it is no faster than an H100</td></tr>
+<tr><td>B200 (HGX)</td><td>Largest models, highest throughput per GPU, FP4, 1.8 TB/s NVLink for big tensor-parallel or MoE groups</td><td>Small models that can't use it fully; power or cooling limits; tooling not yet tested with your stack</td></tr>
+<tr><td>L40S (PCIe)</td><td>Models up to ~13B in FP8, vision and graphics alongside AI, PCIe-only racks, tight power budgets</td><td>70B+ models, multi-GPU tensor parallelism, long contexts</td></tr>
+</table></div>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>I start from the workload: model size and precision, context length, traffic shape, and a latency target such as 50 ms ITL at p99. From that I compute whether weights plus cache fit, the max batch, the decode floor of bytes per step over bandwidth, and the prefill time from dense FLOPS. Then I turn throughput into cost per million tokens with real price quotes. For a 70B FP8 model, one H200 replaces two H100s because of its 141 GB, B200 wins on throughput and on FP4 if quality holds, and L40S suits small models in PCIe servers. Finally I'd benchmark the top two candidates on our actual traffic, because the floor ignores communication, kernels and scheduling.</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Comparing sparse TFLOPS. NVIDIA's headline rates assume 2:4 sparsity; dense LLM inference gets half.</li>
+<li>Mixing SXM and PCIe numbers. H100 SXM and H100 NVL differ in memory, bandwidth, power and interconnect.</li>
+<li>Ranking by FLOPS for a decode-heavy service. Bandwidth and memory capacity usually decide it.</li>
+<li>Presenting prices as facts. They change monthly; show the formula and plug in quotes.</li>
+</ul>
+
+<div class="card demo">
+<h3>Interactive: does it fit, and how fast can it decode?</h3>
+<p class="legend">Decode time per token (ms, the bandwidth floor) against batch size for your setup. The dashed line is total tokens/s, on the right axis. The red vertical line is the largest batch whose KV cache fits in memory. The marker is your batch: green if it fits, red if not.</p>
+<canvas id="gm" width="700" height="260" aria-label="Decode time per token and throughput against batch size for the chosen GPU and model"></canvas>
+<label for="gp">GPU: <span id="gpv" class="num"></span></label>
+<input id="gp" type="range" min="0" max="5" step="1" value="2">
+<label for="ng">GPUs per replica: <span id="ngv" class="num"></span></label>
+<input id="ng" type="range" min="0" max="3" step="1" value="0">
+<label for="md">Model: <span id="mdv" class="num"></span></label>
+<input id="md" type="range" min="0" max="2" step="1" value="1">
+<label for="wp">Weight precision: <span id="wpv" class="num"></span></label>
+<input id="wp" type="range" min="0" max="3" step="1" value="1">
+<label for="kp">KV precision: <span id="kpv" class="num"></span></label>
+<input id="kp" type="range" min="0" max="1" step="1" value="1">
+<label for="cx">Context per sequence: <span id="cxv" class="num"></span> tokens</label>
+<input id="cx" type="range" min="10" max="17" step="1" value="12">
+<label for="bs">Batch: <span id="bsv" class="num"></span></label>
+<input id="bs" type="range" min="0" max="9" step="1" value="6">
+<label for="pr">Assumed price: $<span id="prv" class="num"></span> per GPU-hour</label>
+<input id="pr" type="range" min="50" max="1000" step="10" value="350">
+<div class="stats">
+  <div class="stat"><div class="k">Weights per GPU</div><div class="v" id="sW">–</div></div>
+  <div class="stat"><div class="k">Max batch that fits</div><div class="v" id="sM">–</div></div>
+  <div class="stat"><div class="k">ITL floor</div><div class="v" id="sT">–</div></div>
+  <div class="stat"><div class="k">Tokens/s per GPU</div><div class="v" id="sP">–</div></div>
+  <div class="stat"><div class="k">$ per M tokens</div><div class="v" id="sC">–</div></div>
+</div>
+<p class="meta">Try this: the defaults (1× H200 SXM, 70B, FP8 weights, FP8 KV, 4,096 tokens, batch 64, $3.50/h) give max batch 84, 23.5 ms, 2,720 tokens/s and $0.36 per M. Switch to H100 SXM: it doesn't fit until you set 2 GPUs per replica. Switch to B200 and NVFP4: 10.3 ms. Specs come from NVIDIA's pages (B200 per-GPU numbers are 8-GPU system totals ÷ 8). Assumptions: 90% of memory usable, peak bandwidth reached, free inter-GPU communication. Real throughput is lower. The price is yours to set.</p>
+</div>
+
+<h2 id="practise">Practise it</h2>
+<p><strong>(a) Fake-quantise a small model and measure the loss (laptop or free Colab).</strong> Round-trip the weights of every linear layer through INT8 or INT4 with different group sizes, then compare perplexity. This needs no special hardware, because the maths runs in 16 or 32 bits.</p>
+<pre><code>import torch, math
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from datasets import load_dataset
+
+def fake_quant(w, bits=4, group=128):
+    qmax = 2 ** (bits - 1) - 1
+    g = w.reshape(-1, group)
+    s = g.abs().amax(1, keepdim=True).clamp(min=1e-8) / qmax
+    return (torch.clamp(torch.round(g / s), -qmax, qmax) * s).reshape(w.shape)
+
+def ppl(model, tok, text, n=256, steps=40):
+    ids = tok(text, return_tensors="pt").input_ids[:, : n * steps]
+    nll = 0.0
+    with torch.no_grad():
+        for i in range(steps):
+            x = ids[:, i * n : (i + 1) * n]
+            nll += model(x, labels=x).loss.item()
+    return math.exp(nll / steps)
+
+name = "Qwen/Qwen2.5-0.5B"
+tok = AutoTokenizer.from_pretrained(name)
+text = "\n\n".join(load_dataset("wikitext", "wikitext-2-raw-v1", split="test")["text"])
+for bits, group in [(16, 0), (8, 128), (4, 128), (4, 32)]:
+    m = AutoModelForCausalLM.from_pretrained(name, torch_dtype=torch.float32).eval()
+    if bits &lt; 16:
+        for mod in m.modules():
+            if isinstance(mod, torch.nn.Linear) and mod.weight.numel() % group == 0:
+                mod.weight.data = fake_quant(mod.weight.data, bits, group)
+    print(bits, group, round(ppl(m, tok, text), 3))</code></pre>
+<ul>
+<li>Measure: perplexity for each setting, plus bits per weight including scales (4 + 16/group). Expect INT8 to be nearly free and INT4 at group 32 to beat group 128.</li>
+<li>Add an outlier: multiply one input channel of a layer by 50 before quantising, and watch per-tensor INT8 break while per-group survives.</li>
+<li>Then run a small task eval (for example lm-evaluation-harness on a GSM8K subset) on the 16-bit and INT4 versions, and compute the standard error before deciding whether they differ.</li>
+</ul>
+<p><strong>(b) The real thing (one Hopper or newer GPU).</strong> Make an FP8 checkpoint of an 8B model with TensorRT Model Optimizer or vLLM's quantisation tooling, serve both versions in vLLM, and compare tokens/s, ITL at p99 and the KV-cache capacity vLLM reports at startup. Then run the same evals on both. <strong>(c)</strong> Re-create the worked GPU table in a spreadsheet with your own price quotes and an ITL target, and see which GPU wins.</p>
+
+<h2 id="course">In this course</h2>
+<ul>
+<li><a href="../05-trillion-scale-architecture.html#serving">Module 05 · Serving</a>: MXFP4 quantisation-aware training for a trillion-parameter model, and fleet scheduling.</li>
+<li><a href="../08-ai-research-engineer/08-inference-aware-design.html">Module 08 · Inference-aware design</a>: KV-cache maths, GQA and KV-cache quantisation (KIVI, KVQuant).</li>
+<li><a href="../08-ai-research-engineer/06-distributed-training.html">Module 08 · Distributed training</a>: tensor and pipeline parallelism, which decide how a model splits across GPUs.</li>
+<li><a href="../01-decision-model-evals.html">Module 01 · Decision-model evals</a>: thresholds, metrics and gates, as used in the quantisation acceptance test.</li>
+<li><a href="../04-distill-small-models.html#latency">Module 04 · Latency is a safety number</a>: why small, quantised models go on the device.</li>
+<li><a href="05-latency.html">Page 05 · Latency</a>: the bandwidth floor this page reuses.</li>
+</ul>
+
+<h2 id="robotics">Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Robot memory is small and slow.</strong> NVIDIA lists the Jetson AGX Orin 64GB module at 64 GB of LPDDR5 and 204.8 GB/s, and the Orin NX 16GB at 102.4 GB/s. That's about 1/16 and 1/33 of an H100 SXM's bandwidth. An 8B model in INT4 (≈4 GB) has a decode floor of about 20 ms on the AGX module and 40 ms on the NX. In BF16 it would be 78 ms and 156 ms.</li>
+<li><strong>Memory is shared.</strong> On these modules the CPU, perception and the model share one pool, so the model's footprint competes with camera buffers and maps. Quantisation is often what makes the model fit at all.</li>
+<li><strong>Check the format against the chip.</strong> FP8 and NVFP4 results come from data-centre GPUs. Check which formats your module's tensor cores and inference stack support before you plan on them; INT8 and INT4 weight-only are the common edge choices.</li>
+<li><strong>Evaluate on robot tasks.</strong> A quantised VLA can match on language benchmarks and still lose precision on fine actions. Gate on task success in sim and on hardware, not only on perplexity.</li>
+<li><strong>GPU selection for a fleet backend is the cloud version of this page.</strong> The H100/H200/B200/L40S choice applies to servers that train or serve many robots, not to the robot itself.</li>
+</ul>
+</div>
+
+<h2 id="check">Self-check</h2>
+<details><summary>How many bits per weight does INT4 with group size 64 and an FP16 scale really cost?</summary><p>4 + 16/64 = 4.25 bits per weight.</p></details>
+<details><summary>Why does a single activation outlier hurt per-tensor INT8 more than FP8?</summary><p>INT8 steps are evenly spaced, so the outlier sets a large scale and small values round to zero. FP8 has finer steps near zero and coarser steps for big values, so it keeps small values better at the same bit count.</p></details>
+<details><summary>A quantised model scores 79.0% on GSM8K (1,319 questions) against 80.0% for BF16. Is that a real loss?</summary><p>Not on its own. The SE at 80% is about 1.1 points, so a 1-point gap is within noise. Use a paired comparison on the same questions or a bootstrap, and look at other tasks too.</p></details>
+<details><summary>Why is an H200 not faster than an H100 for a compute-bound prefill?</summary><p>NVIDIA lists the same tensor-core rates for H100 SXM and H200 SXM. The H200 gains memory capacity (141 vs 80 GB) and bandwidth (4.8 vs 3.35 TB/s), which help decode and batch size, not raw FLOPS.</p></details>
+<details><summary>A 70B FP8 model with 671 MB of KV per sequence runs on one H200 with 90% usable memory. What's the max batch?</summary><p>Usable = 0.9 × 141 = 126.9 GB. Minus 70 GB of weights = 56.9 GB. 56.9 / 0.671 ≈ 84 sequences.</p></details>
+<details><summary>NVIDIA's table says "FP8 3,958 TFLOPS" for H100 SXM. What number do you use for dense inference?</summary><p>Half: 1,979 TFLOPS. The headline figure assumes 2:4 structured sparsity.</p></details>
+
+<h2 id="resources">Resources</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/2209.05433">FP8 Formats for Deep Learning</a> (Micikevicius et al., 2022)</li>
+<li><a href="https://arxiv.org/abs/2208.07339">LLM.int8(): 8-bit Matrix Multiplication for Transformers at Scale</a> (Dettmers et al., 2022)</li>
+<li><a href="https://arxiv.org/abs/2211.10438">SmoothQuant: Accurate and Efficient Post-Training Quantization for LLMs</a> (Xiao et al., 2023)</li>
+<li><a href="https://arxiv.org/abs/2210.17323">GPTQ: Accurate Post-Training Quantization for Generative Pre-trained Transformers</a> (Frantar et al., 2022)</li>
+<li><a href="https://arxiv.org/abs/2306.00978">AWQ: Activation-aware Weight Quantization for LLM Compression and Acceleration</a> (Lin et al., 2023)</li>
+<li><a href="https://developer.nvidia.com/blog/introducing-nvfp4-for-efficient-and-accurate-low-precision-inference/">NVIDIA · Introducing NVFP4 for efficient and accurate low-precision inference</a></li>
+<li><a href="https://arxiv.org/abs/2309.06180">Efficient Memory Management for LLM Serving with PagedAttention</a> (Kwon et al., 2023)</li>
+<li>Docs and tools: <a href="https://docs.vllm.ai/en/latest/features/quantization/index.html">vLLM quantisation</a> · <a href="https://github.com/NVIDIA/TensorRT-Model-Optimizer">TensorRT Model Optimizer</a> · <a href="https://nvidia.github.io/TensorRT-LLM/">TensorRT-LLM</a> · <a href="https://docs.sglang.ai/">SGLang</a> · <a href="https://github.com/EleutherAI/lm-evaluation-harness">lm-evaluation-harness</a> · <a href="https://docs.nvidia.com/nsight-systems/UserGuide/index.html">Nsight Systems</a></li>
+<li>Specs: <a href="https://www.nvidia.com/en-us/data-center/h100/">H100</a> · <a href="https://www.nvidia.com/en-us/data-center/h200/">H200</a> · <a href="https://www.nvidia.com/en-us/data-center/dgx-b200/">DGX B200</a> · <a href="https://www.nvidia.com/en-us/data-center/hgx/">HGX</a> · <a href="https://www.nvidia.com/en-us/data-center/l40s/">L40S</a> · <a href="https://www.nvidia.com/en-us/autonomous-machines/embedded-systems/jetson-orin/">Jetson Orin</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="05-latency.html"><small>Previous</small>Page 05 · Latency</a>
+  <a class="next" href="07-profiling-kernels.html"><small>Next</small>Page 07 · Profiling and kernels</a>
+</nav>
+<footer>Module 09 · Page 06 · written for this course from the source post, official docs and papers.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('gm'), ctx = cv.getContext('2d');
+const ids = ['gp', 'ng', 'md', 'wp', 'kp', 'cx', 'bs', 'pr'];
+const el = Object.fromEntries(ids.map(k => [k, document.getElementById(k)]));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = n => Math.round(n).toLocaleString('en-US');
+
+// [name, GB, TB/s, native FP4]; B200 = DGX/HGX B200 system totals ÷ 8
+const GPUS = [
+  ['H100 SXM', 80, 3.35, false], ['H100 NVL (PCIe)', 94, 3.9, false],
+  ['H200 SXM', 141, 4.8, false], ['H200 NVL (PCIe)', 141, 4.8, false],
+  ['B200 (HGX, per GPU)', 180, 8.0, true], ['L40S (PCIe)', 48, 0.864, false]];
+// [name, params (nominal), layers, KV heads, head dim]
+const MODELS = [['8B', 8e9, 32, 8, 128], ['70B', 70e9, 80, 8, 128], ['405B', 405e9, 126, 8, 128]];
+const WPREC = [['BF16', 16], ['FP8 / INT8', 8], ['NVFP4', 4.5], ['INT4 g128', 4.125]];
+const KPREC = [['BF16', 2], ['FP8', 1]];
+const NG = [1, 2, 4, 8], USABLE = 0.9;
+
+function calc(s) {
+  const [, gb, bw] = GPUS[s.gp], [, P, L, kv, hd] = MODELS[s.md];
+  const W = P * WPREC[s.wp][1] / 8, ks = 2 * L * kv * hd * s.T * KPREC[s.kp][1];
+  const free = USABLE * gb * 1e9 * s.n - W;
+  const maxB = free > 0 ? Math.floor(free / ks) : 0;
+  const step = B => (W + B * ks) / (s.n * bw * 1e12);
+  return { W, ks, maxB, step };
+}
+
+function draw() {
+  const s = { gp: +el.gp.value, n: NG[+el.ng.value], md: +el.md.value, wp: +el.wp.value,
+    kp: +el.kp.value, T: 2 ** +el.cx.value, B: 2 ** +el.bs.value, price: +el.pr.value / 100 };
+  const shown = { gp: GPUS[s.gp][0], ng: s.n, md: MODELS[s.md][0], wp: WPREC[s.wp][0],
+    kp: KPREC[s.kp][0], cx: fmt(s.T), bs: s.B, pr: s.price.toFixed(2) };
+  ids.forEach(k => document.getElementById(k + 'v').textContent = shown[k]);
+  const r = calc(s), fp4bad = s.wp === 2 && !GPUS[s.gp][3];
+
+  const W = cv.width, H = cv.height, l = 50, rr = 60, t = 12, b = 30;
+  const tMax = Math.max(r.step(512) * 1e3, 1), pMax = Math.max(512 / r.step(512), 1);
+  const px = e => l + e / 9 * (W - l - rr);
+  const py = v => t + (1 - Math.min(v, 1)) * (H - t - b);
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = css('--line'); ctx.lineWidth = 1; ctx.font = '12px sans-serif'; ctx.fillStyle = css('--muted');
+  for (let i = 0; i <= 4; i++) {
+    const y = py(i / 4);
+    ctx.beginPath(); ctx.moveTo(l, y); ctx.lineTo(W - rr, y); ctx.stroke();
+    ctx.textAlign = 'right'; ctx.fillText((tMax * i / 4).toFixed(0) + ' ms', l - 6, y + 4);
+    ctx.textAlign = 'left'; ctx.fillText(fmt(pMax * i / 4 / 1000) + 'k/s', W - rr + 6, y + 4);
+  }
+  ctx.textAlign = 'center';
+  for (let e = 0; e <= 9; e++) ctx.fillText(2 ** e, px(e), H - 12);
+  ctx.fillText('batch', (l + W - rr) / 2, H - 1);
+
+  const curve = (f, col, dash) => {
+    ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.setLineDash(dash); ctx.beginPath();
+    for (let e = 0; e <= 9.001; e += 0.1) { const y = py(f(2 ** e)); e ? ctx.lineTo(px(e), y) : ctx.moveTo(px(e), y); }
+    ctx.stroke(); ctx.setLineDash([]);
+  };
+  curve(B => r.step(B) * 1e3 / tMax, css('--accent'), []);
+  curve(B => B / r.step(B) / pMax, css('--muted'), [6, 5]);
+  if (r.maxB >= 1) {
+    const x = px(Math.min(Math.log2(r.maxB), 9));
+    ctx.strokeStyle = css('--fail'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x, t); ctx.lineTo(x, H - b); ctx.stroke();
+  }
+  const ok = s.B <= r.maxB && !fp4bad;
+  ctx.fillStyle = ok ? css('--pass') : css('--fail');
+  ctx.beginPath(); ctx.arc(px(Math.log2(s.B)), py(r.step(s.B) * 1e3 / tMax), 6, 0, 7); ctx.fill();
+
+  const st = r.step(s.B), tps = s.B / st;
+  document.getElementById('sW').textContent = (r.W / s.n / 1e9).toFixed(1) + ' GB';
+  document.getElementById('sM').textContent = fp4bad ? 'no native FP4' : r.maxB < 1 ? "doesn't fit" : fmt(r.maxB);
+  document.getElementById('sT').textContent = ok ? (st * 1e3).toFixed(1) + ' ms' : '–';
+  document.getElementById('sP').textContent = ok ? fmt(tps / s.n) : '–';
+  document.getElementById('sC').textContent = ok ? '$' + (s.price * s.n / (tps * 3600) * 1e6).toFixed(2) : '–';
+}
+ids.forEach(k => el[k].oninput = draw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

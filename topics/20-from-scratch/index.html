@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>From-Scratch Repos</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">← LLMs &amp; Robotics</a> · Module 20</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 20 · From-scratch code</div>
+<h1>Six tiny repos that rebuild modern AI from scratch, run and tested</h1>
+<p class="lede">micrograd, minGPT, nanoGPT, llm.c, tinygrad and minimalRL: small, readable code that does the real thing. They're the next rung after Robo-Helper, where the learner wrote everything by hand.</p>
+<p class="meta">Links sent: <a href="https://github.com/karpathy/micrograd">micrograd</a> · <a href="https://github.com/karpathy/minGPT">minGPT</a> · <a href="https://github.com/karpathy/nanoGPT">nanoGPT</a> · <a href="https://github.com/karpathy/llm.c">llm.c</a> · <a href="https://github.com/tinygrad/tinygrad">tinygrad</a> · <a href="https://github.com/seungeunrho/minimalRL">minimalRL</a>. All six are MIT licensed. READMEs saved in <code>sources/20-*-readme.md</code>; stars as of 7 Nov 2026.</p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Big AI programs are huge. These six are tiny versions you can read in an afternoon, and they still work for real.</p>
+<h3>Think of it like this</h3>
+<p>A real car has thousands of parts. A go-kart has an engine, wheels, brakes and a steering wheel, and nothing else. You can see every part, and it still drives. Each of these repos is a go-kart version of something huge: the maths that lets AI learn, a ChatGPT-style text model, a game-playing robot brain.</p>
+<h3>How to use them</h3>
+<ol>
+<li>Pick one page. Each starts with a box like this one.</li>
+<li>Read "how the code works", which explains the one big idea.</li>
+<li>Run it on a laptop. Every page shows the exact commands and what happened when we ran them.</li>
+<li>Do the Robo-Helper exercise at the end, which connects it to what you built yourself.</li>
+</ol>
+<h3>Why robots care</h3>
+<p>Robots learn the same way: gradients (micrograd), sequence models (GPTs), fast code on small chips (llm.c, tinygrad) and learning by trial and error (minimalRL).</p>
+<h3>Try it</h3>
+<p>Before opening any page, guess: how many lines of code do you think it takes to teach a computer to balance a pole on a cart? (Answer on the minimalRL page.)</p>
+<h3>Words to know</h3>
+<dl>
+<dt>Repo</dt><dd>A folder of code shared online, usually on GitHub.</dd>
+<dt>From scratch</dt><dd>Built without big helper libraries, so you see every step.</dd>
+<dt>Gradient</dt><dd>Which way to nudge each number to make the answer less wrong.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> where each repo sits on the ladder, how it connects to the Robo-Helper lessons, and what is out of date.</p>
+
+<div class="card tldr">
+<h3>How to use this module</h3>
+<ul>
+<li><strong>After Module 18.</strong> Robo-Helper builds everything by hand in the standard library. These repos are the next step up: the same ideas with autograd, tensors, GPUs and real datasets.</li>
+<li><strong>Run, don't just read.</strong> Every page has a "Run it, tested" section with real output from a MacBook (Apple Silicon), plus fixes for anything that broke on a 2026 setup.</li>
+<li><strong>Two are officially retired.</strong> minGPT is semi-archived, and nanoGPT's README now points to <a href="https://github.com/karpathy/nanochat">nanochat</a>. They're still the clearest code to learn from; the pages say what to use instead.</li>
+</ul>
+</div>
+
+<h2>Progress</h2>
+<p>Done: <b id="done" class="num">0 / 6</b> · Next: <span id="next"></span> <span class="meta">(saved in this browser only)</span></p>
+
+<h2>The ladder</h2>
+<div class="table-wrap"><table>
+<tr><th>Rung</th><th>Repo</th><th>What you see built</th><th>Needs</th><th>After Robo-Helper lesson</th></tr>
+<tr><td>1</td><td><a href="01-micrograd.html">micrograd</a></td><td>Autograd: backprop done automatically, about 100 + 50 lines</td><td>Python only</td><td><a href="../18-robot-brain/04-neuron.html">Week 3 neuron</a> (gradients by hand)</td></tr>
+<tr><td>2</td><td><a href="02-mingpt.html">minGPT</a></td><td>A GPT in about 300 lines, plus GPT-2's tokenizer</td><td>PyTorch</td><td><a href="../18-robot-brain/15-tiny-lm.html">Week 6 tiny LM</a> + attention</td></tr>
+<tr><td>3</td><td><a href="03-nanogpt.html">nanoGPT → nanochat</a></td><td>The same GPT with teeth: trains Shakespeare, reproduces GPT-2</td><td>PyTorch, GPU helps</td><td><a href="../18-robot-brain/15-tiny-lm.html#attention">Week 6 attention stretch</a></td></tr>
+<tr><td>4</td><td><a href="04-llm-c.html">llm.c</a></td><td>GPT-2 forward and backward by hand in C/CUDA, no autograd</td><td>C compiler (GPU for speed)</td><td><a href="../18-robot-brain/16-speed.html">Week 8 speed</a>, <a href="../18-robot-brain/17-faster.html">week 9 faster</a></td></tr>
+<tr><td>5</td><td><a href="05-tinygrad.html">tinygrad</a></td><td>A whole small framework: tensors, laziness, kernel fusion, many chips</td><td>Python</td><td><a href="../18-robot-brain/17-faster.html">Week 9 faster</a></td></tr>
+<tr><td>6</td><td><a href="06-minimalrl.html">minimalRL</a></td><td>11 RL algorithms (REINFORCE → PPO, SAC), one file each</td><td>PyTorch, gymnasium</td><td><a href="../18-robot-brain/07-trial-and-error.html">Q-learning bonus</a>, <a href="../18-robot-brain/12-preferences.html">week 12 RLHF</a></td></tr>
+</table></div>
+
+<div class="unit">
+<h2>The pages</h2>
+<div class="paper-row"><span class="d">01</span><div><label><input type="checkbox" data-d="01"><a href="01-micrograd.html">micrograd</a><span class="track both">LLM + Robotics</span></label><p>A scalar Value that remembers how it was made, so backward() can apply the chain rule for you.</p></div></div>
+<div class="paper-row"><span class="d">02</span><div><label><input type="checkbox" data-d="02"><a href="02-mingpt.html">minGPT</a><span class="track llm">LLM</span></label><p>The GPT recipe in three files: model, tokenizer, trainer. Small toy projects (an adder, a character model).</p></div></div>
+<div class="paper-row"><span class="d">03</span><div><label><input type="checkbox" data-d="03"><a href="03-nanogpt.html">nanoGPT (and nanochat)</a><span class="track llm">LLM</span></label><p>minGPT rewritten to be fast: Shakespeare in minutes, GPT-2 (124M) in days. Its successor nanochat trains a GPT-2-level chatbot for about $48.</p></div></div>
+<div class="paper-row"><span class="d">04</span><div><label><input type="checkbox" data-d="04"><a href="04-llm-c.html">llm.c</a><span class="track llm">LLM</span></label><p>No PyTorch, no Python: every layer and its gradient written out in C. What frameworks hide.</p></div></div>
+<div class="paper-row"><span class="d">05</span><div><label><input type="checkbox" data-d="05"><a href="05-tinygrad.html">tinygrad</a><span class="track both">LLM + Robotics</span></label><p>Between micrograd and PyTorch: lazy tensors, operations fused into a few fast kernels, many hardware backends.</p></div></div>
+<div class="paper-row"><span class="d">06</span><div><label><input type="checkbox" data-d="06"><a href="06-minimalrl.html">minimalRL</a><span class="track robo">Robotics</span></label><p>Learning by trial and error on CartPole, each algorithm in one file of about 70–190 lines (REINFORCE is 66).</p></div></div>
+</div>
+
+<h2 id="robot">What each one did for Robo-Helper (measured)</h2>
+<p>Each page tries to use its repo to make the Module 18 robot better, and reports what really happened. Baselines on the 12 bake-off tasks: word counter 5/12, tiny LM 8/12, distilled 10/12.</p>
+<div class="table-wrap"><table>
+<tr><th>Repo</th><th>Experiment</th><th>Result</th></tr>
+<tr><td><a href="01-micrograd.html#robohelper">micrograd</a></td><td>Re-derive the robot's hand-written gradients; an MLP stop detector</td><td>Gradients match exactly. On Lesson 4's data the MLP is no better (the true rule is a straight line). On a curved braking case it misses 7 stops instead of 17.</td></tr>
+<tr><td><a href="02-mingpt.html#robohelper">minGPT</a></td><td>A character-level GPT brain</td><td>7–8/12. Typos barely hurt it, but our few hundred examples are too few for a Transformer.</td></tr>
+<tr><td><a href="03-nanogpt.html#robohelper">nanoGPT</a></td><td>A word-level GPT brain</td><td>9/12 (one pass was luck); 10/12 with teacher labels, the same as distilled. Clear win on colours buried in 14 filler words: 100% vs 52%.</td></tr>
+<tr><td><a href="04-llm-c.html#robohelper">llm.c</a></td><td>Could GPT-2 (124M) run on the robot's own computer?</td><td>Not in time: about 245–323 ms per 3-word decision on a laptop CPU, over the 0.2 s budget. The tiny brains take under 1 ms.</td></tr>
+<tr><td><a href="05-tinygrad.html#robohelper">tinygrad</a></td><td>The tiny LM on tensors and the Mac GPU</td><td>Same plans on 50/50 commands. Slower for one command (about 2 ms vs 0.5 ms), 76–333× faster on 4,096 at once.</td></tr>
+<tr><td><a href="06-minimalrl.html#robohelper">minimalRL</a></td><td>DQN drives the room vs A*</td><td>DQN finds the shortest path and copes with wheel slip, but fails when the cat moves (53 bumps), where A* replans in 7 steps.</td></tr>
+</table></div>
+<p class="meta">The pattern: the bigger tools don't automatically make a small robot better. They help where they fit the problem: more data, long inputs, batches, a fixed map.</p>
+
+<h2>What they share</h2>
+<ul>
+<li><strong>One idea per file, nothing hidden.</strong> If you can't find where something happens, it doesn't happen.</li>
+<li><strong>They reproduce something real.</strong> micrograd's gradients are tested against PyTorch, nanoGPT reproduces GPT-2's loss, and llm.c checks its outputs against a PyTorch reference. A from-scratch version is only worth trusting once it matches a reference. That's the same rule as the numerical gradient check in Robo-Helper's attention stretch.</li>
+<li><strong>Each one adds exactly one layer of help</strong> on top of what Robo-Helper did by hand: automatic gradients, then tensors, then GPUs, then compilers.</li>
+</ul>
+
+<h2>Suggested path (one a week, after Module 18)</h2>
+<ol>
+<li><b>micrograd.</b> Rebuild Robo-Helper's neuron with a Value class and compare the gradients.</li>
+<li><b>minGPT.</b> Train the adder, then compare its tokenizer with Robo-Helper's word lists.</li>
+<li><b>nanoGPT.</b> Train the character-level Shakespeare model on a laptop; read nanochat's README for the full modern pipeline.</li>
+<li><b>minimalRL.</b> Run DQN and compare it with tabular Q-learning from the bonus lesson.</li>
+<li><b>tinygrad.</b> Watch operations fuse into kernels (<code>DEBUG=3</code>), and tie it to week 9's speed tricks.</li>
+<li><b>llm.c.</b> Read one layer (layernorm) forward and backward in C; build the CPU version.</li>
+</ol>
+<p class="meta">Related: <a href="../06-30u30/index.html">Module 06</a> (the papers behind these: attention, GPT, PPO), <a href="../12-training-inference-videos/index.html">Module 12</a> (training and inference videos), <a href="../16-hands-on-llm-serving.html">Module 16</a> (serving, after you can train), <a href="../17-free-ai-curriculum.html">Module 17</a> (Karpathy's Zero to Hero lectures are the video companion to micrograd and nanoGPT).</p>
+
+<footer>Module 20 · added 2026-11-07 · all six repos are MIT licensed · <a href="../../index.html">Back to course index</a></footer>
+</main>
+<script>
+const KEY = 'lr-m20-done';
+const boxes = [...document.querySelectorAll('input[data-d]')];
+let done = {};
+try { done = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) {}
+function render() {
+  document.getElementById('done').textContent = boxes.filter(b => b.checked).length + ' / ' + boxes.length;
+  const nxt = boxes.find(b => !b.checked);
+  document.getElementById('next').innerHTML = nxt ? `<a href="${nxt.nextElementSibling.getAttribute('href')}">${nxt.nextElementSibling.textContent}</a>` : 'All done';
+}
+boxes.forEach(b => {
+  b.checked = !!done[b.dataset.d];
+  b.onchange = () => {
+    done[b.dataset.d] = b.checked;
+    try { localStorage.setItem(KEY, JSON.stringify(done)); } catch (e) {}
+    render();
+  };
+});
+render();
+</script>
+</body>
+</html>

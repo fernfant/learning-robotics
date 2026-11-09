@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tinygrad · Module 20</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 20 · From-scratch repos</a> › tinygrad</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 20 · From-scratch code · 5 of 6</div>
+<h1>tinygrad: a deep learning framework you can read</h1>
+<p class="lede">Something between micrograd and PyTorch. It waits until you need an answer, then glues your maths into as few GPU programs as it can.</p>
+
+<div class="facts">
+  <div><b>Repo</b><a href="https://github.com/tinygrad/tinygrad">tinygrad/tinygrad</a></div>
+  <div><b>Licence</b>MIT</div>
+  <div><b>Stars</b>33,856 (7 Nov 2026, GitHub API)</div>
+  <div><b>Core code</b>9,318 lines (the repo's own <code>sz.py</code>); 26,058 lines in <code>tinygrad/</code> without auto-generated files</div>
+  <div><b>Status</b>Actively maintained by tiny corp. Last push 7 Nov 2026. The README says it "isn't 1.0 yet".</div>
+  <div><b>Needs</b>Python ≥ 3.11, no required pip packages. Runs on CPU, Metal (Mac GPU), CUDA, AMD and more.</div>
+</div>
+<p class="meta">Tested at commit <code>853852d</code> (7 Nov 2026) on a MacBook with an Apple M4. Short code excerpts are quoted with credit to the tinygrad authors (MIT).</p>
+
+<div class="toc">
+<strong>On this page</strong>
+<ol>
+<li><a href="#start">Start here (no maths needed)</a></li>
+<li><a href="#summary">Summary</a></li>
+<li><a href="#code">How the code works</a></li>
+<li><a href="#run">Run it, tested</a></li>
+<li><a href="#robohelper">Connect to Robo-Helper (Module 18)</a></li>
+<li><a href="#robotics">Why it matters for robotics</a></li>
+<li><a href="#reality">Reality check</a></li>
+<li><a href="#check">Self-check</a></li>
+<li><a href="#reading">Further reading</a></li>
+</ol>
+</div>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">tinygrad doesn't do your sums straight away. It writes them down as a plan, then turns the whole plan into a few fast programs for the computer's chip.</p>
+
+<h3>Think of it like this</h3>
+<p>You need eggs, milk and bread. You could walk to the shop three times, once for each thing. Or you could write a shopping list and go once. tinygrad is the shopping-list person. Every time you ask it to multiply or add, it only adds a line to the list. When you finally say "I need the answer now", it looks at the whole list and does it in as few trips as possible. Each "trip" is a small program, called a kernel, that runs on the chip.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>You write normal-looking maths: multiply these, add those, take the biggest.</li>
+<li>tinygrad doesn't calculate yet. It builds a plan (a graph of steps).</li>
+<li>When you ask for a result, it squeezes neighbouring steps together. This is called fusing.</li>
+<li>It writes real code for your chip (C for the CPU, Metal for a Mac's graphics chip) and runs it.</li>
+<li>Learning works the same way: it plans the "which way should each number move?" sums too, then runs them.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot has a small computer and a battery. It can't waste trips. Fewer, bigger programs mean faster answers and less power. comma.ai's openpilot, a driver-assistance system that runs on a small computer in a car, uses tinygrad to run its driving model.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Write a shopping list for a meal. Now group it by shop aisle so you walk the shortest path. That's what fusing does to maths.</li>
+<li>If you have a Mac or Linux laptop, follow the commands in <a href="#run">Run it, tested</a>. The tiny XOR example finishes in about 5 seconds.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Tensor</dt><dd>A box of numbers: a list, a grid, or a stack of grids.</dd>
+<dt>Lazy</dt><dd>Waits until the answer is really needed before doing the work.</dd>
+<dt>Kernel</dt><dd>One small program that runs on the chip and does a chunk of the maths.</dd>
+<dt>Fusing</dt><dd>Joining several steps into one kernel so the chip does one trip, not many.</dd>
+<dt>Backend</dt><dd>The part that knows how to talk to one kind of chip: CPU, Mac GPU, NVIDIA GPU and so on.</dd>
+<dt>Autograd</dt><dd>The computer works out the "which way to nudge each number" maths for you.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version. On a first read, look at the real outputs in <a href="#run">Run it, tested</a> and the Robo-Helper link, then come back.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>tinygrad is a complete deep learning stack (tensors, autograd, a compiler, optimisers, datasets) that its README places "between PyTorch and karpathy/micrograd". Its trick is <strong>laziness</strong>: operations build a graph, and only <code>.realize()</code> (or reading a value) turns that graph into kernels. Because it sees the whole graph first, it can <strong>fuse</strong> many operations into one kernel. On our Mac, a matmul written as "reshape, multiply, sum" became exactly <strong>1 kernel</strong> on the Metal GPU. Forcing the multiply to happen first made 2 kernels and a 67 MB temporary array.</p>
+</div>
+<ul>
+<li><strong>PyTorch-like API:</strong> <code>Tensor</code>, <code>.backward()</code>, <code>nn.Linear</code>, <code>nn.optim.Adam</code>. Most training loops look familiar.</li>
+<li><strong>The compiler is in the repo:</strong> the graph format (UOps), the scheduler, the code generators and the device runtimes are all plain Python you can open.</li>
+<li><strong>Many backends, few ops:</strong> the README says a new accelerator "only needs to support a total of ~25 low level ops".</li>
+<li><strong>Debug as a teaching tool:</strong> <code>DEBUG=2</code> prints each kernel and its time. <code>DEBUG=3</code> adds the optimisations chosen. <code>DEBUG=4</code> prints the generated code.</li>
+<li><strong>Tested here:</strong> the README's gradient example, the fusion demo, a tiny XOR network and the full <code>beautiful_mnist.py</code> (97.97% and 98.24% test accuracy in two runs on an M4).</li>
+<li><strong>Robo-Helper test:</strong> our Lesson 15 brain, ported to tinygrad, gives identical answers. It writes the same plans on all 50 held-out examples. It is slower for one command (about 2–4.5 ms vs 0.5 ms) but wins from batches of 16, and is about 76–333× faster at 4,096 commands (<a href="#robohelper">section 4</a>).</li>
+<li><strong>Used in a real product:</strong> openpilot includes tinygrad as a git submodule, and its model daemon imports it (checked in the openpilot repo, see <a href="#robotics">section 5</a>).</li>
+</ul>
+
+<h2 id="code">2. How the code works</h2>
+<p>There are four layers. Each is a folder in <code>tinygrad/</code>.</p>
+<ol>
+<li><strong>Tensor front end</strong> (<code>tensor.py</code>, <code>mixin/</code>). Methods like <code>reshape</code>, <code>*</code> and <code>sum</code> don't touch numbers. Each one wraps a <code>UOp</code>: a node that says "this is a multiply of those two inputs". So <code>c = a * b</code> just grows a graph.</li>
+<li><strong>Autograd</strong> (<code>mixin/gradient.py</code>). <code>.backward()</code> walks the graph backwards and adds more UOps for the gradients. Gradients are also lazy, so the backward pass gets fused too.</li>
+<li><strong>Scheduler</strong> (<code>schedule/</code>). When you call <code>.realize()</code>, it decides where a result must be stored in memory, and cuts the graph into kernels at those points. Everything between two stored results becomes one kernel.</li>
+<li><strong>Codegen and runtime</strong> (<code>codegen/</code>, <code>renderer/</code>, <code>runtime/</code>). Each kernel is optimised (loop splitting, tensor cores, vector loads), then a renderer writes source code: C for the CPU (<code>ClangRenderer</code>), Metal Shading Language for Apple GPUs (<code>MetalRenderer</code>), CUDA, and others. A runtime such as <code>ops_metal.py</code> (282 lines) compiles it and launches it.</li>
+</ol>
+<p>The whole "lazy" idea fits in one method. Nothing runs until here:</p>
+<pre><code># tinygrad/tensor.py (MIT, tinygrad authors), trimmed
+def realize(self, *lst:Tensor, do_update_stats=True) -> Tensor:
+  """Triggers the computation needed to create these Tensor(s)."""
+  to_realize = [x for x in (self,)+lst if x.uop.base.needs_storage()]
+  if len(to_realize):
+    linear, var_vals = Tensor.linear_with_vars(*to_realize)
+    run_linear(linear, var_vals, update_stats=do_update_stats)
+  return self</code></pre>
+<p><code>linear_with_vars</code> builds the list of kernels. <code>run_linear</code> compiles and runs them. Reading a value with <code>.item()</code>, <code>.tolist()</code> or <code>.numpy()</code> calls <code>realize</code> for you.</p>
+
+<h3>The one idea that makes it click</h3>
+<p>Look at the README's matmul: <code>(a.reshape(N,1,N) * b.T.reshape(1,N,N)).sum(axis=2)</code>. Read literally, it builds an N×N×N cube of products, then sums it. For N = 1024 that cube would be about a billion floats, 4 GB. An eager library would build it. tinygrad sees "multiply, then sum" in the same graph, so it writes one kernel that multiplies and adds inside a loop, never storing the cube. Here is the actual C it generated on the CPU backend for N = 4 (<code>DEBUG=4 DEV=CPU</code>):</p>
+<pre><code>// generated by tinygrad for N = 4, trimmed
+for (int Lidx1 = 0; Lidx1 &lt; 4; Lidx1++) {
+  float4 val3 = *((float4*)(((float*)(val1))+alu0));   // one row of a
+  for (int Lidx2 = 0; Lidx2 &lt; 4; Lidx2++) {
+    ...
+    *(((float*)(val0))+(alu0+Lidx2)) =
+      ((val3[0]*val7)+(val3[1]*val5)+(val3[2]*val6)+(val3[3]*val4));
+  }
+}</code></pre>
+<p>Multiply and add, in one loop, writing only the 4×4 answer. That is kernel fusion. The reshapes cost nothing: they only change how indexes are computed.</p>
+
+<h2 id="run">3. Run it, tested</h2>
+<p>All commands were run on 7 Nov 2026 on a MacBook (Apple M4, 16 GB), Python 3.14.5, in a private venv in a scratch folder. <code>Device.DEFAULT</code> reported <strong>METAL</strong>, so the GPU runs below are on the Mac GPU. Clang warning lines have been trimmed from the outputs.</p>
+
+<h3>Install, and one fix that was needed</h3>
+<pre><code>git clone --depth 1 https://github.com/tinygrad/tinygrad.git
+python3 -m venv venv
+./venv/bin/pip install -e tinygrad
+./venv/bin/python -c "from tinygrad import Device; print(Device.DEFAULT)"
+METAL</code></pre>
+<p>The first run failed. On current master, Metal kernels are submitted by a small helper program that tinygrad compiles for the CPU, and by default it uses LLVM. This Mac has no Homebrew LLVM, so every realize crashed:</p>
+<pre><code>loading llvm failed: not found on system
+AttributeError: failed to load library llvm: try setting LLVM_PATH?</code></pre>
+<p>The fix was to tell tinygrad to build that helper with Apple's own <code>clang</code> instead (the setting is in <code>tinygrad/helpers.py</code>). Installing LLVM with Homebrew would also work, but this needs nothing new:</p>
+<pre><code>export HCQ_RUNTIME_DEV=CPU:CLANG</code></pre>
+
+<h3>The README's gradient example</h3>
+<pre><code># quick.py: the README's "Quick example comparing to PyTorch"
+x = Tensor.eye(3).clone(); y = Tensor([[2.0,0,-2.0]])
+z = y.matmul(x).sum(); z.backward()
+
+$ ./venv/bin/python quick.py          # 7 Nov 2026, MacBook (Apple M4), METAL
+[[2.0, 2.0, 2.0], [0.0, 0.0, 0.0], [-2.0, -2.0, -2.0]]
+[[1.0, 1.0, 1.0]]</code></pre>
+<p>Same numbers PyTorch gives for the same code: dz/dx copies y down each column, and dz/dy is all ones because x is the identity.</p>
+
+<h3>The DEBUG=3 fusion demo (N = 1024)</h3>
+<pre><code>$ DEBUG=3 ./venv/bin/python -c "from tinygrad import Tensor;
+N = 1024; a, b = Tensor.empty(N, N), Tensor.empty(N, N);
+(a.reshape(N, 1, N) * b.T.reshape(1, N, N)).sum(axis=2).realize()"
+
+opened device METAL from pid:16667
+scheduled     1 kernels in    25.83 ms | CACHE MISS 157a233c |     103 uops in cache
+TC(0): [((1,), 1024)] [((2,), 1024)] [((0,), 1024)]
+r_32_8_4_32_2_4_4_128     opts: (Opt(op=OptOps.TC, axis=0, arg=(-1, 0, 1)), Opt(op=OptOps.SPLIT, ...
+opened device CPU from pid:16667
+*** CPU        1 hcq_submit      arg  0 mem   0.01 GB tm    477.08us/     4.17ms
+*** METAL      1 r_32_8_4_32_2_4_4_128      arg  3 mem   0.01 GB tm   3695.62us/     4.17ms (    581 GFLOPS   3|74     GB/s)</code></pre>
+<p>What it says:</p>
+<ul>
+<li><strong>"scheduled 1 kernels"</strong>: the reshape, multiply and sum became a single kernel. Its name <code>r_…</code> means it contains a reduce (the sum).</li>
+<li><strong><code>TC(0)</code></strong> and <code>OptOps.TC</code>: tinygrad noticed this is a matmul and used the Apple GPU's matrix (tensor core) instructions.</li>
+<li><strong>METAL, 3.7 ms, 581 GFLOPS</strong> for that first run. The CPU line is the small <code>hcq_submit</code> helper that hands the work to the GPU, not a second maths kernel.</li>
+</ul>
+
+<h3>Fused vs forced, counted</h3>
+<p>To see what laziness buys, this script runs the same maths twice at N = 256: once lazily, once forcing the big product to be stored first. <code>GlobalCounters.kernel_count</code> counts kernels.</p>
+<pre><code># lazy.py (written for this page)
+c = (a.reshape(N, 1, N) * b.T.reshape(1, N, N)).sum(axis=2)
+c.realize()                                  # lazy: one plan, then run
+p = (a.reshape(N, 1, N) * b.T.reshape(1, N, N)).realize()
+d = p.sum(axis=2).realize()                  # forced: store p, then sum
+
+$ ./venv/bin/python lazy.py                  # 7 Nov 2026, MacBook (Apple M4), METAL
+device: METAL
+before realize, c is just a plan: UOp Ops.REDUCE
+lazy (fused):   kernels=1
+forced eager:   kernels=2  intermediate=16,777,216 floats (67 MB)
+same answer: True
+
+$ DEV=CPU ./venv/bin/python lazy.py          # same, on the CPU backend
+device: CPU
+lazy (fused):   kernels=1
+forced eager:   kernels=2  intermediate=16,777,216 floats (67 MB)</code></pre>
+
+<h3>Train something tiny: XOR</h3>
+<pre><code># xor.py: 2 → 8 (tanh) → 2, Adam lr 0.05, 200 steps (written for this page)
+l1, l2 = nn.Linear(2, 8), nn.Linear(8, 2)
+loss = l2(l1(X).tanh()).sparse_categorical_crossentropy(Y).backward()
+
+$ ./venv/bin/python xor.py                   # 7 Nov 2026, MacBook (Apple M4), METAL
+step   0  loss 0.6987
+step  50  loss 0.0020
+step 100  loss 0.0006
+step 150  loss 0.0004
+step 200  loss 0.0003
+predictions: [0, 1, 1, 0] time 5.2s</code></pre>
+<p>It learns XOR. 5.2 s is slow for 4 examples. Almost all of it is compiling kernels the first time and launching tiny GPU jobs. A GPU only pays off on big batches (see <a href="#reality">Reality check</a>).</p>
+
+<h3>Train MNIST: <code>examples/beautiful_mnist.py</code></h3>
+<p>A small convolutional network, 70 steps of batch 512, Adam, with <code>TinyJit</code> capturing the training step. It downloads MNIST (about 55 MB, cached in the scratch folder via <code>XDG_CACHE_HOME</code>, deleted afterwards).</p>
+<pre><code>$ XDG_CACHE_HOME=$PWD/cache ./venv/bin/python tinygrad/examples/beautiful_mnist.py
+# 7 Nov 2026, MacBook (Apple M4), METAL
+loss:   0.08 test_accuracy: 97.97%: 100%|███████| 70/70 [00:17&lt;00:00,  4.01it/s]
+real 28.49      # includes the download and first-time compiles
+
+# second run, data already cached
+loss:   0.10 test_accuracy: 98.24%: 100%|███████| 70/70 [00:24&lt;00:00,  2.80it/s]
+real 26.86</code></pre>
+<p>The README says "98% in ~5 seconds". We got 98% too, but the 70 steps took 17 s and 24 s on this laptop. The README doesn't say what hardware the 5 seconds was measured on. The two runs differ because batches are sampled at random.</p>
+
+<h2 id="robohelper">4. Connect to Robo-Helper (Module 18)</h2>
+<p class="meta">Measured on 8 Nov 2026, with the first version of Robo-Helper's training data: 350 examples, which by accident included 3 of the 12 bake-off commands. On 9 Nov those were removed (343 examples). The small Module 18 brains' bake-off scores didn't change, and the tiny LM's held-out score went from 86% to 92%. Every brain here was compared on the same data, but if you re-run, expect the exact numbers to move by a few points.</p>
+<p>Robo-Helper is standard-library Python: no numpy, no torch. That was on purpose, so you could see every number. tinygrad is the next rung up the ladder:</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Rung</th><th>What computes gradients</th><th>What runs the maths</th></tr></thead>
+<tbody>
+<tr><td><a href="../18-robot-brain/04-neuron.html">Lesson 4, neuron</a> and <a href="../18-robot-brain/15-tiny-lm.html">Lesson 15, tiny LM</a></td><td>You, by hand (manual backprop, checked against numerical gradients)</td><td>Python loops over lists</td></tr>
+<tr><td><a href="01-micrograd.html">micrograd (page 1)</a></td><td>Autograd over single numbers</td><td>Python, one number at a time</td></tr>
+<tr><td><strong>tinygrad</strong></td><td>Autograd over whole tensors, itself lazy</td><td>Generated kernels, fused, on CPU or GPU</td></tr>
+<tr><td>PyTorch</td><td>Autograd over tensors</td><td>Huge hand-written kernel libraries (optionally a compiler)</td></tr>
+</tbody>
+</table>
+</div>
+<ul>
+<li><strong><a href="../18-robot-brain/16-speed.html">Lesson 16, How fast is a brain?</a></strong> taught you to measure latency, p50 and p95. tinygrad shows <em>where</em> the time goes inside one answer: <code>DEBUG=2</code> prints every kernel and its microseconds. Our XOR run shows the lesson's point the other way round: 4 examples on a GPU took 5.2 s, because launching and compiling cost more than the maths.</li>
+<li><strong><a href="../18-robot-brain/17-faster.html">Lesson 17, Faster and cheaper</a></strong> made the brain faster by caching, quantising (4-bit kept 100% accuracy, 2-bit dropped to 75%) and distilling. Kernel fusion is a fourth trick from the same family: same answer, less memory traffic. <code>TinyJit</code> is a cache too. It records the kernels of the first calls and replays them, so later calls skip planning.</li>
+</ul>
+
+<h3>Tested: Robo-Helper's Lesson 15 brain, ported to tinygrad</h3>
+<p>We loaded the trained weights from <code>lesson15_tiny_lm.train_tiny_lm()</code> into tinygrad tensors. That is the averaging TinyLM that writes whole plans like "put red blue", with 10 output words and up to 5 words per plan (2,702 numbers). Then we rewrote <code>TinyLM.generate</code> as tensor maths. Reading the command becomes "bag of words × embedding table". The five greedy steps use <code>one_hot</code> and <code>argmax</code>, so the whole decode is one lazy graph. We checked it and timed it against the pure-Python model. The script is <code>tg_tinylm.py</code>, run from a scratch folder with the solutions folder on <code>sys.path</code>. (We ported only this plain TinyLM, not the attention or distilled brains.)</p>
+<pre><code>$ SOLUTIONS=…/18-robot-brain/project/solutions DEV=CPU   ./venv/bin/python -I tg_tinylm.py
+$ SOLUTIONS=…/18-robot-brain/project/solutions DEV=METAL ./venv/bin/python -I tg_tinylm.py
+# 8 Nov 2026, MacBook (Apple M4). Times in ms are medians. "ms/batch" = one call scoring the whole batch.
+
+test_data(): tinygrad matches pure Python on 50/50 commands; exact-plan accuracy tinygrad 86%, pure Python 86%
+4-bit copy: matches pure-Python 4-bit on 50/50; weights 2702, 10808 B at 32-bit vs 1351 B at 4-bit
+
+           ---------- CPU backend ----------       ---------- METAL backend ---------
+ batch   pure py   tinygrad   tinygrad+JIT      pure py   tinygrad   tinygrad+JIT
+     1     0.383     67.318          4.864        0.370     50.540          1.842
+     8     4.419     68.155          6.604        3.634     61.363          4.481
+    16    10.797    110.808          7.104        9.795     65.238          6.094
+    32    21.630     74.419          9.066       20.056     60.634          4.555
+    64    39.679    103.012          7.947       37.400     59.585          5.162
+   512   303.821     86.144          8.482      283.167     64.383          4.834
+  4096  2172.644     95.716         28.492     1980.240     70.155          5.946
+
+timed single command: 'chuck the red block in the trash' -> ['put', 'red']
+one decision: pure Python p50 0.481 ms p95 0.749 ms | tinygrad+JIT p50 4.525 ms p95 6.658 ms   (CPU)
+one decision: pure Python p50 0.463 ms p95 0.568 ms | tinygrad+JIT p50 1.975 ms p95 3.102 ms   (METAL)</code></pre>
+<p>What the numbers say, honestly:</p>
+<ul>
+<li><strong>Correct:</strong> the tinygrad brain writes exactly the same plan as the Lesson 15 brain on all 50 <code>test_data()</code> examples. Both get 86% of plans exactly right, so the port changes nothing about how good the brain is. The 4-bit copy from <a href="../18-robot-brain/17-faster.html">Lesson 17</a>'s <code>quantized_copy</code> also matches its pure-Python twin on 50/50. (Our tensors still hold the 4-bit values as 32-bit floats. The 1,351 bytes is what it <em>would</em> take packed, using Lesson 17's <code>size_bytes</code>. We didn't pack it. The course's "tinylm-4bit" brain is the distilled model, which has more weights, hence its 1,411 bytes.)</li>
+<li><strong>One command at a time, tinygrad is slower.</strong> Pure Python decides in about 0.4–0.5 ms. tinygrad with <code>TinyJit</code> takes about 2 ms on Metal and 4.5 ms on CPU. Without the JIT it takes 50–110 ms, because it plans and schedules the graph on every call. For this tiny model, the overhead is bigger than the maths.</li>
+<li><strong>Batches flip it.</strong> With the JIT, tinygrad wins from a batch of <strong>16</strong> on both backends. At 4,096 commands at once it is about 76× faster on CPU (2,173 ms vs 28.5 ms) and about 333× faster on Metal (1,980 ms vs 5.9 ms). Without the JIT it starts winning somewhere between 64 and 512.</li>
+<li><strong>The numbers are noisy.</strong> The laptop was running other jobs (load average 8–24 during these runs), which is why the no-JIT column jumps around (for example 110.8 ms at batch 16). On 7 Nov the older single-action model gave the same pattern: tinygrad lost on one command and won from a batch of 16. Treat these as rough sizes.</li>
+</ul>
+<p><strong>When does this matter on a robot?</strong> Robo-Helper hears one command every few seconds. A half-millisecond pure-Python brain is already fast enough, and the tinygrad version would make each decision slower. Batching pays off when a robot must score <em>many</em> things at once: every candidate route, every object in a camera frame, a fleet of robots sharing one brain, or replaying thousands of logged commands to test a new model (as in the <a href="../18-robot-brain/19-bakeoff.html">Lesson 19 bake-off</a>). It is the <a href="../18-robot-brain/16-speed.html">Lesson 16</a> lesson again: measure first, per decision <em>and</em> per batch.</p>
+
+<div class="card note">
+<h3>Next-step exercise</h3>
+<p>Take the forward pass of your <a href="../18-robot-brain/04-neuron.html">Lesson 4 neuron</a> and write it in tinygrad: weights as a <code>Tensor</code>, the same inputs, the same loss. Call <code>loss.backward()</code> and print <code>w.grad.tolist()</code>. Check that the numbers match your hand-derived gradients for the same weights. Then run it with <code>DEBUG=2</code> and count the kernels for one forward and backward step. Can you guess, before running, which steps will fuse?</p>
+</div>
+
+<h2 id="robotics">5. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>A real robot-like product uses it.</strong> comma.ai's openpilot is a driver-assistance system that runs on a small device in the car. Its repo lists tinygrad as a git submodule (<code>.gitmodules</code>), the model daemon <code>openpilot/selfdrive/modeld/modeld.py</code> imports <code>tinygrad</code>, and the driving models ship as <code>*_tinygrad.pkl</code> files. (Checked in the openpilot repo on 7 Nov 2026.)</li>
+<li><strong>Edge chips are varied.</strong> Robots use phone chips, Jetsons and odd accelerators. A framework where a new backend needs only a small set of ops is attractive when you can't get a big vendor library for your chip. The README lists a QCOM (Qualcomm) backend next to the big GPU ones.</li>
+<li><strong>Latency is control.</strong> A control loop has a deadline each cycle. Fewer kernel launches and less memory traffic mean a shorter, steadier step time. Replaying a captured JIT makes each step take about the same time.</li>
+<li><strong>Don't overclaim.</strong> Most robotics research still trains in PyTorch or JAX. tinygrad is a credible way to <em>run</em> a model on unusual hardware, and a great way to <em>learn</em> how frameworks work.</li>
+</ul>
+</div>
+
+<h2 id="reality">6. Reality check</h2>
+<ul>
+<li><strong>Not 1.0.</strong> The README says so. APIs move fast. Our run needed <code>HCQ_RUNTIME_DEV=CPU:CLANG</code> on a Mac without LLVM, on that day's master. Tutorials from a year ago may use names that no longer exist (for example, setting <code>Device.DEFAULT</code> is now deprecated in favour of <code>DEV=…</code>).</li>
+<li><strong>Install from source.</strong> The README recommends <code>pip install -e .</code> from a clone, not a PyPI release.</li>
+<li><strong>The first call is slow.</strong> Every new kernel shape is compiled once. Small jobs look slow (our XOR: 5.2 s). Measure the second run, or use <code>TinyJit</code>.</li>
+<li><strong>"Tiny" is relative.</strong> 9,318 core lines is far bigger than micrograd. It is still small enough to read, unlike PyTorch.</li>
+<li><strong>Lazy bugs show up late.</strong> An error in your maths may only appear at <code>.realize()</code> or <code>.item()</code>, far from the line that caused it.</li>
+<li><strong>Contributing:</strong> the README warns that PRs that look AI-written "will be closed without feedback". Read the contributing rules before sending one.</li>
+</ul>
+
+<h2 id="check">7. Self-check</h2>
+<details><summary>What does "lazy" mean in tinygrad, and what makes the work actually happen?</summary><p>Operations only build a graph of UOps. The work happens when you call <code>.realize()</code>, or read a value with <code>.item()</code>, <code>.tolist()</code> or <code>.numpy()</code>.</p></details>
+<details><summary>Why did the README matmul become 1 kernel instead of 2?</summary><p>The multiply and the sum were in the same graph, and nothing needed the N×N×N products stored. So tinygrad wrote one kernel that multiplies and adds in a loop. Forcing <code>.realize()</code> on the product made it 2 kernels and a 67 MB temporary (at N = 256).</p></details>
+<details><summary>What is a backend, and roughly how much must one support?</summary><p>The code that talks to one kind of chip: it renders kernels to that chip's language and runs them. The README says about 25 low-level ops.</p></details>
+<details><summary>Why did 4 XOR examples take 5.2 seconds on a GPU?</summary><p>Most of the time is compiling each new kernel and launching tiny GPU jobs. The maths itself is trivial. GPUs pay off on big batches.</p></details>
+<details><summary>Where does tinygrad sit between your Lesson 15 language model and PyTorch?</summary><p>Lesson 15 does backprop by hand in plain Python. micrograd automates backprop for single numbers. tinygrad automates it for tensors and compiles fused kernels. PyTorch does the same at full scale with large hand-tuned kernel libraries.</p></details>
+
+<h2 id="reading">8. Further reading</h2>
+<ul>
+<li><a href="https://github.com/tinygrad/tinygrad">tinygrad on GitHub</a> and the <a href="https://docs.tinygrad.org/">tinygrad docs</a> (built from the repo's <code>docs/</code> folder)</li>
+<li><a href="https://github.com/tinygrad/tinygrad/blob/master/examples/beautiful_mnist.py">examples/beautiful_mnist.py</a>, the MNIST script run above</li>
+<li><a href="https://tinygrad.org">tinygrad.org</a> (tiny corp)</li>
+<li><a href="https://github.com/karpathy/micrograd">karpathy/micrograd</a> and <a href="https://github.com/pytorch/pytorch">PyTorch</a>, the two ends the README compares itself to</li>
+<li><a href="https://github.com/commaai/openpilot">commaai/openpilot</a>: see <code>openpilot/selfdrive/modeld/</code> for tinygrad in use</li>
+<li>Earlier in this course: <a href="01-micrograd.html">page 1, micrograd</a>, and <a href="../18-robot-brain/16-speed.html">Lesson 16</a> / <a href="../18-robot-brain/17-faster.html">Lesson 17</a> on speed</li>
+</ul>
+
+<nav class="pager">
+  <a href="04-llm-c.html"><small>Back</small>4 · llm.c</a>
+  <a class="next" href="06-minimalrl.html"><small>Next</small>6 · minimalRL</a>
+</nav>
+<footer>Module 20 · tinygrad · added 2026-11-07 · repo MIT-licensed, short excerpts quoted with credit</footer>
+</main>
+</body>
+</html>

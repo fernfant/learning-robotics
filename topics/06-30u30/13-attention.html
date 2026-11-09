@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 13 · The Transformer</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 13</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Unit 3 · The Transformer era · Day 13</div>
+<h1>Attention Is All You Need</h1>
+<p class="lede">Drop the recurrence, keep the attention. Every token looks at every other token in one parallel step, and that turned out to scale better than anything before it.</p>
+
+<div class="facts">
+  <div><b>Authors</b>Vaswani, Shazeer, Parmar, Uszkoreit, Jones, Gomez, Kaiser, Polosukhin</div>
+  <div><b>Year / venue</b>2017 · NIPS (NeurIPS)</div>
+  <div><b>Core idea</b>Self-attention instead of recurrence</div>
+  <div><b>Study time</b>4–6 h</div>
+</div>
+<p class="meta">Original: <a href="https://arxiv.org/abs/1706.03762">arXiv:1706.03762</a> · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/13_attention">30u30 Day 13</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">A Transformer lets every word in a sentence look at every other word at the same time, and decide which ones matter most for understanding it.</p>
+
+<h3>Think of it like this</h3>
+<p>Imagine you scroll back in a group chat and see the message "She said yes!" To understand it, you look back at the other messages to find out who "she" is and what the question was. You don't reread every message equally. You pay most attention to the few that help. In a Transformer, every word does this for itself, and all the words do it at once instead of waiting in a queue.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>The sentence is split into small pieces called tokens, usually words or parts of words.</li>
+<li>Each token makes a "question" (what am I looking for?) and a "label" (what do I have to offer?).</li>
+<li>Each token compares its question with every other token's label. Good matches get a bigger share of its attention. The shares always add up to 100%.</li>
+<li>Each token then mixes in information from the tokens it paid attention to. All tokens do this at the same time, which makes it very fast on modern chips.</li>
+<li>This is repeated in several layers, so the understanding gets deeper each time.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot looking at a table can treat each thing it sees as a token: the gripper, a cup, a plate, a toy. Attention lets it link "gripper" with "cup" when the task is "pick up the cup", without anyone writing special rules. Many modern robot brains are built from this exact block.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Read this sentence: "The trophy didn't fit in the suitcase because it was too big." What does "it" mean? Which word did you look back at to decide? That looking back is attention.</li>
+<li>In the demo further down, slide <b>Key width d_k</b> to the right. Watch the red bars (no fix) pile onto one key, while the green bars (with the fix) stay spread out. Then press <b>New random query and keys</b> to try again.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Token</dt><dd>One small piece of the input, such as a word.</dd>
+<dt>Attention</dt><dd>Deciding how much to focus on each other token.</dd>
+<dt>Query, key, value</dt><dd>A token's question, its label, and the information it passes on.</dd>
+<dt>Transformer</dt><dd>A neural network built from attention layers, with no step-by-step memory loop.</dd>
+<dt>Parallel</dt><dd>Doing many things at the same time instead of one after another.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Before 2017, the best translation systems were recurrent encoder–decoders with attention bolted on (Day 15). This paper kept only the attention, "dispensing with recurrence and convolutions entirely". The result, the Transformer, trained faster because every position is computed in parallel, and it set new translation records. Almost every large model since, from GPT and BERT to ViT and today's robot policies, is a variant of this block.</p>
+</div>
+<ul>
+<li><strong>Building block:</strong> scaled dot-product attention. Each token emits a query, a key and a value. Output = a softmax-weighted average of the values.</li>
+<li><strong>Multi-head:</strong> run several smaller attentions in parallel so different heads can track different relations.</li>
+<li><strong>Layer:</strong> attention, then a small per-token MLP. Each wrapped in a residual connection plus layer norm. Stack 6 in the encoder and 6 in the decoder.</li>
+<li><strong>Order:</strong> attention ignores position, so sinusoidal positional encodings are added to the input embeddings.</li>
+<li><strong>Results:</strong> 28.4 BLEU on WMT 2014 English→German and 41.8 on English→French with the big model (213M parameters, 3.5 days on 8 P100 GPUs). The base model (65M) trained in 12 hours.</li>
+<li>The 30u30 folder builds every piece from scratch, then a full Transformer, with five exercises.</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<p>Pack the queries, keys and values of all tokens into matrices <code>Q</code>, <code>K</code>, <code>V</code> (one row per token):</p>
+<pre><code>Attention(Q, K, V) = softmax( Q·Kᵀ / √d_k ) · V
+
+head_i      = Attention(X·W_i^Q, X·W_i^K, X·W_i^V)
+MultiHead(X) = Concat(head_1, …, head_h) · W^O
+
+FFN(x) = max(0, x·W_1 + b_1)·W_2 + b_2
+x ← LayerNorm(x + Sublayer(x))      # after every sublayer</code></pre>
+<ul>
+<li><code>Q·Kᵀ</code> is an n×n table of scores: how well token i's query matches token j's key.</li>
+<li><code>/√d_k</code> keeps the scores in a sane range (see the demo). <code>d_k</code> is the key width, 64 in the base model.</li>
+<li><code>softmax</code> runs along each row, so each token's weights over the others are positive and sum to 1.</li>
+<li><code>·V</code> mixes the value vectors with those weights. Each output row is a blend of the tokens that row attended to.</li>
+<li><code>W_i^Q, W_i^K, W_i^V</code> are learned projections, one set per head. Base model: 8 heads of width 64, so <code>d_model</code> = 512. <code>W^O</code> maps the concatenated heads back to 512.</li>
+<li><code>FFN</code> is applied to each position separately, with an inner width of 2048.</li>
+</ul>
+<p><strong>Positions</strong> are injected once, at the bottom of each stack:</p>
+<pre><code>PE(pos, 2i)   = sin(pos / 10000^(2i / d_model))
+PE(pos, 2i+1) = cos(pos / 10000^(2i / d_model))</code></pre>
+<p>Each pair of dimensions is a sine/cosine at a different frequency, from fast to very slow. The authors chose this because a fixed offset <em>k</em> becomes a linear function of the encoding, which should make relative positions easy to learn. Learned position embeddings gave nearly identical results.</p>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>Why throw away recurrence</h3>
+<p>An RNN (Days <a href="01-rnn-effectiveness.html">01</a>–<a href="02-lstm.html">02</a>) must process token 1 before token 2. For a sequence of length n that is n steps you can't parallelise, and information from the start must survive n state updates to reach the end. The paper's Table 1 compares layer types:</p>
+<ul>
+<li><strong>Self-attention:</strong> O(n²·d) work per layer, O(1) sequential steps, path length O(1) between any two tokens.</li>
+<li><strong>Recurrent:</strong> O(n·d²) work, O(n) sequential steps, path length O(n).</li>
+</ul>
+<p>When n is smaller than d (true for sentences), attention is cheaper <em>and</em> fully parallel. The cost is the n² term, which is why long-context models later invented linear and hybrid attention. See <a href="../05-trillion-scale-architecture.html#length">Module 05</a> for how Kimi K3 mixes linear attention with full attention to reach a million tokens.</p>
+
+<h3>Three jobs for one mechanism</h3>
+<ul>
+<li><strong>Encoder self-attention:</strong> every source token attends to every source token.</li>
+<li><strong>Decoder masked self-attention:</strong> each target token attends only to earlier target tokens. Future positions get a score of −∞ before the softmax, so generation stays autoregressive.</li>
+<li><strong>Encoder–decoder attention:</strong> queries come from the decoder, keys and values from the encoder output. This is the Bahdanau idea (<a href="15-bahdanau-attention.html">Day 15</a>) in dot-product form.</li>
+</ul>
+<p>Multiple heads matter: in the paper's ablation, a single head was 0.9 BLEU worse than the best setting, and too many heads also hurt. At inference the decoder caches each layer's keys and values so old tokens aren't recomputed. That cache is the memory bottleneck that DeepSeek's MLA attacks in <a href="../05-trillion-scale-architecture.html#serving">Module 05</a>.</p>
+
+<h3>Why divide by √d_k</h3>
+<p>If query and key entries are independent with mean 0 and variance 1, their dot product has variance d_k. With d_k = 64 raw scores of ±8 or more are normal, and the softmax then puts nearly all weight on one key. Gradients through a saturated softmax are tiny, so learning stalls. Dividing by √d_k brings the variance back to 1 regardless of width.</p>
+<div class="card demo">
+<h3>Interactive: scaled vs unscaled attention</h3>
+<p class="legend">One query against 8 random keys, entries drawn from N(0, 1). Left (<b class="f">red</b>): softmax(q·k). Right (<b class="p">green</b>): softmax(q·k / √d_k). Raise d_k and watch the unscaled weights collapse onto one key.</p>
+<canvas id="att" width="700" height="220" aria-label="Attention weights over eight keys, unscaled and scaled"></canvas>
+<label for="dk">Key width d_k: <span id="dkv" class="num"></span></label>
+<input id="dk" type="range" min="0" max="10" step="1" value="6">
+<p><button id="resample">New random query and keys</button></p>
+<div class="stats">
+  <div class="stat"><div class="k">Max weight, unscaled</div><div class="v" id="mu">–</div></div>
+  <div class="stat"><div class="k">Max weight, scaled</div><div class="v" id="ms">–</div></div>
+  <div class="stat"><div class="k">Entropy unscaled (bits)</div><div class="v" id="eu">–</div></div>
+  <div class="stat"><div class="k">Entropy scaled (bits)</div><div class="v" id="es">–</div></div>
+</div>
+</div>
+
+<h3>Training recipe, in one paragraph</h3>
+<p>Adam with a learning rate that rises linearly for 4,000 warmup steps and then decays with the inverse square root of the step. Dropout 0.1 on each sublayer output. Label smoothing 0.1, which the authors note hurts perplexity but improves BLEU. Beam search of size 4 at test time. <a href="14-annotated-transformer.html">Day 14</a> turns each of these into running code. The same architecture also reached 91.3 F1 on English constituency parsing trained only on the WSJ data, a sign it wasn't tuned only for translation.</p>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>It is the backbone of robot foundation models.</strong> Vision-language-action models such as RT-2 are Transformers that read image patches and instruction tokens and emit action tokens. If you understand this block, you can read their architecture diagrams.</li>
+<li><strong>Action chunking uses the encoder–decoder form.</strong> ACT (the ALOHA policy) feeds camera features into a Transformer encoder and decodes a whole chunk of future joint targets at once with cross-attention, instead of one action per step.</li>
+<li><strong>Attention over objects and sensors.</strong> Treat each detected object, each camera, or each proprioceptive reading as a token. Self-attention then lets the policy relate "gripper" to "cup" without hand-coded features, and the weights are inspectable.</li>
+<li><strong>The n² cost is a real constraint on the robot.</strong> Long observation histories and many image patches blow up compute and KV-cache memory on an onboard GPU. That's why robot stacks shrink token counts, cache, or distil to small models (<a href="../04-distill-small-models.html">Module 04</a>).</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Read the paper sections 3 (model) and 4 (why self-attention) carefully, and skim 5–6. Redraw Figure 1 from memory.</li>
+<li>In the 30u30 Day 13 folder, read <code>implementation.py</code> top to bottom, then run <code>train_minimal.py</code>. Open <code>notebook.ipynb</code> to look at attention maps.</li>
+<li>Do the exercises in order: scaled dot-product, multi-head attention, positional encoding, encoder block, full Transformer. Try each before opening <code>solutions/</code>.</li>
+<li>Check your attention by hand: every row of the weight matrix must sum to 1, and a causal mask must zero the upper triangle.</li>
+<li>Stretch: practise the attention problems in the <a href="../02-tensortonic.html#track">TensorTonic</a> Transformers track (Module 02, Stage D).</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>What do Q, K and V each do?</summary><p>The query says what a token is looking for. Keys say what each token offers to be matched against. Values are what actually gets mixed into the output once the weights are set.</p></details>
+<details><summary>Why scale the scores by 1/√d_k?</summary><p>Dot products of random d_k-dimensional vectors have variance d_k. Large scores saturate the softmax, which makes gradients vanishingly small. Scaling restores unit variance.</p></details>
+<details><summary>Why does the Transformer need positional encodings at all?</summary><p>Attention is a weighted sum over a set. Shuffle the input tokens and each output is just shuffled the same way. Without position signals, "dog bites man" and "man bites dog" look identical.</p></details>
+<details><summary>What does the decoder mask do, and why is it needed in training?</summary><p>It sets scores for future positions to −∞, so token i can only see tokens up to i. Training feeds the whole target sentence at once, so without the mask the model could copy the answer.</p></details>
+<details><summary>When is self-attention more expensive than a recurrent layer?</summary><p>When sequence length n exceeds the model width d, since attention costs O(n²·d) per layer and recurrence O(n·d²). Long contexts are where this bites.</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/1706.03762">The original paper</a> (arXiv, latest version)</li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/13_attention">30u30 Day 13</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Next: <a href="14-annotated-transformer.html">Day 14, The Annotated Transformer</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="12-dropout.html"><small>Previous</small>Day 12 · Dropout</a>
+  <a class="next" href="14-annotated-transformer.html"><small>Next</small>Day 14 · The Annotated Transformer</a>
+</nav>
+<footer>Module 06 · Day 13 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('att'), ctx = cv.getContext('2d'), dkIn = document.getElementById('dk');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const rng = s => () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+const NK = 8;
+let seed = 7;
+
+function gauss(r) { return Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(2 * Math.PI * r()); }
+function softmax(z) { const m = Math.max(...z), e = z.map(v => Math.exp(v - m)), s = e.reduce((a, b) => a + b); return e.map(v => v / s); }
+function entropy(p) { return -p.reduce((a, v) => a + (v > 0 ? v * Math.log2(v) : 0), 0); }
+
+function weights(dk, sd) {
+  const r = rng(sd * 1000 + dk), q = Array.from({ length: dk }, () => gauss(r));
+  const sc = Array.from({ length: NK }, () => Array.from({ length: dk }, () => gauss(r)).reduce((a, v, i) => a + v * q[i], 0));
+  return { un: softmax(sc), sc: softmax(sc.map(v => v / Math.sqrt(dk))) };
+}
+
+function bars(p, x0, w, col) {
+  const H = cv.height, pad = 24, bw = w / NK;
+  ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+  p.forEach((v, i) => {
+    const h = v * (H - 2 * pad - 14);
+    ctx.fillStyle = col; ctx.fillRect(x0 + i * bw + 4, H - pad - h, bw - 8, h);
+    ctx.fillStyle = css('--muted'); ctx.fillText('k' + (i + 1), x0 + i * bw + bw / 2, H - 6);
+  });
+}
+
+function draw() {
+  const dk = 2 ** +dkIn.value;
+  document.getElementById('dkv').textContent = dk;
+  const { un, sc } = weights(dk, seed), W = cv.width, H = cv.height, half = (W - 60) / 2;
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = css('--line'); ctx.beginPath(); ctx.moveTo(W / 2, 8); ctx.lineTo(W / 2, H - 20); ctx.stroke();
+  bars(un, 20, half, css('--fail'));
+  bars(sc, W / 2 + 10, half, css('--pass'));
+  ctx.fillStyle = css('--fg'); ctx.textAlign = 'left'; ctx.font = '13px sans-serif';
+  ctx.fillText('unscaled', 24, 16); ctx.fillText('scaled by 1/√d_k', W / 2 + 14, 16);
+  const pct = v => (v * 100).toFixed(0) + '%';
+  document.getElementById('mu').textContent = pct(Math.max(...un));
+  document.getElementById('ms').textContent = pct(Math.max(...sc));
+  document.getElementById('eu').textContent = entropy(un).toFixed(2);
+  document.getElementById('es').textContent = entropy(sc).toFixed(2);
+}
+dkIn.oninput = draw;
+document.getElementById('resample').onclick = () => { seed++; draw(); };
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

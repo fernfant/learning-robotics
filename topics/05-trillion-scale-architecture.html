@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM Architecture at Scale</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../index.html">← LLMs &amp; Robotics</a> · Module 05</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 05 · Model architecture at frontier scale</div>
+<h1>LLM architecture at trillion scale: width, depth and length in Kimi K3</h1>
+<p class="lede">Kimi K3 as a case study in three scaling problems: routing among hundreds of experts, letting layers reach back across the stack, and holding a million-token memory at fixed cost.</p>
+<p class="meta">Sources:
+<a href="https://x.com/antiAIvo/status/2112510656037761095">@antiAIvo's post</a> (in Chinese), quoting
+<a href="https://x.com/philipkiely/status/2112272656217297224">Philip Kiely (Baseten)</a> and his team's 1-hour explainer video ·
+<a href="https://github.com/MoonshotAI/Kimi-K3">Kimi K3 repo and technical report</a> (Moonshot AI, Jul 2026). I couldn't watch the video. The technical detail below comes from the report, which is saved in <code>sources/</code>.</p>
+
+<div class="toc">
+<strong>In this module</strong>
+<ol>
+<li><a href="#summary">Summary</a></li>
+<li><a href="#why-robotics">Why this matters for robotics</a></li>
+<li><a href="#width">Deep dive: width, routing 896 experts (interactive)</a></li>
+<li><a href="#length">Deep dive: length, hybrid linear + global attention</a></li>
+<li><a href="#depth">Deep dive: depth, attention residuals</a></li>
+<li><a href="#serving">Deep dive: what this means for serving</a></li>
+<li><a href="#compounding">Deep dive: the compounding-learning lesson</a></li>
+<li><a href="#playbook">Playbook</a></li>
+<li><a href="#check">Self-check</a></li>
+<li><a href="#glossary">Glossary &amp; further reading</a></li>
+</ol>
+</div>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>The post's author, a backend engineer, started teaching themselves about LLMs five months ago. Today they could follow over half of Baseten's deep-dive on trillion-parameter inference, and they call it compounding learning paying off.</p>
+<p>Kiely's framing: going past a trillion parameters forces three problems on inference engineers:</p>
+<ul>
+<li><strong>Width:</strong> routing between hundreds of sparse experts.</li>
+<li><strong>Depth:</strong> mixing global and linear attention.</li>
+<li><strong>Length:</strong> handling 1M-token sequences.</li>
+</ul>
+<p>Kimi K3 (2.8T total, 104B active per token) answers each one:</p>
+<ul>
+<li>width: <strong>Stable LatentMoE</strong></li>
+<li>depth: <strong>Attention Residuals</strong></li>
+<li>length: a <strong>3:1 hybrid of Kimi Delta Attention (KDA) and Gated MLA</strong></li>
+</ul>
+</div>
+<div class="table-wrap"><table>
+<tr><th>Kimi K3 at a glance (from the report)</th><th></th></tr>
+<tr><td>Parameters</td><td>2.8T total · 104B active per token</td></tr>
+<tr><td>Layers</td><td>93: 69 KDA + 24 Gated MLA (3 KDA : 1 MLA per block, plus a final MLA)</td></tr>
+<tr><td>Experts</td><td>896 routed (16 picked per token) + 2 shared, per layer. Sparsity 56×.</td></tr>
+<tr><td>Context</td><td>1,048,576 tokens. No positional encoding at all ("NoPE").</td></tr>
+<tr><td>Vision</td><td>MoonViT-V2, 401M parameters, trained from scratch with next-token prediction</td></tr>
+<tr><td>Precision</td><td>MXFP4 expert weights / MXFP8 activations, with quantisation-aware training</td></tr>
+<tr><td>Claimed gain</td><td>~2.5× scaling efficiency over Kimi K2</td></tr>
+</table></div>
+<div class="card note"><p><strong>Framing differences:</strong> the post lists Attention Residuals under "length", but the report says AttnRes works across <em>depth</em> (layers). The hybrid attention handles <em>sequence length</em>. Kiely's tweet puts "mixing global and linear attention" under depth, likely because the mix alternates <em>layer by layer</em>. This module follows the report's mapping.</p></div>
+
+<h2 id="why-robotics">2. Why this matters for robotics</h2>
+<div class="card note">
+<p><strong>Track: LLM.</strong> This is about how frontier LLMs are built and served. It carries over to robotics because robot foundation models (VLAs) use the same transformer backbones, with much tighter latency and memory budgets.</p>
+</div>
+<ul>
+<li><strong>Mixture-of-experts (MoE) for robots:</strong> one policy for many robot bodies and many skills is a natural fit for expert routing. Only the relevant experts run per input, which keeps on-board compute down.</li>
+<li><strong>Fixed-size memory = long-horizon robots.</strong> A robot streaming camera frames for an hour can't keep a full attention cache of every frame. KDA keeps a <em>fixed-size</em> state updated each step, the same shape as a recurrent state estimator. The delta-rule update even resembles the online least-squares filters used in classical robotics.</li>
+<li><strong>Forgetting is a design parameter.</strong> KDA's per-channel decay is learned forgetting. That's the same lesson as the intent model in <a href="03-shared-autonomy.html#intent">Module 03</a>: memory that can't forget gets stuck.</li>
+<li><strong>Native vision:</strong> K3 trains its vision encoder from scratch inside the language model and says pre-trained contrastive encoders (SigLIP-style) were unnecessary and less stable. That's a relevant data point for VLA design, which usually starts from SigLIP.</li>
+<li><strong>Deployment tricks transfer:</strong> quantisation-aware training, speculative decoding and distillation are how big models get onto small robot computers (<a href="04-distill-small-models.html">Module 04</a>).</li>
+</ul>
+
+<h2 id="width">3. Deep dive: width, routing 896 experts</h2>
+<p>In a <strong>mixture-of-experts</strong> layer, a small <em>router</em> scores each token against every expert and sends it to the top-<em>k</em>. K3 picks 16 of 896, so each token touches under 2% of the routed weights. That's how it has 2.8T parameters but only 104B active.</p>
+<p>Two problems appear at this sparsity, and K3 adds three fixes for them:</p>
+<h3>Problem 1: traffic and exploding activations → LatentMoE + normalisation + SiTU-GLU</h3>
+<ul>
+<li><strong>LatentMoE:</strong> routed experts work in a compressed space (3,584 dims, vs 7,168 for the full model), so sending a token to 16 experts costs half the traffic. Two full-width <em>shared</em> experts handle common transformations for every token.</li>
+<li>That path chains about four matrix multiplies, and at 2.8T scale its activations blew up. Fixes:
+  <ul>
+  <li>an <strong>RMSNorm</strong> before projecting back up</li>
+  <li><strong>SiTU-GLU</strong>, a new activation that behaves like SwiGLU near zero but is soft-capped (output bounded at β₁β₂ = 100) using <code>β·tanh(x/β)</code>. Bounded activations matter because they run in low precision (FP4/FP8).</li>
+  </ul></li>
+</ul>
+<h3>Problem 2: load balancing → Quantile Balancing</h3>
+<p>If the router sends most tokens to a few favourite experts, those experts become hot spots that slow distributed training. Others get few tokens and stop learning ("dying experts"). The usual fix adds a per-expert <em>bias</em> to the routing scores, nudged up or down by a fixed step each training step. With 896 experts, fixed steps either adapt too slowly or oscillate.</p>
+<p><strong>Quantile Balancing</strong> computes each expert's bias directly:</p>
+<ul>
+<li>The target load is <code>q = m·k/n</code> tokens per expert.</li>
+<li>For each expert, find the score margin that exactly <code>q</code> tokens exceed. That's a quantile of the margins.</li>
+<li>Set the bias so that cut-off becomes the selection line.</li>
+</ul>
+<p>The bias only affects <em>which</em> experts get picked, not how their outputs are weighted. It's computed from one batch and applied to the next. At scale they estimate the quantile with histograms summed across GPUs.</p>
+
+<div class="card demo">
+<h3>Interactive: top-k routing vs. Quantile Balancing</h3>
+<p class="legend">256 tokens, 16 experts, top-2. Router scores are skewed, so some experts are naturally popular. Bars show tokens per expert. The dashed line is the target load q = 32.</p>
+<canvas id="moe" width="700" height="240" aria-label="Expert load histogram"></canvas>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
+<button id="step">Apply one balancing step →</button>
+<button id="fixed">Fixed-step bias update →</button>
+<button id="reset">Reset</button>
+</div>
+<div class="stats">
+  <div class="stat"><div class="k">Step</div><div class="v" id="st">0</div></div>
+  <div class="stat"><div class="k">Max / target</div><div class="v" id="mx">–</div></div>
+  <div class="stat"><div class="k">Idle experts</div><div class="v" id="dead">–</div></div>
+  <div class="stat"><div class="k">Method</div><div class="v" id="meth" style="font-size:1rem">–</div></div>
+</div>
+<p class="meta">Each step routes a <em>fresh</em> batch using the bias computed from the previous one, as in the report. Compare how many steps each method needs to flatten the bars. Expect Quantile Balancing to get there in 1–2 steps. The fixed step takes ~10 and keeps wobbling. The leftover unevenness is sampling noise from each fresh 256-token batch.</p>
+</div>
+
+<h2 id="length">4. Deep dive: length, hybrid linear + global attention</h2>
+<p>Standard (global) attention compares every token with every earlier token. Its cost grows with n² and its key-value cache grows with n. At 1M tokens, both hurt. K3 interleaves two kinds of layer, 3 to 1:</p>
+<div class="table-wrap"><table>
+<tr><th></th><th>KDA (linear attention)</th><th>Gated MLA (global attention)</th></tr>
+<tr><td>Memory per sequence</td><td><strong>Fixed-size</strong> state matrix per head</td><td>Cache grows with every token (compressed into a small latent vector)</td></tr>
+<tr><td>Compute</td><td>Linear in length</td><td>Quadratic in length</td></tr>
+<tr><td>Strength</td><td>Recency, position, cheap streaming</td><td>Exact recall of anything, anywhere in context</td></tr>
+<tr><td>Share of layers</td><td>69 of 93</td><td>24 of 93 (and always the final layer)</td></tr>
+</table></div>
+<h3>The KDA update, in plain words</h3>
+<pre><code>S_t = (I − β_t k_t k_tᵀ) · Diag(α_t) · S_{t−1}  +  β_t k_t v_tᵀ
+output_t = S_tᵀ q_t</code></pre>
+<ol>
+<li><code>Diag(α_t)</code>: <strong>fade</strong> old memory, channel by channel. Each channel learns its own forgetting rate.</li>
+<li><code>(I − β k kᵀ)</code>: <strong>erase</strong> whatever is currently stored under key <code>k</code>.</li>
+<li><code>+ β k vᵀ</code>: <strong>write</strong> the new value <code>v</code> under key <code>k</code>, with strength β.</li>
+<li>Read by querying the state with <code>q</code>.</li>
+</ol>
+<p>This "delta rule" is online regression: each step nudges the memory to map <code>k → v</code> correctly. Robotics readers will recognise the shape: fixed-size state, predict, correct by the error. It's the same pattern as recursive least squares and Kalman-style estimators (an analogy, not an equivalence).</p>
+<p><strong>A numerics detail worth knowing:</strong> K3 bounds the log-decay to (−5, 0), so every channel keeps at least e⁻⁵ ≈ 0.7% per step. That sounds cosmetic, but it keeps intermediate values inside BF16 range. That lets <em>all</em> the work run as dense tensor-core matrix multiplies, removing a slow special-case path. Small bounds unlocking big speed is a recurring pattern (see SiTU-GLU above).</p>
+<p><strong>No positional encoding:</strong> the MLA layers use none. KDA's decay already tells the model how recent things are. So stretching context from 8K → 64K (pre-training) → 256K → 1M (cooldown) needs no positional-encoding retuning. The report also notes that length alone doesn't teach long-range skill. They synthesise tasks that can <em>only</em> be solved by combining information scattered across the full 1M tokens.</p>
+
+<h2 id="depth">5. Deep dive: depth, attention residuals</h2>
+<p>A normal residual connection adds each layer's output into one running sum. By layer 90, everything earlier is blended into a single vector. The report likens this to how RNNs squeeze all of the past into one state.</p>
+<p><strong>Attention Residuals</strong> apply attention <em>across layers</em>:</p>
+<ul>
+<li>Each layer has a learned query vector.</li>
+<li>It attends over the outputs of earlier layers (and the original embedding).</li>
+<li>It picks a weighted mix of the representations it needs.</li>
+</ul>
+<p>To keep memory down, K3 uses <strong>Block AttnRes</strong>. Layers are grouped into blocks of 12, each block is summed into one vector, and attention runs over the ~9 block summaries. Memory drops from O(layers × width) to O(blocks × width), and about 8 blocks recover most of the benefit.</p>
+<p>A nice side effect: the speculative-decoding draft model reads features from blocks 1, 4 and the final block. AttnRes gives clean low-, mid- and high-level features for free.</p>
+
+<div class="card" id="muon">
+<h3>Aside: the optimiser, Per-Head Muon</h3>
+<p>Like Kimi K2, K3 trains its matrix parameters with the <strong>Muon</strong> optimiser, which orthogonalises each update (Newton–Schulz iterations). For the attention projections, the report uses a <strong>per-head</strong> variant. Instead of orthogonalising the whole Q, K and V momentum matrices at once, it splits them by head and orthogonalises each head's block separately.</p>
+<p>The report's reasoning: with full-matrix orthogonalisation, heads with larger gradients dominate the shared update direction while small-scale heads are under-normalised. Per-head treatment equalises update scale across heads, and the report credits it with more balanced learning, better stability at scale, and slightly lower optimiser overhead (the Newton–Schulz steps run on smaller blocks).</p>
+<p class="meta">Source: Kimi K3 technical report, §2.5. How Muon works: <a href="12-training-inference-videos/08-muon.html">Module 12, video 08</a>.</p>
+</div>
+
+<h2 id="serving">6. Deep dive: what this means for serving</h2>
+<p>This is Kiely's angle as an inference engineer. The report's serving section lists the consequences:</p>
+<ul>
+<li><strong>Two caches, one pool.</strong> MLA's cache grows per token. KDA's is one fixed-size state per request. K3 packs both into the same paged memory pool with equal page sizes, so one allocator and one eviction policy handle both.</li>
+<li><strong>Prefix caching gets harder.</strong> Reusing a shared prompt prefix needs the KDA state <em>at that exact boundary</em>, but states can only be checkpointed occasionally. They decouple hash granularity (512 tokens) from storage blocks (up to 6,144) and keep KDA checkpoints at boundaries.</li>
+<li><strong>Request costs span ~1,000×</strong>, from short chats to 1M-token agent sessions. That requires cache-aware scheduling and budget-based admission control.</li>
+<li><strong>Quantisation-aware training:</strong> experts are trained in MXFP4 throughout post-training, so the served model is the trained model. Compare Module 04, where int8 cost 0.5–0.7 WER points when applied <em>after</em> training.</li>
+<li><strong>Speculative decoding:</strong> a one-layer draft model proposes up to 7 tokens, and the big model verifies them. They train the draft to maximise the <em>acceptance rate</em> directly instead of a KL proxy.</li>
+<li><strong>Multi-teacher on-policy distillation:</strong> nine specialist teachers (by domain and reasoning effort) are merged into one student. It's Module 04's teacher → student pattern at frontier scale.</li>
+</ul>
+<p>Baseten reports serving K3 at ~97 output tokens/s with 0.8 s latency on 1.05M-token context (<a href="https://www.baseten.co/library/kimi-k3/">Baseten model page</a>).</p>
+
+<h2 id="compounding">7. Deep dive: the compounding-learning lesson</h2>
+<p>The quoting post's real message: <em>150 days ago none of this made sense to me; today I follow over half.</em> Understanding compounds because each concept makes the next one cheaper to learn. Here's the prerequisite map for this video, with where this course covers each item:</p>
+<div class="table-wrap"><table>
+<tr><th>To follow…</th><th>You need</th><th>Where</th></tr>
+<tr><td>MoE routing</td><td>Softmax/sigmoid, top-k, quantiles</td><td><a href="02-tensortonic.html#math">02</a> (stats), this module</td></tr>
+<tr><td>Linear attention / KDA</td><td>Dot products, outer products, matrix state, recurrences</td><td><a href="02-tensortonic.html#track">02</a> (linear algebra, RNN/LSTM papers)</td></tr>
+<tr><td>MLA / KV cache</td><td>Scaled dot-product attention, KV caching</td><td><a href="02-tensortonic.html#track">02</a> (Transformers paper, LLM internals)</td></tr>
+<tr><td>Attention residuals</td><td>Residual connections (ResNet)</td><td><a href="02-tensortonic.html#track">02</a> (ResNet paper)</td></tr>
+<tr><td>MXFP4 / QAT / speculative decoding</td><td>Number formats, quantisation, draft-and-verify</td><td><a href="04-distill-small-models.html#latency">04</a>, <a href="02-tensortonic.html#track">02</a></td></tr>
+</table></div>
+<p>Pairing this with <a href="03-shared-autonomy.html#learning">Module 03's</a> advice: don't aim to understand everything on the first pass. Watch, note the 3–4 concepts you didn't follow, implement one of them from scratch (TensorTonic has MoE, attention and KV-cache problems), then re-watch. The second pass is where it compounds.</p>
+
+<h2 id="playbook">8. Playbook</h2>
+<ol>
+<li>When reading any new model card, sort its features into <strong>width</strong> (experts/channels), <strong>depth</strong> (layers/residuals) and <strong>length</strong> (attention/context). It makes new architectures much easier to parse.</li>
+<li>For each, ask: what does it cost at <em>training</em>, and what does it cost at <em>serving</em> (memory, latency, cache reuse)?</li>
+<li>Look for the numerical-stability fix behind each feature (bounded decay, soft-capped activations, normalisation). At scale and low precision, these are what make it work.</li>
+<li>For robotics: prefer fixed-size-state memory for streaming sensors, use sparsity to fit more skills into on-board compute, and train with the quantisation you'll deploy with.</li>
+</ol>
+
+<h2 id="check">9. Self-check</h2>
+<details><summary>K3 has 2.8T parameters. Why does each token only cost ~104B parameters of compute?</summary>
+<p>Each MoE layer runs only 16 of 896 routed experts (plus 2 shared) per token. The remaining expert weights sit idle for that token.</p></details>
+<details><summary>What problem does Quantile Balancing solve that fixed-step bias updates struggle with?</summary>
+<p>With 896 experts, a fixed step size either adapts too slowly or oscillates. QB sets each bias directly to the score quantile that gives that expert exactly its target load, in one step from the previous batch.</p></details>
+<details><summary>Why does a KDA layer's memory not grow with context length, while MLA's does?</summary>
+<p>KDA folds every token into a fixed-size state matrix (decay, erase, write). MLA keeps a compressed latent for <em>every</em> token so it can attend to any of them exactly.</p></details>
+<details><summary>Why keep any global-attention layers at all?</summary>
+<p>A fixed-size state must forget or compress. Exact recall of a detail from 800K tokens ago needs global attention. The 3:1 mix gets most of the efficiency while keeping that capability.</p></details>
+<details><summary>Why could K3 skip positional encodings entirely?</summary>
+<p>KDA's learned decay already encodes recency and order. The MLA layers then do content-based lookup. This also means extending to 1M tokens needs no positional-encoding retuning.</p></details>
+<details><summary>Robotics: why is a fixed-size recurrent state attractive for a robot watching a camera stream?</summary>
+<p>Memory and per-frame compute stay constant however long the robot runs, which suits fixed on-board hardware. A full attention cache would grow without bound.</p></details>
+
+<h2 id="glossary">10. Glossary &amp; further reading</h2>
+<div class="table-wrap"><table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<tr><td>MoE</td><td>Mixture of experts: many sub-networks, with a router choosing a few per token</td></tr>
+<tr><td>Active vs total parameters</td><td>Weights used per token vs all weights stored</td></tr>
+<tr><td>LatentMoE</td><td>Routed experts operate in a compressed (latent) space to cut traffic</td></tr>
+<tr><td>Load balancing</td><td>Keeping token counts per expert even, for speed and so all experts learn</td></tr>
+<tr><td>Linear attention</td><td>Attention with a fixed-size recurrent state. Cost linear in length.</td></tr>
+<tr><td>Delta rule</td><td>Memory update that erases the old value at a key and writes the new one</td></tr>
+<tr><td>KDA</td><td>Kimi Delta Attention: delta rule + learned per-channel forgetting</td></tr>
+<tr><td>MLA</td><td>Multi-head Latent Attention (DeepSeek-V2): caches a small latent per token instead of full keys/values</td></tr>
+<tr><td>KV cache</td><td>Stored keys/values from earlier tokens so they aren't recomputed</td></tr>
+<tr><td>NoPE</td><td>No positional encoding</td></tr>
+<tr><td>Attention Residuals</td><td>Layers attend over earlier layers' outputs instead of a single running sum</td></tr>
+<tr><td>MXFP4 / QAT</td><td>4-bit microscaling floats / training with quantisation in the loop</td></tr>
+<tr><td>Speculative decoding</td><td>A small draft model proposes tokens, and the big model verifies several at once</td></tr>
+</table></div>
+<ul>
+<li><a href="https://github.com/MoonshotAI/Kimi-K3">Kimi K3 repo and technical report</a>: sections 2 (architecture), 4.1.3–4.1.4 (distillation, QAT, drafting), 5.4 (serving)</li>
+<li><a href="https://x.com/philipkiely/status/2112272656217297224">Philip Kiely's post and explainer video</a> (Baseten). Kiely is the author of <em>Inference Engineering</em>.</li>
+<li><a href="https://www.baseten.co/library/kimi-k3/">Kimi K3 on Baseten</a></li>
+<li>Related: <a href="10-rlm-harness.html">Module 10</a>: the scaffolding route to long context (Recursive Language Models), complementary to K3's architectural route</li>
+<li>Related: <a href="07-post-training.html">Module 07</a> explains the post-training stages (SFT, preference RL, verifiable rewards) that K3's pipeline builds on</li>
+<li>Kimi Linear (the KDA paper) and DeepSeek-V2 (MLA): references 64 and 28 in the report</li>
+<li>TensorTonic: <a href="https://www.tensortonic.com/llm-internals/mixture-of-experts">mixture-of-experts</a>, <a href="https://www.tensortonic.com/llm-internals/kv-cache">KV cache</a>, <a href="https://www.tensortonic.com/llm-internals/speculative-decoding">speculative decoding</a>, <a href="https://www.tensortonic.com/llm-internals/quantization">quantisation</a></li>
+</ul>
+
+<footer>Module 05 · added 2026-10-21 · <a href="../index.html">Back to course index</a></footer>
+</main>
+
+<script>
+const cv = document.getElementById('moe'), ctx = cv.getContext('2d');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const M = 256, N = 16, K = 2, Q = M * K / N;
+
+let seed, step, bias, load, method;
+const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const gauss = () => Math.sqrt(-2 * Math.log(rnd())) * Math.cos(2 * Math.PI * rnd());
+const sig = x => 1 / (1 + Math.exp(-x));
+// fixed per-expert popularity so imbalance persists across batches
+const skew = Array.from({length: N}, (_, j) => 1.6 * Math.cos(j * 0.9) - 0.2 * j / N);
+
+function batch() {
+  return Array.from({length: M}, () => skew.map(s => sig(s + gauss())));
+}
+function route(S) {
+  const ld = new Array(N).fill(0), cut = [];
+  for (const s of S) {
+    const order = s.map((v, j) => [v + bias[j], j]).sort((a, b) => b[0] - a[0]);
+    for (let r = 0; r < K; r++) ld[order[r][1]]++;
+    cut.push(order[K][0]);  // (k+1)-th biased score = cut-off to enter this token's top-k
+  }
+  return {ld, cut};
+}
+function quantile(xs, p) {
+  const s = [...xs].sort((a, b) => a - b), i = p * (s.length - 1), lo = Math.floor(i);
+  return s[lo] + (s[Math.min(lo + 1, s.length - 1)] - s[lo]) * (i - lo);
+}
+function reset() {
+  seed = 42; step = 0; bias = new Array(N).fill(0); method = 'plain top-k';
+  load = route(batch()).ld; draw();
+}
+function qbStep() {
+  const S = batch(), {cut} = route(S);
+  const nb = skew.map((_, j) => -quantile(S.map((s, i) => s[j] - cut[i]), 1 - K / N));
+  const mean = nb.reduce((a, b) => a + b) / N;
+  bias = nb.map(b => b - mean);
+  load = route(batch()).ld; step++; method = 'Quantile Bal.'; draw();
+}
+function fixedStep() {
+  const {ld} = route(batch());
+  bias = bias.map((b, j) => b + 0.02 * Math.sign(Q - ld[j]));
+  load = route(batch()).ld; step++; method = 'fixed step γ=0.02'; draw();
+}
+function draw() {
+  const W = cv.width, H = cv.height, pad = 24, bw = (W - 2 * pad) / N, max = Math.max(Q * 3.2, ...load);
+  ctx.clearRect(0, 0, W, H);
+  load.forEach((v, j) => {
+    const h = v / max * (H - 2 * pad);
+    ctx.fillStyle = v > Q * 1.5 ? css('--fail') : v === 0 ? css('--line') : css('--accent');
+    ctx.fillRect(pad + j * bw + 3, H - pad - h, bw - 6, h);
+    ctx.fillStyle = css('--muted'); ctx.font = '11px sans-serif';
+    ctx.fillText('E' + (j + 1), pad + j * bw + bw / 2 - 8, H - 8);
+  });
+  const y = H - pad - Q / max * (H - 2 * pad);
+  ctx.strokeStyle = css('--fg'); ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.stroke(); ctx.setLineDash([]);
+  document.getElementById('st').textContent = step;
+  document.getElementById('mx').textContent = (Math.max(...load) / Q).toFixed(2) + '×';
+  document.getElementById('dead').textContent = load.filter(v => v === 0).length;
+  document.getElementById('meth').textContent = method;
+}
+document.getElementById('step').onclick = qbStep;
+document.getElementById('fixed').onclick = fixedStep;
+document.getElementById('reset').onclick = reset;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+reset();
+</script>
+</body>
+</html>

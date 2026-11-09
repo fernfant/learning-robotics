@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video 09 · LLM serving</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 12 · Training &amp; inference videos</a> › Video 09</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 12 · Video 09</div>
+<h1>How LLM serving actually works: vLLM and SGLang inside</h1>
+<p class="lede">A 40-minute tour of an inference server, covering the scheduler, KV cache, model and sampler, with vLLM and SGLang as the worked examples. Most of it maps straight onto <a href="../09-inference-engineering/index.html">Module 09 · Inference engineering</a>, so this guide is mainly a chapter-by-chapter map into those pages. It explains in full only what Module 09 doesn't: RadixAttention and HiCache, cache-aware scheduling, structured outputs with XGrammar, CUDA graphs and overlap scheduling, and data-parallel attention for MLA.</p>
+
+<div class="facts">
+  <div><b>Video length</b>41:42</div>
+  <div><b>Published</b>29 October 2026</div>
+  <div><b>Level</b>Intermediate: attention and the KV cache at the level of Module 09 pages 01–02</div>
+  <div><b>Builds on</b><a href="../09-inference-engineering/02-kv-cache-attention.html">Module 09 · KV cache</a>, <a href="../09-inference-engineering/03-batching-scheduling.html">Module 09 · Batching</a>, <a href="04-speculative-decoding.html">Video 04 · Speculative decoding</a></div>
+</div>
+<p class="meta">Video by Jia-Bin Huang · <a href="https://www.youtube.com/watch?v=T4SRu-trimA">Watch on YouTube</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">When millions of people chat with an AI at once, a program called a server decides whose words get worked on next, remembers what it has already read, and keeps the expensive chips busy every moment. This video opens that program up.</p>
+
+<h3>Think of it like this</h3>
+<p>Picture a busy restaurant kitchen. Orders arrive all the time. A good head chef doesn't cook one meal from start to finish before looking at the next order. She keeps every pan going and adds new dishes as soon as a burner frees up (batching). She keeps chopped onions ready, because half the dishes start with them (caching shared prefixes). She writes the shared prep on a list shaped like a family tree: "onions → onions and garlic → onions, garlic and tomato", so any dish can pick up the longest bit already done (a radix tree). When the counter is full, old prep goes to the fridge instead of the bin (HiCache). And she never lets a cook stand around waiting for the next ticket (overlap scheduling).</p>
+
+<h3>How it works</h3>
+<ol>
+<li>A request arrives. The scheduler checks how much of its start has already been read and cached.</li>
+<li>The model reads the new part of the prompt in one big pass (prefill), storing notes called the KV cache.</li>
+<li>Then it writes one token at a time (decode), batched together with many other users' requests.</li>
+<li>Memory for the notes is handed out in small pages, so nobody hogs space they don't use.</li>
+<li>Tricks such as guessing ahead (speculative decoding), sticking to a format (structured outputs) and fast GPU kernels make each step cheaper.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot that asks a big model for a plan, or a fleet of robots sharing one model in the cloud, depends on that server answering quickly every time. The same tricks, especially reusing the start of a prompt that never changes, decide how fast the answer comes back.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Write ten sentences that all begin "Once upon a time, in a land far away,". Count how many words you'd save if you only wrote the shared start once and drew arrows from it. That's prefix sharing.</li>
+<li>In the demo below, pick the <b>Workload</b>, then raise <b>Block size</b> from 1 to 256 and watch the orange "rounding loss" grow. Then shrink <b>Cache capacity</b> and see old conversations get evicted.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Prefill</dt><dd>Reading the whole prompt in one pass before the first token comes out.</dd>
+<dt>Decode</dt><dd>Writing the answer one token at a time.</dd>
+<dt>KV cache</dt><dd>The stored keys and values for every token so far, so they aren't recomputed.</dd>
+<dt>Prefix cache</dt><dd>Keeping the KV cache of a prompt's start so a later request with the same start can skip it.</dd>
+<dt>Radix tree</dt><dd>A tree where each branch holds a run of tokens, so shared beginnings are stored once.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="watch">1. Watch</h2>
+<div class="card"><div style="position:relative;padding-top:56.25%"><iframe style="position:absolute;inset:0;width:100%;height:100%;border:0" src="https://www.youtube-nocookie.com/embed/T4SRu-trimA" title="How LLM Serving Actually Works (Jia-Bin Huang)" loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div></div>
+
+<h3>Chapter guide and map into the course</h3>
+<p>"New here" means Module 09 covers the topic only in passing, so section 2 below explains it.</p>
+<div class="table-wrap"><table>
+<tr><th>Time</th><th>Chapter</th><th>What to look for</th><th>Where in the course</th></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=0s">0:00</a></td><td>How does an LLM server handle millions of requests?</td><td>The framing: throughput and latency at the same time.</td><td><a href="../09-inference-engineering/01-request-lifecycle.html#p1">09 · Request lifecycle</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=60s">1:00</a></td><td>The server: scheduler, KV cache, sampler, model</td><td>The four parts the rest of the video fills in.</td><td><a href="../09-inference-engineering/01-request-lifecycle.html#p1">09 · Request lifecycle</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=116s">1:56</a></td><td>Next-token prediction: why each step repeats work</td><td>Without caching, every step re-reads the whole prefix.</td><td><a href="../06-30u30/13-attention.html">30u30 Day 13</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=271s">4:31</a></td><td>The KV cache: compute keys and values once</td><td>What is cached per layer and per token.</td><td><a href="../09-inference-engineering/02-kv-cache-attention.html#p3">09 · KV cache (Problem 3)</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=361s">6:01</a></td><td>Prefill vs decode: compute-bound vs memory-bound</td><td>Why prefill does many FLOPs per byte and decode does few.</td><td><a href="../09-inference-engineering/03-batching-scheduling.html#model">09 · Batching (cost model)</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=473s">7:53</a></td><td>The scheduler: batching for throughput</td><td>Batching decode steps shares one read of the weights.</td><td><a href="../09-inference-engineering/03-batching-scheduling.html#p6">09 · Batching (Problem 6)</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=539s">8:59</a></td><td>Continuous batching (Orca) and priorities</td><td>Iteration-level scheduling: requests join and leave every step.</td><td><a href="../09-inference-engineering/03-batching-scheduling.html#p6">09 · Problem 6</a>, <a href="../09-inference-engineering/03-batching-scheduling.html#p21">Problem 21</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=586s">9:46</a></td><td>Chunked prefill (Sarathi-Serve)</td><td>Splitting a long prompt so it doesn't stall everyone's decode.</td><td><a href="../09-inference-engineering/03-batching-scheduling.html#p7">09 · Problem 7</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=649s">10:49</a></td><td>Goodput and separate prefill/decode pools</td><td>DistServe's goodput metric and Splitwise-style disaggregation.</td><td><a href="../09-inference-engineering/04-prefix-caching-disaggregation.html#p22">09 · Problem 22</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=718s">11:58</a></td><td>How much memory does the KV cache need?</td><td>The per-token formula and why it limits batch size.</td><td><a href="../09-inference-engineering/02-kv-cache-attention.html#p3">09 · Problem 3</a>, <a href="../08-ai-research-engineer/08-inference-aware-design.html#kvmath">08 · Stage 08</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=782s">13:02</a></td><td>How operating systems manage memory: virtual memory</td><td>Pages, page tables and why fragmentation goes away.</td><td><a href="../09-inference-engineering/02-kv-cache-attention.html#p4">09 · Problem 4</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=820s">13:40</a></td><td>PagedAttention: the KV cache in blocks</td><td>Block tables mapping logical to physical KV blocks.</td><td><a href="../09-inference-engineering/02-kv-cache-attention.html#p4">09 · Problem 4</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=880s">14:40</a></td><td>Preemption: when the memory pool fills up</td><td>Swap to CPU or drop and recompute later.</td><td><a href="../09-inference-engineering/03-batching-scheduling.html#p6">09 · Batching</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=923s">15:23</a></td><td>Shared prefixes: system prompts, chats, agents</td><td>How much of real traffic repeats what came before.</td><td><a href="../09-inference-engineering/04-prefix-caching-disaggregation.html#p8">09 · Problem 8</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=1000s">16:40</a></td><td>Prefix caching: vLLM's hashed blocks</td><td>Each full block keyed by a hash of its tokens and its parent.</td><td><a href="../09-inference-engineering/04-prefix-caching-disaggregation.html#p8">09 · Problem 8</a>; <a href="#radix">§2 below</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=1067s">17:47</a></td><td>RadixAttention: a radix tree of cached prefixes</td><td>Token-level longest-prefix match in a tree.</td><td><strong>New here:</strong> <a href="#radix">§2</a> and the demo</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=1143s">19:03</a></td><td>Eviction and HiCache: when the cache runs out</td><td>LRU leaf eviction, then spilling to CPU memory and storage.</td><td><strong>New here:</strong> <a href="#hicache">§2</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=1245s">20:45</a></td><td>Cache-aware scheduling: longest prefix first</td><td>Reordering the queue so shared prefixes are used before eviction.</td><td><strong>New here:</strong> <a href="#sched">§2</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=1376s">22:56</a></td><td>Results, and the catch: fairness</td><td>Throughput gains, and requests with no shared prefix waiting longer.</td><td><a href="#sched">§2</a>; <a href="../09-inference-engineering/03-batching-scheduling.html#p21">09 · Problem 21</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=1448s">24:08</a></td><td>Structured outputs: JSON, regex and state machines</td><td>Masking invalid tokens at each step.</td><td><strong>New here:</strong> <a href="#struct">§2</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=1528s">25:28</a></td><td>Compressed state machines and XGrammar</td><td>Jump-forward decoding; precomputing most of the mask.</td><td><strong>New here:</strong> <a href="#struct">§2</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=1598s">26:38</a></td><td>Speculative decoding: draft, then verify</td><td>Several tokens per expensive forward pass, same distribution.</td><td><a href="04-speculative-decoding.html">Video 04</a>; <a href="../09-inference-engineering/05-latency.html#p10">09 · Problem 10</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=1664s">27:44</a></td><td>Drafters: draft models, Medusa, EAGLE, n-gram</td><td>Where the guesses come from.</td><td><a href="04-speculative-decoding.html">Video 04</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=1754s">29:14</a></td><td>Inside a decode step: FlashAttention</td><td>Tiling attention to avoid writing the score matrix to HBM.</td><td><a href="../09-inference-engineering/02-kv-cache-attention.html#p5">09 · Problem 5</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=1850s">30:50</a></td><td>Kernel launches and CUDA graphs</td><td>Why small decode steps are dominated by launch overhead.</td><td><a href="../09-inference-engineering/07-profiling-kernels.html#p14">09 · Problem 14</a>; <a href="#graphs">§2</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=1936s">32:16</a></td><td>torch.compile and overlap scheduling</td><td>Fusing kernels, and hiding CPU scheduling behind GPU work.</td><td><strong>New here:</strong> <a href="#graphs">§2</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=1998s">33:18</a></td><td>Fewer bytes: FP8 KV cache and quantization</td><td>Decode is bandwidth-bound, so fewer bytes means faster steps.</td><td><a href="../09-inference-engineering/06-quantization-hardware.html#p11">09 · Problem 11</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=2054s">34:14</a></td><td>DeepSeek-V3 on 8 GPUs: tensor parallelism</td><td>Splitting a large model's layers across GPUs.</td><td><a href="../09-inference-engineering/10-scale-cost-capstone.html#p23">09 · Problem 23</a>; <a href="02-5d-parallelism.html">Video 02</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=2113s">35:13</a></td><td>Latent attention and data-parallel attention</td><td>Why TP duplicates an MLA cache, and the DP-attention fix.</td><td><strong>New here:</strong> <a href="#dpattn">§2</a>; <a href="../09-inference-engineering/10-scale-cost-capstone.html#p23">09 · Problem 23</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=2173s">36:13</a></td><td>Mixture of experts and wide expert parallelism</td><td>Experts spread over many GPUs, with all-to-all token exchange.</td><td><a href="../09-inference-engineering/10-scale-cost-capstone.html#p23">09 · Problem 23</a>; <a href="../05-trillion-scale-architecture.html#moe">Module 05 · MoE</a></td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=2350s">39:10</a></td><td>Replicas and the cache-aware router</td><td>Sending requests to the replica that already holds their prefix.</td><td><a href="../09-inference-engineering/04-prefix-caching-disaggregation.html#p8">09 · Problem 8</a> (has a routing demo)</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=T4SRu-trimA&amp;t=2421s">40:21</a></td><td>Recap: never idle, never wasteful, never twice</td><td>The three principles behind every technique above.</td><td><a href="../09-inference-engineering/08-engines-observability.html#p18">09 · Problem 18 (engines)</a></td></tr>
+</table></div>
+
+<h2 id="ideas">2. The ideas, explained</h2>
+
+<h3 id="basics">The parts Module 09 already covers, briefly</h3>
+<p>Decode at batch size b reads every weight once per step, but does only about 2 FLOPs per weight per sequence. So it's memory-bandwidth bound, and batching is nearly free until compute or KV memory runs out. Prefill processes thousands of tokens per weight read and is compute-bound. Orca (Yu et al., OSDI 2022) schedules at the level of single iterations, so requests join and leave the batch every step. Sarathi-Serve (Agrawal et al., OSDI 2024) splits long prefills into chunks under a per-step token budget, so decodes aren't stalled. DistServe (Zhong et al., OSDI 2024) argues for optimising goodput, meaning the request rate served while meeting both time-to-first-token and time-per-output-token targets, and puts prefill and decode on separate GPUs. Splitwise (Patel et al., ISCA 2024) makes the same split on hardware chosen for each phase. PagedAttention (Kwon et al., SOSP 2023) stores the cache in fixed-size blocks with a per-request block table, as an OS does with virtual memory. When the pool fills, vLLM preempts a request and either swaps its blocks to CPU memory or frees them and recomputes later.</p>
+<pre><code>KV bytes per token = 2 × layers × kv_heads × head_dim × bytes_per_value
+decode step time   ≈ (weight bytes + Σ KV bytes of the batch) / HBM bandwidth
+goodput            = max request rate at which ≥ X% of requests meet their TTFT and TPOT SLOs</code></pre>
+<p>Deeper: <a href="../09-inference-engineering/03-batching-scheduling.html">09 · Batching and scheduling</a>, <a href="../09-inference-engineering/02-kv-cache-attention.html">09 · KV cache and attention</a>, <a href="../09-inference-engineering/04-prefix-caching-disaggregation.html#p22">09 · Disaggregation</a>.</p>
+
+<h3 id="radix">Prefix caching: hashed blocks vs a radix tree</h3>
+<p>The KV cache of a prefix depends only on that prefix, so any two requests that start the same way can share it. System prompts, few-shot examples, multi-turn chat history and agent loops all do this. There are two ways to find the shared part:</p>
+<ul>
+<li><strong>Hashed blocks (vLLM's automatic prefix caching).</strong> Each <em>full</em> KV block gets a key built from a hash of its parent block's key plus its own tokens, so a key identifies the whole prefix up to that block. Lookup walks the new prompt block by block until a key misses. Matching is block-granular: a shared run of 1,000 tokens with 16-token blocks reuses 992 tokens.</li>
+<li><strong>RadixAttention (SGLang).</strong> Zheng et al. (2024) keep a radix tree over token sequences. Each edge holds a run of tokens and points to their KV entries in a paged pool. Lookup is a longest-prefix match at token granularity. After a request finishes, its prompt <em>and</em> output stay in the tree, so the next chat turn finds its whole history. Branching programs, such as parallel samples, tree search and few-shot variants, become subtrees sharing one trunk.</li>
+</ul>
+<pre><code>radix hit   = longest common prefix with anything cached           (tokens)
+block hit   = ⌊ radix hit / block_size ⌋ × block_size                (full blocks only)
+eviction    = LRU over leaves; a node in use by a running request is pinned (ref count)</code></pre>
+<p>Granularity is the smallest difference. The bigger ones are the data structure (a tree makes the sharing explicit, which the scheduler and router can exploit) and that SGLang built its whole runtime around reuse. The SGLang paper reports up to 6.4× higher throughput than the systems it compared against, across agent, reasoning, few-shot, JSON, RAG and chat workloads. vLLM's block hashing reaches much of the same reuse for common prefixes; the demo shows by how much.</p>
+
+<div class="card demo">
+<h3>Interactive: radix-tree prefix sharing vs hashed blocks</h3>
+<p class="legend">Each row is one request, in arrival order; bar length is its prompt length. Blue: tokens reused from the cache under both schemes. Orange: tokens a radix tree reuses but block hashing has to recompute, because they don't fill a whole block. Grey: tokens nobody had cached, which must be prefilled. Workloads: <em>Chat</em>, 3 conversations × 4 turns, interleaved; <em>Few-shot</em>, 12 different questions after one shared prefix; <em>Tree search</em>, a root, 3 branches, and 2 sub-branches each. Each request's prompt and output are cached. Capacity applies LRU leaf eviction to the tree. Lengths come from a fixed seed. This is a simplified model: no in-flight batching, and whole cached segments evicted at once.</p>
+<canvas id="rc" width="700" height="300" aria-label="Per-request reused and recomputed prompt tokens under radix-tree and block-hash prefix caching"></canvas>
+<label for="wl">Workload: <span id="wlv" class="num"></span></label>
+<input id="wl" type="range" min="0" max="2" step="1" value="0">
+<label for="sp">Shared prefix (system prompt): <span id="spv" class="num"></span> tokens</label>
+<input id="sp" type="range" min="0" max="4000" step="250" value="1000">
+<label for="bk">Block size: <span id="bkv" class="num"></span> tokens</label>
+<input id="bk" type="range" min="0" max="8" step="1" value="4">
+<label for="cp">Cache capacity: <span id="cpv" class="num"></span></label>
+<input id="cp" type="range" min="0" max="6" step="1" value="6">
+<div class="stats">
+  <div class="stat"><div class="k">Prompt tokens</div><div class="v" id="stot">–</div></div>
+  <div class="stat"><div class="k">Radix-tree hit rate</div><div class="v" id="srad">–</div></div>
+  <div class="stat"><div class="k">Hashed-block hit rate</div><div class="v" id="sblk">–</div></div>
+  <div class="stat"><div class="k">Tokens evicted</div><div class="v" id="sevi">–</div></div>
+</div>
+<p class="meta">Try this: on Chat with a 1,000-token system prompt and 16-token blocks, the radix tree reuses 89.3% of prompt tokens and hashed blocks 88.7%. The granularity gap is small at vLLM's usual block size. At 256-token blocks it opens to 89.3% vs 78.2%. Set the shared prefix to 0 and Few-shot drops to 0% reuse: there's nothing to share. Now go back to Chat and cut capacity to 2,000 tokens: LRU starts evicting older conversations and the hit rate falls to 76.4%. This is the capacity squeeze that HiCache attacks by moving evicted KV to CPU memory instead of deleting it.</p>
+</div>
+
+<h3 id="hicache">Eviction and HiCache</h3>
+<p>The GPU holds only so much KV. RadixAttention evicts least-recently-used leaves first, so shared trunks, which every request touches, survive longest. As conversations get longer and more users come back for more turns, though, most history must be evicted and the hit rate falls. SGLang's HiCache (LMSYS blog, September 2025) extends the tree into a "HiRadixTree" that acts as a page table for KV held in GPU memory, CPU memory and external storage (disks or remote memory such as Mooncake, 3FS or NIXL backends). A cache controller backs up and loads entries between tiers. The details worth knowing:</p>
+<ul>
+<li><strong>Layer-wise overlap.</strong> On a GPU miss that hits CPU memory, layer N+1's KV loads while layer N computes, hiding the transfer.</li>
+<li><strong>Prefetch from storage.</strong> On a storage hit, data is prefetched into host memory, with policies that trade time to first token against reuse.</li>
+<li><strong>Write policies.</strong> Write-through, write-through-selective (back up only frequently hit entries) and write-back.</li>
+<li><strong>Layouts.</strong> GPU memory stays "layer-first" for the kernels; the other tiers use a "page-first" layout for larger I/O transfers.</li>
+</ul>
+<p>The blog reports up to 6× throughput and up to 80% lower TTFT in its benchmarks, plus community reports such as a coding-agent deployment whose cache hit rate rose from 40% to 80%. These are vendor and community numbers on chosen workloads, not independent measurements.</p>
+
+<h3 id="sched">Cache-aware scheduling, and the fairness catch</h3>
+<p>Arrival order isn't the best order for a cache. The SGLang paper sorts waiting requests by the length of their matched prefix, longest first, and notes that this approximates a depth-first walk of the radix tree. Requests that share a subtree run close together, before that subtree is evicted. The cost is fairness: a request with no shared prefix can keep getting overtaken, and its wait grows. Practical schedulers bound this with priorities, ageing or a mix of cache-aware and first-come ordering, which is the fairness and admission-control material of <a href="../09-inference-engineering/03-batching-scheduling.html#p21">09 · Problem 21</a>. Across replicas the same idea becomes the cache-aware router. SGLang's, from the v0.4 release, keeps an approximate radix tree per worker and balances load. On a workload of long shared-prefix groups the release reports a hit rate of 75% against 20% and about 1.9× throughput (<a href="../09-inference-engineering/04-prefix-caching-disaggregation.html#p8">09 · Problem 8</a> has a routing demo).</p>
+
+<h3 id="struct">Structured outputs: state machines, compression and XGrammar</h3>
+<p>To force valid JSON, a regex or a grammar, the server keeps an automaton state per request and, at each step, masks out every vocabulary token that would break the format before sampling:</p>
+<pre><code>logits[t] = −∞  for every token t not allowed from state s
+sample next token, then s ← δ(s, token)</code></pre>
+<p>Two costs dominate. Checking every one of ~100k tokens against the state at every step is expensive, and the model wastes forward passes on text that is fully determined, such as <code>{"name": "</code>. SGLang's <strong>compressed finite state machine</strong> merges chains of states that each have only one allowed continuation, so the server can append that whole string at once ("jump-forward" decoding) instead of generating it token by token. <strong>XGrammar</strong> (Dong et al., 2024) targets full context-free grammars, which need a stack. It splits the vocabulary into <em>context-independent</em> tokens, whose validity depends only on the current grammar position and can be prechecked and cached, and <em>context-dependent</em> tokens checked at runtime with an efficient persistent stack. It also overlaps grammar work with GPU execution. The paper reports up to 100× speedup over existing solutions and near-zero end-to-end overhead. SGLang v0.4 integrated it as a grammar backend.</p>
+
+<h3 id="graphs">CUDA graphs, torch.compile and overlap scheduling</h3>
+<p>A decode step for a small batch launches hundreds of small kernels. Each launch costs CPU time, and the GPU can sit idle between them. <strong>CUDA graphs</strong> record the sequence once and replay it with one launch. Shapes must be fixed, so engines capture one graph per batch-size bucket and pad to it (<a href="../09-inference-engineering/07-profiling-kernels.html#p14">09 · Problem 14</a> covers the profiling side). <strong>torch.compile</strong> fuses elementwise operations into fewer kernels and can emit graph-friendly code. <strong>Overlap scheduling</strong> attacks the CPU work between steps: batch scheduling, memory allocation and radix-tree matching. The SGLang v0.4 release ("zero-overhead batch scheduler", an idea it credits to NanoFlow) runs the scheduler one batch ahead, preparing step t+1's metadata while the GPU runs step t, with placeholder "future tokens" resolving the dependency on step t's output. The release reports 1.1× throughput over the previous version, most for small models and large tensor-parallel sizes.</p>
+<pre><code>serial:   [CPU schedule t][GPU run t][CPU schedule t+1][GPU run t+1] …
+overlap:  [CPU schedule t+1 | GPU run t][CPU schedule t+2 | GPU run t+1] …</code></pre>
+
+<h3 id="dpattn">Data-parallel attention for MLA</h3>
+<p>DeepSeek-V3 (DeepSeek-AI, 2024) uses Multi-head Latent Attention: each token caches one small compressed latent shared by all heads, instead of separate keys and values per head. Tensor parallelism normally splits attention by heads, but an MLA latent can't be split that way, so with TP across 8 GPUs every GPU stores the <em>same</em> latent cache, 8 copies. SGLang's DP attention (v0.4) instead gives each GPU its own subset of requests for the attention layers, so each holds only its own requests' cache and the batch can grow. Before the MoE layer, the attention outputs are all-gathered across workers, and afterwards redistributed back. The release reports up to 1.9× decoding throughput on 8×H100. The catch: workers can end up with uneven batches, and the MoE layers still need their own parallelism, which is where wide expert parallelism comes in (<a href="../09-inference-engineering/10-scale-cost-capstone.html#p23">09 · Problem 23</a>).</p>
+<pre><code>TP-8 attention, MLA:  each GPU stores the latent cache of ALL requests      (8 copies)
+DP-8 attention:       each GPU stores the latent cache of ITS requests      (1 copy)</code></pre>
+
+<h3 id="rest">Speculative decoding, FlashAttention, FP8 and MoE</h3>
+<p>These have full treatments elsewhere. Speculative decoding (Leviathan et al., 2023) with drafters from small models, Medusa heads (Cai et al., 2024) and EAGLE/EAGLE-3 feature-level drafting (Li et al., 2024, 2025) is <a href="04-speculative-decoding.html">Video 04</a>, with a speedup demo in <a href="../09-inference-engineering/05-latency.html#p10">09 · Problem 10</a>. FlashAttention (Dao et al., 2022) is <a href="../09-inference-engineering/02-kv-cache-attention.html#p5">09 · Problem 5</a>. FP8 KV and weight quantisation are <a href="../09-inference-engineering/06-quantization-hardware.html#p11">09 · Problem 11</a>. MoE serving and expert parallelism are <a href="../09-inference-engineering/10-scale-cost-capstone.html#p23">09 · Problem 23</a> and <a href="../05-trillion-scale-architecture.html#moe">Module 05</a>.</p>
+
+<h2 id="course">3. Where the course goes deeper</h2>
+<div class="table-wrap"><table>
+<tr><th>Topic</th><th>Course page</th></tr>
+<tr><td>Request path, streaming, cancellation</td><td><a href="../09-inference-engineering/01-request-lifecycle.html">09 · Request lifecycle</a></td></tr>
+<tr><td>KV sizing, PagedAttention, FlashAttention</td><td><a href="../09-inference-engineering/02-kv-cache-attention.html">09 · KV cache and attention</a></td></tr>
+<tr><td>Continuous batching, chunked prefill, fairness</td><td><a href="../09-inference-engineering/03-batching-scheduling.html">09 · Batching and scheduling</a></td></tr>
+<tr><td>Prefix caching, cache-aware routing, disaggregation</td><td><a href="../09-inference-engineering/04-prefix-caching-disaggregation.html">09 · Prefix caching and disaggregation</a></td></tr>
+<tr><td>Inter-token latency, speculative decoding</td><td><a href="../09-inference-engineering/05-latency.html">09 · Latency</a>; <a href="04-speculative-decoding.html">Video 04</a></td></tr>
+<tr><td>FP8/INT4 quantisation and GPU choice</td><td><a href="../09-inference-engineering/06-quantization-hardware.html">09 · Quantisation and GPUs</a></td></tr>
+<tr><td>Launch overhead, profiling, kernels</td><td><a href="../09-inference-engineering/07-profiling-kernels.html">09 · Profiling and kernels</a></td></tr>
+<tr><td>vLLM vs SGLang vs TensorRT-LLM, metrics</td><td><a href="../09-inference-engineering/08-engines-observability.html">09 · Engines and observability</a></td></tr>
+<tr><td>Large MoE serving, TP/EP/DP attention, cost</td><td><a href="../09-inference-engineering/10-scale-cost-capstone.html">09 · Scale and cost</a>; <a href="02-5d-parallelism.html">Video 02</a></td></tr>
+<tr><td>Designing models for cheap serving (GQA, KV quantisation)</td><td><a href="../08-ai-research-engineer/08-inference-aware-design.html">08 · Stage 08 · Inference-aware design</a></td></tr>
+</table></div>
+
+<h2 id="robotics">Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Prefix reuse fits robot prompts.</strong> A robot querying a language model for plans sends the same system prompt, tool list and scene description many times. Prefix caching turns that repeated prefill into a lookup, which is mostly time to first token, and that's what a waiting robot feels.</li>
+<li><strong>Structured outputs make plans parseable.</strong> Forcing a JSON action schema or a grammar of allowed skills means the controller never receives an unparseable plan. The XGrammar paper names embodied agent commands as one use case.</li>
+<li><strong>Fleets look like multi-tenant serving.</strong> Many robots sharing one cloud model is a classic scheduling problem. Priorities and fairness matter more than raw throughput when one request is a robot mid-motion.</li>
+<li><strong>On-robot is a different regime.</strong> A single robot runs at batch 1 on an edge GPU. Continuous batching, routers and DP attention barely apply there; CUDA graphs, quantisation and small distilled models do.</li>
+<li><strong>Weak link for VLA control loops.</strong> Flow-matching or chunked action heads don't decode token by token, so much of this video's decode machinery doesn't carry over directly to the action expert, only to the language backbone.</li>
+</ul>
+</div>
+
+<h2 id="check">Self-check</h2>
+<details><summary>Why is decode memory-bound while prefill is compute-bound?</summary><p>Decode does a forward pass for one new token per sequence, so each weight read from memory is used for only a few FLOPs. Prefill pushes thousands of prompt tokens through the same weights at once, so arithmetic per byte is high.</p></details>
+<details><summary>A shared 1,000-token prefix and 16-token blocks: how many tokens can vLLM-style block hashing reuse, and how many a token-level radix tree?</summary><p>Block hashing reuses only full blocks: ⌊1000/16⌋ × 16 = 992. A radix tree matches all 1,000.</p></details>
+<details><summary>Why does RadixAttention evict leaves, least recently used first?</summary><p>Leaves are the parts unique to one request, while internal nodes are shared trunks used by many requests. LRU-over-leaves keeps the widely shared prefixes alive longest and never evicts a node a running request still needs.</p></details>
+<details><summary>What is the fairness cost of longest-prefix-first scheduling?</summary><p>Requests with little or no cached prefix keep being overtaken by requests that hit the cache, so their queueing delay can grow without bound unless the scheduler adds ageing, priorities or a cap.</p></details>
+<details><summary>How does XGrammar avoid checking the whole vocabulary at every step?</summary><p>It precomputes validity for context-independent tokens, which depend only on the grammar position, and checks only the context-dependent ones at runtime, using a persistent stack. It also overlaps grammar work with the GPU's forward pass.</p></details>
+<details><summary>Why does tensor parallelism waste memory for MLA, and what does DP attention change?</summary><p>MLA caches one latent per token shared by all heads, so splitting heads across GPUs leaves every GPU holding the full latent cache. DP attention gives each GPU different requests for attention, so each stores only its own requests' cache, then all-gathers before the MoE layer.</p></details>
+
+<h2 id="references">References</h2>
+<p>From the video's description:</p>
+<ul>
+<li><a href="https://arxiv.org/abs/2312.07104">SGLang: Efficient Execution of Structured Language Model Programs</a> (Zheng et al., NeurIPS 2024)</li>
+<li><a href="https://arxiv.org/abs/2309.06180">Efficient Memory Management for Large Language Model Serving with PagedAttention</a> (Kwon et al., SOSP 2023)</li>
+<li><a href="https://www.usenix.org/conference/osdi22/presentation/yu">Orca: A Distributed Serving System for Transformer-Based Generative Models</a> (Yu et al., OSDI 2022)</li>
+<li><a href="https://arxiv.org/abs/2403.02310">Taming Throughput-Latency Tradeoff in LLM Inference with Sarathi-Serve</a> (Agrawal et al., OSDI 2024)</li>
+<li><a href="https://arxiv.org/abs/2401.09670">DistServe: Disaggregating Prefill and Decoding for Goodput-optimized LLM Serving</a> (Zhong et al., OSDI 2024)</li>
+<li><a href="https://arxiv.org/abs/2311.18677">Splitwise: Efficient Generative LLM Inference Using Phase Splitting</a> (Patel et al., ISCA 2024)</li>
+<li><a href="https://arxiv.org/abs/2411.15100">XGrammar: Flexible and Efficient Structured Generation Engine for Large Language Models</a> (Dong et al., 2024)</li>
+<li><a href="https://arxiv.org/abs/2211.17192">Fast Inference from Transformers via Speculative Decoding</a> (Leviathan et al., ICML 2023)</li>
+<li><a href="https://arxiv.org/abs/2401.10774">Medusa: Simple LLM Inference Acceleration Framework with Multiple Decoding Heads</a> (Cai et al., ICML 2024)</li>
+<li><a href="https://arxiv.org/abs/2401.15077">EAGLE: Speculative Sampling Requires Rethinking Feature Uncertainty</a> (Li et al., ICML 2024)</li>
+<li><a href="https://arxiv.org/abs/2503.01840">EAGLE-3: Scaling up Inference Acceleration of Large Language Models via Training-Time Test</a> (Li et al., 2025)</li>
+<li><a href="https://arxiv.org/abs/2205.14135">FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness</a> (Dao et al., NeurIPS 2022)</li>
+<li><a href="https://arxiv.org/abs/2412.19437">DeepSeek-V3 Technical Report</a> (DeepSeek-AI, 2024)</li>
+<li>LMSYS blog: <a href="https://lmsys.org/blog/2024-12-04-sglang-v0-4/">SGLang v0.4: zero-overhead batch scheduler, cache-aware load balancer, faster structured outputs</a> (December 2024); <a href="https://lmsys.org/blog/2025-09-10-sglang-hicache/">SGLang HiCache: fast hierarchical KV caching</a> (Zhiqiang Xie, September 2025)</li>
+<li>vLLM blog: DeepSeek-V4.1-Flash and wide expert parallelism (October 2026). The description gives no link, and this guide doesn't rely on it.</li>
+<li>Code: <a href="https://github.com/vllm-project/vllm">vLLM</a> · <a href="https://github.com/sgl-project/sglang">SGLang</a></li>
+</ul>
+<p>Related videos on the author's channel: <a href="04-speculative-decoding.html">Speculative Decoding</a> (Video 04 here) and <a href="https://youtu.be/gBMO1JZav44">FlashAttention</a>.</p>
+
+<nav class="pager">
+  <a href="08-muon.html"><small>Previous</small>Video 08 · Muon and MuonClip</a>
+  <a class="next" href="index.html"><small>Next</small>Module 12 hub</a>
+</nav>
+<footer>Module 12 · Video 09 · a watch guide written for this course from the video's chapter list, its references and the original papers. Video © Jia-Bin Huang.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('rc'), ctx = cv.getContext('2d');
+const ids = ['wl', 'sp', 'bk', 'cp'];
+const el = Object.fromEntries(ids.map(k => [k, document.getElementById(k)]));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = n => Math.round(n).toLocaleString('en-US');
+const WL = ['Chat', 'Few-shot', 'Tree search'], CAP = [1000, 2000, 3000, 4000, 6000, 8000, Infinity];
+const rng = s => () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 2 ** 32; };
+
+// a sequence is a list of [segmentId, tokens]; different segments share no tokens
+function workload(kind, S) {
+  const r = rng(42), ri = (a, b) => a + Math.floor(r() * (b - a + 1));
+  let id = 1;
+  const seg = n => [id++, n], reqs = [], sys = seg(S);
+  if (kind === 0) {
+    const hist = [[sys], [sys], [sys]];
+    for (let t = 0; t < 4; t++) for (let c = 0; c < 3; c++) {
+      hist[c].push(seg(ri(20, 80)));
+      const out = seg(ri(50, 200));
+      reqs.push({ prompt: hist[c].slice(), out });
+      hist[c].push(out);
+    }
+  } else if (kind === 1) {
+    for (let q = 0; q < 12; q++) reqs.push({ prompt: [sys, seg(ri(20, 60))], out: seg(ri(30, 120)) });
+  } else {
+    const root = [sys, seg(ri(40, 80))];
+    reqs.push({ prompt: root, out: seg(ri(80, 160)) });
+    const base = root.concat([reqs[0].out]);
+    for (let b = 0; b < 3; b++) {
+      const br = base.concat([seg(ri(30, 60))]), out = seg(ri(80, 160));
+      reqs.push({ prompt: br, out });
+      for (let k = 0; k < 2; k++) reqs.push({ prompt: br.concat([out, seg(ri(30, 60))]), out: seg(ri(80, 160)) });
+    }
+  }
+  return reqs;
+}
+
+// radix tree over segments with LRU leaf eviction; block hashing reuses only full blocks
+function simulate(kind, S, B, cap) {
+  const root = { kids: new Map() };
+  let used = 0, evicted = 0, time = 0;
+  const leaves = n => n.kids.size ? [...n.kids.values()].flatMap(leaves) : [n];
+  return workload(kind, S).map(q => {
+    time++;
+    let n = root, hit = 0;
+    for (const [id] of q.prompt) { const c = n.kids.get(id); if (!c) break; c.last = time; hit += c.tok; n = c; }
+    const tot = q.prompt.reduce((a, x) => a + x[1], 0);
+    n = root;
+    for (const [id, t] of q.prompt.concat([q.out])) {
+      let c = n.kids.get(id);
+      if (!c) { c = { kids: new Map(), tok: t, parent: n, id }; n.kids.set(id, c); used += t; }
+      c.last = time; n = c;
+    }
+    while (used > cap) {
+      const v = leaves(root).filter(x => x !== root).sort((a, b) => a.last - b.last)[0];
+      v.parent.kids.delete(v.id); used -= v.tok; evicted += v.tok;
+    }
+    return { tot, radix: hit, block: Math.floor(hit / B) * B, evicted };
+  });
+}
+
+function draw() {
+  const kind = +el.wl.value, S = +el.sp.value, B = 2 ** +el.bk.value, cap = CAP[+el.cp.value];
+  document.getElementById('wlv').textContent = WL[kind];
+  document.getElementById('spv').textContent = fmt(S);
+  document.getElementById('bkv').textContent = B;
+  document.getElementById('cpv').textContent = isFinite(cap) ? fmt(cap) + ' tokens' : 'unlimited';
+
+  const R = simulate(kind, S, B, cap);
+  const W = cv.width, H = cv.height, l = 36, r = 10, t = 8, b = 22;
+  const mx = Math.max(...R.map(x => x.tot)), rh = (H - t - b) / R.length;
+  const px = v => l + v / mx * (W - l - r);
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '11px sans-serif'; ctx.textAlign = 'right';
+  R.forEach((q, i) => {
+    const y = t + i * rh, h = Math.max(4, rh - 6);
+    ctx.fillStyle = css('--line'); ctx.fillRect(px(0), y, px(q.tot) - px(0), h);
+    ctx.fillStyle = css('--warn'); ctx.fillRect(px(0), y, px(q.radix) - px(0), h);
+    ctx.fillStyle = css('--accent'); ctx.fillRect(px(0), y, px(q.block) - px(0), h);
+    ctx.fillStyle = css('--muted'); ctx.fillText(String(i + 1), l - 6, y + h - 2);
+  });
+  ctx.textAlign = 'center'; ctx.fillStyle = css('--muted');
+  ctx.fillText('prompt tokens (max ' + fmt(mx) + ')', (l + W - r) / 2, H - 6);
+
+  const T = R.reduce((a, x) => a + x.tot, 0), rad = R.reduce((a, x) => a + x.radix, 0), blk = R.reduce((a, x) => a + x.block, 0);
+  const pct = v => T ? (100 * v / T).toFixed(1) + '%' : '–';
+  document.getElementById('stot').textContent = fmt(T);
+  document.getElementById('srad').textContent = pct(rad);
+  document.getElementById('sblk').textContent = pct(blk);
+  document.getElementById('sevi').textContent = fmt(R[R.length - 1].evicted);
+}
+ids.forEach(k => el[k].oninput = draw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 11 · Capstone: Robo-Helper</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 7 · Lesson 11</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 7 · Lesson 11</div>
+<h1>Capstone: Robo-Helper</h1>
+<p class="lede">Ten lessons of pieces: moving, sensing, braking, a stop-neuron, honest testing, route planning, a word model, a command reader and a safety layer. Today they click together into one robot that understands you, drives around a surprise, and tells you honestly how good it is.</p>
+
+<div class="facts">
+  <div><b>Time</b>3–4 hours (plus the stretch)</div>
+  <div><b>You'll need</b>Python 3 and your finished Lessons 1–6, 8, 9 and 10</div>
+  <div><b>New words</b>system, integration, pipeline, test set, failure analysis, confidence</div>
+  <div><b>Project piece</b>The full robot, tested</div>
+</div>
+
+<section class="kid" id="start">
+<h2>Start here</h2>
+<p class="big">A robot is not one clever idea. It's lots of small ideas passing messages to each other, and the hard part is making the hand-offs work, then measuring the whole thing honestly.</p>
+<h3>The problem</h3>
+<p>You have all the parts, but they're scattered across ten files. Your A* planner doesn't know what "put the blue block in the bin" means. Your command reader doesn't know where the bin is. Your stop-neuron has never seen the room. And nobody has checked what happens when a cat sits down in the middle of the planned route. Today you write the conductor that makes the orchestra play together.</p>
+<h3>The idea in one picture</h3>
+<p>Think of a restaurant. The waiter takes your order and writes it on a ticket (understanding). The head chef checks the ticket: is that dish on the menu? (safety). The cooks plan who does what (route planning) and cook carefully, watching for spills (sensing and braking). Then a food critic eats ten dishes and writes "9 out of 10 were good, the soup was cold" (evaluation). No single person is the restaurant. The restaurant is how they work together.</p>
+<h3>Words to know</h3>
+<dl>
+<dt>System</dt><dd>Several parts working together to do a job none of them can do alone.</dd>
+<dt>Integration</dt><dd>Joining parts so the output of one becomes the input of the next.</dd>
+<dt>Pipeline</dt><dd>A chain of steps: text → action → route → driving → result.</dd>
+<dt>Test set</dt><dd>A fixed list of tasks, with the right answers, that you run the whole robot on to score it.</dd>
+<dt>Failure analysis</dt><dd>Looking closely at <em>each</em> failed test to find out <em>why</em> it failed.</dd>
+<dt>Confidence</dt><dd>How sure a model is. A model that always gives an answer, even when unsure, has no way to say "I don't know".</dd>
+</dl>
+</section>
+<p class="deeper"><strong>The full lesson:</strong> everything below shows how the pieces connect, then you write the last two functions and test the whole robot.</p>
+
+<h2 id="problem">1. The problem</h2>
+<p>Here's the job. Someone types <em>"put the blue block in the bin"</em>. A friendly cat (a "surprise") is sitting at square (4, 1), and it isn't on the map. The robot starts at (1, 1). It has to:</p>
+<ol>
+<li>understand the words,</li>
+<li>check that the request is allowed and possible,</li>
+<li>plan a route to the blue block at (6, 3),</li>
+<li>drive it at a safe speed, notice the cat, stop, and plan a new route,</li>
+<li>pick up the block, plan a route to the bin at (7, 6), drive there and drop it,</li>
+<li>say what it did.</li>
+</ol>
+<p>And then you need to know: does it work on <em>other</em> commands too? One good demo proves nothing. A test set proves a lot more.</p>
+
+<h2 id="principles">2. First principles</h2>
+<h3>Step 1: draw the pipeline</h3>
+<p>The top of your homework file has the whole plan in five lines. Each arrow is a hand-off between lessons:</p>
+<pre><code>command text --(L9 parser / L10 safety checks)--&gt; action
+action       --(L6 A* planner)--&gt;                  route
+route        --(L1 moving, L2 sensing, L4/L5 stop detector, L3 safe speed)--&gt; driving
+result       --(L5 evaluation habits)--&gt;           success rate on a test set</code></pre>
+<p>The trick to building a system is agreeing on the <strong>shape of each message</strong>. Lesson 9 outputs <code>{"intent": ..., "object": ...}</code>. Lesson 10 checks exactly that shape. Lesson 6 takes two <code>(x, y)</code> squares and returns a list of squares. Because every piece agreed on its inputs and outputs, you can snap them together.</p>
+
+<h3>Step 2: what each earlier lesson does inside Robo-Helper</h3>
+<p>Open <code>lesson11_robohelper.py</code> and look at the imports and at <code>__init__</code>. Most of it is written for you. Here's every earlier piece, and exactly where it's used:</p>
+<div class="table-wrap"><table>
+<tr><th>Lesson</th><th>What's used</th><th>Where, and what for</th></tr>
+<tr><td>world.py</td><td><code>ROOM</code>, <code>OBJECTS</code>, <code>ROBOT_START</code>, <code>find_bin</code>, <code>render</code></td><td>The map, the three blocks, the start (1, 1), the bin's square (7, 6), and drawing the room.</td></tr>
+<tr><td>L1 Moving</td><td>directions as (dx, dy), <code>move</code>, <code>manhattan</code></td><td><code>drive_to</code> turns each step of the route back into "N/S/E/W" using L1's direction changes. <code>move</code> runs inside L2's sensor and L6's <code>neighbors</code>. <code>manhattan</code> is A*'s guess of the distance left.</td></tr>
+<tr><td>L2 Sensors</td><td><code>distance_to_wall</code></td><td>Before each step: how many free squares are ahead? Times <code>SQUARE</code> (0.5 m), plus one square, gives the free distance in metres.</td></tr>
+<tr><td>L3 Learning</td><td><code>STOP_DATA</code>, <code>fit_line</code>, <code>max_safe_speed</code></td><td>In <code>__init__</code>, <code>fit_line</code> learns the braking line (w ≈ 0.81, b ≈ 0.07). In <code>drive_to</code>, <code>max_safe_speed</code> picks the fastest speed that can still stop in the free distance.</td></tr>
+<tr><td>L4 Neuron</td><td><code>make_obstacle_data</code>, <code>train_neuron</code>, <code>should_stop</code></td><td><code>__init__</code> makes 450 examples and trains the stop-neuron. In <code>drive_to</code>, when a surprise is one square ahead, <code>should_stop</code> decides whether to brake.</td></tr>
+<tr><td>L5 Evaluation</td><td><code>safest_threshold</code></td><td>Picks the stop-neuron's threshold so it catches at least 97% of real obstacles. The trained robot gets 0.17, well below 0.5, because a missed stop is worse than a false alarm. (You'll use L5's habits again in <code>evaluate()</code>.)</td></tr>
+<tr><td>L6 Paths</td><td><code>astar_path</code></td><td><code>drive_to</code> plans with A*, passing <code>blocked=self.known_blocked</code> so the second plan avoids the cat.</td></tr>
+<tr><td>L7 Q-learning</td><td>nothing</td><td>A side quest. Robo-Helper has a map, so A* is the better tool here. Q-learning shines when there's no map.</td></tr>
+<tr><td>L8 Words</td><td><code>tokenize</code></td><td>Used inside L9 to split commands into words.</td></tr>
+<tr><td>L9 Commands</td><td><code>TRAIN</code>, <code>train_intent_model</code>, <code>parse_command</code></td><td><code>__init__</code> trains the word-counter. <code>self.parse(text)</code> turns words into an action.</td></tr>
+<tr><td>L10 Safety</td><td><code>validate_action</code></td><td>Your job, in <code>run_command</code>: every action is checked before the robot moves.</td></tr>
+</table></div>
+<p>So if Lesson 11 breaks, the bug might be in an earlier file. That's normal in real systems. <code>check.py 11</code> tells you if an earlier lesson isn't finished yet.</p>
+
+<h3>Step 3: follow the cat by hand</h3>
+<p>Let's trace the drive to the blue block. A* (L6) plans the shortest route from (1, 1) to (6, 3), 7 steps:</p>
+<pre><code>(1,1) → (2,1) → (3,1) → (4,1) → (5,1) → (5,2) → (5,3) → (6,3)</code></pre>
+<p>The robot steps to (2, 1), then to (3, 1). The next square is (4, 1), and the cat is there. <code>drive_to</code> works out how fast it's going:</p>
+<pre><code>direction                  = E   (from (3,1) to (4,1): dx = +1)
+distance_to_wall((3,1),E)  = 5 free squares          (L2)
+free distance              = 5 × 0.5 + 0.5 = 3.0 m
+max_safe_speed: needs  0.81 × speed + 0.07 + 0.2 ≤ 3.0
+                       speed ≤ 3.37, but the top speed tried is 3.00
+                → speed = 3.0 m/s                     (L3)</code></pre>
+<p>Now the stop-neuron (L4) sees something 0.5 m ahead, closing at 3.0 m/s. The trained weights are about −5.17 for distance and 4.92 for speed, with bias 5.33:</p>
+<pre><code>z = −5.17 × 0.5 + 4.92 × 3.0 + 5.33 = −2.58 + 14.77 + 5.33 = 17.52
+sigmoid(17.52) ≈ 1.00   ≥ 0.17 (L5's threshold)   → STOP</code></pre>
+<p>The robot logs <em>"Something is in the way at (4, 1)! Stopping and finding another route."</em>, adds (4, 1) to <code>known_blocked</code>, and asks A* again from where it is, (3, 1):</p>
+<pre><code>(3,1) → (2,1) → (2,2) → (2,3) → (2,4) → (3,4) → (4,4) → (4,3) → (5,3) → (6,3)</code></pre>
+<p>That's 9 more steps (it has to back up, because (3, 2) is a wall). Then from the block to the bin: (7,3) → (7,4) → (7,5) → (7,6), 4 steps. Total: 2 + 9 + 4 = 15 moves instead of 11. Slower, but nobody stepped on the cat.</p>
+<details><summary>Predict first: what if <code>known_blocked</code> was never updated after stopping?</summary>
+<p>A* would plan the exact same route through (4, 1) again. The robot would stop again, plan again, stop again... <code>drive_to</code> has <code>max_replans=5</code> for this reason: after 5 tries it logs "Too many surprises, giving up." and returns <code>False</code>. Remembering what you've seen is what turns a stop into a <em>replan</em>.</p></details>
+
+<h3>Step 4: one demo is not a test</h3>
+<p>Lesson 5's big lesson was: test on many examples, including ones that should fail. <code>TEST_COMMANDS</code> has 12 commands, each with what a correct robot should do:</p>
+<ul>
+<li><b>"ok"</b>: the command should succeed, and the bin must hold <em>exactly</em> the listed blocks: nothing missing, nothing extra. Binning the wrong block is a failure even if the right one went in too.</li>
+<li><b>"refuse"</b>: the command should be refused. "put the purple block in the bin", "make me a sandwich" and "go to the moon" are impossible. Refusing is the <em>correct, safe</em> behaviour, so a refusal counts as a pass.</li>
+</ul>
+<p>Each test runs on a <strong>fresh robot</strong>. Why? If test 1 bins the red block, test 6 ("where is the red block") would get a different answer. Each test must start from the same state, or your score depends on the order of the tests.</p>
+
+<h3>Step 5: the honest result</h3>
+<p>The finished robot scores <strong>83%</strong>, 10 out of 12. The two failures:</p>
+<pre><code>FAILED: ('find the green block', 'The green block is in the bin.')
+FAILED: ('make me a sandwich', 'Stopping.')</code></pre>
+<p>The first one is scary. Asked <em>where</em> the green block was, the robot <em>threw it in the bin</em>. Lesson 9's classifier scored "put" just above "find" (a gap of only 0.09), because "the green block" appears in lots of "put" examples. If the test had only checked "is the right block in the bin?", this would have passed. Checking that nothing <em>else</em> changed is what caught it.</p>
+<p>The second one:</p>
+<p>The robot was asked for a sandwich and decided it was a "stop" command. Why? Let's do Lesson 9's maths by hand. None of the four words "make me a sandwich" appear in the "stop" examples, and only "me" appears anywhere (twice, in "find"). For a word an intent has never seen, Lesson 9 gives it a probability of 1 ÷ (words in that intent + vocabulary size). The vocabulary has 52 words:</p>
+<pre><code>"stop" has seen 15 words in total:   unseen word → 1 / (15 + 52) = 1/67
+"put"  has seen 61 words in total:   unseen word → 1 / (61 + 52) = 1/113</code></pre>
+<p>The "stop" examples are short, so "stop" has the fewest words, so it gives the <em>biggest</em> share to words it has never seen. Four strange words in a row, and "stop" wins. The real scores:</p>
+<pre><code>stop  −18.27     find  −18.77     go  −19.70     put  −20.13</code></pre>
+<p>The deeper problem: <code>predict_intent</code> always returns the highest score. It has no way to say <strong>"I don't know"</strong>. That's the stretch goal of this capstone.</p>
+<details><summary>Predict first: "go to the moon" is also nonsense. Why does it pass (get refused)?</summary>
+<p>The classifier picks "go" (the word "go" helps a lot). But <code>extract_object</code> finds no colour, so the object is <code>None</code>, and Lesson 10's rule says "go" needs an object. Refused, for the right result, but by luck rather than by understanding. It's worth knowing <em>why</em> a test passes, not just that it does.</p></details>
+
+<h2 id="play">3. Play with it</h2>
+<div class="card demo">
+<h3>Interactive: run Robo-Helper</h3>
+<p class="legend">The same pipeline as the Python, step for step: Lesson 9's word-counter (trained on the same 34 sentences), Lesson 10's checks, Lesson 6's A*, Lesson 2's sensor, Lesson 3's braking and Lesson 4's stop-neuron with the weights and 0.17 threshold that the Python trains. Click a floor square to add or remove a surprise (orange). The robot remembers what it's done until you reset.</p>
+<canvas id="room" width="500" height="400" style="height:auto" aria-label="The room: walls, blocks, the bin, surprises and the robot"></canvas>
+<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+<input id="cmdIn" type="text" value="put the blue block in the bin" aria-label="Command" style="flex:1;min-width:200px;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)">
+<button id="go">Run</button><button id="reset">Reset room</button><button id="evalBtn">Run the test set</button>
+</div>
+<pre id="out" style="white-space:pre-wrap;font-size:.85rem;min-height:4em"></pre>
+<div class="stats">
+  <div class="stat"><div class="k">Top intent</div><div class="v" id="topI">–</div></div>
+  <div class="stat"><div class="k">Margin to 2nd</div><div class="v" id="marg">–</div></div>
+  <div class="stat"><div class="k">Moves</div><div class="v" id="moves">–</div></div>
+  <div class="stat"><div class="k">Test set</div><div class="v" id="rate">–</div></div>
+</div>
+</div>
+<p>Try: "make me a sandwich" (look at the margin), "find the green block" (look at the top intent!), then "where is the blue block" after binning it. Put a surprise on (5, 3) as well as (4, 1) and watch the robot work harder. Box the robot in completely and see what it says.</p>
+
+<h2 id="homework">4. Homework</h2>
+<p>Open <code>project/homework/lesson11_robohelper.py</code>. <code>__init__</code>, <code>parse</code> and <code>drive_to</code> are written for you. Read <code>drive_to</code> line by line first: you should recognise every function it calls. Then write two functions.</p>
+
+<h3>4.1 <code>run_command(self, text, parser=None)</code></h3>
+<p>Turn text into an action, check it, then do it. Return a dict <code>{"ok": bool, "action": action_or_None, "message": str}</code>. The docstring lists six steps. In plain words:</p>
+<ol>
+<li>Parse the text (with <code>parser</code> if one was given, otherwise <code>self.parse</code>).</li>
+<li>Check it with <code>validate_action(action, set(self.objects))</code>. If it fails, return <code>ok False</code> and the message <code>"Sorry, I can't do that: &lt;reason&gt;"</code>.</li>
+<li>"stop": nothing to drive. Message "Stopping."</li>
+<li>"find": just answer. It's in the bin, or you're holding it, or say its square.</li>
+<li>"go": <code>self.drive_to(...)</code> the object's square.</li>
+<li>"put": drive to the block, hold it, drive to the bin, drop it, update everything.</li>
+</ol>
+<p>Example: on a fresh robot, <code>run_command("where is the blue block")</code> → <code>{"ok": True, "action": {"intent": "find", "object": "blue block"}, "message": "The blue block is at (6, 3)."}</code></p>
+<details><summary>Hint 1</summary><p><code>(parser or self.parse)(text)</code> picks the parser in one line: <code>or</code> returns the first thing that isn't <code>None</code>. After validating, pull out <code>intent</code> and <code>obj</code>, then handle each intent with an <code>if</code> that <code>return</code>s. Flat is easier than nested.</p></details>
+<details><summary>Hint 2</summary><p>Order "find"'s checks as the docstring says: binned first, then holding, then position. f-strings print a tuple like <code>(6, 3)</code> exactly as the test expects: <code>f"The {obj} is at {self.objects[obj]}."</code>. For "go", <code>drive_to</code> returns <code>True</code> or <code>False</code>: use it as <code>ok</code>.</p></details>
+<details><summary>Hint 3</summary><pre><code>put:
+  already in self.binned?            → ok True, "The X is already in the bin."
+  not drive_to(objects[X])?          → ok False, "I couldn't reach the X."
+  holding = X
+  bin_pos = find_bin(self.room)
+  not drive_to(bin_pos)?             → ok False, "I'm holding the X but can't reach the bin."
+  binned.add(X);  objects[X] = bin_pos;  holding = None
+  → ok True, "The X is in the bin."</code></pre></details>
+
+<h3>4.2 <code>evaluate(commands=TEST_COMMANDS, surprises=((4, 1),), seed=0)</code></h3>
+<p>Run each test command on a <strong>fresh</strong> <code>RoboHelper(surprises=surprises, seed=seed)</code>. Decide pass or fail. Return <code>(pass_rate, failures)</code>, where failures is a list of <code>(command, message)</code>.</p>
+<p>Example: if 10 of 12 pass, return <code>(10/12, [("find the green block", "The green block is in the bin."), ("make me a sandwich", "Stopping.")])</code>, and 10/12 prints as 83%.</p>
+<details><summary>Hint 1</summary><p>Each entry in <code>commands</code> is a triple: <code>for text, expect, binned in commands:</code>.</p></details>
+<details><summary>Hint 2</summary><p>For "ok" tests you need two things: <code>result["ok"]</code> is true, and <code>robot.binned</code> is <em>exactly</em> the set <code>binned</code>. Two sets are equal with <code>==</code>. (Why not "every listed block is in the bin", <code>binned &lt;= robot.binned</code>? Because then a robot that bins <em>everything</em> would pass.)</p></details>
+<details><summary>Hint 3</summary><pre><code>for each (text, expect, binned):
+    robot = fresh RoboHelper;  result = robot.run_command(text)
+    if expect == "ok":  good = result["ok"] and binned &lt;= robot.binned
+    else:               good = not result["ok"]
+    count it, or append (text, result["message"]) to failures
+return passed / len(commands), failures</code></pre></details>
+
+<h3>Run it</h3>
+<pre><code>cd project/homework
+python3 lesson11_robohelper.py</code></pre>
+<p>What you should see (real output from the solution):</p>
+<pre><code>##########
+#Rr......#
+#..##....#
+#..#..b..#
+#....##..#
+#g.......#
+#.#....B.#
+##########
+&gt; where is the blue block
+  The blue block is at (6, 3).
+&gt; put the blue block in the bin
+  The blue block is in the bin.
+&gt; where is the blue block
+  The blue block is in the bin.
+  log: ['Something is in the way at (4, 1)! Stopping and finding another route.']
+##########
+#.r......#
+#..##....#
+#..#.....#
+#....##..#
+#g.......#
+#.#....R.#
+##########
+
+Test set: 83% passed
+  FAILED: ('find the green block', 'The green block is in the bin.')
+  FAILED: ('make me a sandwich', 'Stopping.')</code></pre>
+<p>The first map is the start: R at (1, 1). The last map shows the robot parked on the bin, and the blue block gone from (6, 3). The log line is the cat.</p>
+
+<h3>Check it</h3>
+<pre><code>cd project
+python3 check.py 11</code></pre>
+<p>Five checks: <code>put works</code>, <code>find works</code>, <code>refuses safely</code>, <code>replans around surprises</code> and <code>evaluate</code>. The last one needs <strong>at least 80%</strong>. A red ✗ shows a hint such as <em>"with a surprise at (4, 1) the robot should log a stop and still finish"</em> or <em>"test pass rate should be at least 80% (got 75%)"</em>. If you see a yellow … saying <em>"can't load yet, an earlier lesson isn't finished"</em>, run <code>python3 check.py all</code> to find which one.</p>
+
+<h3>Stretch: teach the robot to say "I don't know"</h3>
+<p>This is the real capstone. Professionals spend most of their time here: finding why a system fails, and fixing it without breaking something else.</p>
+<ol>
+<li><b>Diagnose.</b> Print <code>intent_scores</code> (from Lesson 9) for all 12 test commands, sorted, and the gap between the top two. You already know the sandwich's gap is 0.50. Which <em>passing</em> commands also have a tiny gap?</li>
+<li><b>Fix it, idea A: a confidence margin.</b> If the top score beats the second by less than some number, don't guess: return an action that Lesson 10's <code>validate_action</code> will refuse.</li>
+<li><b>Fix it, idea B: an "unknown" intent.</b> Add a few training examples of things the robot can't do ("tell me a joke", "play some music"...) labelled <code>"unknown"</code>. "unknown" isn't in <code>ALLOWED_INTENTS</code>, so your safety layer refuses it for free.</li>
+<li><b>Re-measure.</b> Run <code>evaluate()</code> again. Did the score go up? Did anything that used to pass now fail?</li>
+</ol>
+<details><summary>Hint 1: where to plug it in</summary><p>You don't need to edit Lesson 9. <code>run_command</code> takes a <code>parser</code> argument, and <code>__init__</code> builds <code>self.intent_model</code>. Either write a new parse function that uses <code>intent_scores(self.intent_model, text)</code>, or train the model on <code>TRAIN</code> plus your extra examples. (Import <code>intent_scores</code> from <code>lesson09_commands</code>.)</p></details>
+<details><summary>Hint 2: choosing the margin</summary><p>Sort the scores from high to low and subtract the second from the first. Look at the gaps of the commands you <em>want</em> to accept ("stop" is 2.25, "halt now" is 1.90, "put the red block in the bin" is 4.74) and the one you want to refuse (sandwich, 0.50). Pick a number in between. Don't pick it by staring at the test set alone, though, or you're cheating on the exam (Lesson 5!). Try it on a few new commands of your own too.</p></details>
+<details><summary>Hint 3: the surprise you'll find</summary><p>With a margin of about 0.6, the sandwich is refused and the score climbs to 92%. "find the green block" still fails, but look <em>how</em>: its gap is only 0.09, so now the robot refuses instead of binning the block. A refusal is a much safer failure than doing the wrong thing. To make it pass, the classifier has to get "find" right. What would a few more "find" examples ("where's the X", "locate the X") do? Re-run <code>evaluate()</code> after each change.</p></details>
+<p>Write down your before and after numbers, and keep them. They go straight into your project README in <a href="12-preferences.html">the coming lessons</a> and <a href="14-go-real.html">Lesson 14</a>.</p>
+
+<h2 id="real-world">5. Real-world challenge: be Robo-Helper</h2>
+<p>You'll run the whole pipeline with your own body, in a real room, with a family member as the user. You need squared paper, a pencil, a cushion, and three small objects (your "blocks").</p>
+<ol>
+<li><b>Map (L1).</b> Draw a room in your home on squared paper, one square per floor tile or per big step. Mark walls and furniture as <code>#</code>, a box or basket as the bin <code>B</code>, and where the three objects sit.</li>
+<li><b>Write the rules (L10).</b> Allowed: put / go / find / stop, and only your three objects. Anything else: refuse politely.</li>
+<li><b>Write a test set (L5).</b> Ask your family member to write 10 commands on slips of paper <em>before</em> you start. Ask for some normal, some odd, and at least two impossible ones.</li>
+<li><b>Run each command.</b> Plan the route on paper first (L6: count the steps). Then walk it, slowly. Meanwhile your helper may quietly drop the cushion on your route (the cat). If it's one step ahead: stop, mark it on the map as blocked, re-plan on paper, carry on.</li>
+<li><b>Score yourself.</b> For each command record: understood correctly? refused when it should be? how many steps planned, how many walked? Work out your pass rate.</li>
+<li><b>Failure analysis.</b> For every failure, write <em>why</em> in one line. Did you ever guess what an odd command meant instead of refusing?</li>
+</ol>
+<p><b>What it teaches:</b> each part is easy alone. Doing them in order, under surprises, while keeping honest score, is the actual skill. And humans also find it hard to say "I don't know" instead of guessing.</p>
+
+<h2 id="so-far">6. Your Robo-Helper so far</h2>
+<p>This is it: <strong>the full robot, tested</strong>. <code>RoboHelper</code> understands, checks, plans, senses, brakes, replans, and reports a score with a list of failures. Every earlier lesson (except the Q-learning side quest) is inside it.</p>
+<p>Next comes inference engineering: <a href="16-speed.html">week 8</a> measures how fast and expensive each brain is, week 9 makes brains faster and cheaper, week 10 plugs in a world-class model, and <a href="19-bakeoff.html">week 11</a> races every brain on the same tasks with <code>sim.py</code>, which runs <em>this</em> robot. In week 12, <a href="12-preferences.html">Lesson 12</a> learns from people's preferences, and <a href="14-go-real.html">Lesson 14</a> takes <code>run_command</code>, your <code>evaluate()</code> score and your failure list, and turn them into a project README, a demo recording, and (if you like) a real wheeled robot.</p>
+
+<h2 id="mistakes">7. Common mistakes</h2>
+<ul>
+<li><b>Re-using one robot for every test.</b> The red block gets binned in test 1, and later tests see a different room. Make a fresh <code>RoboHelper</code> inside the loop.</li>
+<li><b>Counting a refusal as a failure.</b> For "refuse" tests, <code>ok False</code> is the <em>pass</em>. Without this you'd get 75%, and check.py says <em>"test pass rate should be at least 80% (got 75%)"</em>.</li>
+<li><b>Skipping the safety check.</b> Without <code>validate_action</code>, "put the purple block away" crashes: "purple" isn't a known colour, so the object is <code>None</code>, and <code>self.objects[None]</code> raises a <code>KeyError</code>. A robot that crashes mid-drive is not a safe robot. check.py: <em>"an unknown object must be refused"</em>.</li>
+<li><b>Forgetting to update the world after "put".</b> If <code>self.binned</code> and <code>self.objects[X]</code> aren't updated, "where is the blue block" still says (6, 3). check.py: <em>"the red block should be in robot.binned"</em>.</li>
+<li><b>Using <code>==</code> instead of <code>&lt;=</code> for binned.</b> The docstring says "every object in <code>binned</code> is in <code>robot.binned</code>", which is <code>&lt;=</code>. With <code>==</code> you'd get 83%. The reason is a real hidden bug, and finding it is what the stretch is about.</li>
+</ul>
+
+<h2 id="check">8. Check yourself</h2>
+<details><summary>Why does every test in <code>evaluate()</code> use a fresh robot?</summary><p>So each test starts from the same state. Otherwise the result of one test depends on what the earlier tests did, and changing the order would change the score.</p></details>
+<details><summary>Predict: on one robot, you run "put the red block in the bin" twice. What does the second call say?</summary><p><code>"The red block is already in the bin."</code> with <code>ok True</code>. The robot doesn't move.</p></details>
+<details><summary>Why is the stop threshold 0.17 and not 0.5?</summary><p>Lesson 5's <code>safest_threshold</code> picks the highest threshold that still catches at least 97% of real obstacles. Missing a real obstacle is much worse than braking for nothing, so it accepts more false alarms.</p></details>
+<details><summary>Why does "make me a sandwich" become "stop"?</summary><p>The classifier always picks the top score, and "stop" has the fewest training words (15), so it gives the biggest probability to words it has never seen (1/67 versus 1/113 for "put"). Four unknown words make "stop" win. There's no "I don't know" option.</p></details>
+<details><summary>The robot scored 83%. Is it 83% good at real life?</summary><p>No. It's 83% on 12 hand-picked commands, in one room, with one surprise. Real people type far stranger things. And as the stretch shows, a test can pass while the robot does the wrong thing. A score is only as honest as the test set behind it.</p></details>
+
+<h2 id="deeper">9. Go deeper (optional)</h2>
+<ul>
+<li><a href="../01-decision-model-evals.html#precision-recall">Decision-model evals: precision and recall</a>: scoring a system that makes decisions, at a grown-up level.</li>
+<li><a href="../03-shared-autonomy.html#askactwait">Shared autonomy: ask, act or wait</a>: a robot that knows when it's unsure and asks a human.</li>
+<li><a href="../01-decision-model-evals.html#calibration">Calibration</a>: when a model says "90% sure", is it right 90% of the time?</li>
+<li><a href="../10-rlm-harness.html">RLM agent harnesses</a>: how large AI systems are wired together from smaller parts.</li>
+</ul>
+
+<nav class="pager">
+  <a href="10-llm-safety.html"><small>Previous</small>Lesson 10 · Using an LLM safely</a>
+  <a class="next" href="16-speed.html"><small>Next</small>Lesson 16 · How fast is a brain?</a>
+</nav>
+<footer>Build a Robot Brain · Week 7 · Lesson 11</footer>
+</main>
+
+<script>
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+// ---- Same data as world.py and lesson09_commands.py ----
+const ROOM = [
+  "##########",
+  "#........#",
+  "#..##....#",
+  "#..#.....#",
+  "#....##..#",
+  "#........#",
+  "#.#....B.#",
+  "##########",
+];
+const OBJECTS = { "red block": [2, 1], "blue block": [6, 3], "green block": [1, 5] };
+const ROBOT_START = [1, 1];
+const SQUARE = 0.5;
+const TRAIN = [
+  ["put the red block in the bin", "put"], ["throw the blue block away", "put"],
+  ["tidy up the green block", "put"], ["put away the blue block", "put"],
+  ["can you bin the red one", "put"], ["clean up the green block please", "put"],
+  ["drop the blue block in the bin", "put"], ["get rid of the red block", "put"],
+  ["move the green block into the bin", "put"], ["put the blue one in the trash", "put"],
+  ["go to the red block", "go"], ["drive over to the blue block", "go"],
+  ["head to the green block", "go"], ["go near the red one", "go"],
+  ["move next to the blue block", "go"], ["travel to the green one", "go"],
+  ["come to the red block", "go"], ["go over to the blue block please", "go"],
+  ["where is the red block", "find"], ["find the blue block", "find"],
+  ["can you tell me where the green block is", "find"], ["where did the blue one go", "find"],
+  ["locate the red block", "find"], ["which square is the green block on", "find"],
+  ["show me where the red one is", "find"], ["where is the blue block now", "find"],
+  ["stop", "stop"], ["stop now", "stop"], ["halt", "stop"], ["freeze", "stop"],
+  ["stop moving", "stop"], ["please stop right now", "stop"], ["emergency stop", "stop"],
+  ["wait stop", "stop"],
+];
+const COLOURS = ["red", "blue", "green"];
+const TEST_COMMANDS = [
+  ["put the red block in the bin", "ok", ["red block"]],
+  ["throw the blue block away", "ok", ["blue block"]],
+  ["tidy up the green block", "ok", ["green block"]],
+  ["go to the blue block", "ok", []],
+  ["drive over to the green block", "ok", []],
+  ["where is the red block", "ok", []],
+  ["find the green block", "ok", []],
+  ["stop", "ok", []],
+  ["halt now", "ok", []],
+  ["put the purple block in the bin", "refuse", []],
+  ["make me a sandwich", "refuse", []],
+  ["go to the moon", "refuse", []],
+];
+// What the Python trains in RoboHelper.__init__ (Lessons 3, 4, 5), copied exactly
+const BRAKE_W = 0.8095122934300675, BRAKE_B = 0.07122128174123456;
+const STOP_W = [-5.166236839412002, 4.923883038983912], STOP_B = 5.333953115298624, STOP_T = 0.17;
+
+const key = p => p[0] + ',' + p[1];
+const tup = p => '(' + p[0] + ', ' + p[1] + ')';
+
+// world.py + Lesson 1
+const DIRS = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] };
+const move = (p, d) => [p[0] + DIRS[d][0], p[1] + DIRS[d][1]];
+const manhattan = (a, b) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
+function isFree(room, p) {
+  const [x, y] = p;
+  if (y < 0 || y >= room.length || x < 0 || x >= room[0].length) return false;
+  return room[y][x] !== '#';
+}
+function findBin(room) {
+  for (let y = 0; y < room.length; y++) { const x = room[y].indexOf('B'); if (x !== -1) return [x, y]; }
+  return null;
+}
+// Lesson 2
+function distanceToWall(room, pos, d) {
+  let n = 0, p = move(pos, d);
+  while (isFree(room, p)) { n++; p = move(p, d); }
+  return n;
+}
+// Lesson 3
+function maxSafeSpeed(w, b, free, margin = 0.2) {
+  let best = 0;
+  for (let i = 0; i < 61; i++) { const s = i * 0.05; if (w * s + b + margin <= free) best = s; }
+  return Math.round(best * 100) / 100;
+}
+// Lesson 4
+const sigmoid = z => z >= 0 ? 1 / (1 + Math.exp(-z)) : Math.exp(z) / (1 + Math.exp(z));
+const neuron = (w, b, x) => sigmoid(w[0] * x[0] + w[1] * x[1] + b);
+const shouldStop = (w, b, x, t) => neuron(w, b, x) >= t;
+// Lesson 6: A*, popping the smallest (f, g, x, y) exactly like Python's heapq
+function neighbors(room, pos, blocked) {
+  return 'NSEW'.split('').map(d => move(pos, d)).filter(p => isFree(room, p) && !blocked.has(key(p)));
+}
+function less(a, b) { for (let i = 0; i < 4; i++) if (a[i] !== b[i]) return a[i] < b[i]; return false; }
+function astarPath(room, start, goal, blocked = new Set()) {
+  const frontier = [[manhattan(start, goal), 0, start[0], start[1]]];
+  const came = new Map([[key(start), null]]), cost = new Map([[key(start), 0]]);
+  let expanded = 0;
+  while (frontier.length) {
+    let bi = 0;
+    for (let i = 1; i < frontier.length; i++) if (less(frontier[i], frontier[bi])) bi = i;
+    const [, g, cx, cy] = frontier.splice(bi, 1)[0], cur = [cx, cy];
+    if (g > cost.get(key(cur))) continue;
+    expanded++;
+    if (key(cur) === key(goal)) {
+      const path = [];
+      let k = key(cur);
+      while (k !== null) { path.push(k.split(',').map(Number)); k = came.get(k); }
+      return [path.reverse(), expanded];
+    }
+    for (const nx of neighbors(room, cur, blocked)) {
+      const ng = g + 1, nk = key(nx);
+      if (ng < (cost.has(nk) ? cost.get(nk) : Infinity)) {
+        cost.set(nk, ng); came.set(nk, key(cur));
+        frontier.push([ng + manhattan(nx, goal), ng, nx[0], nx[1]]);
+      }
+    }
+  }
+  return [null, expanded];
+}
+// Lessons 8 + 9
+const tokenize = t => t.toLowerCase().match(/[a-z']+|\./g) || [];
+function trainIntentModel(ex) {
+  const wc = {}, ic = {}, vocab = new Set();
+  for (const [text, intent] of ex) {
+    ic[intent] = (ic[intent] || 0) + 1;
+    const b = wc[intent] = wc[intent] || {};
+    for (const w of tokenize(text)) { b[w] = (b[w] || 0) + 1; vocab.add(w); }
+  }
+  return { wc, ic, vocab };
+}
+function intentScores(m, text) {
+  const total = Object.values(m.ic).reduce((a, b) => a + b, 0), V = m.vocab.size, s = {};
+  for (const intent of Object.keys(m.ic)) {
+    const words = m.wc[intent], size = Object.values(words).reduce((a, b) => a + b, 0);
+    let sc = Math.log(m.ic[intent] / total);
+    for (const w of tokenize(text)) sc += Math.log(((words[w] || 0) + 1) / (size + V));
+    s[intent] = sc;
+  }
+  return s;
+}
+function predictIntent(m, text) {
+  const s = intentScores(m, text);
+  let best = null;
+  for (const k of Object.keys(s)) if (best === null || s[k] > s[best]) best = k;
+  return best;
+}
+function extractObject(text) {
+  for (const w of tokenize(text)) if (COLOURS.includes(w)) return w + ' block';
+  return null;
+}
+const parseCommand = (m, t) => { const i = predictIntent(m, t); return { intent: i, object: i === 'stop' ? null : extractObject(t) }; };
+// Lesson 10
+const ALLOWED_INTENTS = new Set(["put", "go", "find", "stop"]), NEEDS_OBJECT = new Set(["put", "go", "find"]);
+function validateAction(a, known) {
+  if (a === null || typeof a !== 'object') return [false, 'not a JSON object'];
+  const ks = Object.keys(a).sort();
+  if (ks.join() !== 'intent,object') return [false, 'unexpected keys'];
+  if (!ALLOWED_INTENTS.has(a.intent)) return [false, "unknown intent '" + a.intent + "'"];
+  if (a.object !== null && !known.has(a.object)) return [false, "unknown object '" + a.object + "'"];
+  if (NEEDS_OBJECT.has(a.intent) && a.object === null) return [false, "'" + a.intent + "' needs an object"];
+  if (a.intent === 'stop' && a.object !== null) return [false, "'stop' takes no object"];
+  return [true, ''];
+}
+
+const MODEL = trainIntentModel(TRAIN);
+
+// Lesson 11: the same RoboHelper as the Python
+class RoboHelper {
+  constructor(surprises = []) {
+    this.room = ROOM;
+    this.objects = {};
+    for (const k in OBJECTS) this.objects[k] = OBJECTS[k].slice();
+    this.pos = ROBOT_START.slice();
+    this.holding = null;
+    this.binned = new Set();
+    this.surprises = new Set(surprises.map(key));
+    this.knownBlocked = new Set();
+    this.log = [];
+    this.frames = [];
+  }
+  say(m) { this.log.push(m); this.snap(m); }
+  state() { return { pos: this.pos.slice(), holding: this.holding, blocked: [...this.knownBlocked], binned: [...this.binned], objects: JSON.parse(JSON.stringify(this.objects)) }; }
+  snap(msg) { this.frames.push(Object.assign(this.state(), { msg })); }
+  parse(t) { return parseCommand(MODEL, t); }
+  driveTo(target, maxReplans = 5) {
+    let replans = 0;
+    while (key(this.pos) !== key(target)) {
+      const [path] = astarPath(this.room, this.pos, target, this.knownBlocked);
+      if (path === null) { this.say("I can't find a way to " + tup(target) + "."); return false; }
+      for (const nxt of path.slice(1)) {
+        const dx = nxt[0] - this.pos[0], dy = nxt[1] - this.pos[1];
+        const d = dx === 1 ? 'E' : dx === -1 ? 'W' : dy === 1 ? 'S' : 'N';
+        const speed = maxSafeSpeed(BRAKE_W, BRAKE_B, distanceToWall(this.room, this.pos, d) * SQUARE + SQUARE);
+        if (this.surprises.has(key(nxt)) && shouldStop(STOP_W, STOP_B, [SQUARE, speed], STOP_T)) {
+          this.knownBlocked.add(key(nxt));
+          this.say('Something is in the way at ' + tup(nxt) + '! Stopping and finding another route.');
+          replans++;
+          if (replans > maxReplans) { this.say('Too many surprises, giving up.'); return false; }
+          break;
+        }
+        this.pos = nxt;
+        this.snap();
+      }
+    }
+    return true;
+  }
+  runCommand(text) {
+    const action = this.parse(text);
+    const [ok, reason] = validateAction(action, new Set(Object.keys(this.objects)));
+    if (!ok) return { ok: false, action, message: "Sorry, I can't do that: " + reason };
+    const { intent, object: obj } = action;
+    if (intent === 'stop') return { ok: true, action, message: 'Stopping.' };
+    if (intent === 'find') {
+      const msg = this.binned.has(obj) ? 'The ' + obj + ' is in the bin.'
+        : this.holding === obj ? "I'm holding the " + obj + '.'
+        : 'The ' + obj + ' is at ' + tup(this.objects[obj]) + '.';
+      return { ok: true, action, message: msg };
+    }
+    if (intent === 'go') {
+      const arrived = this.driveTo(this.objects[obj]);
+      return { ok: arrived, action, message: arrived ? "I'm next to the " + obj + '.' : "I couldn't reach the " + obj + '.' };
+    }
+    if (this.binned.has(obj)) return { ok: true, action, message: 'The ' + obj + ' is already in the bin.' };
+    if (!this.driveTo(this.objects[obj])) return { ok: false, action, message: "I couldn't reach the " + obj + '.' };
+    this.holding = obj;
+    const binPos = findBin(this.room);
+    if (!this.driveTo(binPos)) return { ok: false, action, message: "I'm holding the " + obj + " but can't reach the bin." };
+    this.binned.add(obj);
+    this.objects[obj] = binPos;
+    this.holding = null;
+    return { ok: true, action, message: 'The ' + obj + ' is in the bin.' };
+  }
+}
+function evaluate(commands = TEST_COMMANDS, surprises = [[4, 1]]) {
+  let passed = 0;
+  const failures = [];
+  for (const [text, expect, binned] of commands) {
+    const r = new RoboHelper(surprises), res = r.runCommand(text);
+    const good = expect === 'ok' ? res.ok && binned.length === r.binned.size && binned.every(b => r.binned.has(b)) : !res.ok;
+    if (good) passed++; else failures.push([text, res.message]);
+  }
+  return [passed / commands.length, failures];
+}
+
+// ---- drawing and animation ----
+const cv = document.getElementById('room'), ctx = cv.getContext('2d'), $ = id => document.getElementById(id);
+let userSurprises = [[4, 1]], robot = new RoboHelper(userSurprises), view = null, timer = null;
+const CELL = 50;
+function draw() {
+  const st = view || robot.state();
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (let y = 0; y < ROOM.length; y++) for (let x = 0; x < ROOM[0].length; x++) {
+    const c = ROOM[y][x];
+    ctx.fillStyle = c === '#' ? css('--muted') : css('--card');
+    ctx.fillRect(x * CELL + 1, y * CELL + 1, CELL - 2, CELL - 2);
+    if (c === 'B') { ctx.strokeStyle = css('--accent'); ctx.lineWidth = 3; ctx.strokeRect(x * CELL + 6, y * CELL + 6, CELL - 12, CELL - 12); ctx.fillStyle = css('--accent'); ctx.fillText('B', x * CELL + CELL / 2, y * CELL + CELL / 2); }
+  }
+  for (const k of userSurprises.map(key)) {
+    const [x, y] = k.split(',').map(Number);
+    ctx.fillStyle = css('--warn'); ctx.beginPath(); ctx.arc(x * CELL + CELL / 2, y * CELL + CELL / 2, 16, 0, 7); ctx.fill();
+    if (st.blocked.includes(k)) { ctx.strokeStyle = css('--fail'); ctx.lineWidth = 3; ctx.strokeRect(x * CELL + 4, y * CELL + 4, CELL - 8, CELL - 8); }
+  }
+  const colour = { red: css('--fail'), blue: css('--pass'), green: css('--accent') };
+  for (const [name, p] of Object.entries(st.objects)) {
+    if (st.binned.includes(name) || st.holding === name) continue;
+    ctx.fillStyle = colour[name.split(' ')[0]];
+    ctx.fillRect(p[0] * CELL + 14, p[1] * CELL + 14, CELL - 28, CELL - 28);
+  }
+  ctx.fillStyle = css('--fg'); ctx.beginPath(); ctx.arc(st.pos[0] * CELL + CELL / 2, st.pos[1] * CELL + CELL / 2, 18, 0, 7); ctx.fill();
+  ctx.fillStyle = css('--bg'); ctx.fillText('R', st.pos[0] * CELL + CELL / 2, st.pos[1] * CELL + CELL / 2);
+  if (st.holding) { ctx.fillStyle = colour[st.holding.split(' ')[0]]; ctx.fillRect(st.pos[0] * CELL + 32, st.pos[1] * CELL + 4, 14, 14); }
+}
+function run() {
+  if (timer) { clearInterval(timer); timer = null; view = null; }
+  const text = $('cmdIn').value;
+  const s = intentScores(MODEL, text), order = Object.keys(s).sort((a, b) => s[b] - s[a]);
+  $('topI').textContent = order[0];
+  $('marg').textContent = (s[order[0]] - s[order[1]]).toFixed(2);
+  robot.frames = []; robot.log = [];
+  const start = robot.state();
+  const res = robot.runCommand(text);
+  const frames = robot.frames, moves = frames.filter(f => !f.msg).length;
+  $('moves').textContent = moves;
+  const lines = ['> ' + text,
+    '  scores: ' + order.map(k => k + ' ' + s[k].toFixed(2)).join(', '),
+    '  action: ' + JSON.stringify(res.action)];
+  $('out').textContent = lines.join('\n') + '\n  ...';
+  let i = 0;
+  view = start;
+  const finish = () => {
+    clearInterval(timer); timer = null; view = null;
+    $('out').textContent = lines.concat(robot.log.map(l => '  log: ' + l), ['  ' + res.message]).join('\n');
+    draw();
+  };
+  if (!frames.length) return finish();
+  timer = setInterval(() => {
+    if (i >= frames.length) return finish();
+    view = frames[i++];
+    draw();
+  }, 160);
+  draw();
+}
+cv.addEventListener('click', e => {
+  const r = cv.getBoundingClientRect();
+  const x = Math.floor((e.clientX - r.left) / r.width * ROOM[0].length), y = Math.floor((e.clientY - r.top) / r.height * ROOM.length);
+  if (!isFree(ROOM, [x, y]) || ROOM[y][x] === 'B' || key([x, y]) === key(robot.pos)) return;
+  const i = userSurprises.findIndex(p => key(p) === key([x, y]));
+  if (i >= 0) userSurprises.splice(i, 1); else userSurprises.push([x, y]);
+  robot.surprises = new Set(userSurprises.map(key));
+  robot.knownBlocked.delete(key([x, y]));
+  draw();
+});
+$('go').onclick = run;
+$('cmdIn').addEventListener('keydown', e => { if (e.key === 'Enter') run(); });
+$('reset').onclick = () => { if (timer) clearInterval(timer); timer = null; view = null; robot = new RoboHelper(userSurprises); $('out').textContent = ''; $('moves').textContent = '–'; draw(); };
+$('evalBtn').onclick = () => {
+  const [rate, fails] = evaluate();
+  $('rate').textContent = Math.round(rate * 100) + '%';
+  $('out').textContent = 'Test set (12 commands, fresh robot each, surprise at (4, 1)): ' + Math.round(rate * 100) + '% passed\n' +
+    fails.map(f => '  FAILED: ' + f[0] + ' -> ' + f[1]).join('\n');
+};
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

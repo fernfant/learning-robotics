@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TensorTonic: ML Practice</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../index.html">← LLMs &amp; Robotics</a> · Module 02</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 02 · Practice platform &amp; foundations</div>
+<h1>TensorTonic: hands-on ML practice for LLMs and robotics</h1>
+<p class="lede">An ML coding gym with 1,300+ implement-from-scratch problems. This module shows what it offers and which parts to use for robotics, in what order.</p>
+<p class="meta">Source: <a href="https://www.tensortonic.com/">tensortonic.com</a>, fetched 21 Oct 2026 · snapshot in <code>sources/02-tensortonic.md</code></p>
+
+<div class="toc">
+<strong>In this module</strong>
+<ol>
+<li><a href="#summary">Summary</a></li>
+<li><a href="#why-robotics">Why this matters for robotics</a></li>
+<li><a href="#track">Deep dive: a robotics practice track</a></li>
+<li><a href="#transforms">Deep dive: homogeneous transforms (worked example)</a></li>
+<li><a href="#math">Deep dive: which ML math matters for robots</a></li>
+<li><a href="#rl">Deep dive: the RL ladder</a></li>
+<li><a href="#gaps">What it doesn't cover</a></li>
+<li><a href="#playbook">Playbook</a></li>
+<li><a href="#check">Self-check</a></li>
+<li><a href="#glossary">Glossary &amp; further reading</a></li>
+</ol>
+</div>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>TensorTonic is like LeetCode for machine learning. You implement algorithms from scratch in Python, NumPy, PyTorch, CUDA or Triton, run them against tests in the browser, and get interactive visuals of the maths. It has no robotics section, but its 3D geometry, computer vision, reinforcement learning, ML maths and inference/GPU content covers most of the <em>learning</em> half of modern robotics. The free tier is enough to start.</p>
+</div>
+<ul>
+<li><strong>Scale:</strong> 1,300+ problems, 50,000+ learners, 1M+ submissions (site figures).</li>
+<li><strong>Formats:</strong>
+  <ul>
+  <li>coding problems with tests</li>
+  <li>study plans (structured problem sets)</li>
+  <li>an ML maths course: 67 lessons in 7 modules</li>
+  <li>paper re-implementations: Transformers, ResNet, U-Net, ViT, DDPM, LLaMA, DeepSeek-V3 and more</li>
+  <li>guided projects</li>
+  <li>"LLM internals" explainers: KV cache, RoPE, LoRA, PPO, GRPO, DPO, Flash Attention</li>
+  </ul></li>
+<li><strong>Study plans worth knowing:</strong>
+  <ul>
+  <li>Build Micrograd (25 problems)</li>
+  <li>Build AlphaGo: policy networks, MCTS (Monte Carlo tree search), self-play (18)</li>
+  <li>Build an LLM (62)</li>
+  <li>Cracking RL (30)</li>
+  <li>Cracking CV (35)</li>
+  <li>CUDA Kernels (35)</li>
+  <li>Inference Engineering (30)</li>
+  <li>Linear Algebra, Probability, Calculus and Optimization sets (25–30 each)</li>
+  </ul></li>
+<li><strong>Pricing:</strong>
+  <ul>
+  <li>Free: 500+ problems, 35 CUDA exercises, 13 paper implementations</li>
+  <li>Pro: $12/mo or $100/yr. Adds study roadmaps, quizzes and interview mocks.</li>
+  <li>Plus: $20/mo or $168/yr. Adds LLM architectures and system design.</li>
+  </ul></li>
+<li><strong>Projects:</strong> Agentic Systems, LLM Engineering and Interpretability are live. Reinforcement Learning, Computer Vision, Multimodal and Time Series/Signals are marked "coming soon".</li>
+</ul>
+
+<h2 id="why-robotics">2. Why this matters for robotics</h2>
+<div class="card note">
+<p><strong>Track: LLM + Robotics.</strong> TensorTonic is a general ML platform. Its transformer, LLM-internals, inference and CUDA tracks serve the LLM side. Its geometry, vision and RL problems serve robotics (the path below). It won't teach you motors, kinematics or control.</p>
+</div>
+<p>Modern robotics stacks have two halves:</p>
+<div class="table-wrap"><table>
+<tr><th>Classical half</th><th>Learning half</th></tr>
+<tr><td>Rigid-body geometry, kinematics, dynamics, control (PID, MPC), state estimation (Kalman filters), SLAM, motion planning</td><td>Perception (detection, segmentation), reinforcement learning, imitation learning, transformer-based robot policies (VLAs), on-device inference</td></tr>
+</table></div>
+<p>TensorTonic covers the shared maths and most of the learning half. Implementing things from scratch is the right habit for robotics. When a robot behaves strangely, you need to know what's inside the box.</p>
+
+<h2 id="track">3. Deep dive: a robotics practice track</h2>
+<p>A suggested order through TensorTonic content, picked for robotics. Problem names link to the site.</p>
+
+<h3>Stage A · Maths you'll use every day (2–3 weeks)</h3>
+<ul>
+<li>ML Math: <a href="https://www.tensortonic.com/ml-math/linear-algebra/dot-norm">dot product &amp; norms</a>, <a href="https://www.tensortonic.com/ml-math/linear-algebra/matrix-multiplication">matrix multiplication</a>, <a href="https://www.tensortonic.com/ml-math/linear-algebra/orthogonality">orthogonality</a>, <a href="https://www.tensortonic.com/ml-math/linear-algebra/projections-least-squares">least squares</a>, <a href="https://www.tensortonic.com/ml-math/linear-algebra/svd">SVD</a>, <a href="https://www.tensortonic.com/ml-math/linear-algebra/eigenvalue-eigenvector">eigenvalues</a></li>
+<li>Probability: <a href="https://www.tensortonic.com/ml-math/probability/bayes-theorm">Bayes</a>, <a href="https://www.tensortonic.com/ml-math/probability/covariance-matrix">covariance matrices</a>, <a href="https://www.tensortonic.com/ml-math/probability/markov-chains">Markov chains</a>, <a href="https://www.tensortonic.com/ml-math/probability/monte-carlo">Monte Carlo</a></li>
+<li>Calculus: <a href="https://www.tensortonic.com/ml-math/calculus/jacobian-hessian">Jacobians &amp; Hessians</a>. The Jacobian is <em>the</em> core object in robot kinematics.</li>
+<li>Problems: <a href="https://www.tensortonic.com/problems/matrix-transpose">matrix transpose</a>, finite-difference gradient checking</li>
+</ul>
+
+<h3>Stage B · 3D geometry &amp; perception (2–3 weeks)</h3>
+<ul>
+<li><a href="https://www.tensortonic.com/problems/homogeneous-transform">Apply 4×4 homogeneous transform</a>. See the worked example below.</li>
+<li>Classic image ops: <a href="https://www.tensortonic.com/problems/cv-gaussian-blur">Gaussian blur</a>, <a href="https://www.tensortonic.com/problems/cv-sobel-edges">Sobel edges</a>, <a href="https://www.tensortonic.com/problems/cv-bilinear-resize">bilinear resize</a>, <a href="https://www.tensortonic.com/problems/image-rotation-nearest">image rotation</a></li>
+<li>Detection: <a href="https://www.tensortonic.com/problems/iou-bounding-box">IoU</a>, <a href="https://www.tensortonic.com/problems/cv-nms">non-max suppression</a>, <a href="https://www.tensortonic.com/problems/cv-anchor-generation">anchor generation</a>, <a href="https://www.tensortonic.com/problems/cv-hungarian-matching">Hungarian matching</a> (also used for multi-object tracking)</li>
+<li>Segmentation metrics: <a href="https://www.tensortonic.com/problems/cv-miou">mIoU</a>, <a href="https://www.tensortonic.com/problems/cv-dice-loss">Dice loss</a></li>
+<li>Study plan: <a href="https://www.tensortonic.com/study-plans">Cracking CV</a> (35 problems)</li>
+</ul>
+
+<h3>Stage C · Reinforcement learning (3–4 weeks)</h3>
+<ul>
+<li>See <a href="#rl">the RL ladder</a> below. Then do the <strong>Build AlphaGo</strong> study plan. MCTS and policy/value networks transfer directly to robot planning research.</li>
+</ul>
+
+<h3>Stage D · Transformers → robot foundation models (3–4 weeks)</h3>
+<ul>
+<li>Papers: <a href="https://www.tensortonic.com/research">Transformers, ViT, U-Net, DDPM</a>. ViT is the vision backbone in most VLAs. DDPM is the basis of <em>diffusion policies</em>, a leading approach for robot manipulation.</li>
+<li>Problems: <a href="https://www.tensortonic.com/problems/cv-patchify">patchify</a>, <a href="https://www.tensortonic.com/problems/cv-vit-attention-block">ViT attention block</a>, <a href="https://www.tensortonic.com/problems/cv-clip-cosine-retrieval">CLIP retrieval</a> (vision-language grounding)</li>
+</ul>
+
+<h3>Stage E · Running models on the robot (ongoing)</h3>
+<ul>
+<li>Inference Engineering (30), CUDA Kernels (35), and LLM internals on <a href="https://www.tensortonic.com/llm-internals/quantization">quantization</a> and <a href="https://www.tensortonic.com/llm-internals/kv-cache">KV cache</a>. Robots run on fixed power budgets (e.g. Jetson-class boards), so latency matters as much as accuracy. <a href="04-distill-small-models.html">Module 04</a> shows a full distil-and-deploy example. See the cost/latency discussion in <a href="01-decision-model-evals.html#cost">Module 01</a>.</li>
+</ul>
+
+<h2 id="transforms">4. Deep dive: homogeneous transforms (worked example)</h2>
+<p>This is TensorTonic's most directly robotic problem, and the idea underpins everything from arm kinematics to camera calibration.</p>
+<p><strong>The problem:</strong> a robot has many coordinate frames: world, base, each joint, gripper, camera. A point seen by the camera must be expressed in the gripper's frame before the arm can reach it. Each frame-to-frame relation is a rotation <code>R</code> (3×3) plus a translation <code>t</code> (3×1).</p>
+<p><strong>The trick:</strong> append a 1 to every point, <code>p = (x, y, z, 1)</code>. Then rotation and translation fit in a single 4×4 matrix:</p>
+<pre><code>T = | R  t |      p' = T · p
+    | 0  1 |</code></pre>
+<p>Why bother? Because chains of frames become plain matrix products. <code>T_world←camera = T_world←base · T_base←gripper · T_gripper←camera</code>. That chain <em>is</em> forward kinematics. Inverting is cheap too: <code>T⁻¹ = [Rᵀ, −Rᵀt; 0, 1]</code>.</p>
+
+<div class="card demo">
+<h3>Interactive: a two-link arm as chained transforms (2D)</h3>
+<p class="legend">Each link is a rotation by its joint angle, then a translation along the link. The gripper's position is the product of both transforms applied to the origin.</p>
+<canvas id="arm" width="700" height="300" aria-label="Two-link robot arm driven by joint angle sliders"></canvas>
+<label for="q1">Joint 1 (θ₁): <span id="q1v" class="num"></span></label>
+<input id="q1" type="range" min="-180" max="180" value="35">
+<label for="q2">Joint 2 (θ₂): <span id="q2v" class="num"></span></label>
+<input id="q2" type="range" min="-160" max="160" value="60">
+<div class="stats">
+  <div class="stat"><div class="k">Gripper x</div><div class="v" id="ex">–</div></div>
+  <div class="stat"><div class="k">Gripper y</div><div class="v" id="ey">–</div></div>
+  <div class="stat"><div class="k">Gripper angle</div><div class="v" id="ea">–</div></div>
+</div>
+<pre><code id="mat"></code></pre>
+</div>
+
+<details><summary>NumPy solution sketch (try the problem first)</summary>
+<pre><code>import numpy as np
+
+def apply_transform(T, pts):
+    T, pts = np.asarray(T, float), np.asarray(pts, float)
+    one = pts.ndim == 1
+    P = np.atleast_2d(pts)
+    Ph = np.hstack([P, np.ones((len(P), 1))])
+    out = (T @ Ph.T).T[:, :3]
+    return out[0] if one else out</code></pre>
+</details>
+
+<h2 id="math">5. Deep dive: which ML maths matters for robots</h2>
+<p>TensorTonic's 67 maths lessons are written for ML. Here's how each robotics subsystem uses them:</p>
+<div class="table-wrap"><table>
+<tr><th>Maths topic (TensorTonic lesson)</th><th>Where a roboticist uses it</th></tr>
+<tr><td>Matrix multiplication, orthogonality</td><td>Rotation matrices (orthogonal, det = 1), frame chains</td></tr>
+<tr><td>Jacobian &amp; Hessian</td><td>Velocity kinematics (joint speeds → gripper speed), singularities, inverse kinematics</td></tr>
+<tr><td>Least squares, SVD</td><td>Calibration, point-cloud alignment (ICP / Kabsch uses SVD), pseudo-inverse IK</td></tr>
+<tr><td>Eigenvalues, positive-definite matrices</td><td>Stability of controllers, covariance ellipses for uncertainty</td></tr>
+<tr><td>Covariance, Bayes' theorem</td><td>Kalman filters and sensor fusion: combining IMU + wheel odometry + GPS</td></tr>
+<tr><td>Markov chains, Monte Carlo</td><td>Particle filters (localization), MDPs in RL, sampling-based planners</td></tr>
+<tr><td>Newton's method, Lagrange multipliers / KKT</td><td>Trajectory optimization and model-predictive control (MPC) with constraints</td></tr>
+<tr><td>Type I vs II errors, hypothesis testing</td><td>Detector thresholds and safety stops (links to <a href="01-decision-model-evals.html#precision-recall">Module 01</a>)</td></tr>
+<tr><td>KL divergence, entropy</td><td>PPO's KL penalty, entropy bonus for exploration, active perception</td></tr>
+</table></div>
+
+<h2 id="rl">6. Deep dive: the RL ladder</h2>
+<p>TensorTonic has a clean progression of RL problems. Climb it in this order. Each rung builds the next:</p>
+<ol>
+<li><strong>Foundations:</strong> <a href="https://www.tensortonic.com/problems/rl-discounted-returns">discounted returns</a> → <a href="https://www.tensortonic.com/problems/rl-bellman-expectation-equation">Bellman expectation</a> → <a href="https://www.tensortonic.com/problems/rl-bellman-optimality-equation">Bellman optimality</a></li>
+<li><strong>Planning with a known model:</strong> <a href="https://www.tensortonic.com/problems/rl-value-iteration">value iteration</a>, <a href="https://www.tensortonic.com/problems/rl-policy-iteration">policy iteration</a></li>
+<li><strong>Learning from experience:</strong> <a href="https://www.tensortonic.com/problems/rl-monte-carlo-policy-evaluation">Monte Carlo evaluation</a> → <a href="https://www.tensortonic.com/problems/rl-td-zero-update">TD(0)</a> → <a href="https://www.tensortonic.com/problems/rl-sarsa-update">SARSA</a> / <a href="https://www.tensortonic.com/problems/rl-q-learning-update">Q-learning</a></li>
+<li><strong>Exploration:</strong> <a href="https://www.tensortonic.com/problems/rl-epsilon-greedy-action-selection">ε-greedy</a>, <a href="https://www.tensortonic.com/problems/rl-ucb1-multi-armed-bandit">UCB1</a>, <a href="https://www.tensortonic.com/problems/rl-thompson-sampling-beta-bernoulli">Thompson sampling</a></li>
+<li><strong>Deep value methods:</strong> <a href="https://www.tensortonic.com/problems/rl-experience-replay-buffer">replay buffer</a>, <a href="https://www.tensortonic.com/problems/rl-dqn-loss-with-target-network">DQN with target net</a>, <a href="https://www.tensortonic.com/problems/rl-double-dqn-target">Double DQN</a></li>
+<li><strong>Policy gradients:</strong> <a href="https://www.tensortonic.com/problems/rl-reinforce-gradient">REINFORCE</a> → <a href="https://www.tensortonic.com/problems/rl-reinforce-with-baseline">with baseline</a> → <a href="https://www.tensortonic.com/problems/rl-actor-critic-a2c-loss">A2C</a> → <a href="https://www.tensortonic.com/problems/rl-generalized-advantage-estimation">GAE</a> → <a href="https://www.tensortonic.com/problems/rl-ppo-clipped-surrogate">PPO clipped objective</a></li>
+</ol>
+<p><strong>Why PPO is the target:</strong> PPO with GAE is the workhorse for training locomotion (quadrupeds, humanoids) in simulation before transferring to real hardware ("sim-to-real"). Robot arms use continuous actions, so DQN-style methods matter less there than policy gradients and actor-critic methods.</p>
+
+<h2 id="gaps">7. What it doesn't cover</h2>
+<p>Plan to fill these from other sources (future modules):</p>
+<ul>
+<li>Rotations beyond matrices: quaternions, axis-angle, SO(3)/SE(3) Lie groups</li>
+<li>Forward/inverse kinematics and dynamics of real manipulators (DH parameters, URDF)</li>
+<li>Control: PID, LQR, MPC</li>
+<li>State estimation: Kalman / extended Kalman / particle filters, SLAM</li>
+<li>Motion planning: A*, RRT, trajectory optimization</li>
+<li>Imitation learning and VLAs (behaviour cloning, diffusion policy, ACT, π0-style models)</li>
+<li>Tooling: ROS 2, simulators (MuJoCo, Isaac Sim), real hardware</li>
+</ul>
+
+<h2 id="playbook">8. Playbook</h2>
+<ol>
+<li>Start free. Upgrade to Pro ($100/yr) only if you want the structured roadmaps and quizzes.</li>
+<li>Do ~3 problems a day: 1 maths, 1 geometry/CV, 1 RL. Consistency beats binges.</li>
+<li>Read the <em>Theory</em> tab before coding. Peek at the solution only after a real attempt.</li>
+<li>Connect GitHub (offered on the problems page) so solutions back up to a private repo. That becomes your own robotics-maths library.</li>
+<li>After each stage, port one solution to a mini robot sim (e.g. a 2-link arm in matplotlib or MuJoCo) to make it concrete.</li>
+</ol>
+
+<h2 id="check">9. Self-check</h2>
+<details><summary>Why append a 1 to 3D points instead of storing R and t separately?</summary>
+<p>It turns "rotate then translate" into one matrix multiply. A chain of frames becomes a product of 4×4 matrices, which is forward kinematics.</p></details>
+<details><summary>How do you invert a homogeneous transform cheaply?</summary>
+<p><code>T⁻¹ = [Rᵀ, −Rᵀt; 0, 1]</code>. Rotations are orthogonal, so the inverse is the transpose. No general matrix inversion needed.</p></details>
+<details><summary>Which TensorTonic CV problem doubles as a multi-object tracking building block?</summary>
+<p>Hungarian matching. Trackers use it to assign new detections to existing tracks, usually with IoU or distance as the cost.</p></details>
+<details><summary>Why climb to PPO + GAE rather than stopping at DQN for robotics?</summary>
+<p>Robot actions (joint torques and velocities) are continuous. DQN needs a discrete action set. PPO handles continuous actions and is stable enough for large-scale simulation training.</p></details>
+<details><summary>Which diffusion paper on TensorTonic is a stepping stone to diffusion policies?</summary>
+<p>DDPM. Diffusion policies apply the same denoising process to robot action sequences instead of images.</p></details>
+
+<h2 id="glossary">10. Glossary &amp; further reading</h2>
+<div class="table-wrap"><table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<tr><td>Homogeneous transform</td><td>4×4 matrix combining rotation and translation between two coordinate frames</td></tr>
+<tr><td>Forward kinematics</td><td>Computing gripper pose from joint angles by chaining transforms</td></tr>
+<tr><td>Jacobian</td><td>Matrix mapping joint velocities to gripper velocity</td></tr>
+<tr><td>MDP</td><td>Markov decision process: states, actions, transition probabilities, rewards</td></tr>
+<tr><td>Bellman equation</td><td>Recursive definition of value: reward now + discounted value later</td></tr>
+<tr><td>PPO</td><td>Proximal Policy Optimization: policy gradient with a clipped update for stability</td></tr>
+<tr><td>GAE</td><td>Generalized Advantage Estimation: lower-variance advantage estimates for policy gradients</td></tr>
+<tr><td>Sim-to-real</td><td>Training in simulation, then transferring the policy to a physical robot</td></tr>
+<tr><td>VLA</td><td>Vision-Language-Action model: a transformer mapping camera images and instructions to robot actions</td></tr>
+<tr><td>Diffusion policy</td><td>Robot policy that generates action sequences by iterative denoising</td></tr>
+</table></div>
+<ul>
+<li><a href="https://www.tensortonic.com/study-plans">TensorTonic study plans</a> · <a href="https://www.tensortonic.com/ml-math">ML Math</a> · <a href="https://www.tensortonic.com/research">Research papers</a> · <a href="https://www.tensortonic.com/problems">All problems</a></li>
+<li>Related: <a href="05-trillion-scale-architecture.html#compounding">Module 05</a>, which maps TensorTonic topics to the prerequisites for frontier architecture talks</li>
+<li>Related: <a href="01-decision-model-evals.html">Module 01: decision thresholds &amp; calibration</a> · <a href="03-shared-autonomy.html#learning">Module 03: don't automate your own learning</a> (why to attempt before peeking)</li>
+</ul>
+
+<footer>Module 02 · added 2026-10-21 · <a href="../index.html">Back to course index</a></footer>
+</main>
+
+<script>
+const cv = document.getElementById('arm'), ctx = cv.getContext('2d');
+const q1 = document.getElementById('q1'), q2 = document.getElementById('q2');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const L1 = 1.0, L2 = 0.7;
+
+// 3x3 homogeneous transform in 2D: rotate by a, then translate along the new x by len
+const T = (a, len) => {
+  const c = Math.cos(a), s = Math.sin(a);
+  return [[c, -s, c * len], [s, c, s * len], [0, 0, 1]];
+};
+const mul = (A, B) => A.map(r => B[0].map((_, j) => r.reduce((acc, v, k) => acc + v * B[k][j], 0)));
+
+function draw() {
+  const a1 = +q1.value * Math.PI / 180, a2 = +q2.value * Math.PI / 180;
+  document.getElementById('q1v').textContent = q1.value + '°';
+  document.getElementById('q2v').textContent = q2.value + '°';
+  const T1 = T(a1, L1), T02 = mul(T1, T(a2, L2));
+  const p1 = [T1[0][2], T1[1][2]], p2 = [T02[0][2], T02[1][2]];
+
+  const W = cv.width, H = cv.height, sc = H / 4, ox = W / 2, oy = H / 2 + 20;
+  const px = p => [ox + p[0] * sc, oy - p[1] * sc];
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = css('--line'); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(ox, oy, (L1 + L2) * sc, 0, 2 * Math.PI); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, oy); ctx.lineTo(W, oy); ctx.moveTo(ox, 0); ctx.lineTo(ox, H); ctx.stroke();
+
+  ctx.lineCap = 'round'; ctx.lineWidth = 10;
+  [[[0, 0], p1, css('--accent')], [p1, p2, css('--pass')]].forEach(([a, b, c]) => {
+    ctx.strokeStyle = c; ctx.beginPath(); ctx.moveTo(...px(a)); ctx.lineTo(...px(b)); ctx.stroke();
+  });
+  ctx.fillStyle = css('--fg');
+  [[0, 0], p1].forEach(p => { ctx.beginPath(); ctx.arc(...px(p), 7, 0, 2 * Math.PI); ctx.fill(); });
+  ctx.fillStyle = css('--fail'); ctx.beginPath(); ctx.arc(...px(p2), 8, 0, 2 * Math.PI); ctx.fill();
+
+  // gripper frame axes, read straight from the rotation part of T02
+  ctx.lineWidth = 2;
+  [[0, css('--fail')], [1, css('--pass')]].forEach(([col, c]) => {
+    ctx.strokeStyle = c; ctx.beginPath(); ctx.moveTo(...px(p2));
+    ctx.lineTo(...px([p2[0] + T02[0][col] * .35, p2[1] + T02[1][col] * .35])); ctx.stroke();
+  });
+
+  document.getElementById('ex').textContent = p2[0].toFixed(2);
+  document.getElementById('ey').textContent = p2[1].toFixed(2);
+  let deg = ((+q1.value + +q2.value + 540) % 360) - 180;
+  document.getElementById('ea').textContent = deg + '°';
+  const f = v => (v >= 0 ? ' ' : '') + v.toFixed(2);
+  document.getElementById('mat').textContent =
+    'T_base←gripper = T(θ₁, L₁) · T(θ₂, L₂) =\n' + T02.map(r => '| ' + r.map(f).join('  ') + ' |').join('\n');
+}
+q1.oninput = q2.oninput = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

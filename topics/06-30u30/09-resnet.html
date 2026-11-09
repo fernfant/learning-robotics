@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 09 · ResNet</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 09</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Unit 2 · Deep learning explosion · Day 09</div>
+<h1>Deep Residual Learning for Image Recognition (ResNet)</h1>
+<p class="lede">Make each block learn a correction to its input, not a whole new function. With that change, a 152-layer network trains more easily than a 34-layer one used to.</p>
+
+<div class="facts">
+  <div><b>Authors</b>Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun (Microsoft Research)</div>
+  <div><b>Year / venue</b>arXiv Dec 2015 · CVPR 2016</div>
+  <div><b>Core idea</b>y = F(x) + x</div>
+  <div><b>Study time</b>3–5 h</div>
+</div>
+<p class="meta">Original: <a href="https://arxiv.org/abs/1512.03385">arXiv:1512.03385</a> · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/09_resnet">30u30 Day 9</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Very deep networks used to get worse when you added more layers, until ResNet gave every few layers a shortcut so they only had to learn small fixes.</p>
+
+<h3>Think of it like this</h3>
+<p>Imagine passing a drawing down a line of 100 classmates, where each person redraws it from scratch. By the end it looks nothing like the original. Now change the rule: each person gets the drawing itself and only adds small touch-ups. After 100 people the drawing is still recognisable, and better. ResNet uses that second rule.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>The picture goes into a block of layers.</li>
+<li>The block works out a small change, a "correction".</li>
+<li>A shortcut carries the block's input straight past it, unchanged.</li>
+<li>The input and the correction are added together and passed to the next block.</li>
+<li>If a block has nothing useful to add, it can learn to add almost nothing. So extra blocks don't make things worse.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Many robots that learn by copying people (for example, learning to fold a towel from demonstrations) use a small ResNet to understand their camera images. The same idea also works for control: keep a robot controller that already works, and only learn a small correction on top of it.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Play "telephone" with a sentence twice. The first time, each person whispers it from memory. The second time, each person can see the written sentence and only fixes one word. Which version arrives more correct?</li>
+<li>In the demo further down, move the <b>Residual branch scale s</b> slider. At 0 the input passes through untouched. Small values keep the signal close to the input for many layers. The plain stack (red line) scrambles it almost at once.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Layer</dt><dd>One step of processing inside a neural network.</dd>
+<dt>Shortcut (skip connection)</dt><dd>A path that carries the input past some layers without changing it.</dd>
+<dt>Residual</dt><dd>The small change a block adds on top of its input.</dd>
+<dt>Deep network</dt><dd>A network with many layers stacked on top of each other.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Stacking more layers onto a plain CNN made it worse, and not because of overfitting. Training error itself went up. In principle, the deeper net could copy the shallow one and set its extra layers to the identity, but SGD failed to find that solution. ResNet adds a shortcut around every few layers, so each block outputs <code>F(x) + x</code>. Doing nothing now just means pushing <code>F</code> towards zero. Residual nets of 50, 101 and 152 layers trained cleanly. An ensemble reached 3.57% top-5 error on the ImageNet test set and won ILSVRC 2015.</p>
+</div>
+<ul>
+<li><strong>The degradation problem:</strong> on ImageNet, plain-34 had higher error than plain-18 (28.54% vs 27.94% top-1). With shortcuts the order flipped: ResNet-34 scored 25.03% and ResNet-18 27.88%.</li>
+<li><strong>Identity shortcuts are free.</strong> They add no parameters and almost no compute, so plain and residual nets can be compared fairly.</li>
+<li><strong>Bottleneck blocks</strong> (1×1 → 3×3 → 1×1) keep very deep nets affordable. ResNet-152 needs 11.3 billion FLOPs, less than VGG-19's 19.6 billion.</li>
+<li><strong>The features transfer.</strong> Swapping VGG-16 for ResNet-101 in Faster R-CNN gave a 28% relative gain on COCO detection.</li>
+<li><strong>Not unlimited:</strong> a 1202-layer CIFAR net reached under 0.1% training error but tested worse than the 110-layer one. The authors blame overfitting.</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<p>Call the mapping a few layers should learn <code>H(x)</code>. Instead of fitting <code>H</code> directly, let the layers fit the <strong>residual</strong> <code>F(x) = H(x) − x</code>, and add the input back:</p>
+<pre><code>y = F(x, {W_i}) + x                 # identity shortcut
+y = F(x, {W_i}) + W_s · x           # projection shortcut, only when shapes change
+F(x) = W_2 · σ(W_1 · x)             # basic block (BN omitted); output is σ(y)</code></pre>
+<ul>
+<li><code>x</code> is the block input and <code>y</code> its output. Both are feature maps of the same shape.</li>
+<li><code>F</code> is the residual branch: two 3×3 convs in ResNet-18/34, or a 1×1 → 3×3 → 1×1 bottleneck in ResNet-50/101/152. Each conv is followed by batch norm.</li>
+<li><code>σ</code> is ReLU. In this paper it is applied <em>after</em> the addition. <a href="10-resnet-identity-mappings.html">Day 10</a> shows why moving it helps.</li>
+<li><code>W_s</code> is a 1×1 conv that matches channels and stride when a stage changes resolution. The paper tests three options: zero-padding (A), projections only where needed (B) and projections everywhere (C). The differences were small, so it uses A or B.</li>
+</ul>
+<p>The whole network is 3×3 convs in four stages (56, 28, 14 and 7 pixels wide). Channels double each time the resolution halves. It ends in global average pooling and a single 1000-way FC layer, with no big hidden FC layers like AlexNet's.</p>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>Why "learn the correction" is easier</h3>
+<p>Picture a good 18-layer net and add 16 layers. If the new layers computed the identity, the deeper net would be exactly as good. A stack of conv + ReLU layers with random weights is nowhere near the identity, though. It has to <em>learn</em> to pass its input through unchanged, and the experiments showed SGD doesn't manage it. With a shortcut, the identity is the default, reached when <code>F = 0</code>. Small weights are close to that already. The paper also measured the trained residual branches and found their responses generally small. The blocks really do act as small corrections.</p>
+<p>Note what the paper does <em>not</em> claim. Its plain nets used batch norm, and the authors checked that gradients kept healthy norms. They argue that degradation is an optimisation problem, not vanishing gradients. The cleaner gradient story came a year later in <a href="10-resnet-identity-mappings.html">Day 10</a>.</p>
+
+<div class="card demo">
+<h3>Interactive: what a deep stack does to its input at initialisation</h3>
+<p class="legend">A 64-wide toy network with random He-initialised weights, before any training. The plot shows the cosine similarity between the input vector and the signal after each layer. <span style="color:var(--fail)">Plain</span>: x ← ReLU(W·x). <span style="color:var(--pass)">Residual</span>: x ← x + s·W₂·ReLU(W₁·x). The slider sets s, the scale of the residual branch.</p>
+<canvas id="sig" width="700" height="220" aria-label="Line plot of input-output similarity versus depth for plain and residual stacks"></canvas>
+<label for="s">Residual branch scale s: <span id="sv" class="num"></span></label>
+<input id="s" type="range" min="0" max="0.5" step="0.02" value="0.1">
+<div class="stats">
+  <div class="stat"><div class="k">Plain, layer 50</div><div class="v" id="pl">–</div></div>
+  <div class="stat"><div class="k">Residual, layer 50</div><div class="v" id="rs">–</div></div>
+</div>
+</div>
+<p>A random plain layer scrambles its input at once, because a random matrix is nothing like the identity. Similarity falls below 0.2 after one layer. The residual stack drifts gradually instead. At s = 0.1 the similarity is still about 0.6 after 50 layers, and at s = 0 the stack is exactly the identity. Training then only has to learn useful edits to a signal that is already flowing. This is a toy without batch norm, so read it as intuition, not as a reproduction of the paper.</p>
+
+<h3>The bottleneck block</h3>
+<p>For ResNet-50 and deeper, each block is a 1×1 conv that cuts channels (say 256 → 64), a 3×3 conv at the reduced width, and a 1×1 conv back up to 256. The expensive 3×3 runs on a quarter of the channels. Identity shortcuts matter here: a projection on the 256-wide shortcut would roughly double the block's cost.</p>
+
+<h3>Limitations, and what came after</h3>
+<ul>
+<li><strong>The ReLU after the addition</strong> clips the shortcut signal. At around 1000 layers that hurts. <a href="10-resnet-identity-mappings.html">Day 10</a> moves BN and ReLU inside the branch.</li>
+<li><strong>Depth eventually overfits.</strong> The 1202-layer CIFAR net is the paper's own example.</li>
+<li><strong>Batch norm dependence.</strong> BN behaves differently in training and at inference, and it struggles with tiny batches. The paper itself freezes BN statistics when fine-tuning for detection.</li>
+<li><strong>The residual stream is everywhere now.</strong> Every Transformer layer (<a href="13-attention.html">Day 13</a>) is <code>x + Attention(x)</code> then <code>x + MLP(x)</code>. Kimi K3's attention residuals in <a href="../05-trillion-scale-architecture.html#depth">Module 05</a> revisit exactly this running sum, letting each layer pick a weighted mix of earlier layers instead of one fixed total.</li>
+</ul>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>The default robot vision backbone.</strong> ResNet-18 and ResNet-50 are still the standard image encoders in imitation-learning policies (ACT and Diffusion Policy both use ResNet-18) and in pretrained visual representations for manipulation.</li>
+<li><strong>Detection and segmentation heads sit on ResNet features.</strong> Grasp detection, bin picking and obstacle segmentation pipelines usually start from an ImageNet-pretrained ResNet trunk.</li>
+<li><strong>Residual policy learning is the same idea in control.</strong> Keep a hand-tuned controller and learn only a correction <code>a = a_base + F(s)</code>, starting with F near zero. The robot begins at the baseline's behaviour, which is safer than starting from a random policy. Compare policy blending in <a href="../03-shared-autonomy.html#shared">Module 03</a>.</li>
+<li><strong>Watch batch norm on robots.</strong> Small batches, frozen fine-tuning and train/test differences make BN fragile. Many robot policies swap it for GroupNorm or freeze its statistics.</li>
+<li><strong>Depth is a latency choice.</strong> ResNet-18 at 1.8 GFLOPs versus ResNet-152 at 11.3 is a real control-loop trade-off on an embedded GPU. See <a href="../04-distill-small-models.html#latency">Module 04</a>.</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Read the paper (about 1.5 h). Study Figure 1 (degradation), Figure 2 (the block), Table 1 (architectures) and Figure 4 (plain versus residual training curves).</li>
+<li>In the 30u30 Day 9 folder, read <code>implementation.py</code>. Find the basic block, the bottleneck block and where the projection shortcut is used. Run <code>train_minimal.py</code>.</li>
+<li>Work through <code>notebook.ipynb</code>, then the exercises: build ResNet-18, ablate the skip connections, measure gradient flow, scale depth and try transfer learning.</li>
+<li>Key experiment: train a plain and a residual net of the same depth (say 20 and 56 layers on CIFAR-10) and plot <em>training</em> error. You should see the degradation problem appear and disappear.</li>
+<li>Stretch: fine-tune a pretrained ResNet-18 on a small set of your own object images and time inference on the hardware you'd put on a robot.</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>Why is the degradation problem not overfitting?</summary><p>Overfitting means low training error and high test error. Here the deeper plain net had higher <em>training</em> error too. The optimiser failed to fit, even though a solution at least as good as the shallower net existed.</p></details>
+<details><summary>What does a residual block output when its weights are all zero?</summary><p>Its input, up to the final ReLU. F(x) = 0, so y = x. The identity is the default behaviour.</p></details>
+<details><summary>When is a projection shortcut W_s needed?</summary><p>When the block changes the number of channels or the spatial size, so x and F(x) can't be added directly. The paper uses a 1×1 conv with stride 2 at those points.</p></details>
+<details><summary>Why use 1×1 convs in the bottleneck block?</summary><p>They shrink the channel count before the costly 3×3 conv and restore it afterwards. Depth grows while compute per block stays about the same.</p></details>
+<details><summary>Did the paper claim residuals fix vanishing gradients?</summary><p>No. Its plain nets used batch norm and had healthy gradient norms. It frames the problem as optimisation difficulty and the residual form as a better starting point (preconditioning).</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/1512.03385">The original paper</a> (arXiv, CVPR 2016)</li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/09_resnet">30u30 Day 9</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Next: <a href="10-resnet-identity-mappings.html">Day 10, Identity Mappings in Deep Residual Networks</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="08-alexnet.html"><small>Previous</small>Day 08 · AlexNet</a>
+  <a class="next" href="10-resnet-identity-mappings.html"><small>Next</small>Day 10 · Identity Mappings</a>
+</nav>
+<footer>Module 06 · Day 09 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('sig'), ctx = cv.getContext('2d'), sIn = document.getElementById('s');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const N = 64, D = 50;
+
+function rng(seed) {
+  return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+const R = rng(42), gauss = () => Math.sqrt(-2 * Math.log(1 - R())) * Math.cos(2 * Math.PI * R());
+const mat = () => Array.from({ length: N }, () => Array.from({ length: N }, () => gauss() * Math.sqrt(2 / N)));
+const mv = (W, x) => W.map(r => r.reduce((a, w, j) => a + w * x[j], 0));
+const relu = x => x.map(v => Math.max(0, v));
+const cos = (a, b) => { let d = 0, na = 0, nb = 0; a.forEach((v, i) => { d += v * b[i]; na += v * v; nb += b[i] * b[i]; }); return d / Math.sqrt(na * nb + 1e-30); };
+// fixed weights and input so only s changes between redraws
+const P = Array.from({ length: D }, mat), W1 = Array.from({ length: D }, mat), W2 = Array.from({ length: D }, mat);
+const x0 = Array.from({ length: N }, gauss);
+
+function curves(s) {
+  let xp = x0, xr = x0;
+  const cp = [1], cr = [1];
+  for (let l = 0; l < D; l++) {
+    xp = relu(mv(P[l], xp));
+    const f = mv(W2[l], relu(mv(W1[l], xr)));
+    xr = xr.map((v, i) => v + s * f[i]);
+    cp.push(cos(x0, xp)); cr.push(cos(x0, xr));
+  }
+  return { cp, cr };
+}
+
+function draw() {
+  const s = +sIn.value;
+  document.getElementById('sv').textContent = s.toFixed(2);
+  const { cp, cr } = curves(s);
+  const W = cv.width, H = cv.height, pad = 30;
+  const X = i => pad + i / D * (W - 2 * pad), Y = v => H - pad - (v + 0.2) / 1.2 * (H - 2 * pad);
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = css('--line'); ctx.lineWidth = 1;
+  [0, 0.5, 1].forEach(v => { ctx.beginPath(); ctx.moveTo(pad, Y(v)); ctx.lineTo(W - pad, Y(v)); ctx.stroke(); });
+  ctx.fillStyle = css('--muted'); ctx.font = '12px sans-serif'; ctx.textAlign = 'right';
+  [0, 0.5, 1].forEach(v => ctx.fillText(v.toFixed(1), pad - 4, Y(v) + 4));
+  ctx.textAlign = 'center'; ctx.fillText('layer', W / 2, H - 6);
+  [[cp, '--fail'], [cr, '--pass']].forEach(([c, col]) => {
+    ctx.strokeStyle = css(col); ctx.lineWidth = 2; ctx.beginPath();
+    c.forEach((v, i) => i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v)));
+    ctx.stroke();
+  });
+  document.getElementById('pl').textContent = cp[D].toFixed(2);
+  document.getElementById('rs').textContent = cr[D].toFixed(2);
+}
+sIn.oninput = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

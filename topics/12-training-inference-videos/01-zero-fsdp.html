@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video 01 · ZeRO &amp; FSDP</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 12 · Training &amp; inference videos</a> › Video 01</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 12 · Video 01</div>
+<h1>Training models too big for one GPU: ZeRO &amp; FSDP</h1>
+<p class="lede">The video starts with how a computer stores a real number and ends with a model whose weights live in pieces across many GPUs. This guide follows the same path: number formats, mixed precision, the memory bill of Adam, and how ZeRO and FSDP remove the copies that plain data parallelism keeps on every GPU.</p>
+
+<div class="facts">
+  <div><b>Video length</b>23:05</div>
+  <div><b>Published</b>13 October 2026</div>
+  <div><b>Level</b>Intermediate: you've trained a small model in PyTorch and know what a gradient is</div>
+  <div><b>Builds on</b><a href="../08-ai-research-engineer/06-distributed-training.html">Module 08 · Distributed training</a>, <a href="../08-ai-research-engineer/01-tensor-math-autograd.html">Module 08 · Tensor maths &amp; autograd</a></div>
+</div>
+<p class="meta">Video by Jia-Bin Huang · <a href="https://www.youtube.com/watch?v=nx5yfCa4W98">Watch on YouTube</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">A big AI model is a giant list of numbers. Training it needs several extra lists of the same size, and together they don't fit in one graphics card. The trick in this video is to stop every card keeping its own full copy, and give each card just one slice.</p>
+
+<h3>Think of it like this</h3>
+<p>Eight friends are each solving the same huge jigsaw puzzle at home, from the same picture, to compare notes. Every one of them has bought the full box, the picture on the lid, and a notebook of tips. That's eight copies of everything. A smarter group splits it: each friend keeps one eighth of the pieces and one eighth of the notebook. When someone needs a piece they don't own, they borrow it from the right friend for a moment and hand it back. Nobody's table is crowded, and the puzzle still gets solved.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Numbers can be stored with fewer digits (16 bits instead of 32), which halves the space but makes them a bit less exact.</li>
+<li>Training keeps the model's numbers, the corrections for each number (gradients), and the optimiser's memory of past corrections. The optimiser part is the biggest.</li>
+<li>With plain data parallelism, every card holds all of this and works on different examples.</li>
+<li>ZeRO gives each card only a slice of the optimiser memory, then a slice of the gradients, then a slice of the model itself.</li>
+<li>When a card needs a slice it doesn't own, the cards pass it around over the network, use it, and throw it away again.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Robot foundation models (vision-language-action models) start from big vision-language models. Fine-tuning one of them, even a "small" one with a few billion numbers, already needs more memory than a single card has. Sharding is what lets a lab, or a student with a few rented GPUs, train these models at all.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Write the number 3.14159 on a card with room for only 3 digits, then 2, then 1. How wrong is it each time? Now try 70,000 with only room for 4 digits and no "×10" allowed. That's the difference between precision and range.</li>
+<li>In the demo further down, type a value into <b>Value to store</b> and read how each format stores it. Try 0.1, 70000 and 0.000001, or click the <b>Examples</b> buttons.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>GPU memory</dt><dd>The fast memory on a graphics card. Everything the card works on must fit there.</dd>
+<dt>Gradient</dt><dd>For each number in the model, which way and how much to nudge it to reduce the error.</dd>
+<dt>Optimiser state</dt><dd>Extra numbers the optimiser (like Adam) keeps for each weight, such as running averages of past gradients.</dd>
+<dt>Data parallelism</dt><dd>Many GPUs each run the full model on different examples, then agree on one shared update.</dd>
+<dt>Sharding</dt><dd>Cutting something into slices and giving each GPU one slice.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="watch">1. Watch</h2>
+<div class="card"><div style="position:relative;padding-top:56.25%"><iframe style="position:absolute;inset:0;width:100%;height:100%;border:0" src="https://www.youtube-nocookie.com/embed/nx5yfCa4W98" title="Training Models Too Big for One GPU · ZeRO &amp; FSDP, by Jia-Bin Huang" loading="lazy" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div></div>
+
+<h3>Chapter guide</h3>
+<p>Timestamps come from the video's description. The right-hand column is this course's reading guide, written from the chapter titles; it doesn't describe what the video shows frame by frame.</p>
+<div class="table-wrap"><table>
+<tr><th>Time</th><th>Chapter</th><th>What to look for</th></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=nx5yfCa4W98&amp;t=0s">0:00</a></td><td>How a model learns</td><td>The loop of forward pass, loss, backward pass and update. Every later memory cost is one of the things this loop needs to keep around.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=nx5yfCa4W98&amp;t=55s">0:55</a></td><td>Adam optimizer</td><td>Adam keeps two running averages per weight. Count them: that's where most of the training memory goes.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=nx5yfCa4W98&amp;t=116s">1:56</a></td><td>How a computer stores real numbers</td><td>Sign, exponent and mantissa bits. Exponent bits buy range, mantissa bits buy precision. Compare FP32, FP16 and BF16 with the demo below.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=nx5yfCa4W98&amp;t=700s">11:40</a></td><td>The memory constraint</td><td>Add up bytes per parameter for weights, gradients and Adam states in mixed precision, and compare with one GPU's memory.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=nx5yfCa4W98&amp;t=760s">12:40</a></td><td>Data parallelism</td><td>Each GPU holds a full replica and sees a different slice of the batch. Notice what's duplicated.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=nx5yfCa4W98&amp;t=801s">13:21</a></td><td>How GPUs sync their gradients</td><td>All-reduce, and how it splits into a reduce-scatter followed by an all-gather. That split is the key to ZeRO.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=nx5yfCa4W98&amp;t=967s">16:07</a></td><td>ZeRO stage 1 and 2: shard the optimizer states, then the gradients</td><td>Why stages 1 and 2 cost no extra communication over plain data parallelism.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=nx5yfCa4W98&amp;t=1167s">19:27</a></td><td>ZeRO stage 3: shard the weights</td><td>Weights are gathered just in time for each layer and freed after. Look for the extra all-gather and what it costs.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=nx5yfCa4W98&amp;t=1288s">21:28</a></td><td>FSDP: the same schedule one unit at a time</td><td>FSDP groups layers into units and gathers one unit at a time, overlapping communication with compute.</td></tr>
+</table></div>
+
+<h2 id="ideas">2. The ideas, explained</h2>
+
+<h3 id="adam">Adam, and why it's expensive</h3>
+<p>Adam (Kingma and Ba, 2014) keeps an exponential moving average of the gradient (first moment) and of the squared gradient (second moment) for every parameter, and divides one by the square root of the other:</p>
+<pre><code>m_t = β1·m_(t−1) + (1 − β1)·g_t
+v_t = β2·v_(t−1) + (1 − β2)·g_t²
+m̂ = m_t / (1 − β1^t),   v̂ = v_t / (1 − β2^t)
+θ_t = θ_(t−1) − η · m̂ / (√v̂ + ε)</code></pre>
+<p>So Adam stores two extra numbers per parameter, on top of the parameter and its gradient. The optimiser itself, its variants and AdamW's decoupled weight decay are the subject of <a href="07-adamw.html">Video 07</a>; here only the memory matters.</p>
+
+<h3 id="floats">How a computer stores real numbers</h3>
+<p>A floating-point number is <code>(−1)^sign × 1.mantissa × 2^(exponent − bias)</code>. The exponent field sets the range (how big and how small a number can be); the mantissa field sets the precision (how close together neighbouring numbers are). The formats that matter for training:</p>
+<div class="table-wrap"><table>
+<tr><th>Format</th><th>Sign / exponent / mantissa bits</th><th>Largest finite value</th><th>Gap after 1.0</th></tr>
+<tr><td>FP32</td><td>1 / 8 / 23</td><td>≈ 3.4 × 10³⁸</td><td>2⁻²³ ≈ 1.2 × 10⁻⁷</td></tr>
+<tr><td>BF16</td><td>1 / 8 / 7</td><td>≈ 3.4 × 10³⁸</td><td>2⁻⁷ ≈ 0.0078</td></tr>
+<tr><td>FP16</td><td>1 / 5 / 10</td><td>65,504</td><td>2⁻¹⁰ ≈ 0.00098</td></tr>
+<tr><td>FP8 E4M3</td><td>1 / 4 / 3</td><td>448</td><td>2⁻³ = 0.125</td></tr>
+<tr><td>FP8 E5M2</td><td>1 / 5 / 2</td><td>57,344</td><td>2⁻² = 0.25</td></tr>
+</table></div>
+<p>BF16 ("brain float", from Google Brain's TPU work) is FP32 with the mantissa cut short: same range, much less precision. FP16 keeps more precision but its range is tiny, so small gradients underflow to zero and large activations overflow to infinity. The two FP8 encodings were proposed together by Micikevicius et al. (2022): E5M2 follows IEEE conventions, while E4M3 drops infinities and keeps a single NaN pattern to stretch its range to 448. FP8 training and inference on newer GPUs is covered in <a href="../09-inference-engineering/06-quantization-hardware.html">Module 09 · Quantisation &amp; hardware</a>.</p>
+
+<h3 id="mixed">Mixed-precision training</h3>
+<p>Micikevicius et al. (2017, "Mixed Precision Training") showed you can store weights, activations and gradients in FP16 and still match FP32 accuracy, with two tricks:</p>
+<ul>
+<li><strong>An FP32 master copy of the weights.</strong> Updates are often much smaller than the weight itself. Added in FP16, they round away to nothing (with a gap of about 0.001 after 1.0, adding 0.0001 changes nothing). So the optimiser updates an FP32 copy, which is rounded to half precision for the next forward pass.</li>
+<li><strong>Loss scaling.</strong> Multiply the loss by a factor S before the backward pass so small gradients stay above FP16's underflow threshold, then divide the gradients by S before the update. Modern frameworks pick S dynamically and skip a step if an overflow appears.</li>
+</ul>
+<p>BF16 has FP32's range, so it usually needs no loss scaling, which is why it became the default for large-model training. The FP32 master weights stay either way.</p>
+
+<h3 id="memory">The memory bill: 16 bytes per parameter</h3>
+<p>The ZeRO paper (Rajbhandari, Rasley, Ruwase and He, 2019) counts the "model states" for mixed-precision Adam with Ψ parameters:</p>
+<pre><code>fp16 weights          2Ψ bytes
+fp16 gradients        2Ψ
+fp32 master weights   4Ψ  ┐
+fp32 Adam m           4Ψ  ├ optimiser states: K·Ψ with K = 12
+fp32 Adam v           4Ψ  ┘
+total                16Ψ bytes
+
+7.5B parameters  →  16 × 7.5e9 = 120 GB, before any activations</code></pre>
+<p>Activations, temporary buffers and fragmentation come on top. Activation memory is reduced separately, mainly with checkpointing (recomputing activations in the backward pass), which <a href="../08-ai-research-engineer/06-distributed-training.html">Module 08 · Distributed training</a> covers.</p>
+
+<h3 id="dp">Data parallelism and the all-reduce</h3>
+<p>In data parallelism each of N GPUs runs the full model on its own micro-batch, and the gradients are averaged with an all-reduce so every replica applies the same update. A ring all-reduce has two halves:</p>
+<pre><code>reduce-scatter:  after it, GPU i holds the SUM of chunk i over all GPUs
+all-gather:      every GPU sends its finished chunk to all the others
+
+data each GPU sends ≈ 2·(N − 1)/N × gradient size   (nearly independent of N)</code></pre>
+<p>The catch: all N GPUs hold the same 16Ψ bytes of model states. Adding GPUs adds throughput but never lets you fit a bigger model.</p>
+
+<h3 id="zero">ZeRO stages 1, 2 and 3</h3>
+<p>ZeRO ("Zero Redundancy Optimizer") removes the duplication in three steps, and the per-GPU memory for model states becomes:</p>
+<pre><code>baseline DP      (2 + 2 + K)·Ψ          = 16Ψ
+ZeRO-1  P_os     (2 + 2)·Ψ + K·Ψ/N
+ZeRO-2  P_os+g   2Ψ + (2 + K)·Ψ/N
+ZeRO-3  P_os+g+p (2 + 2 + K)·Ψ/N       = 16Ψ/N
+
+7.5B params, N = 64:  120 GB → 31.4 GB → 16.6 GB → 1.9 GB</code></pre>
+<p><strong>Stage 1</strong> shards the optimiser states: GPU i updates only its 1/N of the parameters. <strong>Stage 2</strong> also shards gradients: instead of an all-reduce, a reduce-scatter leaves each GPU with the summed gradient for exactly the slice it updates, and the rest is freed. After the update, an all-gather shares the new weights. Reduce-scatter plus all-gather is what an all-reduce already does, so the paper reports no extra communication for stages 1 and 2. <strong>Stage 3</strong> shards the weights too. Before each layer's forward pass, its weights are all-gathered, used and freed; the same happens again in the backward pass, followed by a reduce-scatter of the gradients. That's about 1.5× the communication volume of plain data parallelism, in exchange for memory that falls linearly with N.</p>
+<p>The ZeRO memory calculator in <a href="../08-ai-research-engineer/06-distributed-training.html">Module 08 · Distributed training</a> lets you vary Ψ, N and K and see each stage's bar; this guide won't repeat it.</p>
+
+<h3 id="fsdp">FSDP: the same idea, one unit at a time</h3>
+<p>PyTorch's Fully Sharded Data Parallel (Zhao et al., 2023) is the native implementation of the ZeRO-3 schedule. You wrap the model into units, typically one transformer block each. Each unit's parameters are flattened and sharded across GPUs. During the forward pass, FSDP all-gathers one unit, runs it, frees the full parameters, and moves on, prefetching the next unit's all-gather while the current one computes. The backward pass gathers each unit again, computes its gradients and reduce-scatters them. Peak memory is roughly the sharded states plus one or two fully gathered units, instead of the whole model.</p>
+<pre><code>for unit in model:                      # forward
+    full = all_gather(unit.shard)       # overlapped with the previous unit's compute
+    x = unit(x, full); free(full)
+for unit in reversed(model):            # backward
+    full = all_gather(unit.shard)
+    grads = backward(unit, full); free(full)
+    unit.grad_shard = reduce_scatter(grads)
+optimizer.step()                        # each GPU updates its own shard only</code></pre>
+<p>The original FSDP API exposes sharding strategies that map onto ZeRO: <code>FULL_SHARD</code> is stage 3, <code>SHARD_GRAD_OP</code> is close to stage 2, <code>NO_SHARD</code> is ordinary DDP, and <code>HYBRID_SHARD</code> shards inside a node and replicates across nodes to keep the chatty all-gathers on fast links. The paper reports throughput comparable to DDP on models that fit, with near-linear scaling on models that don't.</p>
+
+<div class="card demo">
+<h3>Interactive: how each format stores your number</h3>
+<p class="legend">Each row is one number format. Grey cell: sign bit. Accent cells: exponent bits. Outlined cells: mantissa bits. Filled cells are 1s. On the right: the value actually stored and its relative error. Values beyond a format's range overflow (to infinity, or NaN for E4M3); values too small underflow to zero.</p>
+<canvas id="fc" width="700" height="300" aria-label="Bit layouts and stored values of a number in FP32, BF16, FP16, FP8 E4M3 and FP8 E5M2"></canvas>
+<label for="val">Value to store</label>
+<input id="val" type="number" step="any" value="0.1">
+<p class="meta">Examples:
+<button type="button" data-v="0.1">0.1</button>
+<button type="button" data-v="3.14159">3.14159</button>
+<button type="button" data-v="0.000001">0.000001</button>
+<button type="button" data-v="70000">70000</button>
+<button type="button" data-v="1.0001">1.0001</button>
+<button type="button" data-v="300">300</button></p>
+<div class="stats">
+  <div class="stat"><div class="k">BF16 stores</div><div class="v" id="sb">–</div></div>
+  <div class="stat"><div class="k">FP16 stores</div><div class="v" id="sh">–</div></div>
+  <div class="stat"><div class="k">FP8 E4M3 stores</div><div class="v" id="s8">–</div></div>
+  <div class="stat"><div class="k">More accurate 16-bit format</div><div class="v" id="sw">–</div></div>
+</div>
+<p class="meta">Try this: 0.1 is stored as 0.10009765625 in BF16, 0.0999755859375 in FP16 and 0.1015625 in E4M3, and none of them is exact. 70000 overflows FP16 (largest 65,504) but BF16 keeps it as 70,144. 0.000001 survives in FP16 only as a subnormal (about 1.01 × 10⁻⁶) and vanishes in both FP8 formats. 1.0001 rounds to exactly 1 in BF16 and FP16, which is why updates are applied to an FP32 master copy.</p>
+</div>
+
+<h2 id="course">3. Where the course goes deeper</h2>
+<div class="table-wrap"><table>
+<tr><th>Topic</th><th>Course page</th></tr>
+<tr><td>ZeRO stages, FSDP, NCCL collectives, checkpointing, with a ZeRO memory calculator</td><td><a href="../08-ai-research-engineer/06-distributed-training.html">Module 08 · Distributed training</a></td></tr>
+<tr><td>Pipeline parallelism and the GPipe schedule</td><td><a href="../06-30u30/24-gpipe.html">30u30 Day 24 · GPipe</a></td></tr>
+<tr><td>Tensor, context, pipeline and expert parallelism together</td><td><a href="02-5d-parallelism.html">Video 02 · 5D parallelism</a></td></tr>
+<tr><td>Adam, AdamW and the optimiser family</td><td><a href="07-adamw.html">Video 07 · AdamW</a>, <a href="../08-ai-research-engineer/01-tensor-math-autograd.html">Module 08 · Tensor maths &amp; autograd</a></td></tr>
+<tr><td>FP8, INT8, INT4 and NVFP4 for inference</td><td><a href="../09-inference-engineering/06-quantization-hardware.html">Module 09 · Quantisation &amp; hardware</a></td></tr>
+<tr><td>Training a trillion-parameter MoE at scale (Kimi K3)</td><td><a href="../05-trillion-scale-architecture.html">Module 05 · Trillion-scale architecture</a></td></tr>
+</table></div>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Fine-tuning a VLA is already a multi-GPU job.</strong> At 16 bytes per parameter, full fine-tuning of a 3B-parameter vision-language-action model needs about 48 GB for model states alone, before activations from long image-token sequences. FSDP or ZeRO-2/3 across a handful of GPUs is the usual way to fit it; LoRA (<a href="03-lora.html">Video 03</a>) is the other.</li>
+<li><strong>Robot data is image-heavy.</strong> Multi-camera inputs make activations large, so sharding the model states frees memory for bigger batches of trajectories.</li>
+<li><strong>Precision choices carry over to the robot.</strong> A model trained in BF16 is usually served in BF16 or quantised further. Knowing what each format can and can't represent helps when an on-robot model starts producing NaNs.</li>
+<li><strong>Weak link:</strong> sharding is a training-time technique. It does nothing for latency or memory on the robot's own computer, where the model runs on a single device.</li>
+</ul>
+</div>
+
+<h2 id="check">Self-check</h2>
+<details><summary>Why does mixed-precision Adam need 16 bytes per parameter?</summary><p>2 bytes of FP16 weights, 2 of FP16 gradients, and 12 of FP32 optimiser states: a master copy of the weights plus Adam's first and second moments, 4 bytes each.</p></details>
+<details><summary>BF16 and FP16 both use 16 bits. Why is BF16 preferred for training large models?</summary><p>BF16 has 8 exponent bits like FP32, so it has the same range and rarely overflows or underflows, and usually needs no loss scaling. FP16 has more mantissa bits but a maximum of 65,504 and a much higher underflow threshold.</p></details>
+<details><summary>Why do ZeRO stages 1 and 2 add no communication over plain data parallelism?</summary><p>An all-reduce is a reduce-scatter followed by an all-gather. ZeRO-2 reduce-scatters gradients so each GPU gets the summed slice it owns, updates that slice, then all-gathers the updated weights. The total volume matches the all-reduce.</p></details>
+<details><summary>A 7.5B model trained with ZeRO-3 on 64 GPUs: how much model-state memory per GPU?</summary><p>16 × 7.5 × 10⁹ / 64 ≈ 1.9 GB, compared with 120 GB per GPU for plain data parallelism.</p></details>
+<details><summary>What does FSDP keep fully materialised at any moment, and why does that bound peak memory?</summary><p>Only the unit (for example one transformer block) currently being computed, plus the next one being prefetched. Everything else stays sharded, so peak memory is the shards plus one or two gathered units rather than the whole model.</p></details>
+<details><summary>Why can't you apply an update of 0.0001 to a weight of 1.0 stored in FP16?</summary><p>The gap between 1.0 and the next FP16 number is about 0.00098, so 1.0001 rounds back to 1.0 and the update is lost. Mixed precision applies updates to an FP32 master copy for this reason.</p></details>
+
+<h2 id="refs">References</h2>
+<p>From the video's description:</p>
+<ul>
+<li>Paper: <a href="https://arxiv.org/abs/1910.02054">ZeRO: Memory Optimizations Toward Training Trillion Parameter Models</a> (Rajbhandari, Rasley, Ruwase, He, 2019)</li>
+<li>Code: <a href="https://github.com/microsoft/DeepSpeed">DeepSpeed</a></li>
+<li>Docs: <a href="https://pytorch.org/docs/stable/fsdp.html">PyTorch FSDP</a></li>
+</ul>
+<p>Primary papers cited in this guide:</p>
+<ul>
+<li><a href="https://arxiv.org/abs/1412.6980">Adam: A Method for Stochastic Optimization</a> (Kingma, Ba, 2014)</li>
+<li><a href="https://arxiv.org/abs/1710.03740">Mixed Precision Training</a> (Micikevicius et al., 2017)</li>
+<li><a href="https://arxiv.org/abs/2209.05433">FP8 Formats for Deep Learning</a> (Micikevicius et al., 2022)</li>
+<li><a href="https://arxiv.org/abs/2304.11277">PyTorch FSDP: Experiences on Scaling Fully Sharded Data Parallel</a> (Zhao et al., 2023)</li>
+</ul>
+
+<nav class="pager">
+  <a href="index.html"><small>Previous</small>Module 12 hub</a>
+  <a class="next" href="02-5d-parallelism.html"><small>Next</small>Video 02 · 5D parallelism</a>
+</nav>
+<footer>Module 12 · Video 01 · a watch guide written for this course from the video's chapter list, its references and the original papers. Video © Jia-Bin Huang.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('fc'), ctx = cv.getContext('2d');
+const inp = document.getElementById('val');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const FMT = [['FP32', 8, 23, 0], ['BF16', 8, 7, 0], ['FP16', 5, 10, 0], ['FP8 E4M3', 4, 3, 1], ['FP8 E5M2', 5, 2, 0]];
+
+// round half to even
+const rne = x => { const f = Math.floor(x), d = x - f; return d > 0.5 ? f + 1 : d < 0.5 ? f : (f % 2 ? f + 1 : f); };
+const flog2 = a => { let e = Math.floor(Math.log2(a)); if (2 ** e > a) e--; if (2 ** (e + 1) <= a) e++; return e; };
+
+// fn = E4M3-style: no infinities, top exponent usable, all-ones mantissa there is NaN
+function quant(x, E, M, fn) {
+  const bias = 2 ** (E - 1) - 1, emin = 1 - bias;
+  const emax = fn ? 2 ** E - 1 - bias : 2 ** E - 2 - bias;
+  const maxv = fn ? (2 - 2 ** (1 - M)) * 2 ** emax : (2 - 2 ** -M) * 2 ** emax;
+  const s = x < 0 ? 1 : 0, a = Math.abs(x);
+  if (a === 0) return { v: 0, s, ef: 0, mf: 0, of: false };
+  const e = Math.max(flog2(a), emin);
+  const r = rne(a / 2 ** (e - M)) * 2 ** (e - M);
+  if (r > maxv) return { v: fn ? NaN : (s ? -Infinity : Infinity), s, ef: 2 ** E - 1, mf: fn ? 2 ** M - 1 : 0, of: true };
+  if (r < 2 ** emin) return { v: s ? -r : r, s, ef: 0, mf: r / 2 ** (emin - M), of: false };
+  const e2 = flog2(r);
+  return { v: s ? -r : r, s, ef: e2 + bias, mf: r / 2 ** (e2 - M) - 2 ** M, of: false };
+}
+const show = q => q.of ? (Number.isNaN(q.v) ? 'NaN (overflow)' : 'inf (overflow)') : q.v === 0 ? '0' : +q.v.toPrecision(12) + '';
+const relErr = (x, q) => q.of ? Infinity : x === 0 ? 0 : Math.abs(q.v - x) / Math.abs(x);
+const pct = e => e === Infinity ? '—' : e === 0 ? 'exact' : e >= 1 ? '100% (lost)' : (100 * e).toPrecision(2) + '%';
+
+function draw() {
+  const x = parseFloat(inp.value);
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '12px sans-serif'; ctx.textBaseline = 'middle';
+  if (!isFinite(x)) { ctx.fillStyle = css('--muted'); ctx.fillText('Type a finite number.', 10, 20); return; }
+  const qs = FMT.map(([, E, M, fn]) => quant(x, E, M, fn));
+  const l = 76, cell = 13, gap = 2, rowH = 56, top = 20;
+  FMT.forEach(([name, E, M], i) => {
+    const q = qs[i], y = top + i * rowH, bits = [q.s];
+    for (let k = E - 1; k >= 0; k--) bits.push((q.ef >> k) & 1);
+    for (let k = M - 1; k >= 0; k--) bits.push(Math.floor(q.mf / 2 ** k) % 2);
+    ctx.fillStyle = css('--fg'); ctx.textAlign = 'left'; ctx.fillText(name, 4, y + cell / 2);
+    bits.forEach((b, j) => {
+      const bx = l + j * (cell + gap) + (j > 0 ? 4 : 0) + (j > E ? 4 : 0);
+      const col = j === 0 ? css('--muted') : j <= E ? css('--accent') : css('--fg');
+      ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.strokeRect(bx, y, cell, cell);
+      if (b) { ctx.fillStyle = col; ctx.fillRect(bx + 2, y + 2, cell - 4, cell - 4); }
+    });
+    ctx.fillStyle = q.of ? css('--fail') : css('--muted');
+    ctx.fillText(`stored: ${show(q)}   ·   error: ${pct(relErr(x, q))}`, l, y + cell + 16);
+  });
+  const e = qs.map(q => relErr(x, q));
+  document.getElementById('sb').textContent = show(qs[1]);
+  document.getElementById('sh').textContent = show(qs[2]);
+  document.getElementById('s8').textContent = show(qs[3]);
+  document.getElementById('sw').textContent = e[1] === e[2] ? 'tie' : e[1] < e[2] ? 'BF16' : 'FP16';
+}
+inp.oninput = draw;
+document.querySelectorAll('button[data-v]').forEach(b => b.onclick = () => { inp.value = b.dataset.v; draw(); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLMs &amp; Robotics</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Personal course · living document</div>
+<h1>LLMs &amp; Robotics</h1>
+<p class="lede">A personal course on two connected fields, built from links as they're added. Each module has a summary, deep dives, a self-check and further reading.</p>
+<div class="card"><p style="margin:0"><span class="track llm">LLM</span> how large language models are built, trained, evaluated and served. &nbsp; <span class="track robo">Robotics</span> how robots perceive, decide and act. &nbsp; <span class="track both">LLM + Robotics</span> shared foundations, or ideas that carry across both. Robot foundation models (VLAs) are built on LLM backbones, so the two tracks keep meeting.</p></div>
+<p><a href="sources.html"><strong>Sources &amp; summaries →</strong></a> every link added, its summary, the primary sources behind it, saved files and all external references.</p>
+<p class="meta">21 modules (108 pages) · last updated 2026-11-09</p>
+
+<h2>Modules</h2>
+<!-- MODULES: newest at the bottom; keep numbering sequential -->
+<a class="card module" href="topics/01-decision-model-evals.html">
+  <div class="n">01</div>
+  <h3><span class="track llm">LLM</span>LLM evals with decision models: thresholds, trade-offs and calibration</h3>
+  <p>Why the default 0.50 cut-off leaves performance on the table, how to tune thresholds against minimum precision/recall with cross-validation, compare models on cost, and check whether scores are real probabilities. Includes an interactive threshold demo and a robotics lens (perception, safety stops, policy evals).</p>
+  <span class="tag">evaluation</span><span class="tag">classification</span><span class="tag">calibration</span>
+  <p class="meta">Source: Hamel Husain &amp; Antaripa Saha · Oct 2026</p>
+</a>
+
+<a class="card module" href="topics/02-tensortonic.html">
+  <div class="n">02</div>
+  <h3><span class="track both">LLM + Robotics</span>TensorTonic: hands-on ML practice for LLMs and robotics</h3>
+  <p>What the 1,300-problem ML coding gym offers and a robotics-specific path through it: maths foundations → 3D geometry &amp; perception → the RL ladder up to PPO → transformers and diffusion (VLA groundwork) → on-robot inference. Includes an interactive two-link arm built from chained homogeneous transforms, and a list of what it doesn't cover.</p>
+  <span class="tag">practice</span><span class="tag">kinematics</span><span class="tag">reinforcement learning</span><span class="tag">perception</span>
+  <p class="meta">Source: tensortonic.com · Oct 2026</p>
+</a>
+
+<a class="card module" href="topics/03-shared-autonomy.html">
+  <div class="n">03</div>
+  <h3><span class="track both">LLM + Robotics</span>How much to help: human–AI and human–robot interaction</h3>
+  <p>An AI tutor for kids (gakku) argues the struggle is the product, which is the same "how much to help" problem assistive robots face. Covers levels of automation, policy blending, Bayesian intent inference when the human changes their mind, ask/act/wait as expected cost, and how not to automate your own learning. Includes an interactive shared-autonomy reach simulation.</p>
+  <span class="tag">HRI</span><span class="tag">shared autonomy</span><span class="tag">intent inference</span><span class="tag">learning</span>
+  <p class="meta">Source: Linus Ekenstam on gakku · Oct 2026</p>
+</a>
+
+<a class="card module" href="topics/04-distill-small-models.html">
+  <div class="n">04</div>
+  <h3><span class="track both">LLM + Robotics</span>Big teacher, small student: distilling fast on-device models for apps and robots</h3>
+  <p>Log a big model's outputs on your real task, then fine-tune a tiny one. Rivest's 32M speech model tied a 627M teacher on his voice and answers in ~85 ms instead of ~1 s on a laptop CPU. Covers distillation (and the privileged-teacher version used for legged robots), honest evaluation (day splits, drift cutoffs, paired bootstrap), and pitfalls that transfer to robot data. Includes an interactive "how far does the robot travel after you say stop" calculator.</p>
+  <span class="tag">distillation</span><span class="tag">edge AI</span><span class="tag">data flywheel</span><span class="tag">latency</span>
+  <p class="meta">Source: Maxime Rivest · own-voice-stt · Oct 2026</p>
+</a>
+
+<a class="card module" href="topics/05-trillion-scale-architecture.html">
+  <div class="n">05</div>
+  <h3><span class="track llm">LLM</span>LLM architecture at trillion scale: width, depth and length in Kimi K3</h3>
+  <p>Kimi K3 as a case study (via a post quoting Baseten's inference deep-dive). Covers Stable LatentMoE routing 16 of 896 experts with Quantile Balancing, the 3:1 hybrid of fixed-memory linear attention (KDA) and global attention (MLA) for 1M tokens, Attention Residuals across depth, and the serving consequences. Robotics angle: fixed-size memory for streaming sensors, MoE for multi-skill policies. Includes an interactive expert-routing balancer.</p>
+  <span class="tag">architecture</span><span class="tag">mixture of experts</span><span class="tag">linear attention</span><span class="tag">inference</span>
+  <p class="meta">Source: @antiAIvo / Philip Kiely (Baseten) · Kimi K3 tech report · Oct 2026</p>
+</a>
+
+<a class="card module" href="topics/06-30u30/index.html">
+  <div class="n">06 · 30 papers</div>
+  <h3><span class="track both">LLM + Robotics</span>Ilya's 30 papers: the shared foundations of LLMs and robotics</h3>
+  <p>A hub plus one page per paper, from RNNs, LSTMs and MDL through AlexNet/ResNet, the Transformer, pointer and graph networks, scaling laws, PPO and RLHF. Every day opens with a <strong>Start here</strong> box written for a 13-year-old (analogy, simple steps, a try-it activity, words to know), then goes deeper: core maths, mechanism, robotics angle, self-check and an interactive demo. Includes a 12-day robotics fast track and a progress tracker. Code and exercises are in the 30u30 repo.</p>
+  <span class="tag">foundations</span><span class="tag">deep learning</span><span class="tag">transformers</span><span class="tag">RL</span><span class="tag">beginner-friendly</span>
+  <p class="meta">Source: github.com/Ojhaharsh/30u30 + the 30 original papers · Oct 2026</p>
+</a>
+
+<a class="card module" href="topics/07-post-training.html">
+  <div class="n">07</div>
+  <h3><span class="track both">LLM + Robotics</span>LLM post-training: demonstrations, comparisons and checkers (and the robot equivalents)</h3>
+  <p>Why a model that has "read the internet" still can't help, and the three post-training teachers that fix it: instruction tuning (copy a demonstration), preference alignment (RLHF/PPO or DPO, with a KL leash) and RLVR (a verifier checks the answer). Mapped onto robot training: behaviour cloning, human-ranked rollouts and success detectors. Opens with a Start-here box. Includes an interactive KL-leash / reward-hacking demo.</p>
+  <span class="tag">post-training</span><span class="tag">RLHF</span><span class="tag">behaviour cloning</span><span class="tag">reward hacking</span><span class="tag">beginner-friendly</span>
+  <p class="meta">Source: Dongxi (东锡) · X article (Chinese) · Oct 2026</p>
+</a>
+
+<a class="card module" href="topics/08-ai-research-engineer/index.html">
+  <div class="n">08 · 12 stages</div>
+  <h3><span class="track llm">LLM</span>The LLM research-engineer roadmap: 12 stages, from autograd to open-source teardowns</h3>
+  <p>A hub plus one page per stage: custom autograd and Triton, scaling laws and data mixing, MoE/SSMs/ring attention, synthetic data, DPO/KTO/ORPO, 3D parallelism and ZeRO, multimodal projection (the core of VLAs), GQA and KV-cache design, mechanistic interpretability, evals and red teaming, paper reproduction, and public portfolios. Each stage has a Start-here box, the concepts explained, a laptop-sized project plus the full version, a reality check, and links to where earlier modules already cover it.</p>
+  <span class="tag">career</span><span class="tag">research engineering</span><span class="tag">systems</span><span class="tag">interpretability</span><span class="tag">beginner-friendly</span>
+  <p class="meta">Source: Suraj Sharma · X post · Oct 2026</p>
+</a>
+
+<a class="card module" href="topics/09-inference-engineering/index.html">
+  <div class="n">09 · 25 problems</div>
+  <h3><span class="track llm">LLM</span>LLM inference engineering: 25 interview problems, worked through with real numbers</h3>
+  <p>A hub plus ten pages covering every problem: the request lifecycle and streaming, KV-cache sizing (70B × 32K × 100 users), PagedAttention and FlashAttention, continuous batching and chunked prefill, prefix caching and prefill/decode disaggregation, speculative decoding and tail latency, FP8/INT8/INT4/NVFP4 and GPU choice, profiling and a fused Triton kernel, observability and engine benchmarks, rollouts and autoscaling, MoE serving, cost cutting and a 1M-user capstone. Each has a model interview answer and an interactive calculator.</p>
+  <span class="tag">inference</span><span class="tag">serving</span><span class="tag">KV cache</span><span class="tag">GPUs</span><span class="tag">interview prep</span><span class="tag">beginner-friendly</span>
+  <p class="meta">Source: Vishal Singh · X post · Oct 2026</p>
+</a>
+
+<a class="card module" href="topics/10-rlm-harness.html">
+  <div class="n">10</div>
+  <h3><span class="track both">LLM + Robotics</span>Self-improving agent harnesses: Recursive Language Models, Continual Harness and Prime Agent</h3>
+  <p>Hold context in REPL variables and let the model write code over it and call copies of itself (RLMs). Let the agent make small, reversible, evidence-backed edits to its own prompts, skills, memory and sub-agents without resets (Continual Harness, born from embodied Pokémon agents). Prime Agent combines both. Covers results and how to read them, safety bounds, and the robotics link: reset-free learning, skills libraries, querying robot logs with code. Includes an interactive recursion-tree cost demo.</p>
+  <span class="tag">agents</span><span class="tag">long context</span><span class="tag">self-improvement</span><span class="tag">embodied agents</span><span class="tag">beginner-friendly</span>
+  <p class="meta">Source: Yacine Mahdid (video with Seth Karten, Prime Intellect) · Prime Agent, RLM and Continual Harness papers · Oct 2026</p>
+</a>
+
+<a class="card module" href="topics/11-three-book-path.html">
+  <div class="n">11</div>
+  <h3><span class="track llm">LLM</span>The LLM self-study stack: CS336, Build a Reasoning Model, the RLHF Book (and a gym plan)</h3>
+  <p>Dongxi's four-keyword answer to "what should young people do in the AI era?", turned into a plan: Stanford CS336 for pre-training and systems, Raschka's reasoning book for inference-time scaling, GRPO and distillation, Lambert's RLHF Book for post-training, and a three-way strength-training split. Chapter-by-chapter mapping onto modules 01–10 and an adjustable time-to-complete planner.</p>
+  <span class="tag">study path</span><span class="tag">books</span><span class="tag">reasoning</span><span class="tag">post-training</span><span class="tag">beginner-friendly</span>
+  <p class="meta">Source: Dongxi (东锡) · X post (Chinese) · Oct 2026</p>
+</a>
+
+<a class="card module" href="topics/12-training-inference-videos/index.html">
+  <div class="n">12 · 9 videos</div>
+  <h3><span class="track both">LLM + Robotics</span>AI training and inference, in nine videos: watch guides for Jia-Bin Huang's playlist</h3>
+  <p>A hub plus one watch guide per video: ZeRO &amp; FSDP, 5D parallelism, LoRA/QLoRA/DoRA, speculative decoding, on-policy distillation, REINFORCE→PPO→GRPO, AdamW, Muon, and how LLM serving works (vLLM, SGLang). Each guide embeds the video, maps every chapter with timestamps, explains the ideas from the original papers, and links to where the course goes deeper. Suggested learning order and a progress tracker.</p>
+  <span class="tag">video course</span><span class="tag">training</span><span class="tag">optimisers</span><span class="tag">serving</span><span class="tag">beginner-friendly</span>
+  <p class="meta">Source: Jia-Bin Huang · YouTube playlist · Oct 2026</p>
+</a>
+
+<a class="card module" href="topics/13-100-days-inference.html">
+  <div class="n">13</div>
+  <h3><span class="track llm">LLM</span>100 days of inference engineering: a learning journal, the book behind it, and a plan you can follow</h3>
+  <p>A new public journal working through Philip Kiely's <em>Inference Engineering</em> (Baseten). Maps all eight book chapters onto modules 01–12, summarises the journal's first entries, and lays out a 100-day plan with a hands-on build per chapter, plus a clickable 100-day tracker and tips for learning in public.</p>
+  <span class="tag">learning in public</span><span class="tag">inference</span><span class="tag">books</span><span class="tag">study plan</span><span class="tag">beginner-friendly</span>
+  <p class="meta">Source: Pavel Simo · GitHub · Oct 2026</p>
+</a>
+
+<a class="card module" href="topics/14-deep-ml-deep-path.html">
+  <div class="n">14</div>
+  <h3><span class="track both">LLM + Robotics</span>Deep-ML's Deep-Path: 103 concepts from classical ML to GPU kernels, mapped onto this course (with a placement check)</h3>
+  <p>Deep-ML's ordered route through 1,200+ problems: 14 parts in five depth zones, from Sunlit (classical ML, deep learning) through Twilight (LLMs), Midnight (RL, GNNs) and the Abyss (inference, CUDA, compilers) to the Trench toolboxes. Covers placement plus spaced repetition, a part-by-part crosswalk into modules 01–13 with all 103 concepts listed, a comparison with TensorTonic and 30u30, and a 25-question self-placement check that recommends where to start.</p>
+  <span class="tag">practice</span><span class="tag">placement</span><span class="tag">spaced repetition</span><span class="tag">study plan</span><span class="tag">beginner-friendly</span>
+  <p class="meta">Source: Deep-ML (deep-ml.com) · Oct 2026</p>
+</a>
+
+<a class="card module" href="topics/15-inference-engineering-companion.html">
+  <div class="n">15</div>
+  <h3><span class="track llm">LLM</span>Inference Engineering, interactive edition: how to use inferenceengineering.tech alongside this course</h3>
+  <p>A free interactive companion to Philip Kiely's book: 8 chapters, 3 guided paths (3–4 h each), 7 calculators (VRAM, roofline, KV cache, quantisation, speculative decoding, GPU selection), quizzes, cheat sheets and a vLLM-vs-SGLang benchmark. Includes a chapter-by-chapter pairing with modules 05, 08, 09, 12 and 13, and a critical read of the benchmark's scope and dates.</p>
+  <span class="tag">inference</span><span class="tag">interactive book</span><span class="tag">calculators</span><span class="tag">benchmarks</span><span class="tag">beginner-friendly</span>
+  <p class="meta">Source: inferenceengineering.tech · Nov 2026</p>
+</a>
+
+<a class="card module" href="topics/16-hands-on-llm-serving.html">
+  <div class="n">16</div>
+  <h3><span class="track llm">LLM</span>Hands-On LLM Serving and Optimization: the book's code as a lab track</h3>
+  <p>Chi Wang and Peiheng Hu's O'Reilly book and its companion repo, turned into eight labs: transformer and KV-cache notebooks, a from-scratch FastAPI serving system (workload manager, worker process, streaming, vLLM backend), multi-model and Triton serving, quantisation, speculative decoding, LMCache, SGLang/TensorRT-LLM/llama.cpp, and a Qwen3-14B optimisation case study. Includes a chapter map to the course, a comparison with Kiely's book, practical gotchas, and an interactive dynamic-batching simulator.</p>
+  <span class="tag">serving</span><span class="tag">labs</span><span class="tag">vLLM</span><span class="tag">batching</span><span class="tag">beginner-friendly</span>
+  <p class="meta">Source: orca3/llm-model-inference (O'Reilly companion code) · Nov 2026</p>
+</a>
+
+<a class="card module" href="topics/17-free-ai-curriculum.html">
+  <div class="n">17 · 391 courses</div>
+  <h3><span class="track both">LLM + Robotics</span>391 free AI courses, checked: a searchable catalog with link health, provenance, and 2026 updates</h3>
+  <p>A viral "free curriculum that replaces your degree" turned into something usable. All 391 courses in a filterable catalog (category, year, search, working links only), with all 733 links checked (610 work; 381 of 391 courses still reachable). Credits the real source (the Deep Learning Drizzle list), gives a reality check (the newest course is from 2022), adds modern courses for what's changed, and adds the missing robotics section (Modern Robotics, MIT Manipulation &amp; Underactuated, CS285, HF Robotics/LeRobot, MuJoCo, Isaac Lab).</p>
+  <span class="tag">courses</span><span class="tag">catalog</span><span class="tag">link health</span><span class="tag">robotics courses</span><span class="tag">beginner-friendly</span>
+  <p class="meta">Source: @shikamarutsai X article · list from kmario23/deep-learning-drizzle · Nov 2026</p>
+</a>
+
+<a class="card module" href="topics/18-robot-brain/index.html">
+  <div class="n">18 · our own course</div>
+  <h3><span class="track both">LLM + Robotics</span>Build a Robot Brain: 12 weeks, from zero to a robot that understands you (ages 15+)</h3>
+  <p>Our own first-principles course, built from everything in modules 01–17. One lesson a week for 12 weeks, covering robot basics <em>and</em> inference engineering. A learner with basic Python builds <strong>Robo-Helper</strong>, a simulated robot that understands "put the red block in the bin", plans with A*, stops safely for surprises, and is honestly evaluated (83%). Then they build a tiny neural language model from zero, measure latency, tokens and cost, speed brains up (caching, quantising, distilling, LoRA), plug in Claude as a planner and as a tool-using agent, and race every brain on the same 12 tasks in a simulator with replays. Every lesson has to make the robot measurably better: <code>progress.py</code> shows each one's gain, and the brain the learner builds climbs from 5/12 (word counter) to 8/12 (a tiny LM that writes whole plans) to 10/12 (distilled from a teacher, still 10/12 at 4 bits in 1.4 KB). Extras: attention (how Transformers read), an AI model as judge, and an MCP server so any AI app can drive the robot. Every lesson has a browser playground, real Python homework marked by <code>check.py</code> (100 checks; reference solutions included), hint ladders, and a real-world challenge away from the screen.</p>
+  <span class="tag">course</span><span class="tag">hands-on</span><span class="tag">first principles</span><span class="tag">inference</span><span class="tag">agents</span><span class="tag">RLHF</span><span class="tag">LoRA</span><span class="tag">beginner-friendly</span>
+  <p class="meta">Source: written for this course · Nov 2026</p>
+</a>
+
+<a class="card module" href="topics/19-evals-field-guide.html">
+  <div class="n">19</div>
+  <h3><span class="track llm">LLM</span>Evals: how to know whether an AI system actually works (a field guide, from one test case to a release gate)</h3>
+  <p>Sergii Makarevych's plain-language guide, built on one support assistant: gold answers and dev/test piles, reading outputs before writing graders, code graders vs AI judges, checking a judge with kappa (60% agreement turned out to be kappa 0.15), the five judge biases and why evidence beats a stronger judge, error bars and paired comparisons, grading RAG and agents (pass^k, cost per success), reward hacking, benchmarks, and running evals every week. Three interactive demos (judge quality, error bars, pass@k vs pass^k), plus the same ideas applied to Robo-Helper's bake-off with real numbers.</p>
+  <span class="tag">evals</span><span class="tag">LLM-as-judge</span><span class="tag">kappa</span><span class="tag">error bars</span><span class="tag">agents</span><span class="tag">beginner-friendly</span>
+  <p class="meta">Source: @sermakarevich X article · Oct 2026</p>
+</a>
+
+<a class="card module" href="topics/20-from-scratch/index.html">
+  <div class="n">20 · 6 repos</div>
+  <h3><span class="track both">LLM + Robotics</span>Six tiny repos that rebuild modern AI from scratch: micrograd, minGPT, nanoGPT, llm.c, tinygrad, minimalRL (run and tested)</h3>
+  <p>The next rung after Robo-Helper. A hub with a suggested path, and one page per repo: how the code works, a "Run it, tested" section with real output from a MacBook (and fixes for what broke in 2026), plus an experiment that uses the repo to try to make Robo-Helper better, measured honestly in the simulator. Some results: micrograd re-derives our hand-written gradients exactly; a nanoGPT brain reads colours buried in long rambling commands (100% vs 52%) but doesn't beat the distilled brain overall; minGPT is too data-hungry for 343 examples; llm.c's GPT-2 is too slow for the robot's 0.2 s reaction budget on a CPU; tinygrad loses one command at a time but wins over 100× on big batches; a DQN learns to drive the room but fails when the cat moves, where A* just replans.</p>
+  <span class="tag">from scratch</span><span class="tag">autograd</span><span class="tag">GPT</span><span class="tag">C/CUDA</span><span class="tag">RL</span><span class="tag">beginner-friendly</span>
+  <p class="meta">Source: six GitHub repos (all MIT) · Nov 2026</p>
+</a>
+
+<a class="card module" href="topics/21-robot-math.html">
+  <div class="n">21</div>
+  <h3><span class="track both">LLM + Robotics</span>The maths behind robots, learned by playing: ten interactive explainers, each one used to make Robo-Helper better</h3>
+  <p>Linear algebra, Bayes, Markov chains, Kalman filters, A*, Fourier, momentum, reinforcement learning, Transformers and diffusion, each with a free interactive page to play with, the idea in plain words, the Robo-Helper lesson that uses it, and a tested experiment (<code>bonus_robot_math.py</code>) with real before/after numbers. For example, a Kalman filter cuts distance error while driving from 0.56 m to 0.22 m, where averaging barely helps (0.54 m), and a Markov-chain model of a cat with a favourite bed cuts run-ins from 0.83 to 0.06 per trip. Some results are honest surprises (momentum 0.9 overshoots; exploring more slows Q-learning in a tiny maze). Includes an interactive Kalman demo and a summary of how π0 and GR00T are built (a vision-language model plus a flow-matching action head that outputs chunks of motion).</p>
+  <span class="tag">maths</span><span class="tag">Kalman</span><span class="tag">Bayes</span><span class="tag">A*</span><span class="tag">diffusion</span><span class="tag">beginner-friendly</span>
+  <p class="meta">Source: @0x_meden X post (and his π0/GR00T guide) · Nov 2026</p>
+</a>
+
+<h2>Summaries at a glance</h2>
+<div class="table-wrap"><table>
+<tr><th>#</th><th>Track</th><th>Topic</th><th>Key takeaway</th></tr>
+<tr><td>01</td><td><span class="track llm">LLM</span></td><td><a href="topics/01-decision-model-evals.html">LLM evals with decision models</a></td><td>Set minimum precision and recall first, tune the threshold with CV, verify calibration, then pick on the cost/quality frontier.</td></tr>
+<tr><td>02</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/02-tensortonic.html">TensorTonic ML practice</a></td><td>Drill the maths and learning half of robotics from scratch: transforms, CV, the RL ladder to PPO, ViT/DDPM. Kinematics, control, estimation and planning need other sources.</td></tr>
+<tr><td>03</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/03-shared-autonomy.html">Human–AI &amp; human–robot help</a></td><td>Blend robot and human control by <em>calibrated</em> confidence, keep intent beliefs revisable, choose ask/act/wait by expected cost, and keep the struggle where the learning is.</td></tr>
+<tr><td>04</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/04-distill-small-models.html">Big teacher, small student</a></td><td>Log a big model on your narrow task, fine-tune the smallest model that meets your bar, evaluate against hand-corrected data split by day, and measure latency on the target device. Milliseconds are metres.</td></tr>
+<tr><td>05</td><td><span class="track llm">LLM</span></td><td><a href="topics/05-trillion-scale-architecture.html">LLM architecture at scale (Kimi K3)</a></td><td>Read architectures along three axes: width (sparse experts, balanced routing), depth (layers that reach back), length (fixed-size memory plus some global attention). Every feature also needs a numerical-stability fix and a serving plan.</td></tr>
+<tr><td>06</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/06-30u30/index.html">Ilya's 30 papers</a></td><td>The toolbox behind robot learning in 30 days: memory (RNN → LSTM → attention), seeing (AlexNet → ResNet), relations and graphs, compression as learning, scale, and learning to act (PPO, RLHF). Start each day with the plain-language box.</td></tr>
+<tr><td>07</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/07-post-training.html">LLM post-training</a></td><td>Pre-training sets what a model knows; post-training sets how it uses it. Three teachers: demonstrations (SFT / behaviour cloning), comparisons (RLHF, DPO), checkers (RLVR / success detectors). Always keep a leash and watch the true metric.</td></tr>
+<tr><td>08</td><td><span class="track llm">LLM</span></td><td><a href="topics/08-ai-research-engineer/index.html">Research-engineer roadmap</a></td><td>Twelve skills that turn papers into fast, well-tested models. Learn the internals, the data, the architectures, alignment, systems and inference, then reproduce and publish honestly. Most stages tie back to modules 01–07.</td></tr>
+<tr><td>09</td><td><span class="track llm">LLM</span></td><td><a href="topics/09-inference-engineering/index.html">Inference engineering, 25 problems</a></td><td>Serving is arithmetic plus trade-offs: size the KV cache, keep the GPU busy with continuous batching, protect TTFT with chunked prefill, reuse prefixes, pick precision and GPUs by bandwidth, measure tails, and price it all from explicit assumptions.</td></tr>
+<tr><td>10</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/10-rlm-harness.html">Self-improving agent harnesses</a></td><td>Don't stuff the context: keep it in variables and query it with code and sub-calls (RLM). Let the agent refine its own harness in small, reversible steps without resets (Continual Harness). Read harness benchmarks as "model + harness".</td></tr>
+<tr><td>11</td><td><span class="track llm">LLM</span></td><td><a href="topics/11-three-book-path.html">LLM self-study stack</a></td><td>Build it to understand it: CS336 (pre-training and systems) → Raschka (reasoning, GRPO, distillation) → Lambert (post-training). Plan the hours honestly, and keep your body in the plan.</td></tr>
+<tr><td>12</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/12-training-inference-videos/index.html">Training &amp; inference videos</a></td><td>Watch the mechanisms move: memory and parallelism, LoRA, GRPO, on-policy distillation, optimisers, speculative decoding and serving, each guide tied back to the course's deeper pages.</td></tr>
+<tr><td>13</td><td><span class="track llm">LLM</span></td><td><a href="topics/13-100-days-inference.html">100 days of inference engineering</a></td><td>One chapter of Kiely's book per block, one build per chapter, one written note per day, shared publicly. Start with the smallest model that passes your evals.</td></tr>
+<tr><td>14</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/14-deep-ml-deep-path.html">Deep-ML Deep-Path</a></td><td>Find your frontier, then drill a few steps a day with spaced review. Read the course page to understand a concept, and do the Deep-Path problems to make it stick. Robotics and control is the thinnest part of the map.</td></tr>
+<tr><td>15</td><td><span class="track llm">LLM</span></td><td><a href="topics/15-inference-engineering-companion.html">Inference Engineering, interactive</a></td><td>Read the book chapter, run its calculator, then cross-check against the course's own demo and explain any gap. Treat single-setup benchmarks as a starting point.</td></tr>
+<tr><td>16</td><td><span class="track llm">LLM</span></td><td><a href="topics/16-hands-on-llm-serving.html">Hands-On LLM Serving labs</a></td><td>Build a small server yourself (API, scheduler, worker process), then swap in real engines and optimise one change at a time on realistic data. Batching trades latency for throughput, and continuous batching mostly removes that trade.</td></tr>
+<tr><td>17</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/17-free-ai-curriculum.html">391 free AI courses, checked</a></td><td>A huge free list is only useful once it's filtered and verified. Keep the classics for foundations, add post-2022 courses for LLMs and robotics, and prefer courses with assignments over lectures alone.</td></tr>
+<tr><td>18</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/18-robot-brain/index.html">Build a Robot Brain (our course)</a></td><td>Learn by building: each idea from first principles, then real code, a self-check and a real-world challenge, growing into one working robot that's honestly tested. Then inference engineering: a tiny LM from zero, latency and cost, caching/quantising/distilling, Claude as planner and agent, and a bake-off of every brain.</td></tr>
+<tr><td>19</td><td><span class="track llm">LLM</span></td><td><a href="topics/19-evals-field-guide.html">Evals field guide</a></td><td>An eval is input, system, grader, number. Read outputs before writing graders, use code for anything definite, and trust an AI judge only after measuring it (kappa, not raw agreement), with the evidence in front of it. Every score gets an error bar; agents get pass^k.</td></tr>
+<tr><td>20</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/20-from-scratch/index.html">Six from-scratch repos</a></td><td>Read tiny code that does the real thing, run it, then use it to try to make your own robot better, and measure whether it did. Bigger models need more data; a fast brain on a laptop can be too slow on a robot; learned control is great until the world changes.</td></tr>
+<tr><td>21</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/21-robot-math.html">Robot maths, played with</a></td><td>Play with each idea first, then use it on your own robot and measure it. Estimation (Bayes, Kalman, Fourier) beats plain averaging once the robot moves; a model of the world only helps if the world has patterns; π0 and GR00T are a scene-understanding Transformer plus a noise-to-motion head.</td></tr>
+</table></div>
+
+<h2>Concept map</h2>
+<p>Concepts covered so far, and the modules that teach them:</p>
+<div class="table-wrap"><table>
+<tr><th>Concept</th><th>Modules</th></tr>
+<tr><td>Precision / recall / F-beta, Type I/II errors</td><td>01, 02, 19</td></tr>
+<tr><td>Decision thresholds</td><td>01</td></tr>
+<tr><td>Cross-validation, honest splits (by day/episode, drift cutoff)</td><td>01, 04</td></tr>
+<tr><td>Probability calibration (Platt, Brier), MC-dropout uncertainty</td><td>01, 03, 06</td></tr>
+<tr><td>Cost / latency / quality trade-offs</td><td>01, 02, 04, 09</td></tr>
+<tr><td>LLM judges &amp; evals</td><td>01, 18, 19</td></tr>
+<tr><td>Judge agreement (Cohen's kappa, catch rate), judge biases</td><td>18, 19</td></tr>
+<tr><td>Error analysis (reading outputs, failure taxonomies)</td><td>19</td></tr>
+<tr><td>Agent evaluation (final state, pass^k, reliability, cost per success)</td><td>10, 18, 19</td></tr>
+<tr><td>Linear algebra for robots (rotations, SVD, Jacobians)</td><td>02, 21</td></tr>
+<tr><td>Homogeneous transforms &amp; forward kinematics</td><td>02</td></tr>
+<tr><td>Probability for estimation (Bayes, covariance, Monte Carlo)</td><td>02, 03, 21</td></tr>
+<tr><td>State estimation &amp; filtering (Kalman, Fourier, Markov chains)</td><td>21</td></tr>
+<tr><td>Vision-language-action models (π0, GR00T: VLM + flow-matching action head, action chunks)</td><td>05, 08, 21</td></tr>
+<tr><td>Computer vision for perception (CNNs, ResNet, dilated convs, detection)</td><td>02, 06</td></tr>
+<tr><td>Reinforcement learning (Bellman → Q-learning → DQN → PPO/GAE, SAC, RLHF)</td><td>02, 06, 18, 20</td></tr>
+<tr><td>Transformers, attention, ViT, diffusion → VLAs / diffusion policy</td><td>02, 05, 06, 18, 20</td></tr>
+<tr><td>Autograd &amp; from-scratch implementations (micrograd, minGPT, nanoGPT, llm.c, tinygrad)</td><td>18, 20</td></tr>
+<tr><td>On-device inference &amp; GPU (quantisation, ONNX, QAT, speculative decoding)</td><td>02, 04, 05</td></tr>
+<tr><td>Human–robot interaction, levels of automation</td><td>03</td></tr>
+<tr><td>Shared autonomy &amp; policy blending</td><td>03</td></tr>
+<tr><td>Intent inference (noisily rational, goal switching)</td><td>03</td></tr>
+<tr><td>Ask / act / wait, mixed initiative</td><td>03</td></tr>
+<tr><td>Learning science (scaffolding, desirable difficulty, compounding)</td><td>02, 03, 05</td></tr>
+<tr><td>Knowledge distillation (teacher → student, privileged teacher, multi-teacher)</td><td>04, 05, 07</td></tr>
+<tr><td>Data flywheels &amp; logging</td><td>04</td></tr>
+<tr><td>Speech recognition &amp; voice commands (CTC)</td><td>03, 04, 06</td></tr>
+<tr><td>Bootstrap / paired comparisons, detection floor</td><td>04, 18, 19</td></tr>
+<tr><td>Mixture of experts &amp; load balancing</td><td>05, 08</td></tr>
+<tr><td>Linear attention, delta rule, fixed-size memory</td><td>05</td></tr>
+<tr><td>KV cache, MLA, long context (NoPE, 1M tokens)</td><td>05</td></tr>
+<tr><td>Residual connections &amp; attention residuals</td><td>05, 06</td></tr>
+<tr><td>Forgetting / decay as a design parameter (LSTM gates)</td><td>03, 05, 06</td></tr>
+<tr><td>Recurrent networks, LSTMs, external memory (NTM)</td><td>06</td></tr>
+<tr><td>Compression as learning (MDL, Kolmogorov complexity)</td><td>06</td></tr>
+<tr><td>Graph neural networks &amp; relational reasoning</td><td>06</td></tr>
+<tr><td>Regularisation (dropout)</td><td>06</td></tr>
+<tr><td>Scaling laws, data mixing &amp; distributed training (ZeRO, FSDP, 3D parallelism)</td><td>05, 06, 08</td></tr>
+<tr><td>Learning rewards from human preferences (RLHF, DPO, KTO, ORPO)</td><td>03, 06, 07, 08</td></tr>
+<tr><td>Pre-training vs post-training; SFT / behaviour cloning</td><td>07</td></tr>
+<tr><td>KL penalty, trust regions &amp; reward hacking</td><td>06, 07, 19</td></tr>
+<tr><td>Verifiable rewards (RLVR) &amp; success detectors</td><td>07, 08</td></tr>
+<tr><td>Custom autograd, GPU kernels (Triton), memory layout</td><td>02, 08</td></tr>
+<tr><td>State-space models (Mamba/S4) &amp; ring attention</td><td>08</td></tr>
+<tr><td>Synthetic data &amp; curation (rejection sampling, verifiers, template-generated data)</td><td>04, 07, 08, 18</td></tr>
+<tr><td>Multimodal fusion &amp; vision-language projection (VLA core)</td><td>05, 08</td></tr>
+<tr><td>KV-cache design: MLA, GQA/MQA, KV quantisation, PagedAttention</td><td>05, 08, 09</td></tr>
+<tr><td>Serving: dynamic &amp; continuous batching, chunked prefill, prefix caching, disaggregation</td><td>05, 09, 12, 16</td></tr>
+<tr><td>Latency metrics (TTFT, TPOT, p99), observability &amp; autoscaling</td><td>04, 09</td></tr>
+<tr><td>GPU selection, roofline &amp; profiling (Nsight)</td><td>08, 09</td></tr>
+<tr><td>Agent harnesses: RLMs, programmatic tool calling, sub-agents</td><td>10</td></tr>
+<tr><td>Self-improving / reset-free agents (Continual Harness)</td><td>10</td></tr>
+<tr><td>Reasoning models: inference-time scaling, GRPO, reasoning distillation</td><td>07, 10, 11</td></tr>
+<tr><td>Self-study paths &amp; courses</td><td>02, 06, 08, 11, 12, 13, 14, 17, 18</td></tr>
+<tr><td>Hands-on first-principles curriculum (ages 15+)</td><td>18</td></tr>
+<tr><td>Robotics courses (kinematics, manipulation, control, sim)</td><td>02, 14, 17</td></tr>
+<tr><td>Placement tests &amp; spaced repetition</td><td>03, 14</td></tr>
+<tr><td>Optimisers (SGD → Adam → AdamW → Muon)</td><td>08, 12</td></tr>
+<tr><td>Parameter-efficient fine-tuning (LoRA, QLoRA, DoRA)</td><td>08, 12</td></tr>
+<tr><td>Learning in public</td><td>08, 13</td></tr>
+<tr><td>Mechanistic interpretability (logit lens, activation patching)</td><td>08</td></tr>
+<tr><td>Red teaming &amp; contamination-aware evals, benchmark saturation</td><td>01, 08, 19</td></tr>
+<tr><td>Paper reproduction &amp; honest public write-ups</td><td>04, 06, 08</td></tr>
+</table></div>
+
+<footer>Sources are kept in <code>sources/</code>. The change history is in <code>log.md</code>.</footer>
+</main>
+</body>
+</html>

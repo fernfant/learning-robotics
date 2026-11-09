@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM Post-Training</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../index.html">← LLMs &amp; Robotics</a> · Module 07</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 07 · How models learn to be useful</div>
+<h1>LLM post-training: demonstrations, comparisons and checkers (and the robot equivalents)</h1>
+<p class="lede">Pre-training teaches a model to continue text. Post-training turns it into something that helps. Robot foundation models go through the same two stages.</p>
+<p class="meta">Source: Dongxi (东锡), “预训练之后，为什么还要后训练？” (“After pre-training, why post-train?”), X article in Chinese, 21 Oct 2026 · <a href="https://x.com/dongxi_nlp/status/2112767071926792566">post</a> · translated text in <code>sources/07-dongxi-post-training.md</code>. It's the first part of a series.</p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">A model that has read the whole internet knows a lot but doesn't know how to help. A second round of training, with three kinds of teacher, fixes that.</p>
+
+<h3>Think of it like this</h3>
+<p>Imagine someone who has read every book in a huge library but has never had a job. Start a sentence and they can finish it. But ask them for help and they might just keep chatting about the topic instead of doing what you asked. To become a good helper, they need training on the job, and there are three kinds of teacher:</p>
+<ul>
+<li><b>A teacher who shows you:</b> "Here's a request, here's a great answer. Copy that."</li>
+<li><b>A teacher who compares:</b> "Of these two answers, this one is better." (A food critic can't always cook, but can tell which dish tastes better.)</li>
+<li><b>A teacher who checks:</b> like a maths answer key. Right or wrong, no arguing.</li>
+</ul>
+
+<h3>How it works</h3>
+<ol>
+<li><b>Pre-training:</b> the model reads trillions of words and learns to guess the next word. That's the library-reading part (see <a href="06-30u30/01-rnn-effectiveness.html">Module 06, Day 1</a>).</li>
+<li><b>Learning from examples:</b> it practises on requests paired with good answers.</li>
+<li><b>Learning from comparisons:</b> people pick the better of two answers, and the model leans toward what people prefer.</li>
+<li><b>Learning from a checker:</b> for maths or code, a program marks each attempt right or wrong, and the model does more of what worked.</li>
+<li>Throughout, a "leash" keeps the model close to what it already knew, so it doesn't forget everything while chasing points.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Robot "brains" are now trained the same way. First they learn general knowledge from lots of pictures, videos and robot recordings. Then they're post-trained: people show the robot how to fold a towel (examples), compare two attempts (comparisons), or let a sensor check whether the towel ended up folded (checker).</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Ask a friend to finish this: "Explain the Moon landing to a 6-year-old…". A "just keep going" brain might add "Explain gravity to a 6-year-old. Explain…", because lists of questions are common online. A helpful brain answers the question.</li>
+<li>In the demo below, drag the <b>Leash strength β</b> slider all the way left. The model piles all its chances onto the answer the judge scores highest, even if it's a trick answer. Move it right and the model stays close to where it started.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Pre-training</dt><dd>The first, huge training stage: learn to predict the next word (or next action).</dd>
+<dt>Base model</dt><dd>A model that has only been pre-trained.</dd>
+<dt>Post-training</dt><dd>Everything done afterwards to make the model helpful and safe.</dd>
+<dt>Reward model</dt><dd>A "judge" model trained to score answers like people would.</dd>
+<dt>Verifier</dt><dd>A program that checks whether an answer is right, such as tests for code.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version. On a first read, skim the headings, the robotics mapping table and the demo.</p>
+
+<div class="toc">
+<strong>In this module</strong>
+<ol>
+<li><a href="#summary">Summary</a></li>
+<li><a href="#why-robotics">Why this matters for robotics</a></li>
+<li><a href="#gap">Deep dive: what a base model is missing</a></li>
+<li><a href="#compare">Deep dive: pre-training vs post-training</a></li>
+<li><a href="#sft">Deep dive: instruction tuning (learn from demonstrations)</a></li>
+<li><a href="#pref">Deep dive: preference alignment and the KL leash (interactive)</a></li>
+<li><a href="#rlvr">Deep dive: RLVR (learn from a checker)</a></li>
+<li><a href="#playbook">Playbook</a></li>
+<li><a href="#check">Self-check</a></li>
+<li><a href="#glossary">Glossary &amp; further reading</a></li>
+</ol>
+</div>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Pre-training only teaches next-token prediction on web text. The result, a <em>base model</em>, knows a lot, but it doesn't reliably follow instructions, it isn't steered away from harm, and it struggles with long chains of reasoning. <em>Post-training</em> keeps training the same model on small, curated data with a different signal. There are three main families, each with a different "teacher":</p>
+<ul>
+<li><strong>Instruction tuning (SFT):</strong> learn from a <em>demonstration</em>.</li>
+<li><strong>Preference alignment:</strong> RLHF with a reward model and PPO, or DPO. Learn from a <em>comparison</em>.</li>
+<li><strong>RLVR:</strong> learn from a <em>checker</em>.</li>
+</ul>
+<p>In the author's phrase: pre-training decides what a model knows, and post-training decides how it uses that knowledge.</p>
+</div>
+<ul>
+<li><strong>The opening example (InstructGPT, OpenAI, 2022):</strong> asked to explain the Moon landing to a 6-year-old, GPT-3 produced more prompts of the same kind ("explain gravity…", "explain relativity…"). That's a reasonable <em>continuation</em> of web text, where question lists are common. The post-trained InstructGPT simply answered.</li>
+<li><strong>Same model, different data and signal:</strong> trillions of raw tokens vs. at most a few million curated examples. Most of the compute goes to pre-training.</li>
+<li><strong>Small data can still have large effects:</strong> the article cites a study where mixing about 500 safety examples into a large instruction set noticeably reduced harmful answers.</li>
+<li><strong>The KL penalty</strong> is a "leash" tying the post-trained model to the original, so it doesn't drift away while chasing reward and forget what pre-training taught it.</li>
+<li><strong>Verifiers can't be sweet-talked</strong>, but they're only as good as their rules. A checker that sees only the final answer says nothing about the steps.</li>
+</ul>
+
+<h2 id="why-robotics">2. Why this matters for robotics</h2>
+<p>This is the training recipe for current robot foundation models (VLAs). The three teachers map almost one-to-one:</p>
+<div class="table-wrap"><table>
+<tr><th>LLM stage</th><th>Robot equivalent</th><th>Teacher</th></tr>
+<tr><td>Pre-training on web text</td><td>A vision-language backbone pre-trained on web images and text, then trained on large multi-robot datasets (many robots, many tasks)</td><td>Next token / next action</td></tr>
+<tr><td>Instruction tuning (SFT)</td><td><strong>Behaviour cloning</strong>: fine-tune on teleoperated demonstrations for <em>your</em> robot and task. Condition on camera + instruction, and score only the actions.</td><td>Demonstration</td></tr>
+<tr><td>Preference alignment</td><td>Humans compare two robot rollouts and a reward model learns from the choices: <a href="06-30u30/30-rlhf.html">Module 06, Day 30</a>, the original deep-RL-from-preferences paper, used simulated robots.</td><td>Comparison</td></tr>
+<tr><td>RLVR</td><td>RL with a <strong>success detector</strong>: is the block in the bin? Is the door open? In simulation, the simulator itself is a perfect verifier.</td><td>Checker</td></tr>
+<tr><td>KL leash</td><td>Keep the fine-tuned policy close to the demonstrated behaviour (a trust region, as in <a href="06-30u30/29-ppo.html">PPO, Day 29</a>), because unfamiliar actions on real hardware can break things.</td><td>Regulariser</td></tr>
+</table></div>
+<div class="card note"><p><strong>The robotics twist:</strong> robot demonstrations are expensive (a person teleoperating for hours) while text is nearly free. So the "small, curated post-training data" point is even stronger for robots. A few hundred good demonstrations of one task is typical, which is why the pre-trained backbone matters so much.</p></div>
+
+<h2 id="gap">3. Deep dive: what a base model is missing</h2>
+<p>The article names three gaps, with one root cause: <strong>the training objective (predict web text well) doesn't match the goal (be helpful and harmless)</strong>.</p>
+<ol>
+<li><strong>Instruction following:</strong> asked to translate, a base model may just keep writing in the source language, because that's a likely continuation.</li>
+<li><strong>Harm:</strong> nothing in next-token prediction penalises dangerous advice, abuse or confidently wrong medical answers.</li>
+<li><strong>Long-chain reasoning:</strong> knowing what a maths solution <em>looks like</em> is far from producing a correct one step by step.</li>
+</ol>
+<p>This is the same "objective mismatch" theme as <a href="01-decision-model-evals.html">Module 01</a>: optimise the wrong metric and you get exactly what you asked for, not what you wanted.</p>
+
+<h2 id="compare">4. Deep dive: pre-training vs post-training</h2>
+<div class="table-wrap"><table>
+<tr><th></th><th>Pre-training</th><th>Post-training</th></tr>
+<tr><td>Goal</td><td>Predict the next token in text</td><td>Behave as people want: follow instructions, stay safe, get answers right</td></tr>
+<tr><td>Data</td><td>Raw text, trillions of tokens, mostly web</td><td>Small and curated: prompt+answer pairs, A-vs-B comparisons, checkable problems. Large instruction sets reach a few million examples.</td></tr>
+<tr><td>Signal</td><td>Every next token in the text</td><td>A demonstration, a "which is better" judgment, or a checker's right/wrong</td></tr>
+<tr><td>Compute</td><td>The vast majority</td><td>A small fraction</td></tr>
+<tr><td>Change to the model</td><td>Builds knowledge and language from scratch</td><td>Gently steers an already-capable model</td></tr>
+</table></div>
+<p>Note "same model": post-training doesn't build a new network. It continues optimising the same weights with new data and a new loss. <a href="05-trillion-scale-architecture.html#serving">Module 05</a> shows a frontier example. Kimi K3's post-training combines SFT, RL across domains, and distilling nine specialist teachers back into one model.</p>
+
+<h2 id="sft">5. Deep dive: instruction tuning (learn from demonstrations)</h2>
+<p>The data is (instruction, good response) pairs. The training rule barely changes. It's still next-token prediction, with one twist: <strong>the loss is only computed on the response tokens</strong>. The instruction is context, not something to imitate.</p>
+<pre><code>loss = − Σ_{t ∈ response} log p(token_t | instruction, response_&lt;t)</code></pre>
+<ul>
+<li>Also called <strong>supervised fine-tuning (SFT)</strong>, because every example has a correct answer to copy.</li>
+<li>Training across many task types improves instruction-following in general, including on tasks never seen in training.</li>
+<li><strong>Limit:</strong> the model can only be as good as the demonstrations, and it learns their style and mistakes along with their substance. That's the same caveat as the teacher → student distillation in <a href="04-distill-small-models.html#distill">Module 04</a>.</li>
+</ul>
+<p class="robot"><strong>Robotics:</strong> behaviour cloning is SFT with actions as the "response tokens". Condition on images and the instruction, and maximise the likelihood of the demonstrated actions. The classic failure is <em>compounding error</em>: a small mistake leads to a state no demonstration covered, which leads to a bigger mistake. That's why corrective data (e.g. DAgger) and the next two stages matter.</p>
+
+<h2 id="pref">6. Deep dive: preference alignment and the KL leash</h2>
+<p>Writing a perfect answer is hard, but judging which of two answers is better is easy. Preference data is (prompt, answer A, answer B, which one people prefer). There are two routes:</p>
+<ul>
+<li><strong>RLHF:</strong> first train a <strong>reward model</strong> to score answers as people would. Then optimise the language model against it with RL, classically PPO. This is the InstructGPT recipe.</li>
+<li><strong>DPO (Direct Preference Optimization):</strong> skip the separate reward model and learn directly from the pairs.</li>
+</ul>
+<p>Both include a <strong>KL penalty</strong> to the original (reference) model. The objective being maximised is:</p>
+<pre><code>E[ reward(x, y) ]  −  β · KL( π(·|x) ‖ π_ref(·|x) )</code></pre>
+<p>This has a neat closed-form optimum, the basis of DPO's derivation:</p>
+<pre><code>π*(y|x) ∝ π_ref(y|x) · exp( reward(x, y) / β )</code></pre>
+<p>β is the leash. Large β keeps you near the reference model. Small β lets the policy chase reward, including any <em>flaw</em> in the reward model. That flaw-chasing is called <strong>reward hacking</strong>: the reward model is a learned classifier with errors (see <a href="01-decision-model-evals.html#calibration">Module 01</a>), and an optimiser will find them.</p>
+
+<div class="card demo">
+<h3>Interactive: the KL leash</h3>
+<p class="legend">Five candidate answers to one prompt. Grey bars: the reference (SFT) model's probabilities. Coloured bars: the post-trained optimum π* ∝ π_ref · exp(r/β). Answer E is a <b class="f">reward hack</b>: long and flattering, so the reward model over-scores it, but people actually rate it low.</p>
+<canvas id="kl" width="700" height="260" aria-label="Probability of five answers before and after preference optimisation"></canvas>
+<label for="beta">Leash strength β: <span id="bv" class="num"></span></label>
+<input id="beta" type="range" min="-2" max="1" step="0.02" value="0">
+<div class="stats">
+  <div class="stat"><div class="k">P(hack answer E)</div><div class="v" id="pe">–</div></div>
+  <div class="stat"><div class="k">Reward-model score</div><div class="v" id="rm">–</div></div>
+  <div class="stat"><div class="k">True human score</div><div class="v" id="hs">–</div></div>
+  <div class="stat"><div class="k">KL from reference</div><div class="v" id="klv">–</div></div>
+</div>
+<p class="meta">Drag left (weak leash): the reward-model score keeps rising, but the true human score peaks and then falls as probability floods onto E. That's reward hacking, also called over-optimisation. A moderate β gets most of the real gain.</p>
+</div>
+
+<h2 id="rlvr">7. Deep dive: RLVR (learn from a checker)</h2>
+<p>Some answers can be checked by a program: a maths problem has a final number, and code has tests that pass or fail. <strong>Reinforcement Learning with Verifiable Rewards</strong> uses such a <em>verifier</em> as the teacher:</p>
+<ol>
+<li>Sample several attempts at the same problem.</li>
+<li>The verifier marks each one right or wrong.</li>
+<li>Raise the probability of the correct attempts and lower the others. Group-relative methods (e.g. GRPO) score each attempt against the group's average, so no separate value model is needed.</li>
+</ol>
+<ul>
+<li><strong>Strengths:</strong> no human judge is needed, and a verbose, polished wrong answer still scores zero. That makes RLVR well suited to the long-chain reasoning base models are weak at.</li>
+<li><strong>Caveat:</strong> a verifier is only as reliable as its rules. If it checks only the final answer, it can reward lucky guesses or broken reasoning that happens to land right.</li>
+</ul>
+<p class="robot"><strong>Robotics:</strong> a success detector is a verifier. In simulation it's exact: the simulator knows if the cube is in the bin. In the real world it's often a learned classifier or a sensor, and the same caveat applies with physical consequences. A detector that only checks "cube near bin" can reward a robot that knocks the bin over onto the cube. Tune its threshold with the methods in <a href="01-decision-model-evals.html">Module 01</a> before trusting it as a reward.</p>
+
+<h2 id="playbook">8. Playbook</h2>
+<ol>
+<li>Start from the strongest pre-trained model you can afford. Post-training steers capability, it doesn't create it.</li>
+<li><strong>SFT first</strong> on high-quality demonstrations of the behaviour you want. For robots, collect clean teleoperation data for your exact setup.</li>
+<li>Where good answers are hard to write but easy to compare, collect <strong>preferences</strong>. Use DPO for simplicity, or a reward model plus PPO if you need an explicit judge.</li>
+<li>Where success is checkable, use a <strong>verifier</strong> (RLVR / success detectors). Audit what it actually checks.</li>
+<li>Always keep a <strong>leash</strong> (a KL penalty or trust region) and watch the <em>true</em> metric, not just the optimised one, for over-optimisation.</li>
+<li>Iterate: each stage can expose gaps that need more data for an earlier one.</li>
+</ol>
+
+<h2 id="check">9. Self-check</h2>
+<details><summary>Why did GPT-3 answer "explain the Moon landing to a 6-year-old" with more questions?</summary><p>It was trained only to continue web text, where lists of similar prompts are common. Continuing the list was a high-probability next step. Following the instruction wasn't part of its objective.</p></details>
+<details><summary>In instruction tuning, which tokens carry the loss?</summary><p>Only the response tokens. The instruction is context to condition on, not something to imitate.</p></details>
+<details><summary>Why compare two answers instead of writing the ideal one?</summary><p>Judging is much easier than producing, like a food critic who can't cook. Comparisons are cheaper and more consistent to collect than perfect demonstrations.</p></details>
+<details><summary>What happens with the KL leash removed (β → 0)?</summary><p>The policy collapses onto whatever the reward model scores highest, including its mistakes (reward hacking), and drifts from what pre-training taught it.</p></details>
+<details><summary>Why is RLVR resistant to "sounds good but wrong"?</summary><p>The verifier checks correctness (the final number, the tests), not style or length. A polished wrong answer gets zero.</p></details>
+<details><summary>What's the robotics version of each teacher?</summary><p>Demonstration = behaviour cloning from teleoperation. Comparison = humans ranking robot rollouts (Module 06, Day 30). Checker = a success detector or the simulator's ground truth.</p></details>
+
+<h2 id="glossary">10. Glossary &amp; further reading</h2>
+<div class="table-wrap"><table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<tr><td>Base model</td><td>A model after pre-training only</td></tr>
+<tr><td>SFT / instruction tuning</td><td>Fine-tuning on (instruction, good response), with loss on the response only</td></tr>
+<tr><td>Preference alignment</td><td>Learning from human A-vs-B judgments</td></tr>
+<tr><td>Reward model</td><td>A model trained on preferences to score responses</td></tr>
+<tr><td>RLHF</td><td>RL against a reward model learned from human feedback</td></tr>
+<tr><td>PPO</td><td>Proximal Policy Optimization, a clipped policy-gradient RL algorithm</td></tr>
+<tr><td>DPO</td><td>Direct Preference Optimization: learns from pairs without a separate reward model</td></tr>
+<tr><td>KL penalty</td><td>Cost for drifting from the reference model's distribution: the leash</td></tr>
+<tr><td>Reward hacking</td><td>Exploiting errors in the reward signal instead of doing the task</td></tr>
+<tr><td>RLVR</td><td>RL with verifiable rewards: a program checks correctness</td></tr>
+<tr><td>Behaviour cloning</td><td>Robotics SFT: imitate demonstrated actions</td></tr>
+<tr><td>Success detector</td><td>A robotics verifier: did the task succeed?</td></tr>
+</table></div>
+<ul>
+<li><a href="https://x.com/dongxi_nlp/status/2112767071926792566">Dongxi's original article</a> (Chinese). Later parts of the series will cover each technique's data, losses and failure modes.</li>
+<li>Ouyang et al., “Training language models to follow instructions with human feedback” (InstructGPT), 2022</li>
+<li>Rafailov et al., “Direct Preference Optimization: Your Language Model is Secretly a Reward Model”, 2023</li>
+<li>In this course: <a href="06-30u30/29-ppo.html">PPO (06 · Day 29)</a>, <a href="06-30u30/30-rlhf.html">RL from human preferences (06 · Day 30)</a>, <a href="03-shared-autonomy.html">Module 03</a> (human intent and feedback), <a href="04-distill-small-models.html">Module 04</a> (learning from a teacher), <a href="05-trillion-scale-architecture.html#serving">Module 05</a> (K3 post-training)</li>
+</ul>
+
+<footer>Module 07 · added 2026-10-21 · <a href="../index.html">Back to course index</a></footer>
+</main>
+
+<script>
+const cv = document.getElementById('kl'), ctx = cv.getContext('2d'), bIn = document.getElementById('beta');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+// candidate answers: reference prob, reward-model score, true human score (0-10)
+const ANS = [
+  {n: 'A · terse but correct', ref: .30, rm: 1.0, hum: 6.5},
+  {n: 'B · clear and helpful', ref: .25, rm: 2.0, hum: 9.0},
+  {n: 'C · off-topic', ref: .25, rm: -1.0, hum: 2.0},
+  {n: 'D · partly wrong', ref: .15, rm: 0.0, hum: 3.5},
+  {n: 'E · long + flattering', ref: .05, rm: 3.2, hum: 3.0},
+];
+
+function optimum(beta) {
+  const w = ANS.map(a => a.ref * Math.exp(a.rm / beta)), s = w.reduce((x, y) => x + y);
+  return w.map(v => v / s);
+}
+const expect = (p, k) => p.reduce((acc, v, i) => acc + v * ANS[i][k], 0);
+const kl = p => p.reduce((acc, v, i) => acc + (v > 0 ? v * Math.log(v / ANS[i].ref) : 0), 0);
+
+function draw() {
+  const beta = Math.pow(10, +bIn.value), p = optimum(beta);
+  document.getElementById('bv').textContent = beta < 1 ? beta.toFixed(2) : beta.toFixed(1);
+  const W = cv.width, H = cv.height, L = 190, R = 50, rowH = (H - 10) / ANS.length, sc = W - L - R;
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '13px sans-serif'; ctx.textBaseline = 'middle';
+  ANS.forEach((a, i) => {
+    const y = 6 + i * rowH;
+    ctx.fillStyle = i === 4 ? css('--fail') : css('--fg');
+    ctx.fillText(a.n, 4, y + rowH / 2);
+    ctx.fillStyle = css('--line'); ctx.fillRect(L, y + 6, a.ref * sc, rowH / 2 - 8);
+    ctx.fillStyle = i === 4 ? css('--fail') : css('--accent'); ctx.fillRect(L, y + rowH / 2, p[i] * sc, rowH / 2 - 8);
+    ctx.fillStyle = css('--muted'); ctx.fillText((p[i] * 100).toFixed(0) + '%', L + p[i] * sc + 6, y + rowH * 0.72);
+  });
+  document.getElementById('pe').textContent = (p[4] * 100).toFixed(0) + '%';
+  document.getElementById('rm').textContent = expect(p, 'rm').toFixed(2);
+  document.getElementById('hs').textContent = expect(p, 'hum').toFixed(1) + ' / 10';
+  document.getElementById('klv').textContent = kl(p).toFixed(2) + ' nats';
+}
+bIn.oninput = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

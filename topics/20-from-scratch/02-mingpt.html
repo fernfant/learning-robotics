@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>minGPT · Module 20</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 20 · From-scratch repos</a> › minGPT</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 20 · From-scratch code · 2 of 6</div>
+<h1>minGPT: a whole GPT in about 300 lines of PyTorch</h1>
+<p class="lede">Karpathy's clean, teaching-first GPT. It's the same kind of model as GPT-2, and small enough to learn two-digit addition on a laptop in four minutes. It's semi-archived now, and nanoGPT is its successor.</p>
+
+<div class="facts">
+  <div><b>Repo</b><a href="https://github.com/karpathy/minGPT">karpathy/minGPT</a></div>
+  <div><b>Licence</b>MIT</div>
+  <div><b>Stars</b>25,006 (7 Nov 2026, GitHub API)</div>
+  <div><b>Core code</b><code>model.py</code> 310 lines, <code>trainer.py</code> 109, <code>bpe.py</code> 319, <code>utils.py</code> 103 (counted with <code>wc -l</code>)</div>
+  <div><b>Status</b>Semi-archived. The README's Jan 2023 note says minGPT "is in a semi-archived state" and points to nanoGPT. Last commit 8 Jan 2023.</div>
+  <div><b>Needs</b>Python and PyTorch. <code>bpe.py</code> also needs <code>regex</code> and <code>requests</code>. A MacBook CPU is enough for the demos.</div>
+</div>
+<p class="meta">Tested at commit <code>37baab7</code> on 7–8 Nov 2026, on a MacBook with an Apple M4 (16 GB), Python 3.14.5, PyTorch 2.15.0. Short code excerpts are quoted with credit to Andrej Karpathy (MIT).</p>
+
+<div class="toc">
+<strong>On this page</strong>
+<ol>
+<li><a href="#start">Start here (no maths needed)</a></li>
+<li><a href="#summary">Summary</a></li>
+<li><a href="#code">How the code works</a></li>
+<li><a href="#tokens">bpe.py versus our word tokenizer</a></li>
+<li><a href="#run">Run it, tested</a></li>
+<li><a href="#robohelper">Connect to Robo-Helper (Module 18)</a></li>
+<li><a href="#robotics">Why it matters for robotics</a></li>
+<li><a href="#reality">Reality check</a></li>
+<li><a href="#check">Self-check</a></li>
+<li><a href="#reading">Further reading</a></li>
+</ol>
+</div>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">minGPT is a real GPT, the same design as the model behind early ChatGPT, written so plainly that you can read all of it in one evening.</p>
+
+<h3>Think of it like this</h3>
+<p>Picture a class where every pupil holds one word of a sentence. Before guessing the next word, each pupil may look at the pupils to their <em>left</em>, never the right, and decide whom to listen to most. They pass notes through a few rounds of this. Then the last pupil shouts a guess for the next word. That "who should I listen to?" step is called attention. A GPT is a stack of these rounds.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Text is cut into small pieces called tokens, and each token becomes a number.</li>
+<li>Each number is looked up as a list of numbers (an embedding), plus a note of its position.</li>
+<li>A few Transformer blocks let every position look back at earlier positions (attention), then think on its own (a small neural network).</li>
+<li>The last layer gives a score for every possible next token. Pick a likely one, add it, repeat.</li>
+<li>Training means showing it real text and nudging its weights whenever it guesses wrong.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Robots are starting to use the same machinery. Some robot models turn camera pictures and commands into tokens, then write out actions as tokens, one at a time. On this page we train a tiny minGPT to read Robo-Helper's commands letter by letter and write its plan.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Write <code>85 + 50 = 135</code> as the adder project does: drop the signs and write the answer backwards, <code>8550531</code>. Why might backwards be easier for a model that writes left to right? (Hint: when you add on paper, which digit do you work out first?)</li>
+<li>Type a sentence with a spelling mistake. Read it out. You still understand it, because you read letters, not only whole words. Our character-level robot brain tries to do the same.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Token</dt><dd>One piece of text the model reads: a letter, part of a word, or a whole word.</dd>
+<dt>Transformer</dt><dd>The design inside GPTs: blocks of attention plus small neural networks.</dd>
+<dt>Attention</dt><dd>Each position deciding how much to listen to each earlier position.</dd>
+<dt>BPE</dt><dd>Byte Pair Encoding: building tokens by repeatedly gluing together the most common pairs of pieces.</dd>
+<dt>Iteration</dt><dd>One training step: one batch of examples, one nudge of the weights.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with code. On a first read, skim the headings, the Run it section and the Robo-Helper results, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>minGPT is a PyTorch re-implementation of GPT in three library files: <code>model.py</code> (the Transformer, about 300 lines as the README says; we counted 310), <code>bpe.py</code> (GPT-2's byte-pair tokenizer) and <code>trainer.py</code> (a general training loop). We ran <code>projects/adder</code> on a MacBook CPU. After 6,001 iterations (243 s) the 0.09M-parameter model got all 500 held-out two-digit sums right. We also trained a character-level minGPT as a Robo-Helper brain, with honest results in section 5.</p>
+</div>
+<ul>
+<li><strong>Semi-archived since Jan 2023.</strong> Karpathy kept it stable because books and courses cite it, and moved new work to <a href="03-nanogpt.html">nanoGPT</a> (page 3).</li>
+<li><strong>Every piece is explicit.</strong> Attention is written out by hand instead of calling <code>nn.MultiheadAttention</code>, "to show that there is nothing too scary here" (from the code's docstring).</li>
+<li><strong>Same model at every size.</strong> One <code>model_type</code> switch goes from <code>gpt-nano</code> (3 layers, 48 wide) to <code>gpt2-xl</code> (48 layers, 1600 wide). <code>from_pretrained</code> loads OpenAI's GPT-2 weights.</li>
+<li><strong>Adder result on our Mac:</strong> test accuracy 0% at the start, 74% after 1,000 iterations, 96.2% after 2,000 (37 s), 100% from 4,500 onwards.</li>
+<li><strong>Robo-Helper result:</strong> a character-level minGPT brain scored 7–8/12 in the bake-off (tinylm 8, distilled 10). It shrugs off typos, but 350 examples are too few for a Transformer.</li>
+<li><strong>Install gotchas on 2026 tooling:</strong> <code>regex</code> and <code>requests</code> are missing from <code>setup.py</code>, and a <code>--system.work_dir=./out/x</code> override crashes. Both are explained, with fixes, in section 4.</li>
+</ul>
+
+<h2 id="code">2. How the code works</h2>
+<h3><code>model.py</code>: four small classes</h3>
+<ul>
+<li><code>NewGELU</code>: the activation function GPT-2 uses (a smooth ReLU).</li>
+<li><code>CausalSelfAttention</code>: queries, keys and values for all heads at once, scores scaled by 1/√(head size), a triangular mask so no position can see the future, softmax, then a weighted sum.</li>
+<li><code>Block</code>: LayerNorm → attention → add back, then LayerNorm → MLP (4× wider, GELU) → add back. The "add back" lines are the residual connections.</li>
+<li><code>GPT</code>: token embedding + position embedding → N blocks → final LayerNorm → a linear layer that scores every vocabulary entry. <code>forward</code> returns logits and the cross-entropy loss. <code>generate</code> samples one token at a time.</li>
+</ul>
+<p>The heart of attention is these lines, quoted from <code>CausalSelfAttention.forward</code>:</p>
+<pre><code>att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
+att = att.masked_fill(self.bias[:,:,:T,:T] == 0, float('-inf'))
+att = F.softmax(att, dim=-1)
+y = att @ v</code></pre>
+<p class="legend">From karpathy/minGPT, <code>mingpt/model.py</code> (MIT). The dropout line between softmax and <code>att @ v</code> is left out here.</p>
+<p>This is Lesson 15's attention, done for every position, every head and every example in the batch at once. Score = dot product ÷ √size, softmax, weighted average. The one new idea is the <strong>mask</strong>. Setting future scores to −∞ makes their softmax weight exactly 0, so position 5 can only read positions 0–5. That is what lets one forward pass train on every next-token prediction in a sequence at the same time. The README says most of the complexity is "just being clever with batching".</p>
+
+<h3>The block, quoted whole</h3>
+<pre><code>def forward(self, x):
+    x = x + self.attn(self.ln_1(x))
+    x = x + self.mlpf(self.ln_2(x))
+    return x</code></pre>
+<p class="legend">From karpathy/minGPT, <code>mingpt/model.py</code> (MIT).</p>
+<p>Each sub-layer adds a correction to <code>x</code> instead of replacing it. That's the GPT-2 "pre-norm" layout the README describes: LayerNorm moved to the input of each sub-block.</p>
+
+<h3><code>trainer.py</code> and the projects</h3>
+<p><code>Trainer.run()</code> is a plain loop: get a batch, forward, <code>loss.backward()</code>, clip the gradient norm to 1.0, AdamW step, call any callbacks, stop at <code>max_iters</code>. Nothing in it is specific to GPT. The <code>projects/adder</code> script defines a dataset of n-digit sums. The answer is written reversed and the loss is masked (target −1) on the question digits, so the model only learns to write answers.</p>
+
+<h2 id="tokens">3. <code>bpe.py</code> versus our word tokenizer</h2>
+<p><code>bpe.py</code> is a lightly refactored copy of OpenAI's GPT-2 encoder. It first splits text with a regex (words with their leading space, contractions like <code>'s</code>, numbers, punctuation). Then it maps every byte to a printable character and repeatedly merges the adjacent pair with the best rank from OpenAI's list of 50,000 merges. The vocabulary is 50,257 tokens: 256 bytes, 50,000 merges and one end-of-text token. Our Module 18 tokenizer (<a href="../18-robot-brain/08-words-as-numbers.html">Lesson 8</a>'s <code>tokenize</code>) is one regex: lowercase, then whole words and full stops.</p>
+<p>We ran both on the same commands (the GPT-2 merge files are 1.4 MB, downloaded by <code>bpe.py</code>):</p>
+<pre><code># 7 Nov 2026 · MacBook (Apple M4), CPU
+'put teh red blok in the bin'
+  BPE   ['put', 'Ġte', 'h', 'Ġred', 'Ġbl', 'ok', 'Ġin', 'Ġthe', 'Ġbin']   (Ġ = a leading space)
+  ours  ['put', 'teh', 'red', 'blok', 'in', 'the', 'bin']   unknown to tinylm: ['teh', 'blok']
+"where's the green one?"
+  BPE   ['where', "'s", 'Ġthe', 'Ġgreen', 'Ġone', '?']
+  ours  ["where's", 'the', 'green', 'one']                  unknown to tinylm: ["where's"]
+'Put the RED block!'
+  BPE   ['Put', 'Ġthe', 'ĠRED', 'Ġblock', '!']               (ids differ from 'put', ' red')
+  ours  ['put', 'the', 'red', 'block']</code></pre>
+<div class="table-wrap"><table>
+<tr><th></th><th>GPT-2 BPE (<code>bpe.py</code>)</th><th>Our word tokenizer (Lesson 8)</th></tr>
+<tr><td>Vocabulary</td><td>50,257, fixed, learned from web text</td><td>Whatever words appear in our training commands</td></tr>
+<tr><td>Unknown words</td><td>Never. Anything falls back to smaller pieces, down to single bytes</td><td>Dropped: "teh" and "blok" are simply ignored by the tiny LM</td></tr>
+<tr><td>Capitals, punctuation</td><td>Kept: "RED" and "red" are different tokens</td><td>Lowercased, punctuation removed except "."</td></tr>
+<tr><td>Spaces</td><td>Part of the token ("Ġred")</td><td>Thrown away</td></tr>
+<tr><td>Good for</td><td>Any text in any language</td><td>A tiny, known command vocabulary</td></tr>
+</table></div>
+<p>For the Robo-Helper brain in section 5 we used neither. We used <strong>characters</strong>: 30 symbols (a–z, space, apostrophe, question mark, and two control symbols). That's the simplest way to never meet an unknown word, which BPE gets with a big learned vocabulary.</p>
+
+<h2 id="run">4. Run it, tested</h2>
+<pre><code># 7 Nov 2026 · MacBook (Apple M4) · Python 3.14.5 · torch 2.15.0
+git clone --depth 1 https://github.com/karpathy/minGPT mingpt-src/minGPT
+python3 -m venv venv
+venv/bin/pip install torch
+venv/bin/pip install -e mingpt-src/minGPT
+venv/bin/pip install regex requests      # needed by bpe.py, but not listed in setup.py
+
+mkdir -p runs/cpu6k &amp;&amp; cd runs/cpu6k
+../../venv/bin/python ../../mingpt-src/minGPT/projects/adder/adder.py \
+    --trainer.max_iters=6001 --trainer.device=cpu</code></pre>
+<p>The adder trains <code>gpt-nano</code> (3 layers, 3 heads, 48 wide: 0.09M parameters) on 9,500 of the 10,000 two-digit sums and tests on the other 500. It scores the whole train and test sets every 500 iterations. Real output, trimmed:</p>
+<pre><code># 7 Nov 2026 · MacBook (Apple M4), CPU · adder, 6,001 iterations
+number of parameters: 0.09M
+iter 0: train loss 2.31454
+train final score: 17/9500 = 0.18% correct     test final score: 0/500 = 0.00% correct
+iter 1000: train loss 0.53160
+train final score: 7323/9500 = 77.08% correct  test final score: 370/500 = 74.00% correct
+iter 2000: train loss 0.22252
+GPT claims that 6 + 94 = 90 but gt is 100
+GPT claims that 96 + 4 = 90 but gt is 100
+GPT claims that 37 + 92 = 139 but gt is 129
+train final score: 9181/9500 = 96.64% correct  test final score: 481/500 = 96.20% correct
+iter 3000: train loss 0.22115
+train final score: 9489/9500 = 99.88% correct  test final score: 499/500 = 99.80% correct
+iter 5000: train loss 0.03020
+train final score: 9500/9500 = 100.00% correct test final score: 500/500 = 100.00% correct
+iter 6000: train loss 0.02295
+train final score: 9500/9500 = 100.00% correct test final score: 500/500 = 100.00% correct
+real 242.67 s</code></pre>
+<p>Look at the mistakes at iteration 2000: they are nearly all <strong>carry</strong> errors (6 + 94 = 90, missing the 1 that should carry into the hundreds). The model learns digit-by-digit addition first and carrying last, much as a child does. From iteration 4,500 to the end it scored 100% on both sets at every check.</p>
+
+<h3>CPU or MPS?</h3>
+<pre><code># 7 Nov 2026 · same adder, 2,001 iterations each
+--trainer.device=cpu   real 37.25 s    test 481/500 = 96.20%
+--trainer.device=mps   real 183.67 s   test 478/500 = 95.60%</code></pre>
+<p>On the Apple GPU (MPS) it was about 5× <em>slower</em>. With batches of 64 sequences of 6 tokens and a 0.09M-parameter model, the cost of sending each small job to the GPU outweighs the maths. The two runs also differ slightly in accuracy because GPU and CPU arithmetic don't give bit-identical results.</p>
+
+<h3>What failed, and the fixes</h3>
+<ul>
+<li><strong><code>ModuleNotFoundError: No module named 'regex'</code></strong> on <code>from mingpt.bpe import get_encoder</code>. <code>setup.py</code> only lists <code>torch</code> (the README's todo list even says "i probably should have a requirements.txt file..."). Fix: <code>pip install regex requests</code>.</li>
+<li><strong><code>SyntaxError: invalid syntax</code></strong> when passing <code>--system.work_dir=./out/adder6k</code>. <code>merge_from_args</code> tries <code>literal_eval</code> on the value and only catches <code>ValueError</code>, but a path like <code>./out/x</code> raises <code>SyntaxError</code>. Fix: run from a separate folder and leave <code>work_dir</code> at its default, or quote the value as a Python string (<code>--system.work_dir="'out6k'"</code>).</li>
+<li><strong><code>SyntaxWarning: "\p" is an invalid escape sequence</code></strong> from a docstring in <code>bpe.py</code> on Python 3.14. It's harmless today, but the warning says it "will not work in the future".</li>
+<li><strong>MPS is never picked automatically.</strong> <code>device='auto'</code> chooses CUDA or CPU only. Pass <code>--trainer.device=mps</code> yourself. You'll also see a harmless <code>pin_memory</code> warning.</li>
+</ul>
+
+<h2 id="robohelper">5. Connect to Robo-Helper (Module 18)</h2>
+<p class="meta">Measured on 8 Nov 2026, with the first version of Robo-Helper's training data: 350 examples, which by accident included 3 of the 12 bake-off commands. On 9 Nov those were removed (343 examples). The small Module 18 brains' bake-off scores didn't change, and the tiny LM's held-out score went from 86% to 92%. Every brain here was compared on the same data, but if you re-run, expect the exact numbers to move by a few points.</p>
+<p><a href="../18-robot-brain/15-tiny-lm.html">Lesson 15</a>'s tiny language model is minGPT's little cousin. It reads the command's words, writes a plan one word at a time ("put red blue"), and has its backprop written by hand in the standard library. Its <a href="../18-robot-brain/15-tiny-lm.html#attention">attention stretch</a> computes exactly minGPT's score → softmax → weighted average, for one head and one query. minGPT is the next rung up: many heads, every position at once, a causal mask, residual blocks, and PyTorch working out the gradients.</p>
+
+<h3>The experiment: a character-level minGPT as Robo-Helper's brain</h3>
+<p>We built a brain called <code>minigpt</code>. It's a minGPT with 2 layers, 4 heads and 64-wide embeddings (110,208 weights), reading <strong>characters</strong>. It trains on exactly the same 350 examples as the tiny LM (<code>lesson15_tiny_lm.training_data()</code>, as (command, plan words) pairs). Each example becomes one string, with the loss masked on the command part, as in the adder:</p>
+<pre><code>put the red and blue blocks away|put red blue⏎</code></pre>
+<p>At run time it writes characters greedily until ⏎, turns the words into a plan with Lesson 15's <code>words_to_plan</code>, and passes every action through <a href="../18-robot-brain/10-llm-safety.html">Lesson 10</a>'s <code>validate_action</code>, just like <code>TinyLMBrain</code>. Because it reads characters, we could also add <strong>typo augmentation</strong>: half the training commands get one random typo (swapped, dropped, doubled or neighbouring-key letter). Training: 1,500 iterations, batch 64, on the Mac CPU, about 75–185 s per model. We trained 3 seeds of each version and scored them on the held-out <code>test_data()</code> (50 plans), typo'd copies of it (150 with one typo, 150 with two), 10 hand-written typo commands, and the <a href="../18-robot-brain/19-bakeoff.html">Lesson 19</a> bake-off.</p>
+<pre><code># 8–9 Nov 2026 · MacBook (Apple M4), CPU · scripts/eval_minigpt.py · "+clean" = Lesson 8's typo fixer runs first
+brain                       held-out  1-typo  2-typo  hand-10  bake-off  decide p50
+words (Lesson 9)               34%      34%     33%     70%      5/12     0.05 ms
+tinylm (Lesson 15)             86%      86%     81%    100%      8/12     0.24 ms
+attention (Lesson 15)          92%      92%     87%    100%      8/12     0.25 ms
+distilled (Lesson 17)          94%      93%     90%    100%     10/12     0.25 ms
+minigpt, no typo-aug, seed 0   28%      25%     27%     50%      5/12     6.6 ms
+minigpt, no typo-aug, seed 1   28%      28%     26%     60%      7/12     3.5 ms
+minigpt, no typo-aug, seed 2   28%      27%     23%     60%      5/12     9.7 ms
+minigpt, typo-aug, seed 0      60%      61%     61%     90%      7/12     6.7 ms
+minigpt, typo-aug, seed 1      58%      58%     59%    100%      8/12     8.9 ms
+minigpt, typo-aug, seed 2      52%      53%     51%     80%      7/12    10.1 ms</code></pre>
+<p>We also asked: how much do the word-level brains lean on Lesson 8's typo fixer? We scored them on the same typo sets with the fixer switched off:</p>
+<pre><code># 9 Nov 2026 · MacBook (Apple M4), CPU · scripts/raw_typos.py
+                         held-out  1-typo  2-typo
+tinylm     no fixer         86%      73%     53%
+attention  no fixer         94%      77%     59%
+distilled  no fixer         94%      76%     59%
+minigpt (typo-aug) no fixer, mean of 3 seeds:  57%  58%  56%</code></pre>
+
+<h3>What the numbers say</h3>
+<ul>
+<li><strong>It did not beat the robot's best brains.</strong> Bake-off 7, 8 and 7 out of 12 (mean 7.3), against tinylm 8, attention 8 and distilled 10. Only the word counter (5) is clearly worse. On held-out plans it gets 52–60%, far below the tiny LM's 86%.</li>
+<li><strong>Why: too little data for a Transformer.</strong> 350 examples, most from 8 templates. With no augmentation the model learns the training strings almost by heart and gets only 28% of new phrasings right. The tiny LM averages word embeddings, and that simple shape suits this tiny dataset better.</li>
+<li><strong>The character idea does work, on its own terms.</strong> With typo augmentation, typos cost minigpt nothing: 57% clean, 58% with one typo, 56% with two. Without Lesson 8's fixer, the word-level models drop from 86–94% to 53–59% on two typos. So reading characters really does make a model robust to spelling mistakes. But Lesson 8's fixer already gives the word models the same robustness, for free.</li>
+<li><strong>It is about 30× slower to decide:</strong> 3.5–10 ms per command against 0.25 ms. It runs a whole Transformer once per character and has no KV cache. Lesson 16's speed habits apply here.</li>
+<li><strong>The typical mistakes:</strong> "put the purple block in the bin" → <code>put red blue</code> (it invents colours where the tiny LM refuses), and "where's the green one?" → <code>find red</code> on one seed.</li>
+</ul>
+<p>The honest verdict: as a Robo-Helper brain, minGPT is a step <em>sideways</em>, not up. It shows why real LLMs need huge datasets. The architecture is not the bottleneck here. The data is.</p>
+
+<h3>Your next step</h3>
+<ol>
+<li>Give minigpt more data the cheap way. Add Lesson 17's teacher labels (<code>training_data(extra=...)</code>, as the distilled brain does). Then write 5 new <code>PUT_TEMPLATES</code> of your own. Retrain and check whether held-out accuracy climbs towards the tiny LM's 86%.</li>
+<li>Then shrink it: try <code>n_layer=1, n_embd=32</code> and see whether a smaller Transformer overfits less on 350 examples.</li>
+</ol>
+
+<h2 id="robotics">6. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Actions can be tokens.</strong> Our brain writes "put red blue" one character at a time. Many vision-language-action models do the same with discretised actions, using a GPT-style decoder like this one.</li>
+<li><strong>The causal mask suits robot time.</strong> A controller may use the past but never the future. The same triangular mask applies when a Transformer reads a stream of joint angles or camera frames.</li>
+<li><strong>Small data is the real limit.</strong> Our robot has only 350 example commands, and with that little data our minGPT did worse than Lesson 15's small network (52–60% against 86% on new phrasings). Robot foundation models need large datasets for the same reason.</li>
+<li><strong>Latency matters on a robot.</strong> Writing a plan character by character took milliseconds per command here, against a fraction of a millisecond for the tiny LM. That gap grows with model size (see <a href="../18-robot-brain/16-speed.html">Lesson 16</a>).</li>
+</ul>
+</div>
+
+<h2 id="reality">7. Reality check</h2>
+<ul>
+<li><strong>Semi-archived.</strong> Fine for learning, but not where new ideas land. For training use <a href="03-nanogpt.html">nanoGPT</a>, and for the full path to a chatbot use its successor nanochat (both on page 3).</li>
+<li><strong>Old-style attention.</strong> It builds the full T×T attention matrix by hand. Modern code calls PyTorch's fused <code>scaled_dot_product_attention</code> (flash attention), which nanoGPT does.</li>
+<li><strong>No KV cache.</strong> <code>generate</code> re-runs the whole sequence for every new token. That's fine for 20 characters and slow for long text.</li>
+<li><strong>Small packaging gaps</strong> (missing <code>regex</code>/<code>requests</code>, the <code>literal_eval</code> path crash, no MPS in <code>auto</code>). See section 4.</li>
+<li><strong>Don't expect a GPU to help a tiny model.</strong> On our Mac the CPU beat MPS by about 5× for the adder.</li>
+</ul>
+
+<h2 id="check">8. Self-check</h2>
+<details><summary>What does the causal mask do, and why is it needed for training?</summary><p>It sets attention scores to the future to −∞, so their softmax weight is 0. Each position can only use earlier tokens, so one forward pass can train every next-token prediction in the sequence at once without cheating.</p></details>
+<details><summary>Why does the adder write the answer backwards?</summary><p>When you add, the lowest digit is worked out first and the carry moves left. Writing the answer reversed lets a left-to-right model produce digits in the same order the carries happen.</p></details>
+<details><summary>What does the target value −1 mean in the adder's dataset?</summary><p>It is <code>ignore_index</code> for the cross-entropy loss. Positions marked −1 add nothing to the loss, so the model isn't trained to predict the question digits, only the answer.</p></details>
+<details><summary>Why can't GPT-2's BPE ever meet an unknown word?</summary><p>Its base vocabulary includes all 256 bytes. Anything it can't merge into bigger pieces falls back to single bytes.</p></details>
+<details><summary>Why was MPS slower than CPU for the adder?</summary><p>The model and batches are tiny. The fixed cost of launching work on the GPU is larger than the arithmetic saved.</p></details>
+
+<h2 id="reading">9. Further reading</h2>
+<ul>
+<li><a href="https://github.com/karpathy/minGPT">karpathy/minGPT</a>: the repo, with <code>demo.ipynb</code> (sorting) and <code>generate.ipynb</code> (GPT-2 sampling)</li>
+<li><a href="https://arxiv.org/abs/1706.03762">Attention Is All You Need</a> (2017), the Transformer paper the README links</li>
+<li><a href="https://github.com/openai/gpt-2">openai/gpt-2</a> (the TensorFlow model definition) and <a href="https://github.com/openai/image-gpt">openai/image-gpt</a>, both cited in the README</li>
+<li><a href="https://arxiv.org/abs/1606.08415">Gaussian Error Linear Units (GELU)</a>, cited in <code>model.py</code></li>
+<li><a href="https://github.com/huggingface/transformers">huggingface/transformers</a>, the full-featured reference the README compares against</li>
+<li>In this course: <a href="../06-30u30/13-attention.html">Module 06, Day 13: attention</a>, <a href="../06-30u30/14-annotated-transformer.html">Day 14: the annotated Transformer</a>, <a href="../18-robot-brain/15-tiny-lm.html#attention">Lesson 15's attention stretch</a></li>
+<li>Next: <a href="03-nanogpt.html">nanoGPT</a>, the rewrite "that has teeth"</li>
+</ul>
+
+<nav class="pager">
+  <a href="01-micrograd.html"><small>Back</small>1 · micrograd</a>
+  <a class="next" href="03-nanogpt.html"><small>Next</small>3 · nanoGPT</a>
+</nav>
+<footer>Module 20 · minGPT · added 2026-11-07 · repo MIT-licensed, short excerpts quoted with credit</footer>
+</main>
+</body>
+</html>

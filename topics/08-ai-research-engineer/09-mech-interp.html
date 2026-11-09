@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stage 09 · Mechanistic interpretability</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 08 · Research-engineer roadmap</a> › Stage 09</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 08 · Stage 09</div>
+<h1>Mechanistic interpretability</h1>
+<p class="lede">Open the model up, read what it's thinking layer by layer, and run controlled experiments to find which parts actually cause an answer.</p>
+
+<div class="facts">
+  <div><b>Prerequisites</b>Transformer internals (attention, MLP, residual stream), PyTorch hooks, stage 01</div>
+  <div><b>Time</b>25–40 h: ~10 h of ARENA exercises, 10–20 h on the project, the rest reading</div>
+  <div><b>Hardware</b>Laptop CPU for GPT-2 small. A free Colab GPU for GPT-2 XL or 1–2B models</div>
+  <div><b>Key papers</b>ROME (Meng et al. 2022), IOI circuit (Wang et al. 2022), ACDC (Conmy et al. 2023), Geva et al. 2023</div>
+</div>
+<p class="meta">Source: Suraj Sharma, <a href="https://x.com/suraj_sharma14/status/2112876560629825734">X post</a>, stage 9</p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Mechanistic interpretability is detective work inside an AI. You switch small parts of it on and off to find out which parts make it give a certain answer.</p>
+
+<h3>Think of it like this</h3>
+<p>Imagine a long line of people passing a note down a row, each one adding a few words. At the end, someone reads out "Paris". Which person added the important bit? You can peek at the note after each person (that's the "logit lens"). Or you can run the game twice, once about the Eiffel Tower and once about the Colosseum, then swap one person's words from the first game into the second. If the answer flips to "Paris", that person mattered (that's "activation patching").</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Pick a behaviour, like finishing "The Eiffel Tower is in the city of" with "Paris".</li>
+<li>Make a near-identical prompt that gives a different answer, like the Colosseum and "Rome".</li>
+<li>Record everything the model computes inside on the first prompt.</li>
+<li>Run the second prompt, but paste in one recorded piece from the first. Measure how far the answer moves back towards "Paris".</li>
+<li>Do this for every piece. The pieces that move the answer most are part of the "circuit".</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Robot brains built from language and vision models can do the wrong thing for hidden reasons. A grasping model might be looking at the table's colour instead of the cup. The same switch-and-measure tricks can show what the model is really paying attention to before you trust it near people.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>With a friend, build a sentence one word each, five rounds. Then replay it but swap just one person's word. Which swaps change the meaning a lot, and which barely matter?</li>
+<li>In the demo further down, press <b>Corrupted: Colosseum</b>, then drag the <b>Patch component</b> slider. Watch which single part brings back "Paris", and notice that no single part brings it all the way back except the whole subject state.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Residual stream</dt><dd>The running "note" each layer reads from and adds to.</dd>
+<dt>Logit lens</dt><dd>Reading the model's best guess early, from a middle layer.</dd>
+<dt>Activation patching</dt><dd>Pasting a part's output from one run into another to test if it matters.</dd>
+<dt>Attention head</dt><dd>A small unit that moves information between words.</dd>
+<dt>Circuit</dt><dd>The small set of parts that work together to produce one behaviour.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="covers">1. What this stage covers</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Interpretability tools let you test hypotheses about how a trained transformer computes something. The logit lens reads intermediate predictions. Activation patching gives causal evidence by swapping activations between a clean and a corrupted run. Circuit discovery scales patching up to find the subgraph responsible for a behaviour. The post's project, "find the exact attention head for the Eiffel Tower fact", needs one correction: the classic study of this exact example (ROME) found factual recall concentrated in <strong>mid-layer MLPs at the last subject token</strong>, with attention later moving the answer to the final position. Facts are spread over several components, not stored in one head.</p>
+</div>
+<ul>
+<li><strong>Learn:</strong> activation patching, the logit lens, circuit discovery, and the tooling (TransformerLens, Baukit) that makes hooking into a model easy.</li>
+<li><strong>Practice:</strong> localise a factual recall such as the Eiffel Tower → Paris, and patch activations to change the output. On this page you do it in GPT-2 small on a laptop, with a patching heatmap over layers and token positions.</li>
+<li><strong>Why (the post's claim):</strong> you can't fix hallucinations or bias without knowing which circuit produces them. That's partly true and partly overstated. See the reality check.</li>
+</ul>
+
+<h2 id="concepts">2. Concepts, explained</h2>
+
+<h3 id="lens">The residual stream and the logit lens</h3>
+<p>In a decoder transformer, each layer reads the residual stream and <em>adds</em> its output back to it. The final layer norm and unembedding turn the last residual vector into logits. The logit lens (nostalgebraist, 2020, <a href="https://www.lesswrong.com/posts/AcKRB8wDpdaN6v6ru/interpreting-gpt-the-logit-lens">LessWrong post</a>) applies that same final step to the residual stream after <em>every</em> layer, to see what the model "would say" if it stopped there:</p>
+<pre><code>h_0 = embed(x) + pos
+h_l = h_{l-1} + attn_l(h_{l-1}) + mlp_l(…)      # each block adds to the stream
+lens_l = W_U · LN_final(h_l)                     # logits "as of" layer l</code></pre>
+<p>It's cheap and often revealing in GPT-2: the right answer climbs the ranking over the later layers. It's also biased, because middle layers weren't trained to be read by the final unembedding. The <strong>tuned lens</strong> (Belrose et al., 2023) learns a small affine map per layer to fix this. Treat the logit lens as a quick look, not a proof. It's correlational: it shows what's present, not what's used.</p>
+
+<h3 id="patching">Activation patching (causal tracing)</h3>
+<p>Patching is an intervention. You need two inputs that differ in one controlled way, a metric, and a list of components to test:</p>
+<pre><code>clean:     "The Eiffel Tower is located in the city of"  → Paris
+corrupted: same template, different subject              → Rome (say)
+metric:    LD = logit(Paris) − logit(Rome) at the last position
+
+for each component c (layer × position, or head):
+    run corrupted, but replace c's activation with its clean value
+    recovered(c) = (LD_patched − LD_corr) / (LD_clean − LD_corr)</code></pre>
+<p>This direction (clean into corrupted) asks "is this component <em>sufficient</em> to restore the behaviour?". The reverse (corrupted into clean, sometimes called noising) asks "is it <em>necessary</em>?". The two can disagree when information is stored redundantly. ROME's causal tracing (Meng, Bau, Andonian &amp; Belinkov, 2022) used a variant: it corrupts the subject's token embeddings with Gaussian noise rather than swapping subjects, then restores one hidden state at a time. Practical details that change results: the choice of metric (logit difference is more stable than probability), whether the two prompts tokenise to the same length, and whether you patch a single position or all of them.</p>
+
+<h3 id="rome">What ROME found, and the correction to the post</h3>
+<p>The post frames the project as finding "the exact attention head" for "The Eiffel Tower is in…". The paper that studied exactly this kind of fact found something different. Meng et al. traced factual predictions in GPT-2 XL and found a distinct set of steps in <strong>middle-layer feed-forward (MLP) modules</strong> while the model processes the <strong>last token of the subject</strong> ("Tower"). They then edited one MLP weight matrix with a rank-one update (ROME) to rewrite a fact, and showed the edit generalised to paraphrases without spilling onto unrelated subjects.</p>
+<p>Follow-up work filled in the picture. Geva, Bastings, Filippova &amp; Globerson (2023) found a three-step flow: early MLPs enrich the last-subject-token representation with many attributes, the relation ("is located in") is moved to the final position, and then <strong>attention heads at the final position extract the attribute</strong> from the enriched subject. So heads do matter, but as readers and movers spread over several layers, not as a single head that "contains" the fact. A good project result is a map with an MLP hot spot at the subject and an attention hot spot at the end, not one glowing head.</p>
+<p>One more caution. Hase, Bansal, Kim &amp; Ghandeharioun (2023) found that where causal tracing localises a fact doesn't predict which layer is best to edit. Localisation and control are separate questions.</p>
+
+<h3 id="circuits">Circuits and circuit discovery</h3>
+<p>A circuit is a subgraph of the model (heads, MLPs and the edges between them) that implements one behaviour. The framing comes from Anthropic's "A Mathematical Framework for Transformer Circuits" (Elhage et al., 2021), which treats each attention head as reading from and writing to the residual stream independently.</p>
+<p>The landmark manual study is the <strong>IOI circuit</strong> (Wang, Variengien, Conmy, Shlegeris &amp; Steinhardt, 2022). In "When Mary and John went to the store, John gave a drink to", GPT-2 small predicts "Mary". They explained it with 26 attention heads in 7 classes, found with causal interventions, and checked the explanation for faithfulness, completeness and minimality. Even then they reported gaps.</p>
+<p><strong>ACDC</strong> (Conmy, Mavor-Parker, Lynch, Heimersheim &amp; Garriga-Alonso, 2023) automates the search: it prunes edges of the computational graph whose removal barely changes the metric. On GPT-2 small's greater-than task it kept 68 of 32,000 edges and recovered all 5 component types that manual work had found. Path patching and attribution patching (a gradient-based linear approximation of patching) are cheaper ways to rank components before confirming with real patches.</p>
+<pre><code>circuit ⊂ graph(model)
+faithful: running only the circuit (rest ablated) ≈ full model on the task
+minimal:  removing any node hurts the metric</code></pre>
+
+<h3 id="tools">Tools: TransformerLens and Baukit</h3>
+<p><strong>TransformerLens</strong> (Neel Nanda and contributors) reimplements GPT-style models with a named hook at every activation: <code>blocks.5.hook_mlp_out</code>, <code>blocks.9.attn.hook_z</code> and so on. <code>run_with_cache</code> stores them all, and <code>run_with_hooks</code> lets you edit any of them during a forward pass. That makes patching a few lines. <strong>Baukit</strong> (David Bau's lab, the ROME authors) wraps an ordinary PyTorch model and lets you trace or edit any named module's output. It's lighter and works on models TransformerLens doesn't support. Under the hood both use the forward hooks you met in stage 01. For larger models, <strong>nnsight</strong> follows the same idea. The newer direction of the field, sparse autoencoders that split activations into interpretable features, is covered in the Transformer Circuits Thread linked below.</p>
+
+<h2 id="practice">3. The practice project</h2>
+
+<h3>(a) Laptop version: patch a fact in GPT-2 small</h3>
+<ol>
+<li><code>pip install transformer_lens</code>. Load <code>gpt2</code> (124M parameters, runs on CPU).</li>
+<li><strong>Check the model knows the fact first.</strong> Print the top 5 next tokens for your prompt. If " Paris" isn't top-1, try a rephrase, a different fact, or <code>gpt2-medium</code>/<code>gpt2-xl</code> on Colab. Patching a fact the model doesn't know measures noise.</li>
+<li>Pick a corrupted subject with the <strong>same number of tokens</strong> (check with <code>m.to_str_tokens</code>) and a single-token answer.</li>
+<li>Logit lens: for each layer, project the last-position residual through <code>ln_final</code> and the unembedding. Record the rank of " Paris".</li>
+<li>Patching heatmaps: for <code>resid_pre</code>, <code>mlp_out</code> and <code>attn_out</code>, patch each (layer, position) from clean into corrupted and record the recovered fraction. Then patch individual heads (<code>hook_z</code>) at the final position.</li>
+<li>Repeat on 20–50 facts (city, language, company), averaged. One prompt is an anecdote.</li>
+</ol>
+<pre><code>from transformer_lens import HookedTransformer, utils
+import torch
+
+m = HookedTransformer.from_pretrained("gpt2")
+clean = m.to_tokens("The Eiffel Tower is located in the city of")
+corr = m.to_tokens("The Colosseum is located in the city of")  # check lengths match
+assert clean.shape == corr.shape, m.to_str_tokens(corr)
+P, R = m.to_single_token(" Paris"), m.to_single_token(" Rome")
+ld = lambda lg: (lg[0, -1, P] - lg[0, -1, R]).item()
+
+lg_c, cache = m.run_with_cache(clean)
+base_c, base_x = ld(lg_c), ld(m(corr))
+
+def patch(act, hook, pos):
+    act[:, pos] = cache[hook.name][:, pos]
+    return act
+
+L, T = m.cfg.n_layers, clean.shape[1]
+heat = torch.zeros(L, T)
+for l in range(L):
+    for p in range(T):
+        h = (utils.get_act_name("mlp_out", l), lambda a, hook, p=p: patch(a, hook, p))
+        heat[l, p] = (ld(m.run_with_hooks(corr, fwd_hooks=[h])) - base_x) / (base_c - base_x)
+
+# logit lens at the last position
+for l in range(L):
+    r = cache["resid_post", l][:, -1:]
+    print(l, m.to_string(m.unembed(m.ln_final(r))[0, -1].argmax()))</code></pre>
+<p><strong>What to measure:</strong> the recovered-fraction heatmap for MLP, attention and residual; the layer where " Paris" first reaches top-1 in the lens; the top 5 heads at the final position. <strong>What to look for</strong>, based on ROME and Geva et al. rather than a run I can vouch for in GPT-2 small: a band of MLP effect around the subject's last token in early-to-middle layers, and attention effect at the final position in later layers. If your map differs, report it. That's a finding.</p>
+<p><strong>"Change the behaviour"</strong>: patching from a corrupted run already flips the answer in that run. To make a persistent change, add a steering vector (for example, mean activation difference between Paris and Rome prompts at the hot layer) or try a ROME edit with the authors' code. Then test on paraphrases and unrelated facts so you can see side effects.</p>
+
+<h3>(b) Full version from the post</h3>
+<p>The same experiment on a 1–8B model (Pythia, Gemma 2 2B or Llama-class), over a few hundred facts, with head-level patching, path patching between the key heads, and an edit or steering intervention evaluated for generalisation and specificity. A 2B model fits a free Colab T4 in half precision. An 8B model with caching of all activations needs a 24–48 GB GPU, about $0.50–2 per hour rented; head-level sweeps over hundreds of prompts take a few GPU-hours. Use attribution patching to shortlist components so you don't run every patch.</p>
+
+<h3>(c) Pitfalls</h3>
+<ul>
+<li><strong>Token misalignment.</strong> Different-length subjects shift every position. Match lengths or use ROME-style noise on the subject embeddings.</li>
+<li><strong>Bad metric.</strong> Probabilities saturate. Use logit difference and normalise to the clean/corrupted range.</li>
+<li><strong>One prompt.</strong> Average over many, and look at the variance.</li>
+<li><strong>Sufficiency isn't necessity.</strong> A head that restores the answer when patched in may not be needed when knocked out, because of backup heads (the IOI paper found such backup name movers).</li>
+<li><strong>Logit lens over-reading.</strong> Early-layer lens output is unreliable. Use the tuned lens if you need to compare layers.</li>
+<li><strong>Calling it "the" circuit.</strong> Report what fraction of the effect your components explain.</li>
+</ul>
+
+<div class="card demo">
+<h3>Interactive: logit lens and patching in a toy model</h3>
+<p class="legend">A hand-built 6-layer toy, not a real model. Subject MLPs (layers 1–3) write a city into the subject token. Attention at layers 4–5 copies it to the last token. Left: logit lens at the last token, one row per layer, darker = more probable. Right: how much of the clean answer each single patch recovers (clean → corrupted). The highlighted bar is your current patch.</p>
+<canvas id="lc" width="700" height="220" aria-label="Logit lens heatmap by layer and token, and bar chart of patching recovery by component"></canvas>
+<p><button id="bc">Clean: Eiffel Tower</button> <button id="bx">Corrupted: Colosseum</button></p>
+<label for="pc">Patch component: <span id="pv" class="num"></span></label>
+<input id="pc" type="range" min="0" max="7" step="1" value="0">
+<div class="stats">
+  <div class="stat"><div class="k">Run</div><div class="v" id="sr">–</div></div>
+  <div class="stat"><div class="k">Top token</div><div class="v" id="st">–</div></div>
+  <div class="stat"><div class="k">P(Paris) / P(Rome)</div><div class="v" id="sp">–</div></div>
+  <div class="stat"><div class="k">Recovered</div><div class="v" id="sv">–</div></div>
+</div>
+<p class="meta">Try this: on the corrupted run, layer 2's subject MLP alone recovers 50%, the layer 4 head 67%, and only the whole subject state after layer 3 recovers 100%. The lens shows "the" until layer 3 and the city from layer 4: the fact is computed at the subject, then moved. The patch slider only applies to the corrupted run.</p>
+</div>
+
+<h2 id="reality">4. Reality check</h2>
+<div class="card note">
+<p><strong>The claim:</strong> you can't fix hallucinations or bias without knowing which circuit generates them.</p>
+<ul>
+<li><strong>True in spirit:</strong> understanding mechanisms gives you tools that behaviour-only testing can't: you can check whether a model uses a feature you didn't intend, and find directions to steer or ablate.</li>
+<li><strong>Overstated as a requirement:</strong> almost every hallucination and bias fix used in practice today is behavioural: better data, preference training (<a href="05-alignment-preference.html">stage 05</a>), retrieval, abstention training and evals (<a href="10-evals-red-teaming.html">stage 10</a>). None needed a circuit diagram.</li>
+<li><strong>"Exact head" is the wrong frame.</strong> Facts are spread over mid-layer MLPs at the subject and several later attention heads. Behaviours like hallucination are spread wider still.</li>
+<li><strong>Localisation ≠ control.</strong> Hase et al. (2023) showed the traced location doesn't predict the best layer to edit. Knowing where isn't the same as knowing how to fix it.</li>
+<li><strong>Scale is open.</strong> Full circuits exist for narrow tasks in small models (IOI, greater-than). Explaining a frontier model's behaviour end to end is still a research problem.</li>
+</ul>
+<p>Still worth learning: patching and the lens are the debugger of model internals, and the habit of forming a hypothesis and testing it with an intervention transfers to everything else on this roadmap.</p>
+</div>
+
+<h2 id="course">5. In this course</h2>
+<ul>
+<li><a href="../06-30u30/13-attention.html">30u30 Day 13 · The Transformer</a> and <a href="../06-30u30/14-annotated-transformer.html">Day 14 · Annotated Transformer</a>: the attention heads, MLPs and residual stream you'll be hooking into.</li>
+<li><a href="../06-30u30/01-rnn-effectiveness.html">30u30 Day 01 · RNN Effectiveness</a>: the early "interpretable neuron" result (cells tracking quotes and line position), the ancestor of this field.</li>
+<li><a href="01-tensor-math-autograd.html">Stage 01</a>: PyTorch hooks and autograd, the mechanics behind TransformerLens and Baukit.</li>
+<li><a href="../02-tensortonic.html#track">Module 02 · TensorTonic</a>: lists an Interpretability project track for practice.</li>
+<li><a href="../07-post-training.html#pref">Module 07 · Preference alignment</a>: the behavioural route to fixing model behaviour, for contrast.</li>
+</ul>
+
+<h2 id="robotics">6. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>The tools transfer to VLAs.</strong> A vision-language-action model is a transformer, so the same hooks, lens and patching apply. You can patch image tokens between a "cup on left" and "cup on right" scene and see where the action decision forms.</li>
+<li><strong>Catching shortcuts.</strong> Patching or ablating visual tokens can show whether a policy keys on the object or on a background cue that won't hold in a new lab. That's a cheap check before deployment.</li>
+<li><strong>Weak link today.</strong> Most robot debugging still happens with ablations, saliency maps and held-out evaluation, not circuit analysis. Mechanistic work on robot policies is early, so treat this stage as useful background, not a core robotics skill.</li>
+<li><strong>Steering is risky on hardware.</strong> Editing activations in a model that drives motors needs the same safety testing as any new policy.</li>
+</ul>
+</div>
+
+<h2 id="check">7. Self-check</h2>
+<details><summary>What does the logit lens compute, and why can it mislead?</summary><p>It applies the final layer norm and unembedding to an intermediate residual stream. Middle layers weren't trained to be read that way, so the representation can be in a different basis. The lens shows what's decodable, not what's causally used. The tuned lens adds a learned per-layer map to reduce the bias.</p></details>
+<details><summary>Patching a component from clean into corrupted recovers 90% of the logit difference. Is it necessary for the behaviour?</summary><p>Not necessarily. That shows sufficiency. To test necessity, patch corrupted into clean or ablate it, and check whether backup components take over.</p></details>
+<details><summary>Where did ROME localise factual recall, and what did it edit?</summary><p>In middle-layer MLP (feed-forward) modules while processing the last subject token. It edited one MLP weight matrix with a rank-one update.</p></details>
+<details><summary>Why would a single attention head rarely be "the" location of a fact?</summary><p>Facts are enriched into the subject representation by MLPs. Attention heads at the final position read and move that information, and several heads across layers share the job. Geva et al. (2023) describe this enrich-then-extract flow.</p></details>
+<details><summary>Why use logit difference rather than probability as the patching metric?</summary><p>Probability saturates near 0 and 1, so big internal changes can look small. Logit difference is roughly linear in the residual stream and compares the right answer to a specific alternative.</p></details>
+<details><summary>What does ACDC automate?</summary><p>Finding the circuit: it iteratively removes edges of the computational graph whose removal barely changes the task metric, leaving a small subgraph.</p></details>
+
+<h2 id="courses">8. Courses &amp; content</h2>
+<div class="table-wrap"><table>
+<tr><th>Resource</th><th>Type</th><th>Use it for</th></tr>
+<tr><td><a href="https://arena.education/">ARENA · Transformer interpretability chapter</a></td><td>Course (free materials)</td><td>Hands-on exercises: logit lens, attribution, activation patching, circuits</td></tr>
+<tr><td><a href="https://github.com/callummcdougall/ARENA_3.0">ARENA 3.0 materials (GitHub)</a></td><td>Exercises (free)</td><td>The notebooks themselves</td></tr>
+<tr><td><a href="https://www.neelnanda.io/mechanistic-interpretability/getting-started">Neel Nanda · Getting started in mechanistic interpretability</a></td><td>Guide</td><td>Reading list and learning path</td></tr>
+<tr><td><a href="https://transformerlensorg.github.io/TransformerLens/">TransformerLens docs</a></td><td>Library + docs</td><td>Hooking and patching activations</td></tr>
+<tr><td><a href="https://transformer-circuits.pub/">Transformer Circuits Thread</a></td><td>Research publications</td><td>The primary research on circuits and features</td></tr>
+</table></div>
+<p>Start with ARENA's transformer interpretability chapter: it walks you through the logit lens, patching and the IOI circuit in TransformerLens, which is exactly this stage's project.</p>
+<p class="meta"><a href="index.html#courses">Full course map for all 12 stages →</a></p>
+
+<h2 id="papers">9. Papers &amp; docs</h2>
+<ul>
+<li>Meng, Bau, Andonian &amp; Belinkov (2022). <a href="https://arxiv.org/abs/2202.05262">Locating and Editing Factual Associations in GPT</a> (ROME). Project page: <a href="https://rome.baulab.info/">rome.baulab.info</a></li>
+<li>Geva, Bastings, Filippova &amp; Globerson (2023). <a href="https://arxiv.org/abs/2304.14767">Dissecting Recall of Factual Associations in Auto-Regressive Language Models</a></li>
+<li>Hase, Bansal, Kim &amp; Ghandeharioun (2023). <a href="https://arxiv.org/abs/2301.04213">Does Localization Inform Editing?</a></li>
+<li>Wang, Variengien, Conmy, Shlegeris &amp; Steinhardt (2022). <a href="https://arxiv.org/abs/2211.00593">Interpretability in the Wild: a Circuit for Indirect Object Identification in GPT-2 small</a></li>
+<li>Conmy, Mavor-Parker, Lynch, Heimersheim &amp; Garriga-Alonso (2023). <a href="https://arxiv.org/abs/2304.14997">Towards Automated Circuit Discovery for Mechanistic Interpretability</a> (ACDC)</li>
+<li>Belrose et al. (2023). <a href="https://arxiv.org/abs/2303.08112">Eliciting Latent Predictions from Transformers with the Tuned Lens</a></li>
+<li>nostalgebraist (2020). <a href="https://www.lesswrong.com/posts/AcKRB8wDpdaN6v6ru/interpreting-gpt-the-logit-lens">interpreting GPT: the logit lens</a></li>
+<li>Elhage et al. (2021). <a href="https://transformer-circuits.pub/2021/framework/index.html">A Mathematical Framework for Transformer Circuits</a></li>
+<li>Docs: <a href="https://transformerlensorg.github.io/TransformerLens/">TransformerLens</a> · <a href="https://github.com/davidbau/baukit">Baukit</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="08-inference-aware-design.html"><small>Previous</small>Stage 08 · Inference-aware design</a>
+  <a class="next" href="10-evals-red-teaming.html"><small>Next</small>Stage 10 · Evals &amp; red teaming</a>
+</nav>
+<footer>Module 08 · Stage 09 · written for this course from the source post and primary papers.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('lc'), ctx = cv.getContext('2d');
+const pIn = document.getElementById('pc');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const TOK = ['Paris', 'Rome', 'London', 'the', 'a'];
+const FACT = { Paris: [1, 0, .2, 0, 0], Rome: [0, 1, .2, 0, 0] };
+const WS = [0, .4, 1.2, .8];          // subject-MLP strength at layers 1-3
+const EMB = [0, 0, 0, .5, .5], G0 = [0, 0, 0, 1, .3];
+const IDS = ['none', 'm0', 's1', 's2', 's3', 'a4', 'a5', 'S'];
+const NAME = ['none', 'L0 MLP · last', 'L1 MLP · subject', 'L2 MLP · subject', 'L3 MLP · subject', 'L4 attn · last', 'L5 attn · last', 'subject state after L3'];
+const add = (a, b) => a.map((v, i) => v + b[i]);
+const mul = (a, k) => a.map(v => v * k);
+const soft = z => { const m = Math.max(...z), e = z.map(v => Math.exp(v - m)), s = e.reduce((a, b) => a + b); return e.map(v => v / s); };
+
+// one forward pass; if patch is set, that component's output is taken from src (the clean run)
+function run(subj, patch, src) {
+  const outs = {}, put = (id, v) => (outs[id] = patch === id ? src[id] : v);
+  let s = [0, 0, 0, 0, 0];
+  for (let l = 1; l <= 3; l++) s = add(s, put('s' + l, mul(FACT[subj], WS[l])));
+  s = put('S', s);
+  let f = EMB; const rows = [f];
+  f = add(f, put('m0', G0)); rows.push(f);
+  rows.push(f, f, f);                  // layers 1-3 write nothing at the last token
+  f = add(f, put('a4', mul(s, 1))); rows.push(f);
+  f = add(f, put('a5', mul(s, .5))); rows.push(f);
+  return { rows, outs, f };
+}
+const ld = f => f[0] - f[1];
+const clean = run('Paris'), corr = run('Rome');
+const rec = id => (ld(run('Rome', id, clean.outs).f) - ld(corr.f)) / (ld(clean.f) - ld(corr.f));
+let view = 'corr';
+
+function draw() {
+  const k = +pIn.value, id = IDS[k], W = cv.width, H = cv.height;
+  const r = view === 'clean' ? clean : run('Rome', id, clean.outs);
+  document.getElementById('pv').textContent = NAME[k];
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '12px sans-serif'; ctx.fillStyle = css('--muted'); ctx.textAlign = 'center';
+  const x0 = 60, cw = 52, y0 = 26, ch = 24, labels = ['emb', 'L0', 'L1', 'L2', 'L3', 'L4', 'L5'];
+  TOK.forEach((t, j) => ctx.fillText(t, x0 + cw * j + cw / 2, 16));
+  r.rows.forEach((row, i) => {
+    const p = soft(row);
+    ctx.fillStyle = css('--muted'); ctx.textAlign = 'right'; ctx.fillText(labels[i], x0 - 8, y0 + ch * i + 16);
+    p.forEach((v, j) => {
+      ctx.globalAlpha = .08 + .92 * v; ctx.fillStyle = css('--accent');
+      ctx.fillRect(x0 + cw * j + 1, y0 + ch * i + 1, cw - 2, ch - 2);
+      ctx.globalAlpha = 1; ctx.fillStyle = v > .5 ? css('--bg') : css('--fg'); ctx.textAlign = 'center';
+      ctx.fillText(v.toFixed(2), x0 + cw * j + cw / 2, y0 + ch * i + 16);
+    });
+  });
+  const bx = 470, bw = 185, bh = 20;
+  ctx.textAlign = 'left'; ctx.fillStyle = css('--muted'); ctx.fillText('recovered (clean → corrupted)', bx - 110, 16);
+  IDS.slice(1).forEach((c, i) => {
+    const v = rec(c), y = y0 + (bh + 5) * i;
+    ctx.fillStyle = css('--muted'); ctx.textAlign = 'right'; ctx.fillText(NAME[i + 1].replace(' after L3', ''), bx - 6, y + 14);
+    ctx.fillStyle = css('--line'); ctx.fillRect(bx, y, bw, bh);
+    ctx.fillStyle = c === id && view === 'corr' ? css('--pass') : css('--accent');
+    ctx.fillRect(bx, y, bw * Math.max(0, v), bh);
+    ctx.fillStyle = css('--fg'); ctx.textAlign = 'left'; ctx.fillText(Math.round(v * 100) + '%', bx + bw + 6, y + 14);
+  });
+  const p = soft(r.f), top = TOK[p.indexOf(Math.max(...p))];
+  document.getElementById('sr').textContent = view === 'clean' ? 'clean' : (id === 'none' ? 'corrupted' : 'patched');
+  document.getElementById('st').textContent = top;
+  document.getElementById('sp').textContent = p[0].toFixed(2) + ' / ' + p[1].toFixed(2);
+  document.getElementById('sv').textContent = view === 'clean' ? '100%' : (id === 'none' ? '0%' : Math.round(rec(id) * 100) + '%');
+}
+document.getElementById('bc').onclick = () => { view = 'clean'; draw(); };
+document.getElementById('bx').onclick = () => { view = 'corr'; draw(); };
+pIn.oninput = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

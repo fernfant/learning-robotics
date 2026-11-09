@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 21 · Message Passing</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 21</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Unit 4 · Specialised architectures · Day 21</div>
+<h1>Neural Message Passing for Quantum Chemistry</h1>
+<p class="lede">Most graph neural networks are one algorithm in different clothes: each node collects messages from its neighbours, updates its state, repeats, and then the graph is pooled into an answer.</p>
+
+<div class="facts">
+  <div><b>Authors</b>Justin Gilmer, Samuel S. Schoenholz, Patrick F. Riley, Oriol Vinyals, George E. Dahl (Google Brain, Google, DeepMind)</div>
+  <div><b>Year / venue</b>2017 · ICML</div>
+  <div><b>Core idea</b>Message, update, readout: one framework for graph nets</div>
+  <div><b>Study time</b>3–4 h</div>
+</div>
+<p class="meta">Original: <a href="https://arxiv.org/abs/1704.01212">arXiv:1704.01212</a> · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/21_Neural_Message_Passing">30u30 Day 21</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Many computer programs for networks of things work the same way: each thing swaps messages with its neighbours, updates what it knows, and repeats.</p>
+
+<h3>Think of it like this</h3>
+<p>Think of news spreading through a group of friends. In each round, everyone tells their direct friends what they know. After one round, only your friends have heard. After two rounds, friends of friends have heard too. News travels one step per round. If there's a group chat everyone is in, it reaches everyone much faster. This paper's programs pass messages the same way, between atoms in a molecule.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Draw the things as dots and their connections as lines. For a molecule, dots are atoms and lines are bonds.</li>
+<li>Each dot sends a message to the dots it is connected to.</li>
+<li>Each dot reads its messages and updates what it knows.</li>
+<li>Repeat for a few rounds. Each round, information travels one more step.</li>
+<li>Finally, combine what every dot knows into one answer, such as how the molecule behaves.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A team of delivery robots can only talk to the robots close by. If each one passes on what it hears, a warning like "the hallway is blocked" spreads through the whole team, one robot-hop per round.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>With friends in a line, whisper a fact to the first person. Each round, every person who knows it tells the person next to them. Count how many rounds it takes to reach the end.</li>
+<li>In the demo further down, click a dot to make it the starting point. Move the <b>Rounds T</b> slider to see how far the news spreads. Then tick <b>Add master node</b>, a hub connected to every dot, and see how much faster it reaches everyone.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Graph</dt><dd>A set of dots (nodes) joined by lines (edges).</dd>
+<dt>Node</dt><dd>One dot in the graph, like an atom or a robot.</dd>
+<dt>Message</dt><dd>The information one node sends to a neighbour.</dd>
+<dt>Round</dt><dd>One turn where every node sends and receives messages.</dd>
+<dt>Master node</dt><dd>An extra dot connected to all the others, like a group chat.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>By 2017 there were many neural networks for graphs, each with its own notation. This paper shows at least eight of them fit one template, the Message Passing Neural Network (MPNN), defined by three learned functions: message, update and readout. The authors then searched inside that template for the best model for predicting 13 quantum-chemical properties of small molecules (the QM9 dataset). These normally come from DFT simulations that take about an hour per molecule. Their best MPNN set the state of the art on all 13 targets and reached the chemists' "chemical accuracy" bar on 11 of them.</p>
+</div>
+<ul>
+<li><strong>Template:</strong> <code>T</code> rounds of message passing along edges, then a readout that doesn't depend on node order.</li>
+<li><strong>Best variant:</strong> an <em>edge network</em> message function (edge features become a matrix), a GRU update, a set2set readout, and hydrogens as explicit nodes.</li>
+<li><strong>Numbers:</strong> average error ratio 0.68 across targets for one model and 0.52 for a 5-model ensemble, vs 1.35 for the best earlier method (1.0 = chemical accuracy).</li>
+<li><strong>Long range matters:</strong> without 3D coordinates, adding a global "master node" or a set2set readout cut the average error ratio from 3.47 to about 2.6.</li>
+<li><strong>Speed:</strong> inference is roughly 300,000× faster than the DFT calculation it approximates.</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<p>Each node <code>v</code> has a hidden state <code>h_v</code>, starting from its features (atom type, charge and so on). Each edge has features <code>e_vw</code> (bond type, distance). For <code>t = 0 … T−1</code>:</p>
+<pre><code>m_v^{t+1} = Σ_{w ∈ N(v)} M_t(h_v^t, h_w^t, e_vw)     # gather messages
+h_v^{t+1} = U_t(h_v^t, m_v^{t+1})                    # update state
+ŷ = R({ h_v^T : v ∈ G })                             # read out the graph</code></pre>
+<ul>
+<li><code>N(v)</code>: the neighbours of <code>v</code>. Messages only travel along edges.</li>
+<li><code>M_t</code>: the <strong>message function</strong>. What <code>w</code> tells <code>v</code>, given both states and the edge between them.</li>
+<li><code>Σ</code>: summing over neighbours, so the order of neighbours doesn't matter and any degree works.</li>
+<li><code>U_t</code>: the <strong>update function</strong>, here a GRU. Weights are tied across rounds.</li>
+<li><code>R</code>: the <strong>readout</strong>. It must give the same answer for any ordering of the nodes.</li>
+</ul>
+<p>The paper's best message function is the <strong>edge network</strong>:</p>
+<pre><code>M(h_v, h_w, e_vw) = A(e_vw) · h_w</code></pre>
+<p><code>A</code> is a small neural network that turns the edge feature vector into a <code>d × d</code> matrix. So a short double bond and a long single bond transform the neighbour's state differently, and the edge features can be continuous (like distance), not just a few categories.</p>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>One template, many models</h3>
+<p>The paper rewrites earlier models as choices of <code>M</code>, <code>U</code> and <code>R</code>. Gated Graph Neural Networks use a learned matrix per edge type and a GRU update. The Kipf and Welling graph convolution uses a degree-normalised neighbour sum and a ReLU update. Interaction Networks, built for physics, use an MLP on the pair of states plus the edge. Once you see the template, a new graph paper is mostly a question of which three functions it picked. The Relation Network from <a href="19-relational-reasoning.html">Day 19</a> fits too: think of it as one round on a fully connected graph with a summed readout.</p>
+
+<h3>Information moves one hop per round</h3>
+<p>After <code>T</code> rounds, a node only knows about nodes up to <code>T</code> edges away. In a long molecule, atoms at opposite ends may never hear from each other. The paper tested two fixes. <strong>Virtual edges</strong> connect non-bonded pairs with a special edge type. A <strong>master node</strong> is connected to every node, and acts as shared scratch space that all nodes read and write each round. With it, any two nodes are at most two hops apart. The demo shows the difference. In training, <code>T</code> was searched between 3 and 8.</p>
+<div class="card demo">
+<h3>Interactive: how far does information spread?</h3>
+<p class="legend">Click a node to make it the source. Filled nodes have received its information after T rounds. Tick the master node to add a global hub.</p>
+<canvas id="graph" width="700" height="280" aria-label="Small molecule-like graph; nodes reached by a source after T rounds are filled"></canvas>
+<label for="t">Rounds T: <span id="tv" class="num"></span></label>
+<input id="t" type="range" min="0" max="8" step="1" value="2">
+<label><input id="mn" type="checkbox"> Add master node</label>
+<div class="stats">
+  <div class="stat"><div class="k">Nodes reached</div><div class="v" id="reach">–</div></div>
+  <div class="stat"><div class="k">Rounds to reach all</div><div class="v" id="need">–</div></div>
+</div>
+</div>
+
+<h3>The readout and the set2set trick</h3>
+<p>A plain sum of final node states works, but it can wash out detail. The best model used <strong>set2set</strong>, an attention-based pooling over sets from <a href="16-order-matters.html">Day 16</a>. It reads the node states several times with a small LSTM and attention, and stays order-invariant. Without spatial inputs, set2set alone brought the average error ratio from 3.47 to 2.57.</p>
+
+<h3>Making it cheaper: towers</h3>
+<p>One round on a dense graph costs <code>O(n²d²)</code> for <code>n</code> nodes with <code>d</code>-dimensional states. The <strong>towers</strong> variant splits each state into <code>k</code> chunks of size <code>d/k</code>, runs message passing on each chunk separately, then mixes them. That cuts cost to roughly <code>O(n²d²/k)</code>. With <code>k = 8</code>, <code>n = 9</code>, <code>d = 200</code>, inference was about 2× faster, and accuracy improved slightly too.</p>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Learned physics simulators.</strong> Interaction Networks, one of the models this paper unifies, were built to predict how objects push and pull each other. Later learned simulators for particles, cloth and rigid bodies use exactly this message-update loop, with nodes as particles or mesh points and edges as contacts.</li>
+<li><strong>Multi-robot coordination.</strong> Put robots on nodes and radio links on edges. One round of message passing is one exchange with neighbours, so a policy with <code>T</code> rounds uses information from <code>T</code> hops away. That matches how decentralised teams actually communicate.</li>
+<li><strong>Bodies and scenes are graphs.</strong> A robot's links and joints, or the objects in a scene, form natural graphs. Graph policies handle a different number of legs or objects without retraining the input layer.</li>
+<li><strong>Fast surrogates for slow computation.</strong> Here an MPNN replaced an hour of DFT with a fast prediction. In robotics the same move replaces a slow simulator or contact model with a learned one, but only inside the range it was trained on. The authors themselves flag generalising to larger graphs as unsolved.</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Read section 2 (the framework) and section 5 (the variants) of the paper, about 1.5 h. For each model in section 2, write down its <code>M</code>, <code>U</code> and <code>R</code>.</li>
+<li>In the 30u30 Day 21 folder, read <code>implementation.py</code>: find the message, update and readout pieces and match them to the equations above.</li>
+<li>Run <code>train_minimal.py</code> on the synthetic molecular data. Change the number of message rounds and watch the per-property error.</li>
+<li>Do the exercises: message functions, graph construction and batching, readouts, edge networks, then multi-target property prediction.</li>
+<li>Stretch: add a master node to the implementation and compare on a long chain-shaped graph.</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>What are the three functions that define an MPNN?</summary><p>The message function <code>M</code>, the node update function <code>U</code>, and the graph-level readout <code>R</code>.</p></details>
+<details><summary>Why must the readout be invariant to node order?</summary><p>Node numbering is arbitrary. The same molecule written with atoms in a different order must give the same prediction.</p></details>
+<details><summary>After 3 rounds, what can a node know about?</summary><p>Only nodes within 3 edges of it. Information travels one hop per round.</p></details>
+<details><summary>What does the edge network add over one matrix per bond type?</summary><p>It maps continuous edge features, like distance, to a transformation matrix. So messages can depend smoothly on geometry, not just on a small set of bond categories.</p></details>
+<details><summary>Why does a master node help without 3D coordinates?</summary><p>It connects every node through one hub, so any two nodes are at most two hops apart. Long-range effects that the bond graph alone can't carry in a few rounds get through.</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/1704.01212">The original paper</a>, with the supplementary material deriving each earlier model as an MPNN</li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/21_Neural_Message_Passing">30u30 Day 21</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Next: <a href="22-deep-speech-2.html">Day 22, Deep Speech 2</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="20-relational-rnns.html"><small>Previous</small>Day 20 · Relational RNNs</a>
+  <a class="next" href="22-deep-speech-2.html"><small>Next</small>Day 22 · Deep Speech 2</a>
+</nav>
+<footer>Module 06 · Day 21 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('graph'), ctx = cv.getContext('2d');
+const tIn = document.getElementById('t'), mIn = document.getElementById('mn');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+// a ring of six atoms with a chain and a branch hanging off it
+const NODES = [[90, 140], [130, 80], [200, 80], [240, 140], [200, 200], [130, 200],
+  [310, 140], [380, 140], [450, 140], [520, 140], [590, 140], [650, 90], [650, 190], [380, 210]];
+const EDGES = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 0], [3, 6], [6, 7], [7, 8], [8, 9], [9, 10], [10, 11], [10, 12], [7, 13]];
+const HUB = [380, 30];
+let src = 0;
+
+function adjacency(master) {
+  const n = NODES.length + (master ? 1 : 0), adj = Array.from({length: n}, () => []);
+  EDGES.forEach(([a, b]) => { adj[a].push(b); adj[b].push(a); });
+  if (master) for (let i = 0; i < NODES.length; i++) { adj[i].push(n - 1); adj[n - 1].push(i); }
+  return adj;
+}
+
+// hop distance from s to every node (BFS); one hop = one round of message passing
+function hops(adj, s) {
+  const d = adj.map(() => Infinity); d[s] = 0;
+  const q = [s];
+  while (q.length) { const u = q.shift(); adj[u].forEach(w => { if (d[w] === Infinity) { d[w] = d[u] + 1; q.push(w); } }); }
+  return d;
+}
+
+function draw() {
+  const T = +tIn.value, master = mIn.checked, adj = adjacency(master), d = hops(adj, src);
+  const atoms = d.slice(0, NODES.length);
+  document.getElementById('tv').textContent = T;
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  if (master) {
+    ctx.setLineDash([4, 4]); ctx.strokeStyle = css('--line'); ctx.lineWidth = 1;
+    NODES.forEach(p => { ctx.beginPath(); ctx.moveTo(...HUB); ctx.lineTo(...p); ctx.stroke(); });
+    ctx.setLineDash([]);
+  }
+  ctx.strokeStyle = css('--muted'); ctx.lineWidth = 2;
+  EDGES.forEach(([a, b]) => { ctx.beginPath(); ctx.moveTo(...NODES[a]); ctx.lineTo(...NODES[b]); ctx.stroke(); });
+  const pts = master ? NODES.concat([HUB]) : NODES;
+  pts.forEach((p, i) => {
+    const hit = d[i] <= T;
+    ctx.beginPath(); ctx.arc(p[0], p[1], i === src ? 13 : 11, 0, 2 * Math.PI);
+    ctx.fillStyle = i === src ? css('--accent') : hit ? css('--pass') : css('--bg'); ctx.fill();
+    ctx.strokeStyle = css('--fg'); ctx.lineWidth = 1.5; ctx.stroke();
+  });
+  document.getElementById('reach').textContent = `${atoms.filter(x => x <= T).length} / ${NODES.length}`;
+  document.getElementById('need').textContent = Math.max(...atoms);
+}
+
+cv.addEventListener('click', e => {
+  const b = cv.getBoundingClientRect(), x = (e.clientX - b.left) * cv.width / b.width, y = (e.clientY - b.top) * cv.height / b.height;
+  NODES.forEach((p, i) => { if (Math.hypot(p[0] - x, p[1] - y) < 16) src = i; });
+  draw();
+});
+tIn.oninput = mIn.onchange = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

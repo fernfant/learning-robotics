@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inference · Profiling and kernels</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 09 · Inference engineering</a> › Page 07</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 09 · Problems 13–15</div>
+<h1>Profiling, GPU utilisation and writing a fused kernel</h1>
+<p class="lede">A slow model is slow for one of three reasons: the GPU is out of arithmetic, out of memory bandwidth, or sitting idle waiting for work. This page shows how to tell which one with a profiler, how to debug a GPU that looks two-thirds idle, and how to write and fairly benchmark a small fused kernel.</p>
+
+<div class="facts">
+  <div><b>Problems covered</b>13 (Nsight profiling), 14 (30% GPU utilisation), 15 (fused RMSNorm kernel)</div>
+  <div><b>Interview level</b>Mid to senior. Problem 15 is a common live-coding task for kernel and performance roles</div>
+  <div><b>Key ideas</b>Roofline model, arithmetic intensity, kernel launch overhead, what "GPU utilisation" really measures, kernel fusion, effective bandwidth</div>
+  <div><b>Time to prep</b>4–6 h reading and arithmetic, plus 3–5 h on a Colab GPU for the kernel</div>
+</div>
+<p class="meta">Source: <a href="https://x.com/vishalsingh2972/status/2113830444722741637">Vishal Singh's post of 25 inference-engineering problems</a> · saved in <code>sources/09-vishal-inference-25.md</code></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">When a computer program is slow, guessing why is a waste of time. You measure. Is the worker too slow, are the supplies arriving too slowly, or is the worker standing around waiting to be told what to do next?</p>
+
+<h3>Think of it like this</h3>
+<p>Picture a school canteen kitchen at lunch. The line is slow. Maybe the cook can't chop any faster (that's "compute-bound"). Maybe the cook is fast but keeps walking to the storeroom for one ingredient at a time (that's "memory-bound"). Or maybe the cook is ready, but the manager hands over one order slip at a time and walks off between slips (that's "launch overhead"). Each problem has a different fix: a faster cook, fewer storeroom trips, or a whole stack of slips at once. "Fusing" a kernel is like carrying every ingredient for a dish in one trip, instead of one trip per ingredient.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>A program called a profiler records what the GPU and the main processor did, moment by moment.</li>
+<li>You look at the timeline. Gaps where the GPU does nothing mean it's waiting for instructions.</li>
+<li>For the busy parts, you check each small GPU program (a "kernel"): was it limited by arithmetic or by fetching data?</li>
+<li>You fix the biggest problem first, then measure again.</li>
+<li>Sometimes the fix is a new kernel that does several steps in one pass, so data is fetched once instead of many times.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot's onboard model has a fixed time to answer, for example before the next camera frame arrives. If the answer is late, the robot acts on old information. Profiling tells you where those milliseconds go, so you can fix the right thing instead of buying a bigger computer that can't fit in the robot.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Make a sandwich twice. First, fetch each ingredient from the fridge in a separate trip. Then fetch everything in one trip. Time both. The second is the "fused" version.</li>
+<li>In the demo below, leave <b>Tokens per step</b> at 1 and see the dot sit on the sloped "memory" part of the line. Raise it until the dot reaches the flat "compute" roof. Then lower <b>Memory bandwidth</b> to mimic a small robot computer and watch the roof corner move right.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Kernel</dt><dd>One small program the GPU runs in parallel across many cores, such as "multiply these matrices".</dd>
+<dt>Memory bandwidth</dt><dd>How many bytes per second the GPU can read from its main memory.</dd>
+<dt>Arithmetic intensity</dt><dd>How many calculations a kernel does for each byte it reads or writes.</dd>
+<dt>Profiler</dt><dd>A tool that records where time goes, so you measure instead of guess.</dd>
+<dt>Fusion</dt><dd>Combining several steps into one kernel so data crosses slow memory once.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings, the interview answers and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="hw">The numbers this page uses</h2>
+<p>Every worked answer below uses one GPU, so the arithmetic is comparable. These figures come from NVIDIA's H100 product page, SXM column. The PCIe-class variant listed beside it differs (different memory size and bandwidth), so don't mix the two.</p>
+<div class="table-wrap"><table>
+<tr><th>H100 SXM spec</th><th>Value</th><th>Note</th></tr>
+<tr><td>GPU memory</td><td>80 GB</td><td>HBM</td></tr>
+<tr><td>Memory bandwidth</td><td>3.35 TB/s</td><td>The number that limits decode</td></tr>
+<tr><td>BF16 Tensor Core</td><td>1,979 TFLOPS listed</td><td>NVIDIA lists this <em>with sparsity</em>. Dense is half: about 989 TFLOPS. Use dense for normal models.</td></tr>
+<tr><td>FP8 Tensor Core</td><td>3,958 TFLOPS listed</td><td>Also with sparsity, so about 1,979 dense</td></tr>
+</table></div>
+<p>Kernel launch costs, CPU step times and request rates below are <strong>assumptions</strong> chosen to make the arithmetic clear. They are not measurements. Measure your own.</p>
+
+<h2 id="p13">Problem 13 · Profile a slow model with Nsight: compute, memory bandwidth, or launch overhead?</h2>
+<p><strong>What the interviewer is testing:</strong> whether you have a method, not a hunch. Can you pick the right tool, read a timeline, use the roofline model, and name the fix for each kind of bottleneck?</p>
+
+<h3>The concepts</h3>
+<p><strong>Two tools, two zoom levels.</strong> Nsight Systems (<code>nsys</code>) records a timeline of the whole program: CPU threads, CUDA API calls, every kernel, memory copies, and communication between GPUs. It answers "where does wall-clock time go, and is the GPU ever idle?" Nsight Compute (<code>ncu</code>) replays individual kernels many times with hardware counters. It answers "why is <em>this</em> kernel slow?" Always start with Systems. Running Compute on everything is slow and drowns you in detail.</p>
+<pre><code># 1. Timeline of a few hundred decode steps
+nsys profile -t cuda,nvtx,osrt --cuda-graph-trace=node -o trace python bench.py
+
+# 2. Deep dive on the kernels that dominate the timeline
+ncu --set full -k regex:rms -c 20 -o rms_report python bench.py</code></pre>
+<p>Wrap the phases of your code in NVTX ranges (<code>torch.cuda.nvtx.range_push("prefill")</code> … <code>range_pop()</code>) so the timeline shows "prefill", "decode step", "sampling" as labelled bars. Without them you are reading thousands of anonymous kernel names.</p>
+
+<p><strong>The roofline model.</strong> A kernel does some floating-point operations (FLOPs) and moves some bytes to and from HBM. Its arithmetic intensity is the ratio. Its best possible speed is capped by whichever resource runs out first:</p>
+<pre><code>arithmetic intensity  I = FLOPs / bytes moved            (FLOP per byte)
+attainable FLOP/s       = min( peak FLOP/s ,  I × bandwidth )
+ridge point          I* = peak FLOP/s / bandwidth
+
+H100 SXM, dense BF16:  I* = 989e12 / 3.35e12 ≈ 295 FLOP/byte
+I &lt; 295  → memory-bound   (more bandwidth or fewer bytes helps)
+I &gt; 295  → compute-bound  (more FLOP/s or fewer FLOPs helps)</code></pre>
+<p><strong>Launch overhead</strong> is the third case, and the roofline doesn't show it. Each kernel launch costs CPU time in Python, the framework and the driver. If the GPU finishes a kernel before the CPU has queued the next one, the GPU sits idle. Nsight Systems shows this as gaps between kernels on the GPU row, while the CPU row is busy.</p>
+
+<h3>A worked answer with real numbers</h3>
+<p>Take one linear layer of a model with hidden size d = 4,096, weights in BF16 (2 bytes). Feed it N tokens at once: N is the batch size during decode, or the chunk length during prefill.</p>
+<pre><code>FLOPs = 2 × N × d²                       (multiply + add per weight per token)
+bytes = 2 × (d² + 2·N·d)                 (read weights, read input, write output)
+I     = 2·N·d² / (2·(d² + 2·N·d)) = N·d / (d + 2N)
+
+Decode, N = 1:
+  I = 4096 / 4098 ≈ 1.0 FLOP/byte          → far below 295, memory-bound
+  time ≈ bytes / bandwidth = 33.6 MB / 3.35 TB/s ≈ 10 µs
+  attainable = 1.0 × 3.35 TB/s ≈ 3.35 TFLOP/s → about 0.3% of the 989 peak
+
+Prefill chunk, N = 2,048:
+  I = 2048 × 4096 / (4096 + 4096) = 1,024 FLOP/byte → compute-bound
+  compute time = 2 × 2048 × 4096² / 989e12 ≈ 69 µs
+  memory time  = 67 MB / 3.35 TB/s ≈ 20 µs  → compute wins
+
+Crossover: N·d/(d + 2N) = 295  →  N ≈ 345 tokens per step</code></pre>
+<p>So for this layer on this GPU, any step with fewer than about 345 tokens is memory-bound. Single-user decode is deep in the memory-bound corner. Attention during decode is worse still, because every sequence reads its own KV cache (see <a href="02-kv-cache-attention.html">page 02</a>).</p>
+<p>The whole-model version gives a hard upper bound on single-stream decode speed:</p>
+<pre><code>8B parameters × 2 bytes = 16 GB read per decode step
+16 GB / 3.35 TB/s ≈ 4.8 ms per token  →  at most ~209 tokens/s at batch 1
+(real numbers are lower: KV-cache reads, imperfect bandwidth use, overheads)</code></pre>
+<p><strong>Launch overhead, with assumed numbers.</strong> Suppose a decode step launches about 15 kernels per layer across 32 layers: 480 launches. <em>Assume</em> each costs about 5 µs of CPU time in eager PyTorch. That's 2.4 ms of CPU work per step. For the 8B model the GPU needs about 4.8 ms, so the CPU just keeps up. Shrink the model to 1B parameters (2 GB, about 0.6 ms of GPU time per step) and the same 2.4 ms of launches now dominates: the GPU is idle about three-quarters of the time. Small models are where launch overhead bites.</p>
+
+<h3>Reading the profile: a decision table</h3>
+<div class="table-wrap"><table>
+<tr><th>What you see</th><th>Diagnosis</th><th>Fixes</th></tr>
+<tr><td>Nsight Systems: gaps between short kernels, CPU thread busy in Python or <code>cudaLaunchKernel</code></td><td>Launch or CPU overhead</td><td>CUDA graphs, <code>torch.compile</code>, kernel fusion, a C++ runtime, overlapping CPU scheduling with GPU work</td></tr>
+<tr><td>Nsight Compute: memory throughput near peak, compute throughput low; dot left of the ridge on the roofline chart</td><td>Memory-bound kernel</td><td>Move fewer bytes: fuse ops, quantise weights or KV cache, bigger batch to reuse weights</td></tr>
+<tr><td>Nsight Compute: tensor pipes busy, memory moderate; dot right of the ridge</td><td>Compute-bound kernel</td><td>Lower precision (FP8), a better kernel (FlashAttention), fewer FLOPs</td></tr>
+<tr><td>Both throughputs low, GPU busy</td><td>Latency-bound kernel: poor occupancy, small grid, stalls</td><td>Bigger tiles or grid, check occupancy and warp stall reasons in <code>ncu</code></td></tr>
+<tr><td>Long NCCL kernels or memcpy bars</td><td>Communication or host transfers</td><td>Overlap communication, change parallelism, pin memory, avoid host round-trips</td></tr>
+</table></div>
+
+<h3>Trade-offs</h3>
+<ul>
+<li><strong>Nsight Systems vs Nsight Compute:</strong> Systems is low overhead and shows the whole picture; Compute is precise per kernel but replays each kernel, so it's slow and changes timings. Use Systems to choose which kernels to send to Compute.</li>
+<li><strong>CUDA graphs:</strong> remove launch cost by replaying a recorded sequence of kernels, but need fixed shapes, so engines capture one graph per batch-size bucket. That costs memory and startup time.</li>
+<li><strong>Profiling a server vs a script:</strong> a script is clean and repeatable; a live server shows real scheduler gaps. Profile both.</li>
+</ul>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>I start with Nsight Systems on a few hundred steps, with NVTX ranges around prefill, decode and sampling. If the GPU row has gaps while the CPU is busy, it's launch or CPU overhead, and the fix is CUDA graphs, compilation or fusion. If the GPU is busy, I take the top kernels by time into Nsight Compute and place them on the roofline. On an H100 the ridge is about 295 FLOPs per byte in dense BF16, and decode GEMMs sit near 1, so decode is memory-bound and the fixes are fewer bytes and bigger batches. Prefill chunks of thousands of tokens are compute-bound, where FP8 and better kernels help.</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Running Nsight Compute on the whole program first, and drowning in data.</li>
+<li>Using the "with sparsity" FLOP figure from a spec sheet as the peak for a dense model, which doubles the apparent headroom.</li>
+<li>Profiling a cold start, so the timeline is dominated by compilation, autotuning and memory allocation.</li>
+<li>Calling a kernel "slow" without comparing it to its roofline bound. A kernel at 90% of peak bandwidth is done; only the algorithm can help.</li>
+</ul>
+
+<h2 id="p14">Problem 14 · Your GPU sits at 30% utilisation under load. Debug it</h2>
+<p><strong>What the interviewer is testing:</strong> whether you know what the utilisation number actually measures, and whether you debug from the outside in (load, scheduler, CPU) before blaming kernels.</p>
+
+<h3>The concepts</h3>
+<p><strong>What "GPU utilisation" means.</strong> The figure in <code>nvidia-smi</code> is the share of a sample period during which <em>at least one kernel</em> was running. It says nothing about how much of the GPU that kernel used. A tiny kernel on one SM counts as 100% busy. So 30% means the GPU ran nothing for about 70% of the time. That points at starvation, not slow kernels. For how well the busy time was used, DCGM's profiling metrics are better: SM activity, SM occupancy, tensor pipe activity and DRAM activity.</p>
+<p><strong>Little's law</strong> links load to batch size. The average number of requests in the system equals arrival rate × time each spends there:</p>
+<pre><code>in-flight requests = arrival rate × mean request duration
+GPU busy fraction  = GPU time per step / (GPU time + non-overlapped CPU time per step)</code></pre>
+
+<h3>A worked answer with real numbers</h3>
+<p>Two common stories, with <em>assumed</em> numbers.</p>
+<p><strong>Story A: the load is too light.</strong> The engine is configured for up to 64 concurrent sequences. Each request lasts about 10 s (prompt plus a few hundred output tokens). The load tester sends 1 request per second.</p>
+<pre><code>in-flight = 1 req/s × 10 s = 10 sequences   (the engine allows 64)
+to fill 64 slots: 64 / 10 s = 6.4 req/s needed</code></pre>
+<p>The GPU is not broken. The test is too gentle, or a gateway in front is limiting concurrency. Check the engine's running and waiting counts. If nothing is waiting, the GPU isn't the bottleneck.</p>
+<p><strong>Story B: the CPU is in the critical path.</strong> Each decode step needs 12 ms of GPU work. Between steps, the CPU spends 28 ms on scheduling, sampling, detokenising and streaming, and none of it overlaps with the GPU.</p>
+<pre><code>busy fraction = 12 / (12 + 28) = 30%
+step time     = 40 ms  →  25 steps/s
+
+If CPU work overlaps the next GPU step:
+step time = max(12, 28) = 28 ms → 43% busy, 36 steps/s
+If the CPU work is also cut to 8 ms:
+step time = max(12, 8) = 12 ms → ~100% busy, 83 steps/s</code></pre>
+<p>Overlap alone isn't enough here, because the CPU part is longer than the GPU part. You also have to shrink it: move detokenisation off the main loop, sample on the GPU, batch the streaming writes.</p>
+
+<h3>The debugging ladder</h3>
+<ol>
+<li><strong>Is there enough work?</strong> Look at the waiting queue and running batch size. Empty queue plus small batch means a load or routing problem.</li>
+<li><strong>Is the scheduler capping the batch?</strong> Limits on concurrent sequences or tokens per step, or a KV cache that's full and causing preemptions, keep batches small even when requests are waiting.</li>
+<li><strong>Is the CPU in the path?</strong> Nsight Systems: GPU gaps lined up with Python, tokenisation, sampling or network work on the CPU threads. Also check the CPU itself is not throttled or shared.</li>
+<li><strong>Is it waiting on transfers or other GPUs?</strong> Host-to-device copies, synchronising calls such as <code>.item()</code> in the loop, or tensor-parallel all-reduces waiting on a slow peer.</li>
+<li><strong>Only then, the kernels.</strong> Many small kernels with gaps: launch overhead (Problem 13).</li>
+</ol>
+
+<h3>Trade-offs</h3>
+<div class="table-wrap"><table>
+<tr><th>Fix</th><th>Gains</th><th>Costs</th></tr>
+<tr><td>Raise concurrency limits</td><td>Bigger batches, higher throughput</td><td>Higher per-token latency, more KV memory, risk of preemption</td></tr>
+<tr><td>Overlap CPU scheduling with GPU steps</td><td>Hides CPU time</td><td>Engine complexity; scheduling decisions use slightly stale state</td></tr>
+<tr><td>CUDA graphs</td><td>Removes launch gaps</td><td>Fixed shapes, extra memory, longer startup</td></tr>
+<tr><td>Fewer, larger replicas</td><td>More load per GPU</td><td>Less redundancy, larger blast radius on failure</td></tr>
+</table></div>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>First I'd check what the 30% means: nvidia-smi counts time when any kernel is running, so 30% says the GPU is idle 70% of the time, which is starvation, not slow kernels. I work from the outside in. Is there a waiting queue? If not, the load or the gateway is the problem, and Little's law tells me how much traffic fills the batch. If requests are waiting but batches are small, I look at scheduler limits and KV-cache preemption. If batches are full, I take an Nsight Systems trace and look for CPU work between steps, such as sampling, detokenising or synchronising calls, and overlap or remove it. I'd confirm with DCGM metrics like SM activity rather than nvidia-smi alone.</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Treating nvidia-smi utilisation as "how much of the GPU is used". 100% can still mean one busy SM.</li>
+<li>Jumping straight to kernel optimisation when the queue is empty.</li>
+<li>Testing with a closed-loop client at low concurrency and concluding the server can't scale.</li>
+<li>Adding a hidden <code>.item()</code> or <code>.cpu()</code> in the decode loop, which forces the CPU to wait for the GPU every step.</li>
+</ul>
+
+<h2 id="p15">Problem 15 · Write a fused RMSNorm kernel and benchmark it against PyTorch</h2>
+<p><strong>What the interviewer is testing:</strong> can you write a correct GPU kernel (indexing, masking, reductions, precision), reason about why fusion helps, and benchmark honestly?</p>
+
+<h3>The concepts</h3>
+<p>RMSNorm (Zhang and Sennrich, 2019) is LayerNorm without the mean subtraction and bias. Llama-style models apply it twice per layer. For a row x of length d:</p>
+<pre><code>rms(x) = sqrt( (1/d) × Σ xᵢ²  + ε )
+yᵢ     = xᵢ / rms(x) × wᵢ</code></pre>
+<p>It does about 4 FLOPs per element (square, add, two multiplies). In BF16 a fused version reads 2 bytes and writes 2 bytes per element, so its intensity is about 1 FLOP per byte. That's far below the H100 ridge of about 295. <strong>RMSNorm is memory-bound, so its speed is set by bytes moved.</strong> That's why fusion helps.</p>
+<p>Written naively in eager PyTorch, each operation is its own kernel and writes its result back to HBM:</p>
+<pre><code>x.pow(2)        read x, write tmp1          4 bytes/elem in BF16
+.mean(-1)       read tmp1                   2
+x * rstd        read x, write tmp2          4
+tmp2 * w        read tmp2, write y          4
+                                            ── ~14 bytes/elem
+fused kernel    read x once, write y once   4 bytes/elem</code></pre>
+<p>That simple count says unfused moves about 3.5× more bytes. Real eager code often upcasts to FP32 for the sum, which adds more traffic; PyTorch's built-in <code>torch.nn.functional.rms_norm</code> and <code>torch.compile</code> may already fuse it. So the fair baselines are eager, built-in and compiled, not eager alone.</p>
+
+<h3>A Triton kernel sketch</h3>
+<p>One program instance handles one row. The whole row fits in one block for typical hidden sizes (up to a few tens of thousands), so the reduction is a single <code>tl.sum</code>. Accumulate in FP32 even when inputs are BF16.</p>
+<pre><code>import torch, triton, triton.language as tl
+
+@triton.jit
+def rmsnorm_kernel(X, W, Y, stride, N, eps, BLOCK: tl.constexpr):
+    row = tl.program_id(0)
+    cols = tl.arange(0, BLOCK)
+    mask = cols &lt; N
+    x = tl.load(X + row * stride + cols, mask=mask, other=0.0).to(tl.float32)
+    w = tl.load(W + cols, mask=mask, other=0.0).to(tl.float32)
+    rstd = tl.rsqrt(tl.sum(x * x, axis=0) / N + eps)   # masked lanes add 0
+    y = x * rstd * w
+    tl.store(Y + row * stride + cols, y.to(Y.dtype.element_ty), mask=mask)
+
+def rmsnorm(x, w, eps=1e-6):
+    N = x.shape[-1]
+    x2 = x.reshape(-1, N).contiguous()
+    y = torch.empty_like(x2)
+    BLOCK = triton.next_power_of_2(N)
+    warps = 8 if BLOCK &gt;= 4096 else 4
+    rmsnorm_kernel[(x2.shape[0],)](x2, w, y, x2.stride(0), N, eps,
+                                   BLOCK=BLOCK, num_warps=warps)
+    return y.view_as(x)</code></pre>
+<p>Points worth saying aloud: the mask handles hidden sizes that aren't a power of two; <code>other=0.0</code> keeps masked lanes out of the sum; dividing by N (not BLOCK) gives the true mean; the FP32 accumulator avoids BF16 rounding in the sum. For very wide rows you would loop over chunks of the row, as the Triton layer-norm tutorial does. In a real model, the bigger win is fusing the residual add into the same kernel (read x and residual, write the sum and the normalised output), which serving engines ship as a standard op.</p>
+
+<h3>The benchmarking method</h3>
+<pre><code>from triton.testing import do_bench
+import torch.nn.functional as F
+
+def eager(x, w, eps=1e-6):
+    xf = x.float()
+    return (xf * torch.rsqrt(xf.pow(2).mean(-1, keepdim=True) + eps) * w.float()).to(x.dtype)
+
+builtin  = lambda x, w: F.rms_norm(x, (x.shape[-1],), w, 1e-6)
+compiled = torch.compile(eager)
+
+d = 4096
+w = torch.randn(d, device="cuda", dtype=torch.bfloat16)
+for M in [1, 16, 256, 4096, 32768]:                    # decode-like → prefill-like
+    x = torch.randn(M, d, device="cuda", dtype=torch.bfloat16)
+    ref = eager(x, w)
+    for name, f in [("eager", eager), ("builtin", builtin),
+                    ("compiled", compiled), ("triton", rmsnorm)]:
+        torch.testing.assert_close(f(x, w), ref, atol=2e-2, rtol=2e-2)
+        ms = do_bench(lambda: f(x, w))                 # warm-up + repeats, median
+        gbs = 2 * x.numel() * x.element_size() / ms / 1e6   # read x + write y
+        print(f"{M:6d} {name:9s} {ms*1e3:8.1f} us  {gbs:7.0f} GB/s")</code></pre>
+<p>The rules that make this fair:</p>
+<ul>
+<li><strong>Check correctness first,</strong> against an FP32 reference, with a tolerance that fits BF16.</li>
+<li><strong>Report effective bandwidth,</strong> not just time. Count only the bytes a perfect kernel must move (read x, write y). Then compare with 3.35 TB/s on an H100 SXM. A kernel near 80–90% of peak has little left to gain.</li>
+<li><strong>Sweep shapes.</strong> At M = 1 the kernel takes microseconds and launch overhead dominates every version. At large M bandwidth dominates. Report both regimes.</li>
+<li><strong>Beat the cache.</strong> Small inputs can sit in L2 cache between repeats, which inflates bandwidth above HBM speed. Use sizes well beyond L2 for the bandwidth claim, or flush between runs.</li>
+<li><strong>Warm up.</strong> Exclude Triton and <code>torch.compile</code> compilation from timings. Use CUDA events or <code>do_bench</code>, never Python <code>time.time()</code> without synchronising.</li>
+<li><strong>Confirm with Nsight Compute.</strong> The fused kernel should show memory throughput near peak and one kernel instead of several.</li>
+</ul>
+<p>What to expect, as a roofline estimate rather than a measurement: at M = 4,096 and d = 4,096 in BF16, a perfect fused kernel moves 67 MB, about 20 µs at 3.35 TB/s. The 14-bytes-per-element eager version would need about 70 µs at full bandwidth, plus four launches. Whether your kernel beats the built-in or compiled version is an empirical question. Run it.</p>
+
+<h3>Trade-offs</h3>
+<div class="table-wrap"><table>
+<tr><th>Option</th><th>For</th><th>Against</th></tr>
+<tr><td>Eager PyTorch</td><td>Simplest, easy to debug</td><td>Several kernels, several HBM round-trips</td></tr>
+<tr><td><code>torch.compile</code></td><td>Often fuses automatically, no kernel code</td><td>Compile time, recompiles on new shapes, less control</td></tr>
+<tr><td>Triton kernel</td><td>Python-level, portable across NVIDIA and AMD, quick to write</td><td>You own correctness and tuning</td></tr>
+<tr><td>CUDA C++ kernel</td><td>Full control (vector loads, warp shuffles)</td><td>Much more code, build system, less portable</td></tr>
+</table></div>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>RMSNorm does about one FLOP per byte, so it's memory-bound, and the goal is to read the input once and write the output once. My kernel gives each row to one program, loads it with a mask, sums squares in FP32, multiplies by the reciprocal root and the weight, and stores in the input dtype. I benchmark against eager, the built-in, and torch.compile, check correctness first, and report effective bandwidth as a fraction of the GPU's peak across small and large batch sizes. At small sizes launch overhead dominates, so I'd say so instead of claiming a speedup there. The real production win is fusing the residual add in as well.</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Accumulating the sum of squares in BF16, which loses precision on wide rows.</li>
+<li>Dividing by the block size instead of the true row length when the row is padded.</li>
+<li>Benchmarking only against eager PyTorch and calling it a win, when <code>torch.compile</code> may match it.</li>
+<li>Reporting a speedup from one shape, or from inputs small enough to live in L2 cache.</li>
+</ul>
+
+<div class="card demo">
+<h3>Interactive: roofline for decode and prefill</h3>
+<p class="legend">Attainable TFLOP/s (log scale) against arithmetic intensity (FLOP per byte, log scale). The sloped part is the memory limit, the flat part the compute limit. The filled dot is one linear layer (hidden size d) processing the chosen tokens per step. The hollow dot is a fused RMSNorm (about 4 FLOPs per element, read and write once).</p>
+<canvas id="rf" width="700" height="300" aria-label="Roofline chart showing whether a linear layer and RMSNorm are memory-bound or compute-bound"></canvas>
+<label for="pk">Peak compute: <span id="pkv" class="num"></span> TFLOP/s</label>
+<input id="pk" type="range" min="10" max="2000" step="1" value="989">
+<label for="bw">Memory bandwidth: <span id="bwv" class="num"></span> TB/s</label>
+<input id="bw" type="range" min="0.1" max="8" step="0.05" value="3.35">
+<label for="dm">Hidden size: <span id="dmv" class="num"></span></label>
+<input id="dm" type="range" min="10" max="14" step="1" value="12">
+<label for="nt">Tokens per step: <span id="ntv" class="num"></span></label>
+<input id="nt" type="range" min="0" max="14" step="1" value="0">
+<label for="bp">Bytes per value: <span id="bpv" class="num"></span></label>
+<input id="bp" type="range" min="0" max="1" step="1" value="1">
+<div class="stats">
+  <div class="stat"><div class="k">Intensity</div><div class="v" id="sai">–</div></div>
+  <div class="stat"><div class="k">Ridge point</div><div class="v" id="srd">–</div></div>
+  <div class="stat"><div class="k">Bound by</div><div class="v" id="sbd">–</div></div>
+  <div class="stat"><div class="k">Share of peak</div><div class="v" id="ssh">–</div></div>
+  <div class="stat"><div class="k">Layer time</div><div class="v" id="stm">–</div></div>
+  <div class="stat"><div class="k">Memory-bound below</div><div class="v" id="scr">–</div></div>
+</div>
+<p class="meta">Try this: the defaults are an H100 SXM (989 dense BF16 TFLOP/s, 3.35 TB/s), d = 4,096, one token per step: intensity about 1, ridge about 295, memory-bound at 0.3% of peak, about 10 µs. Set tokens to 2,048: intensity 1,024, compute-bound, about 69 µs. Switch bytes to 1 (FP8): intensity doubles and the crossover falls from 345 to about 159 tokens. Set bandwidth to 0.2 TB/s, near an embedded robot module's memory, and see the ridge move far right. Peak compute for FP8 is higher than for BF16 on real GPUs; raise it yourself.</p>
+</div>
+
+<h2 id="practise">Practise it</h2>
+<p>On a free Colab GPU (a T4 or better), in an afternoon:</p>
+<ol>
+<li><strong>Write the kernel.</strong> Paste the Triton sketch above, run the benchmark loop, and record time and effective GB/s per shape for all four versions. Look up your GPU's memory bandwidth on NVIDIA's product page and compute the fraction of peak.</li>
+<li><strong>Add the residual.</strong> Extend the kernel to take a residual tensor, write <code>x + residual</code> back, and normalise the sum. Count bytes before and after, and check the measured change against the count.</li>
+<li><strong>Profile.</strong> Run <code>nsys profile</code> on a loop of 100 calls to each version. Count kernels per call and look at the gaps at M = 1. Then run <code>ncu</code> on the Triton kernel and read the memory throughput figure.</li>
+<li><strong>Create the 30% problem on purpose.</strong> Serve a small model (about 0.5–1B parameters) with vLLM, drive it with a load tool at concurrency 1, 8 and 64, and log the engine's running-request count, nvidia-smi utilisation and tokens per second. Then add a deliberate <code>.item()</code> in a custom sampling hook (or simulate CPU work) and see utilisation fall.</li>
+</ol>
+<p>What to measure: effective bandwidth vs peak, kernels per call, GPU idle gaps in microseconds, and how throughput and utilisation change with concurrency.</p>
+
+<h2 id="course">In this course</h2>
+<ul>
+<li><a href="../08-ai-research-engineer/01-tensor-math-autograd.html">Module 08 · Tensor maths and autograd</a>: Triton programming basics and FlashAttention's tiling, the bigger cousin of this kernel.</li>
+<li><a href="../08-ai-research-engineer/08-inference-aware-design.html">Module 08 · Inference-aware design</a>: KV-cache maths and why decode reads so many bytes.</li>
+<li><a href="06-quantization-hardware.html">Page 06 · Quantisation and choosing GPUs</a>: fewer bytes per weight moves decode up the memory slope.</li>
+<li><a href="05-latency.html">Page 05 · Latency</a>: inter-token latency and tail latency, which profiling explains.</li>
+<li><a href="../04-distill-small-models.html#latency">Module 04 · Latency as a safety number</a>: measuring wait-after-speech on the device.</li>
+<li><a href="../08-ai-research-engineer/index.html#courses">Module 08 · Course map</a>: GPU programming resources.</li>
+</ul>
+
+<h2 id="robotics">Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Robots live at batch 1.</strong> One robot runs one episode, so its model is deep in the memory-bound corner of the roofline. Bandwidth, not FLOPs, sets the decode floor.</li>
+<li><strong>Embedded bandwidth is much lower.</strong> NVIDIA lists 204.8 GB/s for the Jetson AGX Orin 64GB module. An 8B model in BF16 (16 GB) would then be capped near 13 tokens/s; at 4 bits (about 4 GB) near 51 tokens/s, before any KV-cache reads. That's the arithmetic that decides model size on a robot.</li>
+<li><strong>Launch overhead hurts small models at high rates.</strong> A small policy network run at a high control rate can spend more time launching kernels than computing. CUDA graphs and compiled runtimes are standard fixes, and profiling shows whether you need them.</li>
+<li><strong>Jitter matters as much as the mean.</strong> A control loop needs every step on time. Profiling across many steps (not one) shows occasional stalls from CPU contention or memory allocation that a mean hides.</li>
+<li><strong>Problem 14 is mostly a server problem.</strong> On a robot, low utilisation at batch 1 is normal and fine; what matters is meeting the deadline, not keeping the GPU busy.</li>
+</ul>
+</div>
+
+<h2 id="check">Self-check</h2>
+<details><summary>What is the ridge point of an H100 SXM in dense BF16, and what does it mean?</summary><p>About 989 TFLOP/s ÷ 3.35 TB/s ≈ 295 FLOP per byte. Kernels with lower arithmetic intensity are memory-bound; higher ones are compute-bound.</p></details>
+<details><summary>Why is a decode-time linear layer memory-bound at batch 1?</summary><p>Its intensity is N·d/(d+2N) ≈ 1 FLOP per byte at N = 1: each weight is read once and used for one multiply-add. That's about 300 times below the ridge.</p></details>
+<details><summary>nvidia-smi says 100% utilisation. Is the GPU fully used?</summary><p>Not necessarily. It means a kernel was running for the whole sample period. That kernel could be using a small part of the GPU. Check SM activity, occupancy and tensor-pipe metrics in DCGM or Nsight Compute.</p></details>
+<details><summary>Which Nsight tool do you open first, and why?</summary><p>Nsight Systems. It shows the whole timeline with low overhead, including idle gaps and CPU work. Then send the few kernels that dominate time to Nsight Compute.</p></details>
+<details><summary>In your RMSNorm kernel, why use <code>other=0.0</code> and divide by N rather than BLOCK?</summary><p>Masked lanes beyond the row length load as zero, so they add nothing to the sum of squares. Dividing by the true length N gives the correct mean even though the block is padded to a power of two.</p></details>
+<details><summary>Your fused kernel shows 4 TB/s on an H100 SXM. What happened?</summary><p>That's above the 3.35 TB/s HBM bandwidth, so the data was probably served from L2 cache between repeats, or the byte count is wrong. Use larger inputs or flush the cache.</p></details>
+
+<h2 id="resources">Resources</h2>
+<ul>
+<li><a href="https://docs.nvidia.com/nsight-systems/UserGuide/index.html">Nsight Systems user guide</a> (NVIDIA): timelines, NVTX, CUDA graph tracing</li>
+<li><a href="https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html">Nsight Compute profiling guide</a> (NVIDIA): speed-of-light sections, roofline charts, warp stall reasons</li>
+<li><a href="https://docs.nvidia.com/datacenter/dcgm/latest/user-guide/feature-overview.html">DCGM feature overview</a> (NVIDIA): profiling metrics beyond nvidia-smi</li>
+<li><a href="https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html">CUDA C++ programming guide</a> (NVIDIA): CUDA graphs, streams, the memory hierarchy</li>
+<li><a href="https://www.nvidia.com/en-us/data-center/h100/">NVIDIA H100 product page</a>: the specs used on this page</li>
+<li><a href="https://triton-lang.org/main/getting-started/tutorials/05-layer-norm.html">Triton tutorial: layer normalisation</a>, the closest official example to RMSNorm</li>
+<li><a href="https://triton-lang.org/main/python-api/generated/triton.testing.do_bench.html">triton.testing.do_bench</a> reference</li>
+<li><a href="https://pytorch.org/docs/stable/generated/torch.nn.RMSNorm.html">torch.nn.RMSNorm</a> and the <a href="https://pytorch.org/docs/stable/profiler.html">PyTorch profiler</a></li>
+<li><a href="https://arxiv.org/abs/1910.07467">Root Mean Square Layer Normalization</a> (Zhang and Sennrich, 2019)</li>
+<li><a href="https://arxiv.org/abs/2205.14135">FlashAttention</a> (Dao et al., 2022), <a href="https://arxiv.org/abs/2307.08691">FlashAttention-2</a> (Dao, 2023), <a href="https://arxiv.org/abs/2407.08608">FlashAttention-3</a> (Shah et al., 2024): fusion and IO-awareness at full scale</li>
+<li><a href="https://docs.vllm.ai/en/latest/">vLLM documentation</a>: the engine for the utilisation exercise</li>
+</ul>
+
+<nav class="pager">
+  <a href="06-quantization-hardware.html"><small>Previous</small>Page 06 · Quantisation and choosing GPUs</a>
+  <a class="next" href="08-engines-observability.html"><small>Next</small>Page 08 · Serving engines and observability</a>
+</nav>
+<footer>Module 09 · Page 07 · written for this course from the source post, official docs and papers.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('rf'), ctx = cv.getContext('2d');
+const ids = ['pk', 'bw', 'dm', 'nt', 'bp'];
+const el = Object.fromEntries(ids.map(k => [k, document.getElementById(k)]));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = n => Math.round(n).toLocaleString('en-US');
+const BYTES = [1, 2];
+
+// linear layer, d×d weights, N tokens: FLOPs = 2Nd², bytes = b(d² + 2Nd)
+const gemm = (N, d, b) => ({ f: 2 * N * d * d, by: b * (d * d + 2 * N * d) });
+const RMS_AI = (b) => 4 / (2 * b);                    // ~4 FLOPs per element, read + write once
+const attain = (I, P, B) => Math.min(P, I * B);
+const crossN = (R, d, b) => { const den = 2 * d - 2 * b * R; return den > 0 ? b * R * d / den : Infinity; };
+const tfmt = s => s >= 1e-3 ? (s * 1e3).toFixed(2) + ' ms' : (s * 1e6).toFixed(1) + ' µs';
+
+function draw() {
+  const P = +el.pk.value * 1e12, B = +el.bw.value * 1e12, d = 2 ** +el.dm.value;
+  const N = 2 ** +el.nt.value, b = BYTES[+el.bp.value];
+  const shown = { pk: fmt(+el.pk.value), bw: (+el.bw.value).toFixed(2), dm: fmt(d), nt: fmt(N), bp: b };
+  ids.forEach(k => document.getElementById(k + 'v').textContent = shown[k]);
+
+  const W = cv.width, H = cv.height, l = 60, r = 20, t = 14, bm = 34;
+  const X0 = -1, X1 = 4, Y0 = -2, Y1 = 4;            // log10 FLOP/byte; log10 TFLOP/s
+  const px = v => l + (v - X0) / (X1 - X0) * (W - l - r);
+  const py = v => t + (Y1 - Math.min(Math.max(v, Y0), Y1)) / (Y1 - Y0) * (H - t - bm);
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = css('--line'); ctx.lineWidth = 1; ctx.font = '12px sans-serif'; ctx.fillStyle = css('--muted');
+  for (let e = Y0; e <= Y1; e++) {
+    ctx.beginPath(); ctx.moveTo(l, py(e)); ctx.lineTo(W - r, py(e)); ctx.stroke();
+    ctx.textAlign = 'right'; ctx.fillText(e < 0 ? `${10 ** e}` : fmt(10 ** e), l - 6, py(e) + 4);
+  }
+  ctx.textAlign = 'center';
+  for (let e = X0; e <= X1; e++) ctx.fillText(e < 0 ? '0.1' : fmt(10 ** e), px(e), H - 18);
+  ctx.fillText('FLOP per byte', (l + W - r) / 2, H - 3);
+  ctx.save(); ctx.translate(14, H / 2); ctx.rotate(-Math.PI / 2); ctx.fillText('TFLOP/s', 0, 0); ctx.restore();
+
+  const R = P / B;
+  ctx.strokeStyle = css('--accent'); ctx.lineWidth = 2.5; ctx.beginPath();
+  for (let e = X0; e <= X1 + 1e-9; e += 0.02) {
+    const y = Math.log10(attain(10 ** e, P, B) / 1e12);
+    e === X0 ? ctx.moveTo(px(e), py(y)) : ctx.lineTo(px(e), py(y));
+  }
+  ctx.stroke();
+  ctx.setLineDash([4, 4]); ctx.strokeStyle = css('--muted'); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(px(Math.log10(R)), py(Y0)); ctx.lineTo(px(Math.log10(R)), py(Math.log10(P / 1e12))); ctx.stroke();
+  ctx.setLineDash([]);
+
+  const g = gemm(N, d, b), I = g.f / g.by, A = attain(I, P, B);
+  const Ir = RMS_AI(b), Ar = attain(Ir, P, B);
+  ctx.strokeStyle = css('--muted'); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(px(Math.log10(Ir)), py(Math.log10(Ar / 1e12)), 6, 0, 7); ctx.stroke();
+  ctx.fillStyle = I < R ? css('--fail') : css('--pass');
+  ctx.beginPath(); ctx.arc(px(Math.log10(I)), py(Math.log10(A / 1e12)), 7, 0, 7); ctx.fill();
+
+  const time = Math.max(g.f / P, g.by / B), cn = crossN(R, d, b);
+  document.getElementById('sai').textContent = I < 10 ? I.toFixed(2) : fmt(I);
+  document.getElementById('srd').textContent = fmt(R);
+  document.getElementById('sbd').textContent = I < R ? 'Memory' : 'Compute';
+  document.getElementById('ssh').textContent = ((s) => s >= 10 ? fmt(s) : s >= 0.1 ? s.toFixed(1) : s.toPrecision(2))(A / P * 100) + '%';
+  document.getElementById('stm').textContent = tfmt(time);
+  document.getElementById('scr').textContent = isFinite(cn) ? fmt(cn) + ' tokens' : 'always';
+}
+ids.forEach(k => el[k].oninput = draw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

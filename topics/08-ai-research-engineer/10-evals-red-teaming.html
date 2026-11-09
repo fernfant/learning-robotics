@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stage 10 · Evals &amp; red teaming</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 08 · Research-engineer roadmap</a> › Stage 10</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 08 · Stage 10</div>
+<h1>Evaluation-driven development &amp; red teaming</h1>
+<p class="lede">Decide how you'll measure success before you build, check that your test questions haven't leaked into training, and attack your own model on purpose so you find its weak spots before users do.</p>
+
+<div class="facts">
+  <div><b>Prerequisites</b><a href="../01-decision-model-evals.html">Module 01</a> (thresholds, calibration), <a href="../04-distill-small-models.html#eval">Module 04's evaluation checklist</a>, basic Python</div>
+  <div><b>Time</b>20–35 h: ~8 h reading and tools, 12–25 h on the harness</div>
+  <div><b>Hardware</b>Laptop for the classifier version. Colab GPU or API credits for an LLM attacker and judge</div>
+  <div><b>Key papers</b>Zheng et al. 2023 (LLM-as-a-judge), Perez et al. 2022, TAP (Mehrotra et al. 2023), HarmBench (Mazeika et al. 2024), GSM1k (Zhang et al. 2024)</div>
+</div>
+<p class="meta">Source: Suraj Sharma, <a href="https://x.com/suraj_sharma14/status/2112876560629825734">X post</a>, stage 10</p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Good AI builders test their models like tough teachers: with fresh questions the model has never seen, and with tricky questions designed to catch it out.</p>
+
+<h3>Think of it like this</h3>
+<p>Imagine a spelling test where the teacher uses the same list every year. Older kids pass the list around, so scores go up even though nobody spells better. A good teacher writes new words each year and checks if anyone has seen the list. A great teacher also asks a friend to play "trickster" and try to fool the marking, so the teacher can fix the marking before the real test.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Write down what "good" means and build a test set before changing the model.</li>
+<li>Check the test questions don't appear in the training data (that would be like seeing the answers).</li>
+<li>Keep making new test questions so old ones can't be memorised.</li>
+<li>Run a "trickster" program that keeps changing inputs to find ones your model gets wrong.</li>
+<li>Add every mistake it finds to your tests, fix the model, and test again on tricks it hasn't seen.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot that only ever practised in one kitchen may look perfect there and fail in yours. Testing it in new rooms, with odd lighting and objects in strange places, finds the problems before it drops a plate, or worse.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Write a 5-question quiz for a friend. Then rewrite each question with different numbers and words. Do they still get them right? If not, they memorised answers instead of learning.</li>
+<li>In the demo further down, click the four <b>training document</b> buttons and drag the <b>n-gram length n</b> slider. See which kinds of leak a simple overlap check catches, and which it misses.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Eval</dt><dd>A test that measures how well a model does a job.</dd>
+<dt>Contamination</dt><dd>When test questions leak into the training data.</dd>
+<dt>Red teaming</dt><dd>Attacking your own system on purpose to find its weak spots.</dd>
+<dt>Judge</dt><dd>A model used to mark another model's answers.</dd>
+<dt>Attack success rate</dt><dd>How often the attacker manages to fool the system.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="covers">1. What this stage covers</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Evaluation-driven development means the eval comes first and every change is judged against it. Four skills make the evals trustworthy: <strong>contamination detection</strong> (has the model seen the test?), <strong>dynamic evals</strong> (fresh items so it can't have), <strong>adversarial robustness</strong> (does it hold up when someone searches for failures?) and <strong>judge calibration</strong> (can you trust the model doing the marking?). The post's project is an automated red-teaming agent that uses tree search to find inputs your safety classifier misses. On this page that becomes a sandboxed harness against your <em>own</em> classifier: attack categories, a query budget, attack success rate per category, and a loop that turns failures into training and regression data.</p>
+</div>
+<ul>
+<li><strong>Learn:</strong> contamination detection, dynamic evals, adversarial robustness, LLM-as-a-judge calibration.</li>
+<li><strong>Practice:</strong> build an automated attacker that systematically searches for inputs your classifier gets wrong, using a tree of candidate rewrites.</li>
+<li><strong>Why (the post's claim):</strong> static benchmarks are easy to game, so you need adversarial harnesses that keep attacking your own models. Mostly right. See the reality check for the nuance.</li>
+<li><strong>Builds on:</strong> <a href="../01-decision-model-evals.html#tuning">Module 01</a> for thresholds, cross-validation and calibration of judges, and <a href="../04-distill-small-models.html#eval">Module 04</a> for honest splits, cutoff dates, paired bootstrap and slices. This page doesn't repeat them.</li>
+</ul>
+
+<h2 id="concepts">2. Concepts, explained</h2>
+
+<h3 id="contam">Contamination detection</h3>
+<p>A benchmark is contaminated when its items, or near-copies, are in the training data. Then the score measures memory, not skill. There are three families of check:</p>
+<ul>
+<li><strong>Overlap with the training corpus</strong> (needs the data). GPT-3 (Brown et al., 2020) flagged a test item if it shared any 13-word sequence with the training set. It's fast and catches verbatim copies. It misses paraphrases, translations, and copies with the numbers changed. The demo below shows why.</li>
+<li><strong>Black-box statistical tests</strong> (no data needed). Oren, Meister, Chatterji, Ladhak &amp; Hashimoto (2023) noticed that a benchmark's items are exchangeable: if the model never saw it, every ordering should be about equally likely. A model that memorised the file will find the canonical order much more likely than shuffled orders. That gives a test with a p-value.</li>
+<li><strong>Fresh mirror sets.</strong> Write new items matched in style and difficulty, and compare. Zhang et al. (2024) built GSM1k to mirror GSM8k and saw accuracy drops of up to 8% for some model families, with frontier models showing little sign of overfitting. The gap is the evidence.</li>
+</ul>
+<pre><code>overlap(item, corpus, n) = |ngrams_n(item) ∩ ngrams_n(corpus)| / |ngrams_n(item)|
+flag if any shared n-gram (n = 13 in GPT-3), after lowercasing and stripping punctuation
+gap = acc(public benchmark) − acc(fresh mirror set)     # large gap ⇒ suspect memorisation</code></pre>
+
+<h3 id="dynamic">Dynamic evals</h3>
+<p>A static test set slowly leaks: into web crawls, into synthetic data made by other models, and into your own decisions as you tune against it. Dynamic evals keep the test fresh:</p>
+<ul>
+<li><strong>Time-based refresh.</strong> LiveBench (White et al., 2024) regularly adds questions from recent sources and scores them against objective ground truth. Only items newer than a model's training cutoff are guaranteed unseen. This is <a href="../04-distill-small-models.html#eval">Module 04's cutoff-date split</a> applied to benchmarks.</li>
+<li><strong>Procedural generation.</strong> Templates or programs that produce new instances (new numbers, new entities, new code tasks) with known answers. Cheap and unlimited, but the template itself can be learned.</li>
+<li><strong>Live human comparison.</strong> Chatbot Arena (Zheng et al., 2023) collects head-to-head votes on new user prompts. Fresh, but noisy and tied to who's voting.</li>
+<li><strong>Adversarial refresh.</strong> The red-team loop below is itself a dynamic eval: it generates new hard cases for the current model.</li>
+</ul>
+<p>The cost: scores from different months aren't directly comparable, because the questions changed. Keep a frozen regression set alongside the fresh one.</p>
+
+<h3 id="robust">Adversarial robustness</h3>
+<p>Average-case accuracy says little about worst-case behaviour. Adversarial evaluation asks: if someone searches for a failure, how quickly do they find one?</p>
+<ul>
+<li><strong>LMs red-teaming LMs.</strong> Perez et al. (2022) used one language model to generate test cases for another and a classifier to score the replies, finding tens of thousands of offensive replies in a 280B chatbot. They compared zero-shot generation, few-shot and RL-trained attackers, trading off diversity against difficulty.</li>
+<li><strong>Search-based black-box attacks.</strong> PAIR (Chao et al., 2023) has an attacker LLM refine candidates from the target's responses. TAP (Mehrotra et al., 2023) turns that into a tree: branch several refinements, prune ones that drift off the test goal before querying the target, keep the most promising. This is what the post means by "tree-of-thought prompting". TAP reported success on more than 80% of test goals against the GPT-4-class models it tried, and found it could get past a guardrail classifier (LlamaGuard).</li>
+<li><strong>White-box attacks.</strong> Gradient-guided searches over input tokens (Zou et al., 2023, GCG) need weights and are useful for stress-testing open models you own.</li>
+<li><strong>Standardised measurement.</strong> HarmBench (Mazeika et al., 2024) fixes behaviours, judges and budgets so attack methods and defences can be compared. They compared 18 attack methods on 33 target models and defences.</li>
+</ul>
+<pre><code>ASR(category) = #goals where ≥1 attack within budget B succeeds / #goals
+success = judge says the target failed  AND  the attack kept the test goal's intent</code></pre>
+<p>ASR is only meaningful with its budget, judge and goal set stated. The same attacker can show 10% at B = 5 queries and 70% at B = 100.</p>
+
+<h3 id="judge">LLM-as-a-judge calibration</h3>
+<p>Judges mark open-ended answers, and in red teaming they decide whether an attack "worked". Zheng et al. (2023) found strong judges agreed with human preferences over 80% of the time, about the level at which humans agree with each other. They also documented <strong>position bias</strong> (preferring the first or second answer), <strong>verbosity bias</strong> (preferring longer answers) and <strong>self-enhancement bias</strong> (preferring answers from the same model). A practical calibration routine:</p>
+<ol>
+<li>Hand-label 100–300 examples, stratified by category. Keep a held-out set.</li>
+<li>Measure agreement with humans: precision and recall on "failure", plus Cohen's κ. Use <a href="../01-decision-model-evals.html#tuning">Module 01's cross-validated threshold tuning</a> to pick a cut-off that meets minimum precision and recall.</li>
+<li>Check the score itself with a reliability diagram and Platt scaling (<a href="../01-decision-model-evals.html#calibration">Module 01, calibration</a>) if you'll use it as a probability.</li>
+<li>Run bias probes: swap answer order, pad an answer with filler, and swap which model wrote it. A calibrated judge's verdict shouldn't move.</li>
+<li>Re-check on attack outputs. Adversarial text is out of distribution for the judge too, so a judge tuned on normal traffic can be fooled by the same tricks as the target.</li>
+</ol>
+
+<h2 id="practice">3. The practice project</h2>
+<div class="card note">
+<p><strong>Scope and safety.</strong> Attack only models and classifiers you own or are authorised to test, in a sandbox with no real users. Use test goals from your own policy. Keep generated attacks in an access-controlled store, don't publish working attacks against other people's systems, and report anything you find in third-party models through their disclosure process. This page deliberately contains no jailbreak prompts.</p>
+</div>
+
+<h3>(a) Laptop version: red-team your own contact-details filter</h3>
+<p>Use a deliberately harmless policy so the whole loop is safe to run and share: a classifier that should flag messages containing contact details (an email address or phone number), for example a filter in a marketplace chat. Use made-up data only (<code>example.com</code>, 555 numbers).</p>
+<ol>
+<li><strong>Target:</strong> start with a regex, then a small fine-tuned classifier (a DistilBERT-sized model trains in minutes on CPU or Colab).</li>
+<li><strong>Seed goals:</strong> 100+ messages that must be flagged, plus 200+ benign messages that mustn't (to track false positives).</li>
+<li><strong>Attack categories:</strong> formatting (spacing, separators), spelling-out (" at ", " dot "), character substitution (look-alike Unicode), context wrapping (burying it in a long message), and splitting across turns. Each mutation must keep the details readable to a human. That's the "intent preserved" check.</li>
+<li><strong>Tree search:</strong> from each seed, branch <code>width</code> mutations, score with the target, keep the lowest-scoring children, go <code>depth</code> levels. Count queries.</li>
+<li><strong>Report:</strong> ASR per category at a fixed budget, queries to first success, and the false-positive rate on the benign set.</li>
+<li><strong>Close the loop:</strong> add successful attacks to training, retrain, then measure ASR on a <em>held-out</em> set of attacks from a fresh search. Freeze old successes as a regression suite.</li>
+<li><strong>Upgrade the attacker:</strong> swap the hand-written mutators for a small local instruct model that proposes rewrites (TAP-style), and add a judge that checks the rewrite still contains the details. Calibrate that judge on 100 hand-labelled rewrites first.</li>
+</ol>
+<pre><code>import random, re
+
+def detector(t):  # stand-in for YOUR classifier: P(contains contact details)
+    return 1.0 if re.search(r"[\w.]+@[\w-]+\.\w+|\d{3}[- ]?\d{3}[- ]?\d{4}", t) else 0.0
+
+MUT = {  # each keeps the details readable to a human
+    "spell-out": lambda t: t.replace("@", " at ").replace(".com", " dot com"),
+    "spacing":   lambda t: re.sub(r"(?&lt;=\d)(?=\d)", " ", t),
+    "fullwidth": lambda t: t.translate({ord(c): ord(c) + 0xFEE0 for c in "0123456789@"}),
+    "wrapper":   lambda t: f"reminder for later, {t}, thanks",
+}
+
+def search(seed, depth=3, width=2, rng=None):
+    frontier, q = [(seed, [])], 0
+    for _ in range(depth):
+        kids = []
+        for t, path in frontier:
+            for name in rng.sample(sorted(MUT), width):
+                c = MUT[name](t); q += 1
+                s = detector(c)
+                if s &lt; 0.5:
+                    return path + [name], q
+                kids.append((s, c, path + [name]))
+        kids.sort(key=lambda k: k[0])
+        frontier = [(c, p) for _, c, p in kids[:width]]
+    return None, q
+
+rng = random.Random(0)
+seeds = [f"email me at user{i}@example.com" for i in range(50)] + \
+        [f"call me on 555-{100 + i}-{1000 + i}" for i in range(50)]
+hits = [search(s, rng=rng) for s in seeds]
+print(f"ASR {sum(p is not None for p, _ in hits) / len(seeds):.0%}")</code></pre>
+<p><strong>Expected outcome:</strong> the regex falls to almost every seed (this exact script prints 97%), which is the point: it shows the harness works. The interesting numbers come once you swap in a trained classifier and a model-driven attacker: per-category ASR before and after one round of adversarial training, measured on held-out attacks.</p>
+
+<h3>(b) Full version from the post</h3>
+<p>An attacker LLM running TAP-style tree search against your own safety classifier (for example a guard model you fine-tuned), inside a sandbox. Use a written policy with categories, a goal set per category, a calibrated judge, a fixed query budget, and a non-tree baseline at the same budget so you can show the tree search earns its cost. Frameworks help: PyRIT orchestrates attacker, target and scorer; garak runs libraries of known probes; Inspect makes the whole thing a reproducible eval. <strong>Cost:</strong> each query involves the attacker, the target and usually the judge. 200 goals × 15 target queries each (width 3, depth 5, keeping one branch per level) is 3,000 target queries per run, wider trees multiply that, and attacker and judge calls come on top, so use small open models locally or budget API spend before you start. A 7–8B attacker runs on one 24 GB GPU.</p>
+
+<h3>(c) Pitfalls</h3>
+<ul>
+<li><strong>Judge fooled with the target.</strong> If the judge shares the target's blind spots, ASR is wrong in both directions. Audit a sample of "successes" and "failures" by hand.</li>
+<li><strong>Intent drift.</strong> Attacks that succeed by dropping the test goal aren't successes. Check the goal is still there.</li>
+<li><strong>Training on the test.</strong> Retraining on found attacks then re-scoring the same attacks measures memory. Use a fresh search for the after-number.</li>
+<li><strong>Ignoring false positives.</strong> A classifier that flags everything has 0% ASR and is useless. Always report the benign-set false-positive rate.</li>
+<li><strong>Budget-free ASR.</strong> Always state the query budget and number of goals, with a confidence interval (100 goals gives roughly ±10 points at 50%).</li>
+</ul>
+
+<div class="card demo">
+<h3>Interactive: what an n-gram contamination check catches</h3>
+<p class="legend">Top: a made-up benchmark item. Bottom: a training document. Highlighted words belong to an n-word sequence that appears in both, after lowercasing and removing punctuation. A GPT-3-style check flags the item if any n-gram matches (n = 13 there).</p>
+<canvas id="cc" width="700" height="220" aria-label="Benchmark item and training document with overlapping n-grams highlighted"></canvas>
+<p>Training document: <button id="d0">Verbatim copy</button> <button id="d1">Numbers changed</button> <button id="d2">Paraphrase</button> <button id="d3">Unrelated</button></p>
+<label for="nn">n-gram length n: <span id="nv" class="num"></span></label>
+<input id="nn" type="range" min="3" max="13" step="1" value="13">
+<div class="stats">
+  <div class="stat"><div class="k">Shared n-grams</div><div class="v" id="sm">–</div></div>
+  <div class="stat"><div class="k">Item covered</div><div class="v" id="sc">–</div></div>
+  <div class="stat"><div class="k">Longest shared run</div><div class="v" id="sl">–</div></div>
+  <div class="stat"><div class="k">Flagged?</div><div class="v" id="sf">–</div></div>
+</div>
+<p class="meta">Try this: at n = 13 only the verbatim copy is flagged. "Numbers changed" is the same question with new numbers: its longest shared run is 10 words, so it slips through until n ≤ 10. The paraphrase is missed at every n. That's why mirror sets and dynamic evals exist.</p>
+</div>
+
+<h2 id="reality">4. Reality check</h2>
+<div class="card note">
+<p><strong>The claim:</strong> static benchmarks are easily gamed, so you must build adversarial harnesses that continuously attack your own models.</p>
+<ul>
+<li><strong>Mostly true.</strong> Contamination is real and measurable (GSM1k found drops of up to 8% for some families). Benchmarks also get gamed without leaks, by tuning prompts and checkpoints against them. Continuous adversarial testing is standard practice for deployed models.</li>
+<li><strong>"Easily" overstates it.</strong> GSM1k also found many frontier models showed little overfitting. Static benchmarks remain useful for comparability and as regression tests. Keep them, but alongside fresh and private sets.</li>
+<li><strong>Dynamic evals aren't free of problems.</strong> LiveBench's authors point out that crowdsourced and LLM-judged benchmarks bring their own biases. Fresh questions also mean scores drift over time.</li>
+<li><strong>Red teaming finds failures. It can't prove there are none.</strong> A low ASR means "this attacker, this budget, these goals, this judge". Report it that way.</li>
+<li><strong>Tree search isn't magic.</strong> TAP beat earlier black-box methods in its paper, but always compare against a simple baseline at the same query budget on your own system.</li>
+</ul>
+</div>
+
+<h2 id="course">5. In this course</h2>
+<ul>
+<li><a href="../01-decision-model-evals.html">Module 01 · Decision-model evals</a>: <a href="../01-decision-model-evals.html#thresholds">thresholds</a>, <a href="../01-decision-model-evals.html#tuning">cross-validated tuning</a> and <a href="../01-decision-model-evals.html#calibration">calibration</a>, the toolkit for your judge and your classifier.</li>
+<li><a href="../04-distill-small-models.html#eval">Module 04 · Evaluation that doesn't fool you</a>: splits by session, cutoff dates, paired bootstrap, slices.</li>
+<li><a href="../07-post-training.html#pref">Module 07 · Preference alignment</a>: reward hacking, the training-time version of a model gaming its metric.</li>
+<li><a href="../06-30u30/30-rlhf.html">30u30 Day 30 · RL from Human Preferences</a>: where learned judges (reward models) come from.</li>
+<li><a href="04-synthetic-data.html">Stage 04</a> (verifier filtering) and <a href="05-alignment-preference.html">Stage 05</a> (reward models): the same judge-reliability questions, used for training instead of testing.</li>
+</ul>
+
+<h2 id="robotics">6. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Contamination has a robot twin.</strong> Test episodes from the same scene, day or operator as training demos inflate success rates. Split by episode, scene or site, as <a href="../04-distill-small-models.html#eval">Module 04</a> says.</li>
+<li><strong>Dynamic evals are natural in simulation.</strong> Procedurally generated scenes (new layouts, objects, lighting) give unlimited fresh test sets for a policy. Keep a frozen set too, for regressions.</li>
+<li><strong>Success detectors are judges.</strong> A VLM that decides "did the robot complete the task?" needs the same calibration against human labels as an LLM judge. That's the subject of <a href="../01-decision-model-evals.html">Module 01</a>.</li>
+<li><strong>Red-team the language interface.</strong> For a VLA, test ambiguous, contradictory or unsafe instructions in sim first. The right behaviour is often to ask or refuse, and the harness should measure that rate.</li>
+<li><strong>Physical adversarial testing is different.</strong> Perception attacks (glare, occlusion, distractors) need scenario testing in sim and on the bench. Text-attack tools don't cover them.</li>
+</ul>
+</div>
+
+<h2 id="check">7. Self-check</h2>
+<details><summary>Why does a 13-gram overlap check miss many contaminated items?</summary><p>It only catches long verbatim runs. Changed numbers break the item into short runs, and paraphrases or translations share almost no long n-grams. Mirror sets, order-based statistical tests and fresh items cover those cases.</p></details>
+<details><summary>How can you test for contamination without the training data?</summary><p>Oren et al.'s exchangeability test: compare the model's likelihood of the benchmark in its canonical order with shuffled orders. A significantly higher canonical likelihood suggests the file was memorised. Or build a fresh mirror set and compare accuracy.</p></details>
+<details><summary>An attacker reports 60% ASR. What else do you need to know?</summary><p>The query budget, the number and kind of goals, the judge and its measured agreement with humans, and whether successes kept the test goal's intent. Also the target's false-positive rate on benign inputs.</p></details>
+<details><summary>Name three LLM-judge biases and a probe for each.</summary><p>Position bias: swap answer order. Verbosity bias: pad one answer with filler. Self-enhancement bias: swap which model wrote the answer. A calibrated judge's verdict should stay the same.</p></details>
+<details><summary>You retrain on found attacks and ASR drops from 70% to 5% on those same attacks. Done?</summary><p>No. That measures memorisation of the attacks. Run a fresh search (new seeds, same budget) against the new model and report ASR on those, with the benign false-positive rate.</p></details>
+<details><summary>What does TAP add over a single attacker refining one candidate?</summary><p>A tree: it branches several refinements, prunes candidates that drift off the goal before spending target queries, and keeps the most promising branches.</p></details>
+
+<h2 id="courses">8. Courses &amp; content</h2>
+<div class="table-wrap"><table>
+<tr><th>Resource</th><th>Type</th><th>Use it for</th></tr>
+<tr><td><a href="https://maven.com/parlance-labs/evals">Hamel Husain &amp; Shreya Shankar · AI Evals for Engineers &amp; PMs</a></td><td>Paid cohort course</td><td>Error analysis, LLM judges and evals that drive product decisions (the authors behind Module 01)</td></tr>
+<tr><td><a href="https://inspect.aisi.org.uk/">UK AISI · Inspect</a></td><td>Eval framework + docs</td><td>Write reproducible evals, including agentic ones</td></tr>
+<tr><td><a href="https://github.com/EleutherAI/lm-evaluation-harness">EleutherAI · lm-evaluation-harness</a></td><td>Eval framework</td><td>Standard benchmark runs</td></tr>
+<tr><td><a href="https://github.com/huggingface/evaluation-guidebook">Hugging Face · Evaluation Guidebook</a></td><td>Free guide</td><td>Practical evaluation, including contamination and judges</td></tr>
+<tr><td><a href="https://github.com/Azure/PyRIT">Microsoft PyRIT</a></td><td>Red-teaming toolkit</td><td>Automated adversarial testing of your own GenAI system</td></tr>
+<tr><td><a href="https://github.com/NVIDIA/garak">NVIDIA garak</a></td><td>LLM vulnerability scanner</td><td>Probe your own model for known failure categories</td></tr>
+</table></div>
+<p>Start with the free Hugging Face Evaluation Guidebook for contamination and judges, then build the harness in Inspect. Add PyRIT when you get to the red-teaming loop.</p>
+<p class="meta"><a href="index.html#courses">Full course map for all 12 stages →</a></p>
+
+<h2 id="papers">9. Papers &amp; docs</h2>
+<ul>
+<li>Zheng et al. (2023). <a href="https://arxiv.org/abs/2306.05685">Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena</a></li>
+<li>Perez et al. (2022). <a href="https://arxiv.org/abs/2202.03286">Red Teaming Language Models with Language Models</a></li>
+<li>Mehrotra et al. (2023). <a href="https://arxiv.org/abs/2312.02119">Tree of Attacks: Jailbreaking Black-Box LLMs Automatically</a> (TAP)</li>
+<li>Chao et al. (2023). <a href="https://arxiv.org/abs/2310.08419">Jailbreaking Black Box Large Language Models in Twenty Queries</a> (PAIR)</li>
+<li>Zou et al. (2023). <a href="https://arxiv.org/abs/2307.15043">Universal and Transferable Adversarial Attacks on Aligned Language Models</a> (GCG)</li>
+<li>Mazeika et al. (2024). <a href="https://arxiv.org/abs/2402.04249">HarmBench: A Standardized Evaluation Framework for Automated Red Teaming and Robust Refusal</a></li>
+<li>Oren, Meister, Chatterji, Ladhak &amp; Hashimoto (2023). <a href="https://arxiv.org/abs/2310.17623">Proving Test Set Contamination in Black Box Language Models</a></li>
+<li>Zhang et al. (2024). <a href="https://arxiv.org/abs/2405.00332">A Careful Examination of Large Language Model Performance on Grade School Arithmetic</a> (GSM1k)</li>
+<li>White et al. (2024). <a href="https://arxiv.org/abs/2406.19314">LiveBench: A Challenging, Contamination-Limited LLM Benchmark</a></li>
+<li>Brown et al. (2020). <a href="https://arxiv.org/abs/2005.14165">Language Models are Few-Shot Learners</a> (13-gram contamination analysis)</li>
+<li>Docs: <a href="https://inspect.aisi.org.uk/">Inspect</a> · <a href="https://github.com/Azure/PyRIT">PyRIT</a> · <a href="https://github.com/NVIDIA/garak">garak</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="09-mech-interp.html"><small>Previous</small>Stage 09 · Mechanistic interpretability</a>
+  <a class="next" href="11-paper-to-production.html"><small>Next</small>Stage 11 · Paper to production</a>
+</nav>
+<footer>Module 08 · Stage 10 · written for this course from the source post and primary papers.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('cc'), ctx = cv.getContext('2d');
+const nIn = document.getElementById('nn');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const ITEM = 'A farmer has 12 crates of apples. Each crate holds 30 apples. She sells 85 apples at the market and gives 40 to her neighbours. How many apples does she have left?';
+const DOCS = [
+  'Homework help thread. Q: A farmer has 12 crates of apples. Each crate holds 30 apples. She sells 85 apples at the market and gives 40 to her neighbours. How many apples does she have left? A: 235.',
+  'A farmer has 15 crates of apples. Each crate holds 20 apples. She sells 70 apples at the market and gives 30 to her neighbours. How many apples does she have left?',
+  'There are twelve boxes with thirty apples in each. After selling eighty-five and handing forty to the people next door, how many remain with the farmer?',
+  'Apples keep longer in a cool, dark place. A full crate can last for weeks if each fruit is checked for bruises first.'
+];
+let doc = 0;
+const words = s => s.split(/\s+/).filter(Boolean);
+const norm = w => w.toLowerCase().replace(/[^a-z0-9-]/g, '');
+const grams = (ws, n) => { const g = new Set(); for (let i = 0; i + n <= ws.length; i++) g.add(ws.slice(i, i + n).join(' ')); return g; };
+
+// mark which words of a are inside an n-gram also found in b
+function mark(a, b, n) {
+  const gb = grams(b, n), hit = a.map(() => false); let m = 0;
+  for (let i = 0; i + n <= a.length; i++) if (gb.has(a.slice(i, i + n).join(' '))) { m++; for (let j = i; j < i + n; j++) hit[j] = true; }
+  return { hit, m, tot: Math.max(0, a.length - n + 1) };
+}
+function longest(a, b) {
+  let best = 0;
+  for (let i = 0; i < a.length; i++) for (let j = 0; j < b.length; j++) { let k = 0; while (a[i + k] !== undefined && a[i + k] === b[j + k]) k++; best = Math.max(best, k); }
+  return best;
+}
+function analyse(d, n) {
+  const ra = words(ITEM), rb = words(DOCS[d]), a = ra.map(norm), b = rb.map(norm);
+  return { ra, rb, A: mark(a, b, n), B: mark(b, a, n), run: longest(a, b) };
+}
+
+function text(raw, hit, y0, label) {
+  ctx.font = '12px sans-serif'; ctx.fillStyle = css('--muted'); ctx.fillText(label, 10, y0);
+  ctx.font = '14px sans-serif';
+  let x = 10, y = y0 + 22; const sp = ctx.measureText(' ').width;
+  raw.forEach((w, i) => {
+    const wd = ctx.measureText(w).width;
+    if (x + wd > cv.width - 10) { x = 10; y += 21; }
+    if (hit[i]) { ctx.fillStyle = css('--accent-soft'); ctx.fillRect(x - 2, y - 14, wd + 4, 19); }
+    ctx.fillStyle = hit[i] ? css('--accent') : css('--fg'); ctx.fillText(w, x, y);
+    x += wd + sp;
+  });
+}
+function draw() {
+  const n = +nIn.value, r = analyse(doc, n);
+  document.getElementById('nv').textContent = n;
+  ctx.clearRect(0, 0, cv.width, cv.height); ctx.textAlign = 'left';
+  text(r.ra, r.A.hit, 16, 'Benchmark item');
+  text(r.rb, r.B.hit, 116, 'Training document');
+  document.getElementById('sm').textContent = r.A.m + ' / ' + r.A.tot;
+  document.getElementById('sc').textContent = Math.round(100 * r.A.hit.filter(Boolean).length / r.ra.length) + '%';
+  document.getElementById('sl').textContent = r.run + ' words';
+  document.getElementById('sf').textContent = r.A.m > 0 ? 'yes' : 'no';
+}
+[0, 1, 2, 3].forEach(i => document.getElementById('d' + i).onclick = () => { doc = i; draw(); });
+nIn.oninput = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

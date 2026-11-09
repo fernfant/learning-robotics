@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video 08 · Muon</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 12 · Training &amp; inference videos</a> › Video 08</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 12 · Video 08</div>
+<h1>Muon and MuonClip: orthogonalised updates for LLM training</h1>
+<p class="lede">Muon treats each weight matrix as a matrix, not a bag of numbers. It takes the momentum update, keeps its directions and throws away their uneven sizes, using a few cheap matrix multiplications. This video goes from Adam to Muon to MuonClip, the version Moonshot AI used to pre-train Kimi K2 without loss spikes. This guide explains each step from the original write-ups and lets you watch the Newton–Schulz iteration work.</p>
+
+<div class="facts">
+  <div><b>Video length</b>17:52</div>
+  <div><b>Published</b>13 October 2025</div>
+  <div><b>Level</b>Intermediate: matrix multiplication and the SVD help; Video 07 first</div>
+  <div><b>Builds on</b><a href="07-adamw.html">Video 07 · AdamW</a>, <a href="../06-30u30/13-attention.html">30u30 Day 13 · attention</a>, <a href="../05-trillion-scale-architecture.html#length">Module 05 · MLA</a></div>
+</div>
+<p class="meta">Video by Jia-Bin Huang · <a href="https://www.youtube.com/watch?v=bO5nvE289ec">Watch on YouTube</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Muon is a newer rule for training AI models. Instead of nudging each number on its own, it looks at a whole grid of numbers at once and makes sure every direction of change gets a fair share of the step.</p>
+
+<h3>Think of it like this</h3>
+<p>Imagine a choir where a couple of loud singers drown everyone else out. The conductor wants every voice heard, so she asks the loud ones to sing softer and the quiet ones to sing louder, until everyone sings at the same volume. They still sing their own notes; only the volume changes. Muon does this to the update for each layer: the "notes" are the directions of change, the "volume" is how big each one is, and Muon sets every volume to about the same level. A trick called Newton–Schulz does the evening-out with a few quick rounds of multiplication, like the conductor giving the same instruction five times.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Compute the gradient for a layer's weight grid and blend it with recent gradients (momentum), like Adam does.</li>
+<li>Notice that this update is lopsided: a few directions are huge and most are tiny.</li>
+<li>Run five rounds of a simple multiply-and-add recipe that pushes every direction's size towards 1.</li>
+<li>Use that evened-out grid as the step.</li>
+<li>In very big models, also watch the attention scores, and gently shrink the query and key weights of any head whose scores get too big (MuonClip).</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Big robot models are trained the same way as big language models. If an optimiser can reach the same quality with less computing, or without the training run crashing halfway, that saves money and time for anyone training a robot foundation model. Right now this connection is mostly a promise: Muon's published wins are on language models.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Stretch a rubber band between your fingers in one direction only and look at how lopsided its shape is. Now stretch it equally in all directions into a circle. Muon turns the lopsided ellipse into a circle, but keeps it pointing the same way.</li>
+<li>In the demo below, leave <b>Coefficients</b> on Muon's tuned set and slide <b>NS steps</b> from 0 to 5: watch the tiny singular values shoot up. Then switch to the classic cubic recipe and see how many more steps it needs. Raise <b>Condition number</b> to make the update more lopsided.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Weight matrix</dt><dd>The grid of numbers inside one layer that turns its input into its output.</dd>
+<dt>Singular values</dt><dd>How strongly a matrix stretches things along each of its main directions.</dd>
+<dt>Orthogonalise</dt><dd>Keep a matrix's directions but set all its stretches to 1.</dd>
+<dt>Newton–Schulz iteration</dt><dd>A short repeated recipe of matrix multiplications that orthogonalises a matrix approximately, with no SVD.</dd>
+<dt>Attention logit</dt><dd>The raw score between a query and a key before the softmax turns scores into weights.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="watch">1. Watch</h2>
+<div class="card"><div style="position:relative;padding-top:56.25%"><iframe style="position:absolute;inset:0;width:100%;height:100%;border:0" src="https://www.youtube-nocookie.com/embed/bO5nvE289ec" title="This Simple Optimizer Is Revolutionizing How We Train AI · Muon (Jia-Bin Huang)" loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div></div>
+
+<h3>Chapter guide</h3>
+<div class="table-wrap"><table>
+<tr><th>Time</th><th>Chapter</th><th>What to look for</th></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=bO5nvE289ec&amp;t=0s">00:00</a></td><td>Why Muon?</td><td>The motivation: an optimiser reported to beat well-tuned AdamW on speed records, and the question of whether that holds at scale.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=bO5nvE289ec&amp;t=36s">00:36</a></td><td>Reviewing Adam</td><td>Adam's per-parameter scaling. Note that it treats every entry of a matrix independently; that's the assumption Muon drops. <a href="07-adamw.html">Video 07</a> covers Adam fully.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=bO5nvE289ec&amp;t=133s">02:13</a></td><td>Linear layer</td><td>Why a weight matrix should be judged by how much it can change the layer's <em>output</em>, which leads to the spectral norm and to singular values.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=bO5nvE289ec&amp;t=264s">04:24</a></td><td>Solving orthogonalization with SVD</td><td>Replacing the update G = USVᵀ with UVᵀ: same directions, all singular values set to 1. Then why a full SVD each step is too slow.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=bO5nvE289ec&amp;t=388s">06:28</a></td><td>Newton–Schulz iteration: odd polynomial matrix</td><td>The key identity: an odd matrix polynomial acts on the singular values alone, so you never need the SVD itself.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=bO5nvE289ec&amp;t=491s">08:11</a></td><td>Newton–Schulz iteration: example</td><td>How repeated application pushes values in (0, 1] towards 1, and how the coefficients trade speed near zero against precision near one. The demo below plays the same game.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=bO5nvE289ec&amp;t=635s">10:35</a></td><td>The Muon optimizer</td><td>The full algorithm: momentum, then Newton–Schulz, then the step; which parameters use Muon and which stay on AdamW.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=bO5nvE289ec&amp;t=709s">11:49</a></td><td>The exploding attention logit crisis</td><td>The instability that appears when scaling Muon up: max attention logits growing into the hundreds or thousands, and why existing fixes didn't fit.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=bO5nvE289ec&amp;t=913s">15:13</a></td><td>MuonClip: extending QK-clip to Multi-head Latent Attention (MLA)</td><td>Rescaling query and key weights per head after each step, and how this is split across MLA's head-specific and shared components.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=bO5nvE289ec&amp;t=1044s">17:24</a></td><td>Results of MuonClip</td><td>Max-logit curves and the loss curve for Kimi K2's pre-training.</td></tr>
+</table></div>
+
+<h2 id="ideas">2. The ideas, explained</h2>
+
+<h3 id="adam-view">Adam, seen as steepest descent</h3>
+<p>Bernstein and Newhouse's "Old Optimizer, New Norm: An Anthology" (2024) re-reads popular optimisers as steepest descent under a chosen norm. Switch off Adam's moving averages and its update becomes g/|g| elementwise, which is sign descent: the steepest-descent direction when step size is measured with the max norm (ℓ∞) over all parameters. That norm ignores the fact that some parameters form a matrix that acts on vectors. The paper's suggestion is to give each tensor a norm suited to its role in the network, and for the hidden linear layers that norm is spectral.</p>
+
+<h3 id="linear">The linear-layer view: why the spectral norm</h3>
+<p>A linear layer computes y = Wx. Changing the weights by ΔW changes the output by ΔW·x, and the worst case over inputs is bounded by the spectral norm (the largest singular value):</p>
+<pre><code>‖ΔW · x‖ ≤ ‖ΔW‖₂ · ‖x‖           ‖ΔW‖₂ = largest singular value of ΔW
+
+steepest descent under the spectral norm:
+  minimise ⟨G, ΔW⟩  subject to  ‖ΔW‖₂ ≤ η
+  with G = U S Vᵀ (SVD)   →   ΔW = −η · U Vᵀ</code></pre>
+<p>The answer keeps the gradient's singular vectors and replaces every singular value with 1. Every direction moves by the same amount, so the step changes the output by a controlled amount whatever the input. Jeremy Bernstein's "Deriving Muon" post works this derivation out carefully, with the norm scaled to the layer's input and output dimensions. Keller Jordan's write-up adds an empirical motivation: momentum and Adam updates for transformer matrices typically have a very high condition number, close to low-rank, and orthogonalising boosts the "rare directions" that are small but still useful.</p>
+
+<h3 id="svd">Orthogonalisation with the SVD, and why not</h3>
+<p>The operation is the polar factor of G, the nearest semi-orthogonal matrix in Frobenius norm:</p>
+<pre><code>Ortho(G) = argmin_O ‖O − G‖_F   s.t.  OᵀO = I or OOᵀ = I
+         = U Vᵀ                  where G = U S Vᵀ</code></pre>
+<p>Computing an SVD for every weight matrix at every step is far too slow on GPUs, which are built for matrix multiplication, not for iterative decompositions. Shampoo-style inverse matrix roots can do it but, as Jordan notes, need fp32 to stay stable. The fix is an iteration made only of matrix multiplies, stable in bf16.</p>
+
+<h3 id="sec-ns">Newton–Schulz: an odd polynomial on singular values</h3>
+<p>The trick behind the 06:28 chapter: for G = USVᵀ, any odd polynomial of the form aG + b(GGᵀ)G + c(GGᵀ)²G equals U·φ(S)·Vᵀ with φ(x) = ax + bx³ + cx⁵ applied to each singular value. Matrix multiplications therefore reshape the singular values without touching the singular vectors, and you never compute U, S or V.</p>
+<pre><code>X₀ = G / ‖G‖_F                    so every singular value is in (0, 1]
+repeat N times:
+  A = X Xᵀ
+  X = a·X + (b·A + c·A·A)·X        singular values: σ → φ(σ) = aσ + bσ³ + cσ⁵
+
+classic cubic:      (a, b, c) = (1.5, −0.5, 0)         converges to exactly 1, slowly near 0
+simple quintic:     (2, −1.5, 0.5)                      φ(1) = 1, φ′(1) = 0
+Muon's tuned set:   (3.4445, −4.7750, 2.0315)           large slope a near 0; ends in a band near 1</code></pre>
+<p>The slope at zero is a, so a large a lifts tiny singular values quickly: roughly a× per step while they're small. Keller Jordan tuned the coefficients to maximise a while keeping the long-run values roughly within 0.7–1.3, after finding that a band that loose did not hurt training. With those coefficients, five steps are enough in his experiments. Cost: for an n×m matrix (m ≤ n), each step costs about 2(2nm² + m³) FLOPs, and the write-up bounds the total overhead relative to the forward and backward pass by Tm/B, with T the number of steps, m the model width and B the batch in tokens. Its worked examples come to 0.7% for the NanoGPT speedrun and 0.5% for a Llama-405B-sized run.</p>
+
+<div class="card demo">
+<h3>Interactive: Newton–Schulz pushing singular values towards 1</h3>
+<p class="legend">Left: the curve φᴺ(x), what N steps do to a starting singular value x, with the 0.7–1.3 band shaded and the line y = 1 dashed. Right: 16 singular values of a lopsided update after Frobenius normalisation, sorted, before (grey outlines) and after N steps (blue bars). Their spread is set by the condition number; values are drawn from a fixed seed. Because the iteration acts on each singular value separately, these bars are exactly what the matrix iteration would produce.</p>
+<canvas id="nc" width="700" height="260" aria-label="Newton-Schulz polynomial curve and singular values before and after iteration"></canvas>
+<label for="co">Coefficients: <span id="cov" class="num"></span></label>
+<input id="co" type="range" min="0" max="2" step="1" value="2">
+<label for="ns">NS steps: <span id="nsv" class="num"></span></label>
+<input id="ns" type="range" min="0" max="10" step="1" value="5">
+<label for="ck">Condition number: <span id="ckv" class="num"></span></label>
+<input id="ck" type="range" min="1" max="4" step="0.5" value="3">
+<div class="stats">
+  <div class="stat"><div class="k">Smallest σ</div><div class="v" id="smin">–</div></div>
+  <div class="stat"><div class="k">Largest σ</div><div class="v" id="smax">–</div></div>
+  <div class="stat"><div class="k">σ in 0.7–1.3</div><div class="v" id="sin">–</div></div>
+  <div class="stat"><div class="k">Spread (max ÷ min)</div><div class="v" id="ssp">–</div></div>
+</div>
+<p class="meta">Try this: at the defaults (tuned coefficients, 5 steps, condition number 1,000) the smallest value rises from about 0.001 to about 0.36 and 14 of 16 values sit in the band, while the largest overshoots to about 1.2. Switch to the simple quintic: after 5 steps the smallest is only about 0.02, and it takes 10 steps to reach about 0.67. The classic cubic is slower still. Notice the tuned set never settles at exactly 1: it oscillates within roughly 0.68–1.2 here, which is the deliberate trade Jordan describes.</p>
+</div>
+
+<h3 id="muon">The Muon optimizer</h3>
+<p>Keller Jordan introduced Muon (MomentUm Orthogonalized by Newton-Schulz) in late 2024 for the NanoGPT and CIFAR-10 speedrunning competitions. For each 2D hidden-layer weight:</p>
+<pre><code>M ← μ · M + G                       SGD momentum (μ is the momentum coefficient)
+O = NewtonSchulz5(M)                ≈ U Vᵀ of the momentum
+W ← W − η · O</code></pre>
+<p>Practical rules from the write-up: Muon is only for 2D hidden-layer matrices (convolution filters can be flattened). Scalars, vectors, the embedding and the output head stay on AdamW, which Jordan reports matters for performance even though those layers are 2D. Memory is the same as SGD with momentum: one buffer per parameter instead of Adam's two. Momentum goes <em>before</em> the orthogonalisation; the write-up notes that an earlier method which orthogonalised first and averaged afterwards did worse.</p>
+<p>Reported results in the write-up include a CIFAR-10 speed record cut from 3.3 to 2.6 A100-seconds, a 1.35× improvement on the NanoGPT speedrun record, and a 1.5B-parameter model reaching GPT-2 XL level on HellaSwag in 10 8×H100-hours against 13.3 for AdamW.</p>
+<p><strong>Scaling it up (Moonlight).</strong> Liu et al. (Moonshot AI, 2025), "Muon is Scalable for LLM Training", identified two changes needed at scale: add weight decay, and rescale each matrix's update so its RMS matches what AdamW would produce, so learning rates and weight decay carry over without retuning. The rescaling in Kimi K2's algorithm is O · 0.2 · √max(n, m). Their scaling-law experiments report about 2× compute efficiency over AdamW, and they trained Moonlight, a 3B-active / 16B-total MoE model, on 5.7T tokens with it.</p>
+<pre><code>W ← W − η · ( 0.2 · √max(n, m) · NewtonSchulz(M)  +  λ · W )</code></pre>
+<p><strong>A sober comparison.</strong> Wen, Hall, Ma and Liang's "Fantastic Pretraining Optimizers and Where to Find Them" (2025) tuned ten optimisers carefully across 0.1B–1.2B models. They found the fastest ones, Muon and Soap, both precondition with matrices, but the speedup over well-tuned AdamW shrank with scale, from about 1.4× at 0.1B to about 1.1× at 1.2B. Treat "2×" claims as setting-dependent.</p>
+
+<h3 id="logits">The exploding-logit problem</h3>
+<p>The Kimi K2 report (Kimi Team, 2025) describes the instability met when scaling Muon. Define the max logit of head h over a batch:</p>
+<pre><code>S_max^h = (1/√d) · max over samples, i, j of  q_i^h · k_j^h</code></pre>
+<p>In a 9B-active / 53B-total MoE trained with vanilla Muon, max logits quickly passed 1,000, which the report links to loss spikes and occasional divergence; it says this happened more often with Muon than with AdamW in their experiments. Two known fixes didn't fit. Logit soft-capping clips the scores, but the query–key dot products can keep growing underneath. QK-Norm normalises queries and keys, but with Multi-head Latent Attention the keys are never fully materialised at inference, so there is nothing to normalise. (<a href="../05-trillion-scale-architecture.html#length">Module 05</a> explains MLA.)</p>
+
+<h3 id="qkclip">MuonClip: QK-clip, per head, adapted to MLA</h3>
+<p>QK-Clip leaves the forward and backward pass alone and instead rescales weights after the optimiser step, whenever a head's max logit exceeded a threshold τ:</p>
+<pre><code>γ_h = min(1, τ / S_max^h)                    per head, τ = 100 for K2
+MHA:   W_q^h ← γ_h^α · W_q^h,  W_k^h ← γ_h^(1−α) · W_k^h      α = 0.5
+MLA:   head-specific q^C, k^C   × √γ_h
+       head-specific rotary q^R × γ_h
+       shared rotary k^R        untouched (it is shared across heads)</code></pre>
+<p>Because the logit is a product of a query and a key, scaling both by √γ scales the logit by γ, bringing that head back to τ. Clipping per head matters because only a few heads blow up; a global γ would needlessly shrink healthy heads. In MLA the rotary key part is shared by all heads, so it is left alone and the head's own rotary query part takes the full γ. MuonClip is then Moonlight's Muon (weight decay and RMS matching) plus QK-Clip.</p>
+<p>The report's results: for K2's 15.5T-token pre-training with τ = 100, max logits were capped at 100 early on and decayed to a normal range after roughly 30% of training, with no adjustment to τ, and the per-step loss curve showed no spikes. An appendix reports small-scale ablations in which QK-Clip did not hurt model quality.</p>
+
+<h2 id="course">3. Where the course goes deeper</h2>
+<div class="table-wrap"><table>
+<tr><th>Topic</th><th>Course page</th></tr>
+<tr><td>Adam, AdamW and the optimiser family tree</td><td><a href="07-adamw.html">Video 07 · Optimisers to AdamW</a></td></tr>
+<tr><td>Attention, queries, keys and the softmax</td><td><a href="../06-30u30/13-attention.html">30u30 Day 13 · Attention is all you need</a></td></tr>
+<tr><td>Multi-head Latent Attention and the KV cache</td><td><a href="../05-trillion-scale-architecture.html#length">Module 05 · Trillion-scale architecture (length)</a>; <a href="../08-ai-research-engineer/08-inference-aware-design.html#gqa">Module 08 · Stage 08 · Inference-aware design</a></td></tr>
+<tr><td>Training instability and large MoE runs</td><td><a href="../05-trillion-scale-architecture.html">Module 05 · Trillion-scale architecture</a>; <a href="../08-ai-research-engineer/03-beyond-transformers.html">Module 08 · Stage 03 · Beyond transformers</a></td></tr>
+<tr><td>Optimiser memory under ZeRO sharding</td><td><a href="../08-ai-research-engineer/06-distributed-training.html#zc">Module 08 · Stage 06 · Distributed training</a></td></tr>
+<tr><td>Matrix maths and autograd from scratch</td><td><a href="../08-ai-research-engineer/01-tensor-math-autograd.html">Module 08 · Stage 01 · Tensor maths and autograd</a></td></tr>
+</table></div>
+
+<h2 id="robotics">Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>The link is indirect.</strong> Muon's published evidence is on language-model pre-training. I'm not aware of a robot-policy paper showing it beats AdamW, so treat it as an LLM-training tool that robot foundation models may inherit.</li>
+<li><strong>Robot foundation models are transformers.</strong> VLAs are built on language and vision backbones and trained with the same recipes, so a cheaper or more stable optimiser for their hidden matrices would carry over to their pre-training.</li>
+<li><strong>Stability is worth more than speed for expensive runs.</strong> QK-Clip's appeal is a long run with no loss spikes. A robot lab with one shot at a large pre-training run cares about that.</li>
+<li><strong>Memory.</strong> One optimiser buffer instead of two frees about a quarter of model-state memory in mixed precision, which helps on smaller training clusters.</li>
+<li><strong>Fine-tuning on a robot dataset is a different regime.</strong> Small-data fine-tunes are often done with LoRA and AdamW; nothing in these sources tells you Muon helps there.</li>
+</ul>
+</div>
+
+<h2 id="check">Self-check</h2>
+<details><summary>What does Muon do to the singular values and singular vectors of the momentum matrix?</summary><p>It keeps the singular vectors and pushes every singular value towards 1, approximately replacing USVᵀ with UVᵀ.</p></details>
+<details><summary>Why can Newton–Schulz orthogonalise a matrix without ever computing its SVD?</summary><p>An odd matrix polynomial aX + b(XXᵀ)X + c(XXᵀ)²X equals U·φ(S)·Vᵀ, so it reshapes singular values elementwise while leaving U and V unchanged. Choosing φ so that repeated application sends (0, 1] towards 1 orthogonalises using only matrix multiplications.</p></details>
+<details><summary>Why is G divided by its Frobenius norm first?</summary><p>The iteration only converges for singular values in (0, 1]. The Frobenius norm is at least the largest singular value, so dividing by it puts every singular value in range, and orthogonalisation ignores overall scale anyway.</p></details>
+<details><summary>Which parameters should not use Muon, according to Keller Jordan's write-up?</summary><p>Scalars and vectors (biases, norm gains), plus the input embedding and the output head, which stay on AdamW.</p></details>
+<details><summary>Why couldn't Kimi K2 use QK-Norm to stop exploding logits?</summary><p>K2 uses Multi-head Latent Attention, where the keys are not fully materialised at inference, so there's no explicit key vector to normalise. QK-Clip instead rescales the query and key weights after each step.</p></details>
+<details><summary>A head has max logit 400 and τ = 100. What happens to its MLA weights under QK-Clip?</summary><p>γ = 100/400 = 0.25. The head-specific q^C and k^C weights are scaled by √0.25 = 0.5, the head-specific rotary query weights by 0.25, and the shared rotary key is untouched.</p></details>
+
+<h2 id="references">References</h2>
+<p>From the video's description:</p>
+<ul>
+<li><a href="https://kellerjordan.github.io/posts/muon/">Muon: An optimizer for hidden layers in neural networks</a> (Keller Jordan, blog, December 2024)</li>
+<li><a href="https://jeremybernste.in/writing/deriving-muon">Deriving Muon</a> (Jeremy Bernstein, blog)</li>
+<li><a href="https://arxiv.org/abs/2409.20325">Old Optimizer, New Norm: An Anthology</a> (Bernstein and Newhouse, 2024)</li>
+<li><a href="https://arxiv.org/abs/2502.16982">Muon is Scalable for LLM Training</a> (Liu et al., Moonshot AI, 2025)</li>
+<li>MuonClip: <a href="https://arxiv.org/abs/2507.20534">Kimi K2: Open Agentic Intelligence</a> (Kimi Team, 2025)</li>
+<li><a href="https://arxiv.org/abs/2509.02046">Fantastic Pretraining Optimizers and Where to Find Them</a> (Wen, Hall, Ma and Liang, 2025). The description's link for this entry points to the Anthology paper above (arXiv 2409.20325); this is the paper with this title.</li>
+<li>Course link: <a href="../05-trillion-scale-architecture.html#muon">Module 05</a>: Kimi K3 trains with a per-head variant of Muon</li>
+</ul>
+<p>The description also links the author's <a href="07-adamw.html">AdamW video</a> (Video 07 here) and notes the video was made with <a href="https://www.manim.community/">Manim</a>.</p>
+
+<nav class="pager">
+  <a href="07-adamw.html"><small>Previous</small>Video 07 · Optimisers to AdamW</a>
+  <a class="next" href="09-llm-serving.html"><small>Next</small>Video 09 · How LLM serving works</a>
+</nav>
+<footer>Module 12 · Video 08 · a watch guide written for this course from the video's chapter list, its references and the original papers. Video © Jia-Bin Huang.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('nc'), ctx = cv.getContext('2d');
+const ids = ['co', 'ns', 'ck'];
+const el = Object.fromEntries(ids.map(k => [k, document.getElementById(k)]));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+const CO = [[1.5, -0.5, 0], [2, -1.5, 0.5], [3.4445, -4.7750, 2.0315]];
+const NAMES = ['classic cubic (1.5, −0.5)', 'simple quintic (2, −1.5, 0.5)', 'Muon tuned (3.4445, −4.7750, 2.0315)'];
+const phi = (c, x) => c[0] * x + c[1] * x ** 3 + c[2] * x ** 5;
+const iter = (c, x, n) => { for (let k = 0; k < n; k++) x = phi(c, x); return x; };
+const rng = s => () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 2 ** 32; };
+
+// 16 singular values log-spread over [10^-logk, 1], then Frobenius-normalised
+function singular(n, logk) {
+  const r = rng(3);
+  const s = Array.from({ length: n }, (_, i) => 10 ** (-logk * (i === 0 ? 0 : i === n - 1 ? 1 : r())));
+  s.sort((a, b) => b - a);
+  const fr = Math.hypot(...s);
+  return s.map(x => x / fr);
+}
+
+function draw() {
+  const ci = +el.co.value, N = +el.ns.value, logk = +el.ck.value, c = CO[ci];
+  document.getElementById('cov').textContent = NAMES[ci];
+  document.getElementById('nsv').textContent = N;
+  document.getElementById('ckv').textContent = Math.round(10 ** logk).toLocaleString('en-US');
+
+  const W = cv.width, H = cv.height, t = 14, b = 28, YM = 1.4;
+  const s0 = singular(16, logk), s1 = s0.map(x => iter(c, x, N));
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '12px sans-serif';
+
+  // left panel: phi^N curve
+  const l = 40, r = W / 2 - 16;
+  const px = x => l + x * (r - l), py = y => t + (YM - Math.max(0, Math.min(YM, y))) / YM * (H - t - b);
+  ctx.fillStyle = css('--accent-soft'); ctx.fillRect(l, py(1.3), r - l, py(0.7) - py(1.3));
+  ctx.strokeStyle = css('--line'); ctx.lineWidth = 1; ctx.strokeRect(l, t, r - l, H - t - b);
+  ctx.fillStyle = css('--muted'); ctx.textAlign = 'right';
+  for (const y of [0, 0.5, 1]) ctx.fillText(y.toFixed(1), l - 6, py(y) + 4);
+  ctx.textAlign = 'center';
+  for (const x of [0, 0.5, 1]) ctx.fillText(x.toFixed(1), px(x), H - 10);
+  ctx.strokeStyle = css('--muted'); ctx.setLineDash([4, 4]); ctx.beginPath();
+  ctx.moveTo(l, py(1)); ctx.lineTo(r, py(1)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = css('--accent'); ctx.lineWidth = 2.5; ctx.beginPath();
+  for (let i = 0; i <= 400; i++) {
+    const x = i / 400, y = iter(c, x, N);
+    i ? ctx.lineTo(px(x), py(y)) : ctx.moveTo(px(x), py(y));
+  }
+  ctx.stroke();
+  ctx.fillStyle = css('--fg');
+  s0.forEach((x, i) => { ctx.beginPath(); ctx.arc(px(x), py(s1[i]), 3.5, 0, 7); ctx.fill(); });
+
+  // right panel: bars before (outline) and after (filled)
+  const L2 = W / 2 + 16, R2 = W - 10, bw = (R2 - L2) / s0.length;
+  ctx.fillStyle = css('--accent-soft'); ctx.fillRect(L2, py(1.3), R2 - L2, py(0.7) - py(1.3));
+  ctx.strokeStyle = css('--line'); ctx.lineWidth = 1; ctx.strokeRect(L2, t, R2 - L2, H - t - b);
+  s1.forEach((y, i) => {
+    ctx.fillStyle = css('--accent');
+    ctx.fillRect(L2 + i * bw + 3, py(y), bw - 6, py(0) - py(y));
+    ctx.strokeStyle = css('--muted'); ctx.lineWidth = 1.5;
+    ctx.strokeRect(L2 + i * bw + 3, py(s0[i]), bw - 6, py(0) - py(s0[i]));
+  });
+  ctx.fillStyle = css('--muted'); ctx.textAlign = 'center';
+  ctx.fillText('16 singular values, sorted', (L2 + R2) / 2, H - 10);
+
+  const mn = Math.min(...s1), mx = Math.max(...s1);
+  document.getElementById('smin').textContent = mn.toFixed(3);
+  document.getElementById('smax').textContent = mx.toFixed(3);
+  document.getElementById('sin').textContent = s1.filter(x => x >= 0.7 && x <= 1.3).length + ' / 16';
+  document.getElementById('ssp').textContent = (mx / mn < 100 ? (mx / mn).toFixed(2) : Math.round(mx / mn).toLocaleString('en-US')) + '×';
+}
+ids.forEach(k => el[k].oninput = draw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video 07 · AdamW</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 12 · Training &amp; inference videos</a> › Video 07</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 12 · Video 07</div>
+<h1>Optimisers from gradient descent to AdamW</h1>
+<p class="lede">Almost every large model in this course, and most robot policies, is trained with AdamW. This short video walks the family tree that leads there: plain gradient descent, momentum, RMSProp, Adam, and the one-line fix that turns Adam into AdamW. This guide explains each step from the original sources and gives you a 2D "optimiser race" to play with.</p>
+
+<div class="facts">
+  <div><b>Video length</b>7:19</div>
+  <div><b>Published</b>11 October 2024</div>
+  <div><b>Level</b>Introductory: gradients and a loss function are enough</div>
+  <div><b>Builds on</b><a href="../08-ai-research-engineer/01-tensor-math-autograd.html">Module 08 · Stage 01 (autograd)</a>, <a href="../08-ai-research-engineer/06-distributed-training.html#zc">Module 08 · Stage 06 (optimiser-state memory)</a></div>
+</div>
+<p class="meta">Video by Jia-Bin Huang · <a href="https://www.youtube.com/watch?v=1_nujVNUsto">Watch on YouTube</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Training a model means nudging millions of knobs, a tiny bit at a time, so its mistakes get smaller. An optimiser is the rule that decides how far to turn each knob on each step.</p>
+
+<h3>Think of it like this</h3>
+<p>You're lost on a foggy hillside and want to reach the lowest point of the valley. You can only feel the slope under your feet. The simplest rule is "step downhill". But the valley is long and narrow: the sides are steep and the floor slopes gently. If you only follow the slope, you zig-zag from wall to wall and crawl along the floor. A rolling ball does better, because it builds up speed along the floor and the side-to-side wobbles cancel out. A careful hiker does better too, by taking small steps where the ground is steep and bigger steps where it's flat. Adam does both. AdamW adds a gentle elastic band pulling you back towards home, so you don't wander off to some extreme spot.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Measure the slope (the gradient) for every knob.</li>
+<li>Gradient descent: move every knob a little way downhill.</li>
+<li>Momentum: keep a running average of recent slopes, so steady directions speed up and wobbles cancel.</li>
+<li>RMSProp: keep a running average of how big each knob's slopes have been, and take smaller steps on knobs with big, jumpy slopes.</li>
+<li>Adam combines the two, and AdamW adds a separate, steady shrink of every knob towards zero (weight decay).</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Robot policies, from small grasping networks to big vision-language-action models, are trained with these same rules. A good optimiser means fewer hours of GPU time and fewer failed training runs, and the weight-decay part helps a policy not over-fit to the few hundred demonstrations you recorded.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Roll a marble down the inside of a long, curved gutter or a folded piece of card. Watch it wobble side to side while it travels along. That wobble is what momentum smooths out.</li>
+<li>In the demo below, push <b>SGD learning rate</b> above 1.0 and watch plain SGD fly off. Then add <b>Gradient noise</b> and see which optimisers still get close. Finally raise <b>Weight decay (AdamW)</b> and watch the AdamW path stop short of the minimum, pulled towards zero.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Loss</dt><dd>One number saying how wrong the model is. Training tries to make it small.</dd>
+<dt>Gradient</dt><dd>The slope of the loss for every parameter: which way is uphill, and how steep.</dd>
+<dt>Learning rate</dt><dd>How big a step to take each time.</dd>
+<dt>Momentum</dt><dd>A running average of past gradients that keeps you moving in steady directions.</dd>
+<dt>Weight decay</dt><dd>Shrinking every weight a little each step, so the model prefers small weights.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="watch">1. Watch</h2>
+<div class="card"><div style="position:relative;padding-top:56.25%"><iframe style="position:absolute;inset:0;width:100%;height:100%;border:0" src="https://www.youtube-nocookie.com/embed/1_nujVNUsto" title="The Algorithm that Helps Machines Learn · AdamW (Jia-Bin Huang)" loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div></div>
+
+<h3>Topic guide</h3>
+<p>The description for this video has no chapter timestamps. It names five topics, listed here in the order it gives them, so this table has no time links. The whole video is just over seven minutes, so watching straight through is easy.</p>
+<div class="table-wrap"><table>
+<tr><th>Topic (from the description)</th><th>What to look for</th></tr>
+<tr><td>Gradient descent</td><td>The basic update, the role of the learning rate, and why a narrow valley (very different curvature in different directions) makes it slow.</td></tr>
+<tr><td>Momentum</td><td>How averaging past gradients damps the side-to-side oscillation and speeds progress along the valley floor.</td></tr>
+<tr><td>RMSProp</td><td>Dividing each parameter's step by a running root-mean-square of its gradients, so every direction gets a step of similar size.</td></tr>
+<tr><td>Adam</td><td>Momentum and RMSProp combined, plus bias correction for the zero-initialised averages.</td></tr>
+<tr><td>AdamW</td><td>The difference between adding an L2 penalty to the loss and decaying the weights directly, and why that difference only appears for adaptive optimisers.</td></tr>
+</table></div>
+
+<h2 id="ideas">2. The ideas, explained</h2>
+
+<h3 id="gd">Gradient descent and the narrow-valley problem</h3>
+<p>Given a loss L(θ) and its gradient g = ∇L(θ), gradient descent repeats one update. In deep learning the gradient comes from a mini-batch rather than the whole dataset, which makes it stochastic gradient descent (SGD).</p>
+<pre><code>θ ← θ − η · g          η = learning rate
+
+on a quadratic with curvature h along some direction:
+  error_next = (1 − η·h) · error
+  stable only if η &lt; 2 / h_max</code></pre>
+<p>The last line is the whole problem. The steepest direction (largest curvature h_max) caps the learning rate, and with that small η the flattest direction (smallest curvature h_min) creeps along at a rate set by η·h_min. The ratio h_max/h_min, the condition number, says how badly a single learning rate fits. Neural-network losses are badly conditioned, so the two fixes below attack exactly this: momentum by accumulating speed along the flat direction, adaptive methods by giving each parameter its own step size.</p>
+
+<h3 id="momentum">Momentum</h3>
+<p>Heavy-ball momentum goes back to Polyak (1964). Sutskever, Martens, Dahl and Hinton (2013) showed that momentum with a well-chosen schedule matters a lot for training deep networks. The common form keeps a velocity:</p>
+<pre><code>v ← μ · v + g          μ ≈ 0.9
+θ ← θ − η · v</code></pre>
+<p>Along a direction where the gradient keeps the same sign, v grows towards g/(1 − μ), so the effective step is up to 10× larger at μ = 0.9. Along a direction where the gradient flips sign each step (the valley walls), the terms partly cancel. Nesterov's variant evaluates the gradient at the look-ahead point θ − ημv and is often a little more stable.</p>
+
+<h3 id="rmsprop">RMSProp</h3>
+<p>RMSProp was never published as a paper. Geoffrey Hinton introduced it in lecture 6 of his 2012 Coursera course, Neural Networks for Machine Learning, and the slides (the video's first reference) are the usual citation. The idea is to divide each parameter's gradient by a running estimate of its typical size:</p>
+<pre><code>s ← ρ · s + (1 − ρ) · g²      (elementwise; the slides suggest ρ = 0.9)
+θ ← θ − η · g / (√s + ε)</code></pre>
+<p>A parameter with consistently large gradients gets its step shrunk; one with tiny gradients gets it enlarged. In the narrow valley, both directions end up moving at a similar speed of roughly η per step, regardless of curvature. RMSProp descends from Rprop, which used only the sign of the gradient; dividing by the root mean square is a mini-batch-friendly way to get sign-like steps. AdaGrad (Duchi, Hazan and Singer, 2011) had divided by the root of the <em>sum</em> of all past squared gradients, which shrinks the step forever; RMSProp's moving average forgets old gradients and keeps going.</p>
+
+<h3 id="adam">Adam</h3>
+<p>Adam (Kingma and Ba, ICLR 2015) keeps both a momentum-like first moment and an RMSProp-like second moment, and corrects both for starting at zero:</p>
+<pre><code>m ← β₁ · m + (1 − β₁) · g          first moment  (β₁ = 0.9)
+v ← β₂ · v + (1 − β₂) · g²         second moment (β₂ = 0.999)
+m̂ = m / (1 − β₁ᵗ),  v̂ = v / (1 − β₂ᵗ)    bias correction at step t
+θ ← θ − α · m̂ / (√v̂ + ε)          α = 0.001, ε = 1e-8 (paper defaults)</code></pre>
+<p>Why bias correction: m and v start at zero, so early on they underestimate the true averages. At step 1, m = 0.1·g, and dividing by 1 − 0.9 = 0.1 recovers g. Without the correction for v, which uses β₂ = 0.999 and so warms up over about a thousand steps, the first steps would divide by a tiny √v and be far too large. The paper also notes that the step size is roughly bounded by α, which makes α easy to reason about: it is about how far each parameter can move per step.</p>
+<p>Adam has a cost that matters at scale: two extra numbers per parameter, usually stored in fp32. With mixed precision that's 8 of the roughly 16 bytes per parameter that ZeRO shards across GPUs. <a href="../08-ai-research-engineer/06-distributed-training.html#zc">Module 08 · Stage 06</a> does the accounting and has the ZeRO memory calculator.</p>
+
+<h3 id="adamw">AdamW: decoupled weight decay</h3>
+<p>Loshchilov and Hutter's "Decoupled Weight Decay Regularization" (ICLR 2019) starts from an observation. For plain SGD, adding an L2 penalty (λ/2)‖θ‖² to the loss and shrinking the weights directly by a factor each step are the same thing, up to rescaling λ by the learning rate. For adaptive methods like Adam they are not, and most libraries at the time implemented "weight decay" in Adam as the L2 version.</p>
+<pre><code>Adam + L2 (what libraries did):
+  g ← ∇L(θ) + λ·θ                    decay enters the gradient …
+  θ ← θ − α · m̂ / (√v̂ + ε)           … and is then divided by √v̂
+
+AdamW (decoupled):
+  g ← ∇L(θ)
+  θ ← θ − α · ( m̂ / (√v̂ + ε) + λ·θ )   decay applied directly, not rescaled</code></pre>
+<p>With L2, the decay term passes through the adaptive scaling. Parameters with a history of large gradients have a large √v̂, so they are decayed <em>less</em>, which is the opposite of what a regulariser should do uniformly. AdamW applies the same relative shrink to every weight. The paper reports two effects: the best weight decay becomes much less dependent on the learning rate, so the two can be tuned separately, and Adam's generalisation improves enough to compete with SGD with momentum on image classification, where it had usually lost before. (In the paper the whole update is also multiplied by a schedule multiplier η_t; PyTorch's <code>torch.optim.AdamW</code> applies <code>θ ← θ − lr·λ·θ</code> before the Adam step.)</p>
+<p>In LLM practice, AdamW with β₂ around 0.95, a warmup followed by cosine or linear decay, gradient clipping, and weight decay around 0.1 has been the standard recipe for years. Weight decay is usually not applied to biases, normalisation gains or sometimes embeddings. The next video, on Muon, is about the first optimiser to seriously challenge this default for the hidden-layer matrices.</p>
+
+<div class="card demo">
+<h3>Interactive: an optimiser race in a narrow valley</h3>
+<p class="legend">Contours of f(x, y) = 0.05·(x − 2)² + (y − 1)²: curvature 0.1 along x, 2 along y, condition number 20. All five optimisers start at the ringed dot (−4, −0.5); the cross marks the minimum (2, 1). Grey: SGD. Orange: momentum (μ = 0.9). Red: RMSProp (ρ = 0.9). Blue: Adam (0.9, 0.999). Green dashed: AdamW, the same Adam with decoupled weight decay. SGD and momentum use the SGD learning rate; the other three use the adaptive one. Gradient noise is Gaussian, from a fixed seed, so runs are repeatable.</p>
+<canvas id="oc" width="700" height="300" aria-label="Optimiser paths on a 2D narrow valley: SGD, momentum, RMSProp, Adam and AdamW"></canvas>
+<label for="lr">SGD learning rate: <span id="lrv" class="num"></span></label>
+<input id="lr" type="range" min="0.05" max="1.1" step="0.05" value="0.5">
+<label for="alr">Adaptive learning rate: <span id="alrv" class="num"></span></label>
+<input id="alr" type="range" min="0.01" max="0.5" step="0.01" value="0.1">
+<label for="st">Steps: <span id="stv" class="num"></span></label>
+<input id="st" type="range" min="5" max="300" step="5" value="100">
+<label for="nz">Gradient noise: <span id="nzv" class="num"></span></label>
+<input id="nz" type="range" min="0" max="2" step="0.1" value="0">
+<label for="wd">Weight decay (AdamW): <span id="wdv" class="num"></span></label>
+<input id="wd" type="range" min="0" max="0.5" step="0.05" value="0">
+<div class="stats">
+  <div class="stat"><div class="k">SGD loss</div><div class="v" id="r-sgd">–</div></div>
+  <div class="stat"><div class="k">Momentum loss</div><div class="v" id="r-mom">–</div></div>
+  <div class="stat"><div class="k">RMSProp loss</div><div class="v" id="r-rms">–</div></div>
+  <div class="stat"><div class="k">Adam loss</div><div class="v" id="r-adam">–</div></div>
+  <div class="stat"><div class="k">AdamW loss</div><div class="v" id="r-adamw">–</div></div>
+</div>
+<p class="meta">Try this: at the defaults (SGD rate 0.5, adaptive rate 0.1, 100 steps) SGD still hasn't quite reached the minimum along the flat x direction (loss about 6×10⁻⁵), while RMSProp is essentially there. Push the SGD rate to 1.05: the y curvature is 2, so the stability limit is 2/2 = 1, and SGD blows up along y while momentum survives. Set weight decay to 0.1: AdamW ends near (1.59, 0.96) instead of (2, 1), because decay pulls the weights towards zero. That is the regulariser doing its job, not a bug. With noise 0.5, nobody settles exactly; the adaptive methods hover with steps of roughly the learning rate. This is a toy with two parameters and axis-aligned curvature, which flatters per-parameter methods; don't read real-model rankings from it.</p>
+</div>
+
+<h2 id="course">3. Where the course goes deeper</h2>
+<div class="table-wrap"><table>
+<tr><th>Topic</th><th>Course page</th></tr>
+<tr><td>Autograd, where the gradients come from</td><td><a href="../08-ai-research-engineer/01-tensor-math-autograd.html">Module 08 · Stage 01 · Tensor maths and autograd</a></td></tr>
+<tr><td>Adam's memory cost and sharding optimiser state (ZeRO calculator)</td><td><a href="../08-ai-research-engineer/06-distributed-training.html#zc">Module 08 · Stage 06 · Distributed training</a>; <a href="01-zero-fsdp.html">Video 01 · ZeRO &amp; FSDP</a></td></tr>
+<tr><td>Adam with warmup in the original Transformer</td><td><a href="../06-30u30/13-attention.html">30u30 Day 13 · Attention is all you need</a></td></tr>
+<tr><td>Adam in reinforcement learning (PPO settings)</td><td><a href="../06-30u30/29-ppo.html">30u30 Day 29 · PPO</a></td></tr>
+<tr><td>Training recipes and learning-rate schedules at scale</td><td><a href="../08-ai-research-engineer/02-scaling-data-mixing.html">Module 08 · Stage 02 · Scaling and data mixing</a></td></tr>
+<tr><td>The next optimiser: orthogonalised updates</td><td><a href="08-muon.html">Video 08 · Muon and MuonClip</a></td></tr>
+</table></div>
+
+<h2 id="robotics">Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>It's the default for robot policies too.</strong> Behaviour-cloning policies, diffusion policies and VLA fine-tunes are almost always trained with Adam or AdamW. Knowing what β₂, ε and weight decay do makes debugging a diverging policy run much less mysterious.</li>
+<li><strong>Small datasets make weight decay matter.</strong> Robot demonstration sets are tiny by LLM standards, so over-fitting is a real risk. Decoupled weight decay is one of the cheap regularisers you can tune independently of the learning rate.</li>
+<li><strong>RL is noisy.</strong> Policy-gradient methods such as PPO feed Adam very noisy gradients; the per-parameter normalisation is part of why they train at all. The PPO paper's MuJoCo settings use Adam (see <a href="../06-30u30/29-ppo.html">30u30 Day 29</a>).</li>
+<li><strong>Memory on small GPUs.</strong> Adam's two extra states per parameter are why fine-tuning a VLA on one GPU often needs LoRA or 8-bit optimiser states.</li>
+<li><strong>Honest caveat:</strong> nothing here is robot-specific. The optimiser is a shared foundation; robot-specific gains come from data, architecture and evaluation, not from this video's topic.</li>
+</ul>
+</div>
+
+<h2 id="check">Self-check</h2>
+<details><summary>Along one direction the loss has curvature 4. What is the largest learning rate plain gradient descent can use without diverging?</summary><p>η must be below 2/h = 2/4 = 0.5. Above that, each step overshoots by more than it corrects, and the error grows.</p></details>
+<details><summary>Why does momentum help in a long, narrow valley?</summary><p>Along the valley floor the gradient keeps the same sign, so the velocity builds up (towards g/(1 − μ)). Across the valley the gradient flips sign, so successive contributions cancel and the oscillation is damped.</p></details>
+<details><summary>What problem does RMSProp fix that AdaGrad has?</summary><p>AdaGrad divides by the root of the sum of all past squared gradients, so its effective step size only ever shrinks and can stall. RMSProp uses an exponential moving average, which forgets old gradients.</p></details>
+<details><summary>Why does Adam need bias correction?</summary><p>Its moving averages start at zero, so early estimates are biased towards zero. Dividing by 1 − βᵗ removes the bias. It matters most for the second moment with β₂ = 0.999, where an uncorrected √v would be tiny for the first few hundred steps and the steps far too large.</p></details>
+<details><summary>Adam + L2 and AdamW both "use weight decay". What's actually different?</summary><p>With L2, λθ is added to the gradient and then divided by √v̂, so weights with large historical gradients are decayed less. AdamW subtracts αλθ directly, outside the adaptive scaling, so every weight shrinks by the same fraction. Loshchilov and Hutter showed this decouples the best λ from the learning rate and improves generalisation.</p></details>
+<details><summary>Roughly how many bytes per parameter does mixed-precision AdamW need for model states?</summary><p>About 16: 2 for bf16 weights, 2 for gradients, 4 for an fp32 master copy, and 4 + 4 for the two Adam moments. Module 08 · Stage 06 walks through it.</p></details>
+
+<h2 id="references">References</h2>
+<p>From the video's description:</p>
+<ul>
+<li>[RMSProp] <a href="https://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf">Neural Networks for Machine Learning, lecture 6 slides</a> (Hinton, with Srivastava and Swersky, 2012)</li>
+<li>[Adam] <a href="https://arxiv.org/abs/1412.6980">Adam: A Method for Stochastic Optimization</a> (Kingma and Ba, ICLR 2015)</li>
+<li>[AdamW] <a href="https://openreview.net/forum?id=Bkg6RiCqY7">Decoupled Weight Decay Regularization</a> (Loshchilov and Hutter, ICLR 2019); also on <a href="https://arxiv.org/abs/1711.05101">arXiv</a></li>
+</ul>
+<p>Also cited on this page:</p>
+<ul>
+<li>Polyak, B. T. (1964). Some methods of speeding up the convergence of iteration methods. <em>USSR Computational Mathematics and Mathematical Physics</em> 4(5).</li>
+<li><a href="https://proceedings.mlr.press/v28/sutskever13.html">On the importance of initialization and momentum in deep learning</a> (Sutskever, Martens, Dahl and Hinton, ICML 2013)</li>
+<li><a href="https://jmlr.org/papers/v12/duchi11a.html">Adaptive Subgradient Methods for Online Learning and Stochastic Optimization (AdaGrad)</a> (Duchi, Hazan and Singer, JMLR 2011)</li>
+</ul>
+
+<nav class="pager">
+  <a href="06-grpo.html"><small>Previous</small>Video 06 · From REINFORCE to PPO to GRPO</a>
+  <a class="next" href="08-muon.html"><small>Next</small>Video 08 · Muon and MuonClip</a>
+</nav>
+<footer>Module 12 · Video 07 · a watch guide written for this course from the video's chapter list, its references and the original papers. Video © Jia-Bin Huang.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('oc'), ctx = cv.getContext('2d');
+const ids = ['lr', 'alr', 'st', 'nz', 'wd'];
+const el = Object.fromEntries(ids.map(k => [k, document.getElementById(k)]));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+// f = A/2 (x-X0)^2 + B/2 (y-Y0)^2
+const A = 0.1, B = 2, X0 = 2, Y0 = 1, START = [-4, -0.5];
+const f = (x, y) => A / 2 * (x - X0) ** 2 + B / 2 * (y - Y0) ** 2;
+const grad = (x, y) => [A * (x - X0), B * (y - Y0)];
+const rng = s => () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 2 ** 32; };
+const gauss = r => Math.sqrt(-2 * Math.log(r() + 1e-12)) * Math.cos(2 * Math.PI * r());
+
+function run(kind, p) {
+  let [x, y] = START;
+  const m = [0, 0], v = [0, 0], r = rng(7), path = [[x, y]];
+  for (let t = 1; t <= p.steps; t++) {
+    const g = grad(x, y).map(c => c + p.noise * gauss(r)), th = [x, y];
+    for (let i = 0; i < 2; i++) {
+      if (kind === 'sgd') th[i] -= p.lr * g[i];
+      else if (kind === 'mom') { m[i] = 0.9 * m[i] + g[i]; th[i] -= p.lr * m[i]; }
+      else if (kind === 'rms') { v[i] = 0.9 * v[i] + 0.1 * g[i] ** 2; th[i] -= p.alr * g[i] / (Math.sqrt(v[i]) + 1e-8); }
+      else {
+        m[i] = 0.9 * m[i] + 0.1 * g[i]; v[i] = 0.999 * v[i] + 0.001 * g[i] ** 2;
+        const mh = m[i] / (1 - 0.9 ** t), vh = v[i] / (1 - 0.999 ** t);
+        if (kind === 'adamw') th[i] -= p.alr * p.wd * th[i];
+        th[i] -= p.alr * mh / (Math.sqrt(vh) + 1e-8);
+      }
+    }
+    [x, y] = th; path.push([x, y]);
+  }
+  return path;
+}
+
+const KINDS = [['sgd', '--muted', []], ['mom', '--warn', []], ['rms', '--fail', []], ['adam', '--accent', []], ['adamw', '--pass', [6, 4]]];
+const fmtL = z => !isFinite(z) || z > 1e6 ? 'diverged' : z < 1e-12 ? '< 1e-12' : z.toExponential(1);
+
+function draw() {
+  const p = { lr: +el.lr.value, alr: +el.alr.value, steps: +el.st.value, noise: +el.nz.value, wd: +el.wd.value };
+  const shown = { lr: p.lr.toFixed(2), alr: p.alr.toFixed(2), st: p.steps, nz: p.noise.toFixed(1), wd: p.wd.toFixed(2) };
+  ids.forEach(k => document.getElementById(k + 'v').textContent = shown[k]);
+
+  const W = cv.width, H = cv.height, XA = -5, XB = 4.5, YA = -1.5, YB = 2.5;
+  const px = x => (x - XA) / (XB - XA) * W, py = y => H - (y - YA) / (YB - YA) * H;
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = css('--line'); ctx.lineWidth = 1;
+  for (const c of [0.02, 0.1, 0.3, 0.7, 1.4, 2.4]) {
+    ctx.beginPath();
+    for (let a = 0; a <= 6.3; a += 0.05) {
+      const x = X0 + Math.sqrt(2 * c / A) * Math.cos(a), y = Y0 + Math.sqrt(2 * c / B) * Math.sin(a);
+      a === 0 ? ctx.moveTo(px(x), py(y)) : ctx.lineTo(px(x), py(y));
+    }
+    ctx.stroke();
+  }
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
+  for (const [k, col, dash] of KINDS) {
+    const P = run(k, p), e = P[P.length - 1];
+    ctx.strokeStyle = css(col); ctx.lineWidth = 2; ctx.setLineDash(dash); ctx.beginPath();
+    P.forEach(([x, y], i) => {
+      const X = Math.max(-1e4, Math.min(1e4, px(x))), Y = Math.max(-1e4, Math.min(1e4, py(y)));
+      i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y);
+    });
+    ctx.stroke(); ctx.setLineDash([]);
+    document.getElementById('r-' + k).textContent = fmtL(f(e[0], e[1]));
+  }
+  ctx.restore();
+  ctx.fillStyle = css('--fg'); ctx.strokeStyle = css('--bg'); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(px(START[0]), py(START[1]), 6, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = css('--fg'); ctx.lineWidth = 2; ctx.beginPath();
+  ctx.moveTo(px(X0) - 6, py(Y0) - 6); ctx.lineTo(px(X0) + 6, py(Y0) + 6);
+  ctx.moveTo(px(X0) - 6, py(Y0) + 6); ctx.lineTo(px(X0) + 6, py(Y0) - 6); ctx.stroke();
+}
+ids.forEach(k => el[k].oninput = draw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

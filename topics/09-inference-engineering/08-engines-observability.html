@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inference · Engines and observability</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 09 · Inference engineering</a> › Page 08</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 09 · Problems 16 and 18</div>
+<h1>Serving engines and observability</h1>
+<p class="lede">You can't run what you can't see, and you can't choose what you haven't measured fairly. This page designs the metrics an inference service needs, from time-to-first-token to cost per request, and then shows how to benchmark vLLM, TensorRT-LLM and SGLang so the comparison means something.</p>
+
+<div class="facts">
+  <div><b>Problems covered</b>16 (observability design), 18 (choosing a serving engine by benchmark)</div>
+  <div><b>Interview level</b>Mid to senior. Both are system-design questions with no single right answer</div>
+  <div><b>Key ideas</b>TTFT, TPOT, queue depth, KV-cache utilisation, prefix-cache hit rate, cost attribution, histograms and percentiles, goodput, open-loop load testing</div>
+  <div><b>Time to prep</b>3–5 h reading, plus a day on one rented GPU for the benchmark exercise</div>
+</div>
+<p class="meta">Source: <a href="https://x.com/vishalsingh2972/status/2113830444722741637">Vishal Singh's post of 25 inference-engineering problems</a> · saved in <code>sources/09-vishal-inference-25.md</code></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">A dashboard tells you how a system is doing right now. A fair test tells you which of several systems is better for your job. Both are about measuring the right things in the right way.</p>
+
+<h3>Think of it like this</h3>
+<p>Think of a pizza delivery app. Most pizzas arrive in 30 minutes, but one order in a hundred takes two hours. The average looks fine, and that one customer is furious. So a good dashboard shows "how long did the slowest 1 in 100 wait", not just the average. It also shows how many orders are waiting, how full the ovens are, and what each pizza cost to make. Now suppose you want to pick the best of three pizza shops. A fair test orders the same pizzas, at the same busy time of day, to the same address. Ordering one plain pizza at 3 pm from one shop and ten fancy ones on Friday night from another tells you nothing.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>For every request, record how long until the first word came back, and how fast the rest arrived.</li>
+<li>Record the state of the machine: how many requests are waiting, how full its memory is, how often it reused earlier work.</li>
+<li>Show the slow tail (the worst 1%), not only the middle, because that's what angry users feel.</li>
+<li>To compare engines, run each one on the same model, same hardware and same realistic traffic, and push them until they miss your speed target.</li>
+<li>Pick the engine that serves the most traffic within the target, then check the things a benchmark can't show, like how easy it is to run.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot's onboard model must answer within a fixed time, every time. A robot team needs the same habits: log the slowest responses, not just the average, and test any new software on the same robot and same tasks before trusting it.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Time how long it takes ten classmates to answer a simple question. Work out the average, then look at the slowest one. Which number better describes the worst experience?</li>
+<li>In the demo below, raise <b>Stall share</b> from 0 to a few percent and watch the p99 marker jump while the p50 barely moves. Then switch <b>Histogram buckets</b> between coarse and fine and compare the "p99 from buckets" with the true p99.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>TTFT</dt><dd>Time to first token: how long until the first piece of the answer arrives.</dd>
+<dt>TPOT</dt><dd>Time per output token: the gap between later pieces of the answer.</dd>
+<dt>Percentile</dt><dd>p99 is the value that 99% of requests beat. It describes the slow tail.</dd>
+<dt>Throughput</dt><dd>How much work the system finishes per second, such as tokens per second.</dd>
+<dt>Benchmark</dt><dd>A repeatable test that measures and compares systems under the same conditions.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings, the interview answers and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="p16">Problem 16 · Design observability: TTFT, TPOT, queue depth, KV-cache utilisation, prefix-cache hit rate, cost per request</h2>
+<p><strong>What the interviewer is testing:</strong> do you know what each metric means and how to compute it, which ones lead (warn before users notice) and which lag, how to store latencies so percentiles are correct, and how to turn GPU-hours into a cost per request?</p>
+
+<h3>The concepts</h3>
+<p><strong>Per-request latency metrics.</strong> For a request with a prompt, a queue wait, and n output tokens:</p>
+<pre><code>TTFT  = time of first output token − time request arrived
+        = queue wait + prefill (+ network and tokenisation)
+TPOT  = (end-to-end latency − TTFT) / (n − 1)        mean gap after the first token
+ITL   = each individual gap between consecutive tokens (TPOT is their mean)
+E2E   = TTFT + (n − 1) × TPOT</code></pre>
+<p>TTFT is what a user feels as "is it working?". TPOT is reading speed. Measure both at two points: at the engine (what it controls) and at the client or gateway (what the user sees, including network and streaming). A gap between the two is a finding in itself.</p>
+<p><strong>Engine-state metrics.</strong> These lead: they move before latency does.</p>
+<ul>
+<li><strong>Queue depth:</strong> requests waiting for a slot. Rising queue with flat traffic means the engine got slower. It is the best early autoscaling signal (<a href="09-production-operations.html">page 09</a>).</li>
+<li><strong>Running batch size:</strong> sequences decoded per step. Low batch with a long queue means a scheduler limit (<a href="07-profiling-kernels.html#p14">page 07, Problem 14</a>).</li>
+<li><strong>KV-cache utilisation:</strong> share of KV blocks in use. Near 100% leads to preemption, where the engine evicts a running request and recomputes it later. Track preemptions as their own counter.</li>
+<li><strong>Prefix-cache hit rate:</strong> share of prompt tokens served from cache instead of recomputed. It's a direct multiplier on prefill cost (<a href="04-prefix-caching-disaggregation.html">page 04</a>).</li>
+</ul>
+<pre><code>prefix hit rate  = prompt tokens found in cache / prompt tokens looked up
+KV utilisation   = KV blocks in use / KV blocks allocated at startup</code></pre>
+<p><strong>Store latencies as histograms, not averages.</strong> An average can't give you a percentile, and you can't average percentiles across replicas. A Prometheus histogram counts requests in fixed buckets; you sum buckets across replicas and estimate the quantile afterwards. The estimate is only as good as the buckets: Prometheus interpolates linearly inside a bucket, so a coarse bucket from 10 s to 30 s can put the p99 anywhere in that range. The demo shows this.</p>
+<pre><code># p99 TTFT over 5 minutes, all replicas, per model (PromQL)
+histogram_quantile(0.99,
+  sum by (le, model_name) (rate(vllm:time_to_first_token_seconds_bucket[5m])))
+
+# prefix-cache hit rate
+sum(rate(vllm:prefix_cache_hits[5m])) / sum(rate(vllm:prefix_cache_queries[5m]))</code></pre>
+<p>vLLM's metrics page lists, among others, <code>vllm:time_to_first_token_seconds</code>, <code>vllm:inter_token_latency_seconds</code>, <code>vllm:request_queue_time_seconds</code>, <code>vllm:num_requests_running</code>, <code>vllm:kv_cache_usage_perc</code> and the prefix-cache hit and query counters. Names change between versions (counters usually get a <code>_total</code> suffix when exported), so read your server's <code>/metrics</code> output rather than copying names.</p>
+
+<h3>A worked answer: cost per request</h3>
+<p>Cost needs two inputs: what a GPU-hour costs, and how many GPU-seconds each request used. The price below is an <strong>assumption</strong> for illustration: say <strong>$2–4 per H100-hour</strong>, and use $3 for the arithmetic. Check your own contract or cloud price.</p>
+<p><strong>Step 1: time-share each decode step.</strong> If one step takes 30 ms and decodes 40 sequences, each sequence is charged 30 / 40 = 0.75 ms of GPU time for that step. Summing over a request's steps (and its share of prefill steps) gives its GPU-seconds. That's fair under batching, because a request that shares the GPU with 39 others shouldn't pay for the whole step.</p>
+<p><strong>Step 2: a steady-state check with Little's law.</strong></p>
+<pre><code>Assumed: average 40 requests in flight on one GPU, each lasting 12 s
+throughput        = 40 / 12 s ≈ 3.33 requests/s  = 12,000 requests/hour
+GPU-s per request = 12 s / 40 = 0.3 GPU-s
+cost per request  = $3 / 12,000 = $0.00025   (= 0.3 s × $3/3,600 s)
+                  → $0.25 per 1,000 requests</code></pre>
+<p><strong>Step 3: charge the idle time too.</strong> Traffic isn't flat. If over a day the fleet averages 40% of the load it was sized for, every served request carries the idle cost:</p>
+<pre><code>cost per request at 40% average load = $0.00025 / 0.4 = $0.000625</code></pre>
+<p>Report both numbers: the marginal cost (what one more request costs at the margin) and the fully loaded cost (total GPU bill ÷ requests served). The second is the one finance sees. Prefill and decode tokens cost different amounts per token, so for pricing you can fit cost per input token and per output token from the measured GPU-seconds.</p>
+
+<h3>The layers to instrument</h3>
+<div class="table-wrap"><table>
+<tr><th>Layer</th><th>Metrics</th><th>Why</th></tr>
+<tr><td>Client / gateway</td><td>TTFT and E2E as the user sees them, error rate, disconnects, rate-limit rejections</td><td>The truth about user experience</td></tr>
+<tr><td>Router</td><td>Requests per replica, cache-aware routing decisions, retries</td><td>Uneven load and cache misses start here</td></tr>
+<tr><td>Engine</td><td>Queue time, TTFT, TPOT, batch size, KV utilisation, preemptions, prefix hit rate, tokens in and out</td><td>Leading indicators and capacity</td></tr>
+<tr><td>GPU</td><td>DCGM SM activity, memory used, power, temperature, ECC and Xid errors</td><td>Hardware faults and real utilisation</td></tr>
+<tr><td>Business</td><td>Cost per request and per million tokens, by tenant and model</td><td>Pricing, capacity planning</td></tr>
+</table></div>
+<p>Add per-request traces (OpenTelemetry has semantic conventions for generative-AI spans) that follow one request through gateway, router, queue, prefill and decode. Metrics tell you that p99 went up; a trace of a slow request tells you which stage did it.</p>
+
+<h3>Trade-offs</h3>
+<ul>
+<li><strong>Label cardinality:</strong> labelling metrics by model and tenant is useful; labelling by user or request ID explodes the time-series database. Put per-request detail in traces and logs, sampled.</li>
+<li><strong>Bucket resolution vs cost:</strong> more histogram buckets give better percentiles but more series. Put buckets densely around your SLO thresholds.</li>
+<li><strong>Logging prompts:</strong> invaluable for debugging, but a privacy and security risk. Log lengths and hashes by default; store content only with consent and retention rules.</li>
+<li><strong>Engine-side vs client-side timing:</strong> engine-side is precise and cheap; client-side is what matters. You need both.</li>
+</ul>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>I'd instrument four layers: client, router, engine and GPU, plus a cost view. The engine exports TTFT, TPOT and queue time as histograms, so I can sum across replicas and compute p50 and p99, with buckets dense around the SLO. The leading indicators are queue depth, KV-cache utilisation with preemption counts, and prefix-cache hit rate; they move before latency does, so they drive alerts and autoscaling. Cost per request comes from time-sharing each step's GPU time across the sequences in the batch, times the GPU-hour price, and I report both marginal and fully loaded cost including idle time. Per-request traces explain the outliers that the dashboards show.</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Alerting on average latency, which hides the tail entirely.</li>
+<li>Averaging p99s across replicas instead of summing histogram buckets and computing the quantile once.</li>
+<li>Measuring only at the engine, missing network, streaming and gateway delays.</li>
+<li>Computing cost from peak throughput, ignoring idle capacity and over-provisioning.</li>
+</ul>
+
+<h2 id="p18">Problem 18 · vLLM vs TensorRT-LLM vs SGLang: benchmark on realistic workloads and pick one</h2>
+<p><strong>What the interviewer is testing:</strong> can you design a benchmark that is fair, realistic and statistically sound, and do you know that the fastest engine on one chart is not automatically the right choice? A candidate who names a winner without asking about the workload is giving the wrong answer.</p>
+
+<h3>The concepts</h3>
+<p><strong>The three engines, briefly.</strong> All three serve LLMs with continuous batching and paged KV caches, and all three can expose an OpenAI-compatible HTTP API, so one client can drive them all.</p>
+<ul>
+<li><strong>vLLM</strong> grew out of the PagedAttention paper (Kwon et al., 2023). It is Python-first, supports a very wide range of models and several hardware vendors.</li>
+<li><strong>SGLang</strong> came with RadixAttention, a prefix cache organised as a radix tree (Zheng et al., 2023), and a frontend language for structured, multi-call programs.</li>
+<li><strong>TensorRT-LLM</strong> is NVIDIA's library. It targets NVIDIA GPUs only and leans on NVIDIA's optimised kernels and low-precision formats.</li>
+</ul>
+<p>Each engine's performance changes from release to release, and each wins on some workloads in someone's benchmark. That's exactly why you measure on yours.</p>
+<p><strong>Goodput, not peak throughput.</strong> Peak tokens per second at unlimited batch size is easy to quote and useless for a latency-sensitive product. The useful number is the highest request rate at which the engine still meets your SLO. DistServe (Zhong et al., 2024) calls this goodput.</p>
+<pre><code>SLO (example, set yours):  p99 TTFT ≤ 1 s  and  p99 TPOT ≤ 50 ms
+goodput = max request rate λ such that the SLO holds at λ
+cost per 1M output tokens = ($ per GPU-hour × GPUs) / (output tokens/s at λ × 3,600) × 10⁶</code></pre>
+<p><strong>Open loop vs closed loop.</strong> A closed-loop client sends the next request only when one finishes, so a slow server automatically receives less load and looks better than it is. Real users don't wait for each other. Use open-loop arrivals at a fixed average rate (Poisson is the usual choice), and sweep the rate.</p>
+
+<h3>The fairness checklist</h3>
+<div class="table-wrap"><table>
+<tr><th>Hold constant</th><th>Why it matters</th></tr>
+<tr><td>Same checkpoint, tokenizer and chat template</td><td>A different template changes prompt length and output</td></tr>
+<tr><td>Same precision and quantisation, or report separately</td><td>FP8 in one engine and BF16 in another compares formats, not engines. Different FP8 recipes can differ in quality too</td></tr>
+<tr><td>Same GPU model, count, driver, CUDA and parallelism (TP size)</td><td>Hardware differences swamp engine differences</td></tr>
+<tr><td>Same max context and sampling parameters</td><td>Context limit sets KV memory; sampling changes cost</td></tr>
+<tr><td>Same output lengths</td><td>Fix max tokens and check actual output-token counts; one engine stopping early looks "faster"</td></tr>
+<tr><td>Features on or off for all</td><td>Prefix caching, chunked prefill, speculative decoding: enable in all or none, then test each separately</td></tr>
+<tr><td>Equal tuning effort, from each engine's own docs</td><td>A tuned engine against a default one is a tuning benchmark</td></tr>
+<tr><td>One client tool for all three, run on a separate machine</td><td>Different clients measure TTFT differently; a client on the GPU host steals CPU</td></tr>
+<tr><td>Pinned versions, warm-up excluded</td><td>Reproducibility; compile and graph capture happen on first requests</td></tr>
+<tr><td>Quality check on outputs</td><td>Run a small eval on each engine's outputs. Fast and wrong isn't fast</td></tr>
+</table></div>
+
+<h3>Realistic workloads</h3>
+<p>Run at least three, matched to your product. Use length distributions from your own traffic logs if you have them; otherwise public conversation datasets give a starting shape.</p>
+<div class="table-wrap"><table>
+<tr><th>Workload</th><th>Shape</th><th>What it stresses</th></tr>
+<tr><td>Chat</td><td>Short to medium prompts, a few hundred output tokens, wide spread</td><td>Scheduling, TPOT under batching</td></tr>
+<tr><td>Long-context / RAG</td><td>8K–32K prompt tokens, short answers</td><td>Prefill, chunked prefill, KV memory</td></tr>
+<tr><td>Agentic / multi-turn</td><td>Long shared system prompt, growing conversation history</td><td>Prefix caching, cache eviction</td></tr>
+<tr><td>Structured output</td><td>JSON schema constrained decoding</td><td>Grammar overhead per token</td></tr>
+<tr><td>Offline batch</td><td>Thousands of requests at once, no SLO</td><td>Raw throughput only</td></tr>
+</table></div>
+
+<h3>A worked plan with real numbers</h3>
+<p><strong>How many requests per point?</strong> A p99 from 1,000 requests rests on the slowest 10. One odd request moves it noticeably. Aim for several thousand requests per measurement point, and repeat each point 3 times to see the spread.</p>
+<pre><code>At λ = 5 req/s, 5,000 requests ≈ 1,000 s ≈ 17 min per point
+(shorter runs at low λ, or report p95 when p99 is too noisy)</code></pre>
+<p><strong>GPU budget.</strong> Suppose 5-minute runs (warm-up excluded) at 6 request rates:</p>
+<pre><code>3 engines × 3 workloads × 6 rates × 3 repeats × 5 min = 810 min ≈ 13.5 h
+1 GPU   at an assumed $2–4/GPU-hour  → about $27–54
+8 GPUs (TP=8 node)                   → about $216–432
+plus engine setup time (TensorRT-LLM engine builds, graph capture) per model</code></pre>
+<p><strong>Turning results into a decision, with made-up numbers.</strong> These numbers are invented to show the arithmetic; they say nothing about any real engine. Say on your chat workload, on one GPU at an assumed $3/hour, engine A meets the SLO up to 9 req/s and engine B up to 7.5 req/s, both averaging 300 output tokens per request.</p>
+<pre><code>A: 9 × 300 = 2,700 output tok/s   → $3 / (2,700 × 3,600) × 10⁶ ≈ $0.31 per 1M output tokens
+B: 7.5 × 300 = 2,250 output tok/s → $3 / (2,250 × 3,600) × 10⁶ ≈ $0.37 per 1M output tokens
+GPUs for a 90 req/s peak:  A → 10,  B → 12</code></pre>
+<p>A 20% capacity gap is real money at scale. But if B wins on your long-context workload, or A needs an hour-long engine build that breaks your autoscaling, the answer changes. Weigh it.</p>
+
+<h3>Beyond the benchmark</h3>
+<ul>
+<li><strong>Model coverage:</strong> does it support your model, on release day, including its attention variant and quantisation format?</li>
+<li><strong>Hardware:</strong> TensorRT-LLM is NVIDIA-only. If you might use other accelerators, that matters.</li>
+<li><strong>Startup and build time:</strong> cold starts decide how fast you can scale up (<a href="09-production-operations.html">page 09</a>).</li>
+<li><strong>Features:</strong> structured output, LoRA adapters, speculative decoding, multi-node and prefill/decode disaggregation, metrics.</li>
+<li><strong>Operations:</strong> release cadence, stability, community, and whether your team can debug it (Python vs C++ internals).</li>
+</ul>
+
+<h3>Trade-offs</h3>
+<div class="table-wrap"><table>
+<tr><th>Choice</th><th>For</th><th>Against</th></tr>
+<tr><td>Benchmark on your traffic</td><td>Answers your question</td><td>Needs logs and a replay tool; privacy work on prompts</td></tr>
+<tr><td>Benchmark on public datasets</td><td>Reproducible, shareable</td><td>May not match your length mix or prefix sharing</td></tr>
+<tr><td>Pick one engine</td><td>One stack to learn and run</td><td>Locked in if another engine pulls ahead</td></tr>
+<tr><td>Abstract behind an OpenAI-compatible API</td><td>Swap engines per model</td><td>Lowest-common-denominator features, more to operate</td></tr>
+</table></div>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>I wouldn't pick from published charts, because results change with each release and depend on the workload. I'd fix the model, precision, GPU and parallelism, drive all three engines with one open-loop client from a separate machine, and sweep the request rate on three workloads that match our traffic: chat, long-context and multi-turn with shared prefixes. The metric is goodput: the highest rate that still meets our p99 TTFT and TPOT targets, converted to GPUs and cost per million tokens. I'd tune each engine with equal effort from its own docs, repeat runs, and check output quality so no one wins by producing shorter or worse answers. Then I'd weigh the numbers against model coverage, startup time, features and how well the team can run it.</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Comparing peak throughput at unlimited batch size instead of throughput at the SLO.</li>
+<li>Using a closed-loop client, which hides queueing and flatters the slower engine.</li>
+<li>Different precisions or output lengths across engines, so the comparison isn't like for like.</li>
+<li>Tuning one engine for days and running the others on defaults.</li>
+</ul>
+
+<div class="card demo">
+<h3>Interactive: latency percentiles and histogram buckets</h3>
+<p class="legend">Histogram of time to first token for simulated requests (log scale from 10 ms to 100 s). Most requests wait briefly in the queue, then run prefill. A small "stall share" of requests is stuck behind something slow, such as a long prompt. Solid lines mark p50 and p99, the dashed line the mean. Seeded random numbers, so each setting gives the same result.</p>
+<canvas id="lt" width="700" height="260" aria-label="Histogram of time to first token with p50, p99 and mean markers"></canvas>
+<label for="nr">Requests: <span id="nrv" class="num"></span></label>
+<input id="nr" type="range" min="500" max="20000" step="500" value="5000">
+<label for="ss">Stall share: <span id="ssv" class="num"></span>%</label>
+<input id="ss" type="range" min="0" max="20" step="0.5" value="2">
+<label for="sz">Stall size: <span id="szv" class="num"></span> s mean</label>
+<input id="sz" type="range" min="0.5" max="20" step="0.5" value="5">
+<label for="tp">TPOT median: <span id="tpv" class="num"></span> ms</label>
+<input id="tp" type="range" min="10" max="100" step="5" value="30">
+<label for="bk">Histogram buckets: <span id="bkv" class="num"></span></label>
+<input id="bk" type="range" min="0" max="1" step="1" value="0">
+<div class="stats">
+  <div class="stat"><div class="k">TTFT p50</div><div class="v" id="s50">–</div></div>
+  <div class="stat"><div class="k">TTFT p99</div><div class="v" id="s99">–</div></div>
+  <div class="stat"><div class="k">p99 ÷ p50</div><div class="v" id="srt">–</div></div>
+  <div class="stat"><div class="k">TTFT mean</div><div class="v" id="smn">–</div></div>
+  <div class="stat"><div class="k">Queue p99</div><div class="v" id="sq9">–</div></div>
+  <div class="stat"><div class="k">TPOT p99</div><div class="v" id="st9">–</div></div>
+  <div class="stat"><div class="k">E2E p99</div><div class="v" id="se9">–</div></div>
+  <div class="stat"><div class="k">p99 from buckets</div><div class="v" id="sbk">–</div></div>
+</div>
+<p class="meta" id="trythis">Try this: set <b>Stall share</b> to 0. TTFT p50 is about 171 ms and p99 about 659 ms (3.8×). Back at the default 2% with 5 s stalls, the p50 barely moves (174 ms) but the p99 jumps to 2.88 s (16.5×), and the mean of 301 ms describes nobody. With coarse buckets, a Prometheus-style estimate puts that p99 at 3.33 s; fine buckets give 2.94 s. Drop <b>Requests</b> to 500 and the p99 falls to about 0.8 s, because only 5 requests make up the top 1%: small samples make tails noisy. E2E p99 is long because a few answers run to 2,000 tokens, while TPOT p99 stays near 53 ms.</p>
+</div>
+
+<h2 id="practise">Practise it</h2>
+<p>Two exercises, one cheap and one on a rented GPU.</p>
+<ol>
+<li><strong>Dashboard on a laptop-sized model.</strong> Serve a small model (about 0.5–1B parameters) with vLLM on a Colab GPU or a single rented GPU. Scrape its <code>/metrics</code> endpoint with Prometheus (or just poll it with a script). Drive it with a load tool at increasing request rates. Plot p50 and p99 TTFT from the histogram buckets, queue time, running batch size and KV-cache usage against time. Find the rate where queue time starts to climb: that's your capacity.</li>
+<li><strong>Cost per request.</strong> From the same run, compute GPU-seconds per request by Little's law (in-flight ÷ throughput), then cost with an assumed GPU-hour price. Check it against total GPU time ÷ requests served.</li>
+<li><strong>A small fair benchmark.</strong> On one rented GPU, serve the same small model in two engines (for example vLLM and SGLang) with the same precision and context length. Use one client, such as vLLM's <code>vllm bench serve</code> or NVIDIA's GenAI-Perf, pointed at each OpenAI-compatible endpoint. Sweep Poisson request rates on a chat-shaped and a long-prompt dataset, three repeats each. Plot p99 TTFT against rate and read off goodput for an SLO you choose.</li>
+</ol>
+<p>What to measure: p50 and p99 TTFT and TPOT per rate, goodput at your SLO, output-token counts per engine (to confirm they match), run-to-run spread, and cost per million output tokens.</p>
+
+<h2 id="course">In this course</h2>
+<ul>
+<li><a href="05-latency.html">Page 05 · Latency</a>: diagnosing p99 ≫ p50 (Problem 17), the other half of the percentile story.</li>
+<li><a href="07-profiling-kernels.html">Page 07 · Profiling and kernels</a>: what to do once a metric points at the GPU.</li>
+<li><a href="04-prefix-caching-disaggregation.html">Page 04 · Prefix caching and disaggregation</a>: what the prefix hit rate measures.</li>
+<li><a href="../05-trillion-scale-architecture.html#serving">Module 05 · Serving</a>: paged KV pools, prefix caching and fleet scheduling at trillion scale.</li>
+<li><a href="../01-decision-model-evals.html">Module 01 · Decision-model evals</a>: thresholds and metrics, the same discipline applied to quality.</li>
+<li><a href="../04-distill-small-models.html#latency">Module 04 · Latency as a safety number</a>: measuring latency on the device.</li>
+</ul>
+
+<h2 id="robotics">Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Tail latency is the safety number.</strong> A robot that answers in 100 ms on average and 2 s once in a hundred steps will eventually act on stale data. Log and alert on p99 and the maximum, per step, on the robot.</li>
+<li><strong>TTFT is reaction time.</strong> For a voice-driven robot, time to first token (or first action) is how long the robot seems to "think" before responding. Measure it on the device, end to end, as Module 04 does.</li>
+<li><strong>Fleets look like servers.</strong> If many robots call a shared cloud model, everything in Problem 16 applies directly, plus network latency, which you must measure on the robot side.</li>
+<li><strong>Problem 18 is mostly a cloud question.</strong> On a robot, the engine choice is usually narrowed by the hardware vendor's supported runtime. The fairness rules still apply when you compare runtimes: same model, same precision, same tasks, measured on the target device.</li>
+</ul>
+</div>
+
+<h2 id="check">Self-check</h2>
+<details><summary>A request took 6.2 s end to end, produced 201 tokens, and had a TTFT of 0.2 s. What is its TPOT?</summary><p>(6.2 − 0.2) / (201 − 1) = 6.0 / 200 = 30 ms per token.</p></details>
+<details><summary>You have p99 TTFT from each of 8 replicas. Can you average them to get the fleet p99?</summary><p>No. Percentiles don't average. Sum the histogram bucket counts across replicas and compute the quantile once.</p></details>
+<details><summary>Which three engine metrics lead latency, and why?</summary><p>Queue depth (work is piling up), KV-cache utilisation with preemptions (the engine is about to evict or stall), and prefix-cache hit rate (a fall means more prefill work per request). They change before TTFT does.</p></details>
+<details><summary>A GPU at an assumed $3/hour serves an average of 40 requests in flight, each lasting 12 s. What is the cost per request?</summary><p>Throughput is 40 / 12 ≈ 3.33 req/s, or 12,000 per hour. $3 / 12,000 = $0.00025 per request, before idle time.</p></details>
+<details><summary>Why is a closed-loop load test misleading for comparing engines?</summary><p>The client waits for each response before sending the next, so a slower engine automatically receives less load. Queueing never builds up the way it does with real users. Use open-loop arrivals at fixed rates.</p></details>
+<details><summary>What is goodput?</summary><p>The highest request rate (or throughput) at which the service still meets its latency SLO, for example p99 TTFT and TPOT targets. It's the fair basis for comparing engines and sizing fleets.</p></details>
+
+<h2 id="resources">Resources</h2>
+<ul>
+<li><a href="https://docs.vllm.ai/en/latest/">vLLM documentation</a>, its <a href="https://docs.vllm.ai/en/latest/design/metrics.html">metrics design page</a> and <a href="https://docs.vllm.ai/en/latest/contributing/benchmarks.html">benchmark suites</a></li>
+<li><a href="https://docs.sglang.ai/">SGLang documentation</a></li>
+<li><a href="https://nvidia.github.io/TensorRT-LLM/">TensorRT-LLM documentation</a> (NVIDIA)</li>
+<li><a href="https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/perf_analyzer/genai-perf/README.html">GenAI-Perf</a> (NVIDIA): an engine-agnostic LLM benchmarking client</li>
+<li><a href="https://prometheus.io/docs/practices/histograms/">Prometheus: histograms and summaries</a>: why bucket choice limits percentile accuracy</li>
+<li><a href="https://opentelemetry.io/docs/specs/semconv/gen-ai/">OpenTelemetry semantic conventions for generative AI</a></li>
+<li><a href="https://docs.nvidia.com/datacenter/dcgm/latest/user-guide/feature-overview.html">DCGM feature overview</a> (NVIDIA): GPU health and profiling metrics</li>
+<li><a href="https://arxiv.org/abs/2309.06180">Efficient Memory Management for LLM Serving with PagedAttention</a> (Kwon et al., 2023)</li>
+<li><a href="https://arxiv.org/abs/2312.07104">SGLang: Efficient Execution of Structured Language Model Programs</a> (Zheng et al., 2023)</li>
+<li><a href="https://www.usenix.org/conference/osdi22/presentation/yu">Orca: A Distributed Serving System for Transformer-Based Generative Models</a> (Yu et al., OSDI 2022): iteration-level scheduling</li>
+<li><a href="https://arxiv.org/abs/2401.09670">DistServe</a> (Zhong et al., 2024): goodput under TTFT and TPOT SLOs</li>
+<li><a href="https://arxiv.org/abs/2403.02310">Sarathi-Serve</a> (Agrawal et al., 2024): the throughput–latency trade-off and chunked prefill</li>
+</ul>
+
+<nav class="pager">
+  <a href="07-profiling-kernels.html"><small>Previous</small>Page 07 · Profiling, GPU utilisation and kernels</a>
+  <a class="next" href="09-production-operations.html"><small>Next</small>Page 09 · Safe rollouts and GPU autoscaling</a>
+</nav>
+<footer>Module 09 · Page 08 · written for this course from the source post, official docs and papers.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('lt'), ctx = cv.getContext('2d');
+const ids = ['nr', 'ss', 'sz', 'tp', 'bk'];
+const el = Object.fromEntries(ids.map(k => [k, document.getElementById(k)]));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = n => Math.round(n).toLocaleString('en-US');
+
+function rng(seed) {                                  // mulberry32
+  return () => {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const normal = r => Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(2 * Math.PI * r());
+const expo = (r, mean) => -mean * Math.log(1 - r());
+const logn = (r, med, sig) => med * Math.exp(sig * normal(r));
+
+// times in seconds
+function simulate(n, stall, stallMean, tpotMed) {
+  const r = rng(42), out = { q: [], ttft: [], tpot: [], e2e: [] };
+  for (let i = 0; i < n; i++) {
+    const q = expo(r, 0.02) + (r() < stall ? expo(r, stallMean) : 0);
+    const ttft = q + logn(r, 0.15, 0.6);
+    const tpot = logn(r, tpotMed, 0.25);
+    const toks = Math.min(2000, Math.max(1, Math.round(logn(r, 200, 0.8))));
+    out.q.push(q); out.ttft.push(ttft); out.tpot.push(tpot); out.e2e.push(ttft + tpot * (toks - 1));
+  }
+  for (const k in out) out[k].sort((a, b) => a - b);
+  return out;
+}
+const pct = (s, p) => s[Math.max(0, Math.ceil(p * s.length) - 1)];
+const mean = s => s.reduce((a, b) => a + b, 0) / s.length;
+
+const BUCKETS = [
+  [0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60],
+  Array.from({ length: 41 }, (_, i) => +(0.01 * 10 ** (i / 10)).toPrecision(3))  // 10 ms … 100 s, 10 per decade
+];
+// Prometheus histogram_quantile: linear interpolation inside the bucket
+function bucketQuantile(sorted, bounds, p) {
+  const n = sorted.length, rank = p * n;
+  let j = 0, prev = 0, lo = 0;
+  for (const ub of bounds) {
+    while (j < n && sorted[j] <= ub) j++;
+    if (j >= rank) return lo + (ub - lo) * (rank - prev) / Math.max(j - prev, 1);
+    prev = j; lo = ub;
+  }
+  return bounds[bounds.length - 1];                   // rank in the +Inf bucket
+}
+const tf = s => s >= 1 ? s.toFixed(2) + ' s' : fmt(s * 1000) + ' ms';
+
+function draw() {
+  const n = +el.nr.value, stall = +el.ss.value / 100, sm = +el.sz.value, tp = +el.tp.value / 1000, bk = +el.bk.value;
+  const shown = { nr: fmt(n), ss: (+el.ss.value).toFixed(1), sz: (+el.sz.value).toFixed(1), tp: el.tp.value, bk: bk ? 'fine' : 'coarse' };
+  ids.forEach(k => document.getElementById(k + 'v').textContent = shown[k]);
+  const S = simulate(n, stall, sm, tp);
+
+  const W = cv.width, H = cv.height, l = 50, r = 16, t = 14, b = 34;
+  const X0 = -2, X1 = 2, NB = 80;                     // log10 seconds
+  const px = v => l + (v - X0) / (X1 - X0) * (W - l - r);
+  const counts = new Array(NB).fill(0);
+  S.ttft.forEach(v => { const i = Math.floor((Math.log10(v) - X0) / (X1 - X0) * NB); counts[Math.min(NB - 1, Math.max(0, i))]++; });
+  const cmax = Math.max(...counts);
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = css('--line'); ctx.lineWidth = 1; ctx.font = '12px sans-serif'; ctx.fillStyle = css('--muted');
+  ctx.beginPath(); ctx.moveTo(l, H - b); ctx.lineTo(W - r, H - b); ctx.stroke();
+  ctx.textAlign = 'center';
+  ['10 ms', '100 ms', '1 s', '10 s', '100 s'].forEach((s, i) => ctx.fillText(s, px(X0 + i), H - b + 16));
+  ctx.fillText('time to first token (log scale)', (l + W - r) / 2, H - 3);
+  // sqrt height so the rare tail stays visible
+  ctx.fillStyle = css('--accent');
+  const bw = (W - l - r) / NB;
+  counts.forEach((c, i) => { if (c) { const h = Math.sqrt(c / cmax) * (H - t - b); ctx.fillRect(l + i * bw + 0.5, H - b - h, bw - 1, h); } });
+
+  const p50 = pct(S.ttft, 0.5), p99 = pct(S.ttft, 0.99), mn = mean(S.ttft);
+  const mark = (v, col, dash, label) => {
+    const x = px(Math.min(Math.max(Math.log10(v), X0), X1));
+    ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.setLineDash(dash);
+    ctx.beginPath(); ctx.moveTo(x, t); ctx.lineTo(x, H - b); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = col; ctx.textAlign = 'left'; ctx.fillText(label, x + 4, t + 10);
+  };
+  mark(p50, css('--pass'), [], 'p50');
+  mark(mn, css('--muted'), [5, 4], 'mean');
+  mark(p99, css('--fail'), [], 'p99');
+
+  document.getElementById('s50').textContent = tf(p50);
+  document.getElementById('s99').textContent = tf(p99);
+  document.getElementById('srt').textContent = (p99 / p50).toFixed(1) + '×';
+  document.getElementById('smn').textContent = tf(mn);
+  document.getElementById('sq9').textContent = tf(pct(S.q, 0.99));
+  document.getElementById('st9').textContent = tf(pct(S.tpot, 0.99));
+  document.getElementById('se9').textContent = tf(pct(S.e2e, 0.99));
+  document.getElementById('sbk').textContent = tf(bucketQuantile(S.ttft, BUCKETS[bk], 0.99));
+}
+ids.forEach(k => el[k].oninput = draw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

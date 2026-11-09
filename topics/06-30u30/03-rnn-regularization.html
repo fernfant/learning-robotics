@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 03 · RNN Regularisation</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 03</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Unit 1 · The foundations · Day 03</div>
+<h1>Recurrent Neural Network Regularization</h1>
+<p class="lede">Dropout breaks an LSTM's memory if you put it everywhere. Put it only between layers, never along time, and big recurrent models stop overfitting.</p>
+
+<div class="facts">
+  <div><b>Authors</b>Wojciech Zaremba, Ilya Sutskever, Oriol Vinyals</div>
+  <div><b>Year / venue</b>2014 · arXiv (1409.2329)</div>
+  <div><b>Core idea</b>Dropout on non-recurrent connections only</div>
+  <div><b>Study time</b>2–3 h</div>
+</div>
+<p class="meta">Original: <a href="https://arxiv.org/abs/1409.2329">arXiv:1409.2329</a> · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/03_RNN_Regularization">30u30 Day 3</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">To stop a big memory-network from just memorising its homework, you switch off random parts of it while it trains, but never the part that carries its memory.</p>
+
+<h3>Think of it like this</h3>
+<p>Imagine a football team that only practises with all 11 players every time. They might rely too much on one star player. A coach could make random players sit out each drill, so everyone learns to play well. That is "dropout". But if the coach also kept taping over the team's playbook between plays, the team would forget the plan. This paper says: bench random players, but leave the playbook alone.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>The network has layers stacked on top of each other, and it also passes a memory forward through time.</li>
+<li>During training, random parts of the signal going <em>up</em> between layers are switched off for a moment.</li>
+<li>The memory going <em>forward</em> in time is never switched off.</li>
+<li>So the network has to learn several ways to get the answer, which makes it better on new examples.</li>
+<li>When the network is actually used, nothing is switched off.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Robot training data is expensive. Someone has to show the robot a task by hand, again and again. With only a few hundred examples, a big network can just memorise them and fail on anything new. Tricks like this help a robot's memory-network learn the skill instead of the exact examples.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Write a short sentence. Cover one random word with your finger and see if a friend can still guess the meaning. Do it a few times. You are "dropping out" words, and the meaning usually survives.</li>
+<li>In the demo further down, move the <b>Distance in time k</b> slider to the right. Compare "Hits, paper" (stays the same) with "Hits, naive" (keeps growing). Then click the <b>Show: naive dropout everywhere</b> button to see which arrows get dropout in each version.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Overfitting</dt><dd>When a program memorises its training examples but does badly on new ones.</dd>
+<dt>Regularisation</dt><dd>Any trick that stops overfitting.</dd>
+<dt>Dropout</dt><dd>Switching off random parts of a network during training.</dd>
+<dt>Recurrent connection</dt><dd>The link that carries memory from one time step to the next.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>In 2014, dropout was the best regulariser for feed-forward nets, but it was widely believed not to work for RNNs: noise on the recurrent connection gets amplified step after step. So people kept RNNs small to avoid overfitting. This short paper shows the fix is about <em>where</em> you drop. Apply dropout to the vertical connections (input to layer 1, layer to layer, top layer to output) and leave the horizontal, time-to-time connections clean. Large LSTMs then generalise much better on language modelling, speech, translation and captioning.</p>
+</div>
+<ul>
+<li><strong>Rule:</strong> dropout on <code>h<sup>l−1</sup>_t</code> (the input coming from below), never on <code>h<sup>l</sup>_{t−1}</code> (the state coming from the past).</li>
+<li><strong>Why it works:</strong> any piece of information is hit by dropout exactly L+1 times, however far it travels in time.</li>
+<li><strong>Penn Treebank (word level):</strong> test perplexity went from 114.5 (best non-regularised LSTM) to 82.7 (medium, 650 units) and 78.4 (large, 1500 units).</li>
+<li><strong>Prior art:</strong> Pham et al. (2013) had independently used the same trick for handwriting. This paper showed it works broadly.</li>
+<li>Written by Sutskever's group at Google Brain. The code was released at <code>github.com/wojzaremba/lstm</code>.</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<p>Take a stack of L LSTM layers. Superscript <em>l</em> is the layer, subscript <em>t</em> the time step. <code>h<sup>0</sup>_t</code> is the input word vector. Each layer computes its four gates from two vectors: the output of the layer below at this step, and its own output at the previous step. The paper's change is one operator, <code>D</code>, which zeroes a random subset of its input:</p>
+<pre><code>(i, f, o, g) = (σ, σ, σ, tanh)( W · [ D(h^{l−1}_t) , h^l_{t−1} ] + b )
+c^l_t = f ⊙ c^l_{t−1} + i ⊙ g
+h^l_t = o ⊙ tanh(c^l_t)
+prediction at t uses D(h^L_t)</code></pre>
+<ul>
+<li><code>D(h<sup>l−1</sup>_t)</code>: the vertical input is corrupted. This forces each layer to work with partial information, which is what regularises it.</li>
+<li><code>h<sup>l</sup>_{t−1}</code> and <code>c<sup>l</sup>_{t−1}</code>: the recurrent state passes through untouched, so the memory channel described in <a href="02-lstm.html">Day 02</a> stays reliable.</li>
+<li>At test time dropout is switched off and activations are scaled as usual (or use inverted dropout during training).</li>
+</ul>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>The L+1 argument</h3>
+<p>Follow a fact from the input at time <em>t−k</em> to the prediction at time <em>t</em>. It enters through the input dropout, travels sideways through the recurrent connections for k steps, and climbs one layer at a time to the output. Under this scheme it meets dropout once per vertical hop, so L+1 times in total, and that number doesn't depend on k. If you also dropped the recurrent connection, every extra time step would add another hit, and long-range memory would decay geometrically.</p>
+
+<div class="card demo">
+<h3>Interactive: count the dropout hits</h3>
+<p class="legend">A fact enters at step t−k and is needed at step t. Dashed arrows have dropout. Each mask keeps a unit with probability 1−p, so a single unit's path survives all masks with probability (1−p)<sup>hits</sup>.</p>
+<canvas id="grid" width="700" height="220" aria-label="Grid of LSTM layers over time showing which connections have dropout"></canvas>
+<label for="k">Distance in time k: <span id="kv" class="num"></span></label>
+<input id="k" type="range" min="1" max="12" step="1" value="6">
+<label for="L">Layers L: <span id="Lv" class="num"></span></label>
+<input id="L" type="range" min="1" max="4" step="1" value="2">
+<label for="p">Dropout rate p: <span id="pv" class="num"></span></label>
+<input id="p" type="range" min="0" max="0.7" step="0.05" value="0.5">
+<p><button id="mode" type="button">Show: naive dropout everywhere</button></p>
+<div class="stats">
+  <div class="stat"><div class="k">Hits, paper</div><div class="v" id="hz">–</div></div>
+  <div class="stat"><div class="k">Hits, naive</div><div class="v" id="hn">–</div></div>
+  <div class="stat"><div class="k">Survive, paper</div><div class="v" id="sz">–</div></div>
+  <div class="stat"><div class="k">Survive, naive</div><div class="v" id="sn">–</div></div>
+</div>
+</div>
+<p>The survival number is a simplification: real information is spread over many units, so one dropped unit doesn't erase a fact. But the scaling is the point: with the naive scheme the damage grows with distance, with the paper's scheme it doesn't.</p>
+
+<h3>What the experiments showed</h3>
+<ul>
+<li><strong>Language modelling, Penn Treebank</strong> (929k training words, 10k vocabulary). Two-layer LSTMs unrolled 35 steps. Medium: 650 units, 50% dropout. Large: 1500 units, 65% dropout. Without regularisation, the best model they could train had only 200 units, because bigger ones overfit. An ensemble of 38 large regularised models reached 68.7 test perplexity.</li>
+<li><strong>Speech</strong> (an internal Icelandic dataset, 93k utterances): frame accuracy on validation rose from 68.9% to 70.5%, while training accuracy fell. That's the classic regularisation signature.</li>
+<li><strong>Translation</strong> (WMT'14 English→French): BLEU rose from 25.9 to 29.03 with dropout 0.2. Still below the phrase-based LIUM system at 33.30.</li>
+<li><strong>Image captioning:</strong> dropout helped a single model, but an ensemble of 10 unregularised models did about as well. Dropout's main win there was getting ensemble quality from one model.</li>
+</ul>
+
+<h3>Limits and what came after</h3>
+<ul>
+<li>The recurrent weights themselves stay unregularised. Gal &amp; Ghahramani (2016) later showed you <em>can</em> drop recurrent connections if you reuse the same mask at every time step ("variational dropout"), with a Bayesian justification.</li>
+<li>AWD-LSTM (Merity et al., 2017) stacked many such tricks, including DropConnect on the recurrent weight matrix, and pushed PTB perplexity much lower.</li>
+<li>Transformers inherit the same spirit: dropout sits on residual branches and attention weights, not on a long recurrent chain. General dropout is <a href="12-dropout.html">Day 12</a>.</li>
+</ul>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Robot datasets are small.</strong> Teleoperated demonstrations are expensive, so sequence policies trained on them overfit just like the paper's small speech set. Regularisation decides whether a bigger model helps or hurts.</li>
+<li><strong>Don't corrupt the memory you rely on.</strong> If a recurrent policy must remember that it already grasped the object, noise on the recurrent path makes that fact unreliable. The general lesson: inject noise where it regularises, not where it destroys state.</li>
+<li><strong>Dropout as uncertainty.</strong> Keeping dropout on at test time and sampling several predictions gives a cheap uncertainty estimate (Gal &amp; Ghahramani's MC dropout). A robot can use that spread to slow down or ask for help, but check it is calibrated first (see <a href="../01-decision-model-evals.html#calibration">Module 01</a>).</li>
+<li><strong>Train/test gap is the signal to watch.</strong> The speech result, lower training accuracy but higher validation accuracy, is what a healthy regulariser looks like on any robot learning curve.</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Read the paper (8 pages, about 45 min). Focus on Section 3.2 and Figures 2–3.</li>
+<li>In the 30u30 Day 3 folder, read <code>implementation.py</code> and find exactly where the dropout masks are applied. Run <code>train_minimal.py</code>.</li>
+<li>Do the exercises: the dropout exercise is the paper itself. The others (normalisation, weight decay, early stopping, full pipeline) are standard companions.</li>
+<li>Experiment: add dropout to the recurrent path too and compare validation perplexity and the train/validation gap.</li>
+<li>Stretch: implement variational dropout (one mask per sequence) and compare.</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>Which connections get dropout in this scheme?</summary><p>Only the non-recurrent ones: input to the first layer, each layer to the next at the same time step, and the top layer to the output.</p></details>
+<details><summary>How many times is information hit by dropout between input and prediction?</summary><p>L+1, where L is the number of layers, independent of how many time steps it travels.</p></details>
+<details><summary>Why did people keep RNNs small before this paper?</summary><p>Without a working regulariser, large RNNs overfit. The best unregularised PTB model in the paper had just 200 units per layer.</p></details>
+<details><summary>Training accuracy went down but validation went up. Is that bad?</summary><p>No. Dropout makes training harder on purpose. The useful number is validation or test performance, and that improved.</p></details>
+<details><summary>How did later work manage to regularise the recurrent path?</summary><p>By sampling one dropout mask per sequence and reusing it at every step (variational dropout), or by dropping recurrent weights rather than activations (DropConnect, as in AWD-LSTM).</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/1409.2329">The original paper</a>, and Gal &amp; Ghahramani (2016), <a href="https://arxiv.org/abs/1512.05287">A theoretically grounded application of dropout in RNNs</a></li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/03_RNN_Regularization">30u30 Day 3</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Next: <a href="04-mdl-noisy-weights.html">Day 04, Keeping Neural Networks Simple</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="02-lstm.html"><small>Previous</small>Day 02 · Understanding LSTMs</a>
+  <a class="next" href="04-mdl-noisy-weights.html"><small>Next</small>Day 04 · Noisy weights and MDL</a>
+</nav>
+<footer>Module 06 · Day 03 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('grid'), ctx = cv.getContext('2d');
+const kIn = document.getElementById('k'), LIn = document.getElementById('L'), pIn = document.getElementById('p'), mBtn = document.getElementById('mode');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let naive = false;
+
+function hits(L, k) { return { paper: L + 1, naive: L + 1 + k }; }
+
+function arrow(x1, y1, x2, y2, dashed, color, w) {
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = w;
+  ctx.setLineDash(dashed ? [4, 3] : []);
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.setLineDash([]);
+  const a = Math.atan2(y2 - y1, x2 - x1);
+  ctx.beginPath(); ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - 7 * Math.cos(a - 0.4), y2 - 7 * Math.sin(a - 0.4));
+  ctx.lineTo(x2 - 7 * Math.cos(a + 0.4), y2 - 7 * Math.sin(a + 0.4)); ctx.fill();
+}
+
+function draw() {
+  const k = +kIn.value, L = +LIn.value, p = +pIn.value;
+  document.getElementById('kv').textContent = k;
+  document.getElementById('Lv').textContent = L;
+  document.getElementById('pv').textContent = p.toFixed(2);
+  mBtn.textContent = naive ? 'Show: paper\'s scheme' : 'Show: naive dropout everywhere';
+  const W = cv.width, H = cv.height, cols = k + 1, rows = L + 2;  // input row, L layers, output row
+  const cx = c => 50 + (W - 90) * c / Math.max(1, cols - 1), cy = r => H - 20 - (H - 40) * r / (rows - 1);
+  ctx.clearRect(0, 0, W, H); ctx.font = '12px sans-serif';
+  const dim = css('--line'), hot = css('--accent'), node = css('--muted');
+  for (let c = 0; c < cols; c++) for (let r = 0; r < rows - 1; r++) {
+    const onPath = (r === 0 && c === 0) || (r === 1) || (c === cols - 1 && r >= 1);
+    const vert = onPath && ((c === 0 && r === 0) || (c === cols - 1 && r >= 1));
+    arrow(cx(c), cy(r) - 6, cx(c), cy(r + 1) + 8, true, vert ? hot : dim, vert ? 2.5 : 1);
+    if (r >= 1 && r < rows - 1 && c < cols - 1) {
+      const hp = r === 1;
+      arrow(cx(c) + 8, cy(r), cx(c + 1) - 10, cy(r), naive, hp ? hot : dim, hp ? 2.5 : 1);
+    }
+  }
+  for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) {
+    ctx.fillStyle = r === 0 || r === rows - 1 ? css('--card') : node;
+    ctx.strokeStyle = node; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx(c), cy(r), 5, 0, 7); ctx.fill(); ctx.stroke();
+  }
+  ctx.fillStyle = css('--muted'); ctx.textAlign = 'left';
+  ctx.fillText('in', 4, cy(0) + 4); ctx.fillText('out', 4, cy(rows - 1) + 4);
+  ctx.textAlign = 'center';
+  ctx.fillText('t−' + k, cx(0), H - 4); ctx.fillText('t', cx(cols - 1), H - 4);
+  const h = hits(L, k), keep = 1 - p;
+  document.getElementById('hz').textContent = h.paper;
+  document.getElementById('hn').textContent = h.naive;
+  document.getElementById('sz').textContent = (100 * keep ** h.paper).toFixed(1) + '%';
+  document.getElementById('sn').textContent = (100 * keep ** h.naive).toFixed(1) + '%';
+}
+kIn.oninput = LIn.oninput = pIn.oninput = draw;
+mBtn.onclick = () => { naive = !naive; draw(); };
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

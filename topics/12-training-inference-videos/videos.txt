@@ -1,0 +1,10 @@
+n|slug|title|track|video_id|youtube_title|seconds|published
+01|01-zero-fsdp|Training models too big for one GPU: ZeRO & FSDP|both|nx5yfCa4W98|Training Models Too Big for One GPU · ZeRO & FSDP|1385|2026-10-13
+02|02-5d-parallelism|5D parallelism: data, tensor, context, pipeline and expert|both|SlNxNpaNPdA|How Thousands of GPUs Train One AI: 5 Ways They Work Together|2427|2026-10-22
+03|03-lora|LoRA and its descendants: LoRA+, QLoRA, VeRA, DoRA|both|U80tjcThl9Q|The Tiny Idea That Lets Anyone Fine-Tune AI|1286|2026-06-21
+04|04-speculative-decoding|Speculative decoding: draft, verify, and the EAGLE/Medusa/DFlash family|both|l8gWQlrVOKQ|How LLMs Get Faster Without Changing Their Outputs · Speculative Decoding|1474|2026-08-28
+05|05-on-policy-distillation|On-policy distillation: small models learning from their own mistakes|both|YH0YXgDWZXA|How Small Models Learn to Think Like Giants · On-Policy Distillation|1834|2026-07-15
+06|06-grpo|From REINFORCE to PPO to GRPO: the RL behind reasoning models|both|mg-iU-WxiNs|GRPO: The RL Trick Behind DeepSeek-R1's Reasoning|1411|2025-05-16
+07|07-adamw|Optimisers from gradient descent to AdamW|both|1_nujVNUsto|The Algorithm that Helps Machines Learn · AdamW|439|2024-10-11
+08|08-muon|Muon and MuonClip: orthogonalised updates for LLM training|llm|bO5nvE289ec|This Simple Optimizer Is Revolutionizing How We Train AI · Muon|1072|2025-10-13
+09|09-llm-serving|How LLM serving actually works: vLLM and SGLang inside|llm|T4SRu-trimA|How LLM Serving Actually Works|2502|2026-10-29

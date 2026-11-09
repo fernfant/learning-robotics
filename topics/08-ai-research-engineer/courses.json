@@ -1,0 +1,88 @@
+{
+ "01": [
+  ["Stanford CS336 · Assignment 1 (Basics) + Assignment 2 (Systems)", "https://stanford-cs336.github.io/spring2025/", "University course (free materials)", "Build tokenizer, Transformer and optimizer from scratch; then write FlashAttention2 in Triton and profile it"],
+  ["Karpathy · Neural Networks: Zero to Hero", "https://karpathy.ai/zero-to-hero.html", "Video course (free)", "Backprop by hand with micrograd, then up to a GPT"],
+  ["PyTorch docs · Extending PyTorch (custom autograd.Function)", "https://docs.pytorch.org/docs/stable/notes/extending.html", "Official docs", "Writing your own forward/backward"],
+  ["Triton tutorials", "https://triton-lang.org/main/getting-started/tutorials/index.html", "Official tutorials", "Vector add → fused softmax → matmul → fused attention"],
+  ["GPU MODE lectures", "https://github.com/gpu-mode/lectures", "Lecture series (free)", "Profiling, CUDA and Triton kernels, memory layout"]
+ ],
+ "02": [
+  ["Stanford CS336 · Assignment 3 (Scaling) + Assignment 4 (Data)", "https://stanford-cs336.github.io/spring2025/", "University course (free materials)", "Fit a scaling law; turn Common Crawl into training data with filtering and dedup"],
+  ["FineWeb: decanting the web for the finest text data", "https://huggingface.co/spaces/HuggingFaceFW/blogpost-fineweb-v1", "Long-form guide", "Dedup (MinHash), quality filtering and the ablations behind each choice"],
+  ["datatrove", "https://github.com/huggingface/datatrove", "Library", "The data-processing pipeline used for FineWeb"],
+  ["Karpathy · build-nanogpt (reproduce GPT-2 124M)", "https://github.com/karpathy/build-nanogpt", "Video + code (free)", "A full small pre-training run with LR warmup and cosine decay"],
+  ["Karpathy · nanochat", "https://github.com/karpathy/nanochat", "Code (free)", "End-to-end small ChatGPT: pre-train, mid-train, SFT, RL, on a small budget"]
+ ],
+ "03": [
+  ["Stanford CS336 lectures", "https://stanford-cs336.github.io/spring2025/", "University course (free materials)", "Architecture variants and mixture of experts"],
+  ["Hugging Face · Mixture of Experts Explained", "https://huggingface.co/blog/moe", "Blog guide", "Routing, load-balancing loss, capacity factor"],
+  ["A Visual Guide to Mixture of Experts", "https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-mixture-of-experts", "Illustrated guide", "MoE intuition with diagrams"],
+  ["A Visual Guide to Mamba and State Space Models", "https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-mamba-and-state", "Illustrated guide", "From RNNs to S4 to Mamba's selective scan"],
+  ["The Annotated S4", "https://srush.github.io/annotated-s4/", "Annotated code", "S4 implemented step by step"],
+  ["Stanford CS25 · Transformers United", "https://web.stanford.edu/class/cs25/", "Seminar talks (free)", "Talks from the people building new architectures"]
+ ],
+ "04": [
+  ["Hugging Face smol-course · Synthetic Data unit", "https://github.com/huggingface/smol-course", "Course (free)", "Generating synthetic datasets for a domain"],
+  ["Cosmopedia: how to create large-scale synthetic data", "https://huggingface.co/blog/cosmopedia", "Case study", "Prompt design, diversity and dedup for a large synthetic pre-training set"],
+  ["distilabel", "https://distilabel.argilla.io/", "Library + docs", "Pipelines for generating, judging and filtering synthetic data"],
+  ["Karpathy · nanochat", "https://github.com/karpathy/nanochat", "Code (free)", "How synthetic and curated data feed the later training stages"]
+ ],
+ "05": [
+  ["Nathan Lambert · RLHF Book", "https://rlhfbook.com/", "Free online book", "Reward models, PPO, DPO-family methods, over-optimisation"],
+  ["Hugging Face TRL · DPO / KTO / ORPO trainers", "https://huggingface.co/docs/trl/index", "Official docs", "Run each method on a small model"],
+  ["DeepLearning.AI · Post-training of LLMs", "https://www.deeplearning.ai/short-courses/post-training-of-llms/", "Short course", "SFT, DPO and online RL, hands-on"],
+  ["DeepLearning.AI · Reinforcement Learning from Human Feedback", "https://www.deeplearning.ai/short-courses/reinforcement-learning-from-human-feedback/", "Short course", "The classic reward-model + RL pipeline"],
+  ["Hugging Face smol-course · Preference Alignment unit", "https://github.com/huggingface/smol-course", "Course (free)", "DPO in practice on a small model"],
+  ["Stanford CS336 · Assignment 5 (Alignment & reasoning RL)", "https://stanford-cs336.github.io/spring2025/", "University course (free materials)", "SFT and RL for maths reasoning; optional DPO"]
+ ],
+ "06": [
+  ["Hugging Face · The Ultra-Scale Playbook", "https://huggingface.co/spaces/nanotron/ultrascale-playbook", "Free long-form guide", "Data, tensor, pipeline, context and expert parallelism, ZeRO, with measured benchmarks"],
+  ["Google DeepMind · How To Scale Your Model", "https://jax-ml.github.io/scaling-book/", "Free online book", "Rooflines, sharding and communication cost, worked examples"],
+  ["PyTorch · Getting started with FSDP", "https://docs.pytorch.org/tutorials/intermediate/FSDP_tutorial.html", "Official tutorial", "Sharded data-parallel training"],
+  ["DeepSpeed · ZeRO tutorial", "https://www.deepspeed.ai/tutorials/zero/", "Official tutorial", "ZeRO stages 1–3 and offload"],
+  ["Stanford CS336 · Assignment 2 (Systems)", "https://stanford-cs336.github.io/spring2025/", "University course (free materials)", "Build memory-efficient distributed training yourself"]
+ ],
+ "07": [
+  ["Hugging Face · nanoVLM", "https://github.com/huggingface/nanoVLM", "Code (free)", "A small VLM: vision encoder + projection + language model, trainable on one GPU"],
+  ["Hugging Face · Vision Language Models Explained", "https://huggingface.co/blog/vlms", "Blog guide", "Architectures and how to fine-tune them"],
+  ["Hugging Face smol-course · Vision Language Models unit", "https://github.com/huggingface/smol-course", "Course (free)", "Adapting and using multimodal models"],
+  ["LLaVA project", "https://llava-vl.github.io/", "Paper + code", "The classic 'vision encoder + projector + LLM' recipe"],
+  ["Hugging Face · Robotics Course + LeRobot", "https://huggingface.co/learn/robotics-course", "Course (free)", "Robotics track: from classical robotics to learned policies on real hardware"],
+  ["OpenVLA", "https://openvla.github.io/", "Paper + code", "Robotics track: a VLM turned into a robot policy that outputs actions"]
+ ],
+ "08": [
+  ["Google DeepMind · How To Scale Your Model (inference chapters)", "https://jax-ml.github.io/scaling-book/", "Free online book", "KV-cache maths, batching and latency vs throughput"],
+  ["Hugging Face · KV cache explained", "https://huggingface.co/blog/kv-cache", "Blog guide", "What the KV cache stores and why it dominates memory"],
+  ["vLLM docs", "https://docs.vllm.ai/en/latest/", "Official docs", "Paged KV cache, quantisation, speculative decoding in a real server"],
+  ["DeepLearning.AI · Efficiently Serving LLMs", "https://www.deeplearning.ai/short-courses/efficiently-serving-llms/", "Short course", "KV caching, batching, quantisation, LoRA serving"],
+  ["MIT 6.5940 · TinyML and Efficient Deep Learning Computing", "https://hanlab.mit.edu/courses/2024-fall-65940", "University course (free lectures)", "Quantisation, pruning, efficient attention, on-device and edge, which matters for robots too"],
+  ["Philip Kiely · Inference Engineering (book)", "https://www.philipkiely.com/", "Book", "Production inference from the Baseten side (see Module 05)"]
+ ],
+ "09": [
+  ["ARENA · Transformer interpretability chapter", "https://arena.education/", "Course (free materials)", "Hands-on exercises: logit lens, attribution, activation patching, circuits"],
+  ["ARENA 3.0 materials (GitHub)", "https://github.com/callummcdougall/ARENA_3.0", "Exercises (free)", "The notebooks themselves"],
+  ["Neel Nanda · Getting started in mechanistic interpretability", "https://www.neelnanda.io/mechanistic-interpretability/getting-started", "Guide", "Reading list and learning path"],
+  ["TransformerLens docs", "https://transformerlensorg.github.io/TransformerLens/", "Library + docs", "Hooking and patching activations"],
+  ["Transformer Circuits Thread", "https://transformer-circuits.pub/", "Research publications", "The primary research on circuits and features"]
+ ],
+ "10": [
+  ["Hamel Husain & Shreya Shankar · AI Evals for Engineers & PMs", "https://maven.com/parlance-labs/evals", "Paid cohort course", "Error analysis, LLM judges and evals that drive product decisions (the authors behind Module 01)"],
+  ["UK AISI · Inspect", "https://inspect.aisi.org.uk/", "Eval framework + docs", "Write reproducible evals, including agentic ones"],
+  ["EleutherAI · lm-evaluation-harness", "https://github.com/EleutherAI/lm-evaluation-harness", "Eval framework", "Standard benchmark runs"],
+  ["Hugging Face · Evaluation Guidebook", "https://github.com/huggingface/evaluation-guidebook", "Free guide", "Practical evaluation, including contamination and judges"],
+  ["Microsoft PyRIT", "https://github.com/Azure/PyRIT", "Red-teaming toolkit", "Automated adversarial testing of your own GenAI system"],
+  ["NVIDIA garak", "https://github.com/NVIDIA/garak", "LLM vulnerability scanner", "Probe your own model for known failure categories"]
+ ],
+ "11": [
+  ["labml.ai annotated paper implementations", "https://nn.labml.ai/", "Annotated code (free)", "Many papers implemented with side-by-side notes"],
+  ["Karpathy · nanoGPT", "https://github.com/karpathy/nanoGPT", "Code (free)", "A minimal, hackable baseline to drop new ideas into"],
+  ["30u30 (this course's Module 06)", "https://github.com/Ojhaharsh/30u30", "Exercises (free)", "Thirty from-scratch reproductions to practise on"],
+  ["Stanford CS336", "https://stanford-cs336.github.io/spring2025/", "University course (free materials)", "Low-scaffolding assignments: the closest thing to lab work"]
+ ],
+ "12": [
+  ["Hugging Face Hub · Model cards", "https://huggingface.co/docs/hub/model-cards", "Official docs", "What a rigorous model card contains"],
+  ["Hugging Face LLM Course", "https://huggingface.co/learn/llm-course", "Course (free)", "Fine-tune, then share models and datasets on the Hub"],
+  ["Weights & Biases · Reports", "https://docs.wandb.ai/guides/reports/", "Official docs", "Publishing training logs and comparisons"],
+  ["fast.ai · Practical Deep Learning", "https://course.fast.ai/", "Course (free)", "Strong emphasis on shipping and writing about your work"]
+ ]
+}

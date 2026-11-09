@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 28 · CS231n ConvNets</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 28</nav>
+
+<div class="eyebrow"><span class="track robo">Robotics</span>Unit 5 · Generative models &amp; scaling · Day 28</div>
+<h1>CS231n: Convolutional Neural Networks for Visual Recognition</h1>
+<p class="lede">The Stanford course notes that taught a generation how a CNN really works: shapes, strides, padding, parameter counts and memory. This is the bookkeeping you need before you can design or debug any vision model.</p>
+
+<div class="facts">
+  <div><b>Authors</b>Stanford CS231n. Notes primarily by Andrej Karpathy, course led by Fei-Fei Li</div>
+  <div><b>Year / venue</b>2015 onwards · Stanford course notes</div>
+  <div><b>Core idea</b>Local connectivity + weight sharing</div>
+  <div><b>Study time</b>4–6 h</div>
+</div>
+<p class="meta">Original: <a href="https://cs231n.github.io/convolutional-networks/">cs231n.github.io, ConvNets notes</a> · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/28_CS231n">30u30 Day 28</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">This free Stanford course explains, step by step, how computer vision networks look at pictures, and how to work out their sizes so they fit on a real machine.</p>
+
+<h3>Think of it like this</h3>
+<p>Picture a stamp that checks for one pattern, like a vertical line. You press it at every spot on a page, moving it a few squares at a time, and write down how well each spot matches. A vision network does exactly that with many different stamps. The course teaches you to work out how many spots you get, and how much storage all of it needs.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>A picture is a grid of numbers: width, height and colour.</li>
+<li>A small filter (the "stamp") slides across the picture and gives a score at each spot.</li>
+<li>Many filters make many score maps. Each looks for a different pattern.</li>
+<li>Pooling shrinks the maps, keeping the strongest scores.</li>
+<li>After several rounds, the last layers turn the maps into an answer, like "cat".</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot's computer has limited memory and must answer fast, often many times a second. If you add a depth camera or change the picture size, the network's shapes change. The sums in this course tell you whether the network still fits, and how long it will take to run.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Draw a row of 10 squares. Slide a 3-square-wide window along it, jumping 1 square at a time. How many places does it fit? Now jump 2 squares at a time. Does it fit evenly?</li>
+<li>In the demo further down, click <b>AlexNet conv1</b>, <b>VGG 3×3 "same"</b> and <b>Bad stride</b>. Then move the <b>Stride S</b> and <b>Padding P</b> sliders and watch the output size change. Red means the filter doesn't fit evenly.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Filter</dt><dd>A small grid of learned numbers that looks for one pattern.</dd>
+<dt>Stride</dt><dd>How many pixels the filter jumps each time it moves.</dd>
+<dt>Padding</dt><dd>Extra blank border added around a picture so the filter fits.</dd>
+<dt>Pooling</dt><dd>Shrinking a map by keeping the biggest value in each small patch.</dd>
+<dt>Parameters</dt><dd>The learned numbers stored inside the network.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>This isn't a paper. It is the "Convolutional Neural Networks" chapter of Stanford's CS231n notes. It explains ConvNets as stacks of 3-D volumes (width × height × depth) and spells out the arithmetic: how big each layer's output is, how many weights it has, and where memory and compute go. Its two central ideas are <strong>local connectivity</strong> (each neuron looks at a small patch) and <strong>parameter sharing</strong> (the same filter is used at every position). The notes finish with practical rules (small 3×3 filters, stride 1, padding that preserves size, 2×2 pooling) and case studies from LeNet to ResNet.</p>
+</div>
+<ul>
+<li><strong>Four layer types:</strong> CONV, ReLU, POOL and FC, stacked in the pattern <code>INPUT → [[CONV → RELU]×N → POOL?]×M → [FC → RELU]×K → FC</code>.</li>
+<li><strong>Weight sharing cuts AlexNet's first layer</strong> from about 105.7 million weights (if every position had its own) to 34,944.</li>
+<li><strong>Three stacked 3×3 convs</strong> see a 7×7 region with fewer weights and more nonlinearity than one 7×7 conv.</li>
+<li><strong>VGG-16, worked out by hand:</strong> about 138M parameters and about 93 MB of activations per image in the forward pass. Most memory goes to the early conv layers. Most parameters sit in the first FC layer.</li>
+<li><strong>Practical advice:</strong> don't design your own architecture. Take whatever works best on ImageNet, download pretrained weights and fine-tune.</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<p>A conv layer takes a volume <code>W₁ × H₁ × D₁</code> and has four hyperparameters: number of filters <code>K</code>, filter size <code>F</code>, stride <code>S</code> and zero-padding <code>P</code>. It produces:</p>
+<pre><code>W₂ = (W₁ − F + 2P) / S + 1          # same for H₂; must be an integer
+D₂ = K
+weights = (F · F · D₁) · K,   biases = K
+
+"same" padding with stride 1:  P = (F − 1) / 2
+pooling (F, S):  W₂ = (W₁ − F) / S + 1,  no weights</code></pre>
+<ul>
+<li><code>F</code> is the receptive field of one neuron in the previous layer. A filter is always full-depth: an F×F filter on a D₁-deep input has F·F·D₁ weights.</li>
+<li><code>S</code> is how far the filter jumps. <code>P</code> adds zeros around the border so sizes work out.</li>
+<li>If <code>(W₁ − F + 2P)/S</code> isn't a whole number, the filter doesn't tile the input. That's a design error, not something to round away.</li>
+<li><strong>Example from the notes:</strong> AlexNet's conv1 on a 227×227×3 image with F = 11, S = 4, P = 0 gives (227 − 11)/4 + 1 = 55. With K = 96 the output is 55×55×96.</li>
+</ul>
+<p><strong>im2col.</strong> Real implementations stretch every receptive field into a column (for AlexNet conv1, a 363 × 3025 matrix) and every filter into a row (96 × 363). The whole layer then becomes one big matrix multiply, which BLAS and GPUs do very fast. The price is memory, because overlapping patches are copied.</p>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>Interactive: conv layer calculator</h3>
+<div class="card demo">
+<h3>Interactive: output size and parameters</h3>
+<p class="legend">The strip shows one row of the padded input (padding greyed out) and where each filter placement lands. Red means the filter doesn't fit evenly.</p>
+<canvas id="conv" width="700" height="220" aria-label="One-dimensional view of filter placements across the padded input"></canvas>
+<button id="a">AlexNet conv1</button> <button id="v">VGG 3×3 "same"</button> <button id="b">Bad stride</button>
+<label for="w">Input width W₁: <span id="wv" class="num"></span></label>
+<input id="w" type="range" min="3" max="256" step="1" value="227">
+<label for="f">Filter size F: <span id="fv" class="num"></span></label>
+<input id="f" type="range" min="1" max="11" step="1" value="11">
+<label for="s">Stride S: <span id="sv" class="num"></span></label>
+<input id="s" type="range" min="1" max="4" step="1" value="4">
+<label for="pd">Padding P: <span id="pdv" class="num"></span></label>
+<input id="pd" type="range" min="0" max="5" step="1" value="0">
+<label for="d">Input depth D₁: <span id="dv" class="num"></span></label>
+<input id="d" type="range" min="1" max="512" step="1" value="3">
+<label for="k">Filters K: <span id="kv" class="num"></span></label>
+<input id="k" type="range" min="1" max="512" step="1" value="96">
+<div class="stats">
+  <div class="stat"><div class="k">Output</div><div class="v" id="out">–</div></div>
+  <div class="stat"><div class="k">Parameters</div><div class="v" id="par">–</div></div>
+  <div class="stat"><div class="k">Multiply-adds</div><div class="v" id="mac">–</div></div>
+</div>
+</div>
+
+<h3>Design rules the notes recommend</h3>
+<ul>
+<li><strong>Input size divisible by 2 many times</strong> (32, 64, 224, 384 …), so repeated halving stays clean.</li>
+<li><strong>Conv layers: 3×3, stride 1, padding 1.</strong> They keep spatial size, so only the pooling layers downsample, and the shapes are easy to track.</li>
+<li><strong>Pooling: 2×2, stride 2.</strong> This discards 75% of activations. 3×3 with stride 2 (overlapping, as in <a href="08-alexnet.html">AlexNet</a>) is the main alternative. Larger pools destroy too much.</li>
+<li><strong>Prefer stacks of small filters.</strong> Three 3×3 layers give a 7×7 view with 27·C² weights, compared with 49·C² for one 7×7 layer, and add two extra nonlinearities.</li>
+<li><strong>FC layers can be rewritten as convs.</strong> Then the network slides over a bigger image in one pass. For example, 384×384 input gives a 6×6 grid of class scores, much cheaper than cropping repeatedly.</li>
+</ul>
+
+<h3>Memory is the real bottleneck</h3>
+<p>The VGG-16 walkthrough is the most useful part of the notes. Activations are huge early (224×224×64 values per layer, for two layers). Parameters are huge late (the first FC layer alone holds about 100M weights). During training you also store gradients for both, plus optimiser state, roughly three times the parameter memory. Count values, multiply by 4 bytes, then decide your batch size. This explains why ResNet (<a href="09-resnet.html">Day 09</a>) uses global average pooling instead of big FC layers, and why dilated networks (<a href="11-dilated-convolutions.html">Day 11</a>) pay so much for keeping full resolution.</p>
+
+<h3>Limitations</h3>
+<ul>
+<li><strong>The architecture survey stops at about 2016</strong> (LeNet, AlexNet, ZFNet, GoogLeNet, VGG, ResNet). Efficient mobile conv blocks, Vision Transformers and modern self-supervised encoders aren't in this chapter, though recent offerings of the course cover newer topics.</li>
+<li><strong>The weight-sharing assumption can be wrong.</strong> The notes point out that for centred inputs such as aligned faces, different positions may need different features.</li>
+</ul>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>You will debug shapes.</strong> Plugging a wrist camera at 240×320 into a backbone trained on 224×224, or adding a depth channel (D₁ = 4), breaks shape assumptions. The output-size formula is how you fix it.</li>
+<li><strong>Memory and compute decide what runs on board.</strong> The notes' method (count activations and parameters, times 4 bytes) is how you check whether a perception model fits a Jetson-class device and its latency budget. See <a href="../04-distill-small-models.html#latency">Module 04</a>.</li>
+<li><strong>Dense outputs from a classifier.</strong> The FC-to-conv trick turns a classifier into a heatmap over the image. Grasp-affordance and keypoint maps for manipulation are built the same way.</li>
+<li><strong>"Don't be a hero" is good robot advice.</strong> Use a pretrained backbone and fine-tune. Robot data is too scarce to train vision from scratch.</li>
+<li><strong>The hands-on basics carry over.</strong> Conv, pooling, IoU and NMS are all practised in <a href="../02-tensortonic.html#track">Module 02's TensorTonic track</a>.</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Read the ConvNets notes end to end (about 2 h). Redo the AlexNet and VGG arithmetic on paper as you go.</li>
+<li>In the 30u30 Day 28 folder, read <code>implementation.py</code>: a naive conv forward pass, im2col, pooling, and a small NumPy CNN. Run <code>train_minimal.py</code> and check the im2col output against the naive version.</li>
+<li>Work through <code>notebook.ipynb</code>, then the five exercises: naive conv forward, max-pool forward and backward, output sizes, VGG-style parameter counts and filter visualisation.</li>
+<li>Use the calculator above to check your exercise 3 and 4 answers.</li>
+<li>Stretch: do the official CS231n assignments (linked from the course site), especially the conv-net and batch-norm parts of assignment 2.</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>Input 32×32×3, ten 5×5 filters, stride 1, padding 2. Output shape and parameter count?</summary><p>(32 − 5 + 4)/1 + 1 = 32, so 32×32×10. Weights: 5·5·3·10 = 750, plus 10 biases, giving 760.</p></details>
+<details><summary>Why can't you use F = 3, S = 2, P = 0 on a 10-wide input?</summary><p>(10 − 3)/2 + 1 = 4.5 isn't an integer. The filter doesn't tile the input evenly.</p></details>
+<details><summary>Where does VGG-16 use most of its memory, and most of its parameters?</summary><p>Memory: the early conv layers, which have large spatial activations. Parameters: the first FC layer, with about 100M of roughly 138M.</p></details>
+<details><summary>What is a 1×1 convolution good for?</summary><p>It mixes channels at each pixel. Use it to change depth cheaply, as in ResNet's bottleneck blocks.</p></details>
+<details><summary>What does im2col trade off?</summary><p>It turns convolution into one fast matrix multiply, at the cost of memory to hold duplicated overlapping patches.</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://cs231n.github.io/convolutional-networks/">CS231n ConvNets notes</a> and the <a href="https://cs231n.github.io/">full notes index</a></li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/28_CS231n">30u30 Day 28</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Next: <a href="29-ppo.html">Day 29, Proximal Policy Optimization</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="27-machine-super-intelligence.html"><small>Previous</small>Day 27 · Machine Super Intelligence</a>
+  <a class="next" href="29-ppo.html"><small>Next</small>Day 29 · PPO</a>
+</nav>
+<footer>Module 06 · Day 28 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('conv'), ctx = cv.getContext('2d');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const ids = ['w', 'f', 's', 'pd', 'd', 'k'], inp = Object.fromEntries(ids.map(i => [i, document.getElementById(i)]));
+const PRE = { a: [227, 11, 4, 0, 3, 96], v: [224, 3, 1, 1, 3, 64], b: [10, 3, 2, 0, 1, 1] };
+const fmt = v => v >= 1e9 ? (v / 1e9).toFixed(2) + ' G' : v >= 1e6 ? (v / 1e6).toFixed(1) + ' M' : v >= 1e4 ? (v / 1e3).toFixed(1) + ' k' : String(v);
+
+function layer(W, F, S, P, D, K) {
+  const raw = (W - F + 2 * P) / S + 1, ok = Number.isInteger(raw) && raw >= 1;
+  const o = Math.floor(raw);
+  return { raw, ok, o, params: F * F * D * K + K, macs: ok ? o * o * K * F * F * D : 0 };
+}
+
+function draw() {
+  const [W, F, S, P, D, K] = ids.map(i => +inp[i].value);
+  ids.forEach(i => document.getElementById(i + 'v').textContent = inp[i].value);
+  const r = layer(W, F, S, P, D, K);
+  const n = W + 2 * P, cw = Math.min(16, (cv.width - 20) / n), x0 = (cv.width - n * cw) / 2, y0 = 30;
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  for (let i = 0; i < n; i++) {
+    ctx.fillStyle = i < P || i >= P + W ? css('--line') : css('--accent-soft');
+    ctx.fillRect(x0 + i * cw, y0, Math.max(1, cw - (cw > 4 ? 1 : 0)), 24);
+  }
+  // filter placements, staggered over rows so they stay readable
+  const pos = Math.max(0, Math.floor((n - F) / S) + 1), rows = Math.min(6, pos);
+  for (let j = 0; j < pos; j++) {
+    const y = y0 + 34 + (j % rows) * 22;
+    ctx.fillStyle = css('--pass'); ctx.fillRect(x0 + j * S * cw, y, F * cw, 14);
+  }
+  const used = (pos - 1) * S + F;
+  if (!r.ok && used < n) { ctx.fillStyle = css('--fail'); ctx.fillRect(x0 + used * cw, y0, (n - used) * cw, 24); }
+  ctx.fillStyle = css('--muted'); ctx.font = '12px sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText('padded input: ' + n + ' wide · ' + pos + ' filter placements', x0, 18);
+  document.getElementById('out').textContent = r.ok ? r.o + '×' + r.o + '×' + K : r.raw.toFixed(2) + ' ✗';
+  document.getElementById('par').textContent = fmt(r.params);
+  document.getElementById('mac').textContent = r.ok ? fmt(r.macs) : '–';
+}
+ids.forEach(i => inp[i].oninput = draw);
+Object.entries(PRE).forEach(([b, v]) => document.getElementById(b).onclick = () => { ids.forEach((i, j) => inp[i].value = v[j]); draw(); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

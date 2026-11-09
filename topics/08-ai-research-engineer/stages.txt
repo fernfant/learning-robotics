@@ -1,0 +1,13 @@
+stage|slug|title|track
+01|01-tensor-math-autograd|Tensor maths & custom autograd|both
+02|02-scaling-data-mixing|Scaling laws & data mixing|llm
+03|03-beyond-transformers|Next-gen architectures: MoE, state-space models, linear & ring attention|llm
+04|04-synthetic-data|Synthetic data & curation pipelines|llm
+05|05-alignment-preference|Advanced alignment & preference optimisation|llm
+06|06-distributed-training|Distributed training & systems ML|both
+07|07-multimodal-fusion|Multimodal fusion & projection|both
+08|08-inference-aware-design|Inference-aware model design|both
+09|09-mech-interp|Mechanistic interpretability|llm
+10|10-evals-red-teaming|Evaluation-driven development & red teaming|llm
+11|11-paper-to-production|Paper-to-production prototyping|both
+12|12-open-source-portfolio|Open-source portfolio & teardowns|both

@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Research Engineer Roadmap</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">← LLMs &amp; Robotics</a> · Module 08</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 08 · Career roadmap</div>
+<h1>The LLM research-engineer roadmap: 12 stages, from autograd to open-source teardowns</h1>
+<p class="lede">A popular 12-stage plan for becoming an AI research engineer. Each stage gets its own page: the concepts explained, a project you can actually run, a reality check, links to where this course already covers it, and the real courses that teach it (<a href="#courses">course map</a>).</p>
+<p class="meta">Source: Suraj Sharma, <a href="https://x.com/suraj_sharma14/status/2112876560629825734">X post</a>, 21 Oct 2026 · saved in <code>sources/08-suraj-ai-research-engineer.md</code></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">A research engineer turns new AI ideas from papers into working, fast, well-tested models. This roadmap lists the 12 skills they use.</p>
+<h3>Think of it like this</h3>
+<p>Think of a Formula 1 team. Some people invent new ideas for the car (researchers). Others build the engine, test it on the track, make it faster and fix what breaks (engineers). A research engineer does a bit of both: reads the new idea, builds it, races it, and reports honestly how it did.</p>
+<h3>How it works</h3>
+<ol>
+<li><b>Know the engine:</b> the maths and code inside a neural network (stage 1).</li>
+<li><b>Feed it well:</b> choose how big to make it and what data to train it on (stages 2 and 4).</li>
+<li><b>Try new designs:</b> new kinds of model, new ways to see pictures and hear sound (stages 3 and 7).</li>
+<li><b>Teach it manners, and make it fast:</b> make it behave well, train it on many computers at once, and make it quick to use (stages 5, 6 and 8).</li>
+<li><b>Look inside, test hard and share:</b> find out how it thinks, attack it to find weak spots, and publish your work (stages 9–12).</li>
+</ol>
+<h3>Why robots care</h3>
+<p>Robot "brains" are now built from the same parts. Stage 7, joining a vision model to a language model, is exactly how robots that follow spoken instructions are made. Stage 8, making models fast, decides whether the robot reacts in time.</p>
+<h3>Try it</h3>
+<p>Pick one stage below that sounds interesting and read only its Start-here box. Then come back and tick it off in the tracker.</p>
+<h3>Words to know</h3>
+<dl>
+<dt>Research engineer</dt><dd>Someone who builds and tests new AI ideas in code.</dd>
+<dt>Training</dt><dd>Teaching a model by showing it lots of data.</dd>
+<dt>Inference</dt><dd>Using a trained model to answer questions.</dd>
+<dt>GPU</dt><dd>A chip that does the huge amounts of maths AI needs, very fast.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> the rest of this page is the full roadmap. It's mostly LLM track, and a few stages are marked LLM + Robotics where they carry straight over to robot learning.</p>
+
+<h2>Progress</h2>
+<div class="stats">
+  <div class="stat"><div class="k">Done</div><div class="v" id="done">0 / 12</div></div>
+  <div class="stat"><div class="k">Next up</div><div class="v" id="next" style="font-size:1rem">–</div></div>
+</div>
+
+<h2>The 12 stages</h2>
+<div class="paper-row"><span class="d">01</span><div><label><input type="checkbox" data-d="01"><a href="01-tensor-math-autograd.html">Tensor maths &amp; custom autograd</a><span class="track both">LLM + Robotics</span></label><p>PyTorch internals, hand-written backward passes, Triton kernels, memory layout and strides.</p></div></div>
+<div class="paper-row"><span class="d">02</span><div><label><input type="checkbox" data-d="02"><a href="02-scaling-data-mixing.html">Scaling laws &amp; data mixing</a><span class="track llm">LLM</span></label><p>Compute-optimal model size, deduplication, domain weights, learning-rate schedules.</p></div></div>
+<div class="paper-row"><span class="d">03</span><div><label><input type="checkbox" data-d="03"><a href="03-beyond-transformers.html">Next-gen architectures</a><span class="track llm">LLM</span></label><p>Mixture of experts, state-space models (Mamba/S4), linear attention, ring attention.</p></div></div>
+<div class="paper-row"><span class="d">04</span><div><label><input type="checkbox" data-d="04"><a href="04-synthetic-data.html">Synthetic data &amp; curation</a><span class="track llm">LLM</span></label><p>Self-instruct, rejection sampling, verifier filtering, training a small model on the survivors.</p></div></div>
+<div class="paper-row"><span class="d">05</span><div><label><input type="checkbox" data-d="05"><a href="05-alignment-preference.html">Alignment &amp; preference optimisation</a><span class="track llm">LLM</span></label><p>DPO, KTO, ORPO, reward models, and how to stop reward hacking.</p></div></div>
+<div class="paper-row"><span class="d">06</span><div><label><input type="checkbox" data-d="06"><a href="06-distributed-training.html">Distributed training &amp; systems ML</a><span class="track both">LLM + Robotics</span></label><p>Data, tensor and pipeline parallelism, ZeRO/FSDP, NCCL, gradient checkpointing.</p></div></div>
+<div class="paper-row"><span class="d">07</span><div><label><input type="checkbox" data-d="07"><a href="07-multimodal-fusion.html">Multimodal fusion &amp; projection</a><span class="track both">LLM + Robotics</span></label><p>Vision encoders, projection layers, cross-attention, early vs late fusion. The core of a VLA.</p></div></div>
+<div class="paper-row"><span class="d">08</span><div><label><input type="checkbox" data-d="08"><a href="08-inference-aware-design.html">Inference-aware model design</a><span class="track both">LLM + Robotics</span></label><p>GQA/MQA, KV-cache size and quantisation, speculative decoding.</p></div></div>
+<div class="paper-row"><span class="d">09</span><div><label><input type="checkbox" data-d="09"><a href="09-mech-interp.html">Mechanistic interpretability</a><span class="track llm">LLM</span></label><p>Logit lens, activation patching, finding the circuit behind a fact.</p></div></div>
+<div class="paper-row"><span class="d">10</span><div><label><input type="checkbox" data-d="10"><a href="10-evals-red-teaming.html">Evaluation-driven development &amp; red teaming</a><span class="track llm">LLM</span></label><p>Contamination checks, dynamic evals, calibrated LLM judges, attacking your own models.</p></div></div>
+<div class="paper-row"><span class="d">11</span><div><label><input type="checkbox" data-d="11"><a href="11-paper-to-production.html">Paper-to-production prototyping</a><span class="track both">LLM + Robotics</span></label><p>Reproduce a new paper's core idea in under 500 lines and benchmark it honestly.</p></div></div>
+<div class="paper-row"><span class="d">12</span><div><label><input type="checkbox" data-d="12"><a href="12-open-source-portfolio.html">Open-source portfolio &amp; teardowns</a><span class="track both">LLM + Robotics</span></label><p>Model cards, public training logs, and honest write-ups of what didn't reproduce.</p></div></div>
+
+<h2 id="courses">Courses &amp; content for each stage</h2>
+<p>Real courses, books, docs and repos you can follow, with each one mapped to the stages it teaches. All links were checked on 22 Oct 2026. Each stage page repeats its own list.</p>
+<h3>Spine courses (cover several stages)</h3>
+<div class="table-wrap"><table>
+<tr><th>Course</th><th>Stages</th><th>Why</th></tr>
+<tr><td><a href="https://stanford-cs336.github.io/spring2025/">Stanford CS336 · Language Modeling from Scratch</a></td><td class="num">01 02 03 04 05 06 11</td><td>The closest thing to the whole roadmap: five low-scaffolding assignments (basics, systems, scaling, data, alignment). Needs GPU rental for the big runs.</td></tr>
+<tr><td><a href="https://karpathy.ai/zero-to-hero.html">Karpathy · Zero to Hero + nanoGPT + nanochat</a></td><td class="num">01 02 04 11</td><td>Free, gentle on-ramp: backprop by hand → GPT-2 reproduction → a small end-to-end chat model.</td></tr>
+<tr><td><a href="https://huggingface.co/learn/llm-course">Hugging Face LLM Course + smol-course</a></td><td class="num">04 05 07 10 12</td><td>Practical fine-tuning, alignment, VLMs, evaluation and sharing on the Hub, on small models.</td></tr>
+<tr><td><a href="https://huggingface.co/spaces/nanotron/ultrascale-playbook">Ultra-Scale Playbook + How To Scale Your Model</a></td><td class="num">06 08</td><td>The two best free references on parallelism, memory and inference cost.</td></tr>
+<tr><td><a href="https://hanlab.mit.edu/courses/2024-fall-65940">MIT 6.5940 · TinyML &amp; Efficient Deep Learning</a></td><td class="num">08</td><td>Quantisation, pruning and edge deployment. The bridge to on-robot models.</td></tr>
+<tr><td><a href="https://arena.education/">ARENA</a></td><td class="num">09</td><td>The standard hands-on mech-interp curriculum.</td></tr>
+<tr><td><a href="https://maven.com/parlance-labs/evals">AI Evals for Engineers &amp; PMs (Husain &amp; Shankar)</a></td><td class="num">10</td><td>Paid. Error analysis and judges, from the authors behind Module 01.</td></tr>
+<tr><td><a href="https://huggingface.co/learn/robotics-course">Hugging Face Robotics Course + LeRobot</a></td><td class="num">07 (robotics)</td><td>The robotics-track companion: from classical robotics to learned policies on hardware.</td></tr>
+</table></div>
+<p class="meta">One sensible path: Karpathy Zero to Hero → CS336 assignments 1–2 → Ultra-Scale Playbook → CS336 3–5 → ARENA, with the per-stage resources below where needed.</p>
+<h3>Stage by stage</h3>
+<details><summary>Stage 01 · Tensor maths &amp; custom autograd <span class="meta">(5 resources)</span></summary><div class="table-wrap"><table><tr><th>Resource</th><th>Type</th><th>Use it for</th></tr>
+<tr><td><a href="https://stanford-cs336.github.io/spring2025/">Stanford CS336 · Assignment 1 (Basics) + Assignment 2 (Systems)</a></td><td>University course (free materials)</td><td>Build tokenizer, Transformer and optimizer from scratch; then write FlashAttention2 in Triton and profile it</td></tr>
+<tr><td><a href="https://karpathy.ai/zero-to-hero.html">Karpathy · Neural Networks: Zero to Hero</a></td><td>Video course (free)</td><td>Backprop by hand with micrograd, then up to a GPT</td></tr>
+<tr><td><a href="https://docs.pytorch.org/docs/stable/notes/extending.html">PyTorch docs · Extending PyTorch (custom autograd.Function)</a></td><td>Official docs</td><td>Writing your own forward/backward</td></tr>
+<tr><td><a href="https://triton-lang.org/main/getting-started/tutorials/index.html">Triton tutorials</a></td><td>Official tutorials</td><td>Vector add → fused softmax → matmul → fused attention</td></tr>
+<tr><td><a href="https://github.com/gpu-mode/lectures">GPU MODE lectures</a></td><td>Lecture series (free)</td><td>Profiling, CUDA and Triton kernels, memory layout</td></tr>
+</table></div><p class="meta"><a href="01-tensor-math-autograd.html">Go to the stage 01 page →</a></p></details>
+<details><summary>Stage 02 · Scaling laws &amp; data mixing <span class="meta">(5 resources)</span></summary><div class="table-wrap"><table><tr><th>Resource</th><th>Type</th><th>Use it for</th></tr>
+<tr><td><a href="https://stanford-cs336.github.io/spring2025/">Stanford CS336 · Assignment 3 (Scaling) + Assignment 4 (Data)</a></td><td>University course (free materials)</td><td>Fit a scaling law; turn Common Crawl into training data with filtering and dedup</td></tr>
+<tr><td><a href="https://huggingface.co/spaces/HuggingFaceFW/blogpost-fineweb-v1">FineWeb: decanting the web for the finest text data</a></td><td>Long-form guide</td><td>Dedup (MinHash), quality filtering and the ablations behind each choice</td></tr>
+<tr><td><a href="https://github.com/huggingface/datatrove">datatrove</a></td><td>Library</td><td>The data-processing pipeline used for FineWeb</td></tr>
+<tr><td><a href="https://github.com/karpathy/build-nanogpt">Karpathy · build-nanogpt (reproduce GPT-2 124M)</a></td><td>Video + code (free)</td><td>A full small pre-training run with LR warmup and cosine decay</td></tr>
+<tr><td><a href="https://github.com/karpathy/nanochat">Karpathy · nanochat</a></td><td>Code (free)</td><td>End-to-end small ChatGPT: pre-train, mid-train, SFT, RL, on a small budget</td></tr>
+</table></div><p class="meta"><a href="02-scaling-data-mixing.html">Go to the stage 02 page →</a></p></details>
+<details><summary>Stage 03 · Next-gen architectures: MoE, state-space models, linear &amp; ring attention <span class="meta">(6 resources)</span></summary><div class="table-wrap"><table><tr><th>Resource</th><th>Type</th><th>Use it for</th></tr>
+<tr><td><a href="https://stanford-cs336.github.io/spring2025/">Stanford CS336 lectures</a></td><td>University course (free materials)</td><td>Architecture variants and mixture of experts</td></tr>
+<tr><td><a href="https://huggingface.co/blog/moe">Hugging Face · Mixture of Experts Explained</a></td><td>Blog guide</td><td>Routing, load-balancing loss, capacity factor</td></tr>
+<tr><td><a href="https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-mixture-of-experts">A Visual Guide to Mixture of Experts</a></td><td>Illustrated guide</td><td>MoE intuition with diagrams</td></tr>
+<tr><td><a href="https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-mamba-and-state">A Visual Guide to Mamba and State Space Models</a></td><td>Illustrated guide</td><td>From RNNs to S4 to Mamba&#x27;s selective scan</td></tr>
+<tr><td><a href="https://srush.github.io/annotated-s4/">The Annotated S4</a></td><td>Annotated code</td><td>S4 implemented step by step</td></tr>
+<tr><td><a href="https://web.stanford.edu/class/cs25/">Stanford CS25 · Transformers United</a></td><td>Seminar talks (free)</td><td>Talks from the people building new architectures</td></tr>
+</table></div><p class="meta"><a href="03-beyond-transformers.html">Go to the stage 03 page →</a></p></details>
+<details><summary>Stage 04 · Synthetic data &amp; curation pipelines <span class="meta">(4 resources)</span></summary><div class="table-wrap"><table><tr><th>Resource</th><th>Type</th><th>Use it for</th></tr>
+<tr><td><a href="https://github.com/huggingface/smol-course">Hugging Face smol-course · Synthetic Data unit</a></td><td>Course (free)</td><td>Generating synthetic datasets for a domain</td></tr>
+<tr><td><a href="https://huggingface.co/blog/cosmopedia">Cosmopedia: how to create large-scale synthetic data</a></td><td>Case study</td><td>Prompt design, diversity and dedup for a large synthetic pre-training set</td></tr>
+<tr><td><a href="https://distilabel.argilla.io/">distilabel</a></td><td>Library + docs</td><td>Pipelines for generating, judging and filtering synthetic data</td></tr>
+<tr><td><a href="https://github.com/karpathy/nanochat">Karpathy · nanochat</a></td><td>Code (free)</td><td>How synthetic and curated data feed the later training stages</td></tr>
+</table></div><p class="meta"><a href="04-synthetic-data.html">Go to the stage 04 page →</a></p></details>
+<details><summary>Stage 05 · Advanced alignment &amp; preference optimisation <span class="meta">(6 resources)</span></summary><div class="table-wrap"><table><tr><th>Resource</th><th>Type</th><th>Use it for</th></tr>
+<tr><td><a href="https://rlhfbook.com/">Nathan Lambert · RLHF Book</a></td><td>Free online book</td><td>Reward models, PPO, DPO-family methods, over-optimisation</td></tr>
+<tr><td><a href="https://huggingface.co/docs/trl/index">Hugging Face TRL · DPO / KTO / ORPO trainers</a></td><td>Official docs</td><td>Run each method on a small model</td></tr>
+<tr><td><a href="https://www.deeplearning.ai/short-courses/post-training-of-llms/">DeepLearning.AI · Post-training of LLMs</a></td><td>Short course</td><td>SFT, DPO and online RL, hands-on</td></tr>
+<tr><td><a href="https://www.deeplearning.ai/short-courses/reinforcement-learning-from-human-feedback/">DeepLearning.AI · Reinforcement Learning from Human Feedback</a></td><td>Short course</td><td>The classic reward-model + RL pipeline</td></tr>
+<tr><td><a href="https://github.com/huggingface/smol-course">Hugging Face smol-course · Preference Alignment unit</a></td><td>Course (free)</td><td>DPO in practice on a small model</td></tr>
+<tr><td><a href="https://stanford-cs336.github.io/spring2025/">Stanford CS336 · Assignment 5 (Alignment &amp; reasoning RL)</a></td><td>University course (free materials)</td><td>SFT and RL for maths reasoning; optional DPO</td></tr>
+</table></div><p class="meta"><a href="05-alignment-preference.html">Go to the stage 05 page →</a></p></details>
+<details><summary>Stage 06 · Distributed training &amp; systems ML <span class="meta">(5 resources)</span></summary><div class="table-wrap"><table><tr><th>Resource</th><th>Type</th><th>Use it for</th></tr>
+<tr><td><a href="https://huggingface.co/spaces/nanotron/ultrascale-playbook">Hugging Face · The Ultra-Scale Playbook</a></td><td>Free long-form guide</td><td>Data, tensor, pipeline, context and expert parallelism, ZeRO, with measured benchmarks</td></tr>
+<tr><td><a href="https://jax-ml.github.io/scaling-book/">Google DeepMind · How To Scale Your Model</a></td><td>Free online book</td><td>Rooflines, sharding and communication cost, worked examples</td></tr>
+<tr><td><a href="https://docs.pytorch.org/tutorials/intermediate/FSDP_tutorial.html">PyTorch · Getting started with FSDP</a></td><td>Official tutorial</td><td>Sharded data-parallel training</td></tr>
+<tr><td><a href="https://www.deepspeed.ai/tutorials/zero/">DeepSpeed · ZeRO tutorial</a></td><td>Official tutorial</td><td>ZeRO stages 1–3 and offload</td></tr>
+<tr><td><a href="https://stanford-cs336.github.io/spring2025/">Stanford CS336 · Assignment 2 (Systems)</a></td><td>University course (free materials)</td><td>Build memory-efficient distributed training yourself</td></tr>
+</table></div><p class="meta"><a href="06-distributed-training.html">Go to the stage 06 page →</a></p></details>
+<details><summary>Stage 07 · Multimodal fusion &amp; projection <span class="meta">(6 resources)</span></summary><div class="table-wrap"><table><tr><th>Resource</th><th>Type</th><th>Use it for</th></tr>
+<tr><td><a href="https://github.com/huggingface/nanoVLM">Hugging Face · nanoVLM</a></td><td>Code (free)</td><td>A small VLM: vision encoder + projection + language model, trainable on one GPU</td></tr>
+<tr><td><a href="https://huggingface.co/blog/vlms">Hugging Face · Vision Language Models Explained</a></td><td>Blog guide</td><td>Architectures and how to fine-tune them</td></tr>
+<tr><td><a href="https://github.com/huggingface/smol-course">Hugging Face smol-course · Vision Language Models unit</a></td><td>Course (free)</td><td>Adapting and using multimodal models</td></tr>
+<tr><td><a href="https://llava-vl.github.io/">LLaVA project</a></td><td>Paper + code</td><td>The classic &#x27;vision encoder + projector + LLM&#x27; recipe</td></tr>
+<tr><td><a href="https://huggingface.co/learn/robotics-course">Hugging Face · Robotics Course + LeRobot</a></td><td>Course (free)</td><td>Robotics track: from classical robotics to learned policies on real hardware</td></tr>
+<tr><td><a href="https://openvla.github.io/">OpenVLA</a></td><td>Paper + code</td><td>Robotics track: a VLM turned into a robot policy that outputs actions</td></tr>
+</table></div><p class="meta"><a href="07-multimodal-fusion.html">Go to the stage 07 page →</a></p></details>
+<details><summary>Stage 08 · Inference-aware model design <span class="meta">(6 resources)</span></summary><div class="table-wrap"><table><tr><th>Resource</th><th>Type</th><th>Use it for</th></tr>
+<tr><td><a href="https://jax-ml.github.io/scaling-book/">Google DeepMind · How To Scale Your Model (inference chapters)</a></td><td>Free online book</td><td>KV-cache maths, batching and latency vs throughput</td></tr>
+<tr><td><a href="https://huggingface.co/blog/kv-cache">Hugging Face · KV cache explained</a></td><td>Blog guide</td><td>What the KV cache stores and why it dominates memory</td></tr>
+<tr><td><a href="https://docs.vllm.ai/en/latest/">vLLM docs</a></td><td>Official docs</td><td>Paged KV cache, quantisation, speculative decoding in a real server</td></tr>
+<tr><td><a href="https://www.deeplearning.ai/short-courses/efficiently-serving-llms/">DeepLearning.AI · Efficiently Serving LLMs</a></td><td>Short course</td><td>KV caching, batching, quantisation, LoRA serving</td></tr>
+<tr><td><a href="https://hanlab.mit.edu/courses/2024-fall-65940">MIT 6.5940 · TinyML and Efficient Deep Learning Computing</a></td><td>University course (free lectures)</td><td>Quantisation, pruning, efficient attention, on-device and edge, which matters for robots too</td></tr>
+<tr><td><a href="https://www.philipkiely.com/">Philip Kiely · Inference Engineering (book)</a></td><td>Book</td><td>Production inference from the Baseten side (see Module 05)</td></tr>
+</table></div><p class="meta"><a href="08-inference-aware-design.html">Go to the stage 08 page →</a></p></details>
+<details><summary>Stage 09 · Mechanistic interpretability <span class="meta">(5 resources)</span></summary><div class="table-wrap"><table><tr><th>Resource</th><th>Type</th><th>Use it for</th></tr>
+<tr><td><a href="https://arena.education/">ARENA · Transformer interpretability chapter</a></td><td>Course (free materials)</td><td>Hands-on exercises: logit lens, attribution, activation patching, circuits</td></tr>
+<tr><td><a href="https://github.com/callummcdougall/ARENA_3.0">ARENA 3.0 materials (GitHub)</a></td><td>Exercises (free)</td><td>The notebooks themselves</td></tr>
+<tr><td><a href="https://www.neelnanda.io/mechanistic-interpretability/getting-started">Neel Nanda · Getting started in mechanistic interpretability</a></td><td>Guide</td><td>Reading list and learning path</td></tr>
+<tr><td><a href="https://transformerlensorg.github.io/TransformerLens/">TransformerLens docs</a></td><td>Library + docs</td><td>Hooking and patching activations</td></tr>
+<tr><td><a href="https://transformer-circuits.pub/">Transformer Circuits Thread</a></td><td>Research publications</td><td>The primary research on circuits and features</td></tr>
+</table></div><p class="meta"><a href="09-mech-interp.html">Go to the stage 09 page →</a></p></details>
+<details><summary>Stage 10 · Evaluation-driven development &amp; red teaming <span class="meta">(6 resources)</span></summary><div class="table-wrap"><table><tr><th>Resource</th><th>Type</th><th>Use it for</th></tr>
+<tr><td><a href="https://maven.com/parlance-labs/evals">Hamel Husain &amp; Shreya Shankar · AI Evals for Engineers &amp; PMs</a></td><td>Paid cohort course</td><td>Error analysis, LLM judges and evals that drive product decisions (the authors behind Module 01)</td></tr>
+<tr><td><a href="https://inspect.aisi.org.uk/">UK AISI · Inspect</a></td><td>Eval framework + docs</td><td>Write reproducible evals, including agentic ones</td></tr>
+<tr><td><a href="https://github.com/EleutherAI/lm-evaluation-harness">EleutherAI · lm-evaluation-harness</a></td><td>Eval framework</td><td>Standard benchmark runs</td></tr>
+<tr><td><a href="https://github.com/huggingface/evaluation-guidebook">Hugging Face · Evaluation Guidebook</a></td><td>Free guide</td><td>Practical evaluation, including contamination and judges</td></tr>
+<tr><td><a href="https://github.com/Azure/PyRIT">Microsoft PyRIT</a></td><td>Red-teaming toolkit</td><td>Automated adversarial testing of your own GenAI system</td></tr>
+<tr><td><a href="https://github.com/NVIDIA/garak">NVIDIA garak</a></td><td>LLM vulnerability scanner</td><td>Probe your own model for known failure categories</td></tr>
+</table></div><p class="meta"><a href="10-evals-red-teaming.html">Go to the stage 10 page →</a></p></details>
+<details><summary>Stage 11 · Paper-to-production prototyping <span class="meta">(4 resources)</span></summary><div class="table-wrap"><table><tr><th>Resource</th><th>Type</th><th>Use it for</th></tr>
+<tr><td><a href="https://nn.labml.ai/">labml.ai annotated paper implementations</a></td><td>Annotated code (free)</td><td>Many papers implemented with side-by-side notes</td></tr>
+<tr><td><a href="https://github.com/karpathy/nanoGPT">Karpathy · nanoGPT</a></td><td>Code (free)</td><td>A minimal, hackable baseline to drop new ideas into</td></tr>
+<tr><td><a href="https://github.com/Ojhaharsh/30u30">30u30 (this course&#x27;s Module 06)</a></td><td>Exercises (free)</td><td>Thirty from-scratch reproductions to practise on</td></tr>
+<tr><td><a href="https://stanford-cs336.github.io/spring2025/">Stanford CS336</a></td><td>University course (free materials)</td><td>Low-scaffolding assignments: the closest thing to lab work</td></tr>
+</table></div><p class="meta"><a href="11-paper-to-production.html">Go to the stage 11 page →</a></p></details>
+<details><summary>Stage 12 · Open-source portfolio &amp; teardowns <span class="meta">(4 resources)</span></summary><div class="table-wrap"><table><tr><th>Resource</th><th>Type</th><th>Use it for</th></tr>
+<tr><td><a href="https://huggingface.co/docs/hub/model-cards">Hugging Face Hub · Model cards</a></td><td>Official docs</td><td>What a rigorous model card contains</td></tr>
+<tr><td><a href="https://huggingface.co/learn/llm-course">Hugging Face LLM Course</a></td><td>Course (free)</td><td>Fine-tune, then share models and datasets on the Hub</td></tr>
+<tr><td><a href="https://docs.wandb.ai/guides/reports/">Weights &amp; Biases · Reports</a></td><td>Official docs</td><td>Publishing training logs and comparisons</td></tr>
+<tr><td><a href="https://course.fast.ai/">fast.ai · Practical Deep Learning</a></td><td>Course (free)</td><td>Strong emphasis on shipping and writing about your work</td></tr>
+</table></div><p class="meta"><a href="12-open-source-portfolio.html">Go to the stage 12 page →</a></p></details>
+
+<p class="meta">For classic foundations courses (deep learning, ML, RL, CV, NLP), see <a href="../17-free-ai-curriculum.html">Module 17's checked catalog of 391 free courses</a>.</p>
+
+<h2>Where this course already covers it</h2>
+<div class="table-wrap"><table>
+<tr><th>Stage</th><th>Already in the course</th></tr>
+<tr><td>01 Tensor maths</td><td><a href="../02-tensortonic.html#track">02 TensorTonic</a> (CUDA/Triton tracks), <a href="../06-30u30/01-rnn-effectiveness.html">06 Day 1</a> (backprop through time by hand)</td></tr>
+<tr><td>02 Scaling &amp; data</td><td><a href="../06-30u30/25-scaling-laws.html">06 Day 25 Scaling laws</a>, <a href="../04-distill-small-models.html#eval">04</a> (data filtering, honest splits)</td></tr>
+<tr><td>03 Architectures</td><td><a href="../05-trillion-scale-architecture.html">05 Kimi K3</a> (MoE routing, linear attention), <a href="../06-30u30/13-attention.html">06 Day 13</a></td></tr>
+<tr><td>04 Synthetic data</td><td><a href="../04-distill-small-models.html">04 Teacher → student</a>, <a href="../07-post-training.html#rlvr">07 RLVR verifiers</a></td></tr>
+<tr><td>05 Alignment</td><td><a href="../07-post-training.html#pref">07 Preferences &amp; the KL leash</a>, <a href="../06-30u30/30-rlhf.html">06 Day 30</a>, <a href="../06-30u30/29-ppo.html">06 Day 29</a></td></tr>
+<tr><td>06 Distributed</td><td><a href="../06-30u30/24-gpipe.html">06 Day 24 GPipe</a>, <a href="../05-trillion-scale-architecture.html#serving">05 serving</a></td></tr>
+<tr><td>07 Multimodal</td><td><a href="../05-trillion-scale-architecture.html#why-robotics">05</a> (K3 trains its vision encoder from scratch), <a href="../06-30u30/28-cs231n.html">06 Day 28</a></td></tr>
+<tr><td>08 Inference</td><td><a href="../05-trillion-scale-architecture.html#serving">05</a> (MLA, KV cache, speculative decoding), <a href="../04-distill-small-models.html#latency">04 latency</a></td></tr>
+<tr><td>10 Evals</td><td><a href="../01-decision-model-evals.html">01 LLM evals &amp; calibration</a>, <a href="../04-distill-small-models.html#eval">04 evaluation that doesn't fool you</a></td></tr>
+<tr><td>11–12 Reproduce &amp; publish</td><td><a href="../04-distill-small-models.html#results">04</a> (an honest model write-up), <a href="../06-30u30/index.html">06</a> (reading papers)</td></tr>
+</table></div>
+
+<h2>Reality check</h2>
+<div class="card note">
+<p><strong>A good map, with some hype.</strong> The topics are the real core of LLM research engineering in 2026, and the projects are good practice. A few claims need caveats:</p>
+<ul>
+<li><strong>"Never be unemployed again"</strong> is marketing. No skill set guarantees that.</li>
+<li><strong>"Architecture is secondary, data is the secret sauce"</strong> overstates it. Data mix matters enormously, but frontier models still compete on architecture too. <a href="../05-trillion-scale-architecture.html">Module 05</a> credits Kimi K3's new architecture with about 2.5× scaling efficiency.</li>
+<li><strong>"Ring Attention for infinite context"</strong>: ring attention spreads a long sequence across devices, so the maximum length grows with the number of GPUs. That's very long, not infinite.</li>
+<li><strong>Several projects assume real hardware</strong> (a 7B model across 4 GPUs, 50,000 reasoning traces from a frontier model). Each stage page gives a laptop/Colab-sized version first, and the full version second.</li>
+<li><strong>"Labs hire on HuggingFace repos, not degrees"</strong>: public work helps a lot, but it isn't the only route.</li>
+</ul>
+</div>
+
+<h2>Suggested order</h2>
+<ol>
+<li><strong>Foundations first:</strong> 1 → 2 → 8. You can't optimise what you can't see, and inference cost shapes everything.</li>
+<li><strong>Then the model:</strong> 3 → 7 → 6.</li>
+<li><strong>Then behaviour:</strong> 4 → 5 → 10 → 9.</li>
+<li><strong>Throughout:</strong> 11 and 12 aren't stages to "finish". Do one paper reproduction and one public write-up per stage.</li>
+</ol>
+
+<footer>Module 08 · added 2026-10-21 · <a href="../../index.html">Back to course index</a></footer>
+</main>
+
+<script>
+const KEY = 'lr-ai-re-done';
+const boxes = [...document.querySelectorAll('input[data-d]')];
+let done = {};
+try { done = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) {}
+
+function render() {
+  document.getElementById('done').textContent = boxes.filter(b => b.checked).length + ' / 12';
+  const nxt = boxes.find(b => !b.checked);
+  document.getElementById('next').innerHTML = nxt ? `<a href="${nxt.nextElementSibling.getAttribute('href')}">Stage ${nxt.dataset.d}</a>` : 'All done 🎉';
+}
+boxes.forEach(b => {
+  b.checked = !!done[b.dataset.d];
+  b.onchange = () => {
+    done[b.dataset.d] = b.checked;
+    try { localStorage.setItem(KEY, JSON.stringify(done)); } catch (e) {}
+    render();
+  };
+});
+render();
+</script>
+</body>
+</html>

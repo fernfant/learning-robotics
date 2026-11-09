@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 04 · Noisy Weights</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 04</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Unit 1 · The foundations · Day 04</div>
+<h1>Keeping Neural Networks Simple by Minimizing the Description Length of the Weights</h1>
+<p class="lede">A network generalises when its weights carry little information. Make every weight a noisy Gaussian, count the bits it costs to send, and you get the objective behind Bayesian neural nets and VAEs, in 1993.</p>
+
+<div class="facts">
+  <div><b>Authors</b>Geoffrey E. Hinton, Drew van Camp</div>
+  <div><b>Year / venue</b>1993 · COLT</div>
+  <div><b>Core idea</b>Weight cost = KL(posterior ‖ prior), via "bits back"</div>
+  <div><b>Study time</b>3–4 h</div>
+</div>
+<p class="meta">Original: <a href="https://www.cs.toronto.edu/~hinton/absps/colt93.pdf">cs.toronto.edu (PDF)</a> · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/04_Minimizing_Description_Length">30u30 Day 4</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">A network learns better when its settings are kept simple, and you can measure "simple" by how few bits it would take to send those settings to a friend.</p>
+
+<h3>Think of it like this</h3>
+<p>Imagine texting a friend the answers to a maths worksheet. You could send every answer, digit by digit. Or you could send a short rule ("each answer is the question number times 3") plus a few corrections. The short message is cheaper, and the rule will probably work on the next worksheet too. This paper also notices that you do not need to send every setting exactly. "About 0.3" is a shorter text than "0.31827", and often works just as well.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>A neural network has lots of number settings called weights.</li>
+<li>Instead of one exact number, each weight becomes a fuzzy range, like "somewhere around 0.3".</li>
+<li>Fuzzy weights are cheap to describe. But too much fuzz makes the answers worse.</li>
+<li>Training looks for the best balance: as fuzzy as possible while still giving good answers.</li>
+<li>A clever trick called "bits back" shows exactly how to count the cost of a fuzzy weight.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot that has learned how its arm moves should also know when it is unsure, for example when it is holding a heavy object it has never lifted before. Fuzzy weights give the robot a "how sure am I?" signal, so it can move more carefully when it is unsure.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Describe your bedroom to a friend in exactly 10 words, then in 50 words. Which details did you drop in the short one? Those were the ones that did not matter much. That is the trade-off this paper makes.</li>
+<li>In the demo further down, drag the <b>Weight noise s</b> slider and find the lowest point of the Total curve. Then move the <b>Training cases N</b> slider to the right. With more data, the best amount of fuzz gets smaller.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Weight</dt><dd>One of the adjustable numbers inside a neural network.</dd>
+<dt>Bit</dt><dd>The smallest piece of information: a single 0 or 1.</dd>
+<dt>Description length</dt><dd>How many bits it takes to describe something.</dd>
+<dt>Noise</dt><dd>Random wobble added on purpose, here to a weight.</dd>
+<dt>Prior</dt><dd>What both sides agree to expect before seeing any data.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Hinton and van Camp frame learning as communication. A sender must transmit the training targets to a receiver who already has the inputs. She can send a network plus its errors. A good network makes the errors cheap, but costs bits itself. Instead of sending exact weights, she sends noisy ones: each weight is a Gaussian with a mean and a variance. Using a clever "bits back" argument, the true cost of a noisy weight turns out to be the KL divergence between its Gaussian and a shared prior. Noisy weights are cheap. Precise weights are expensive. Learning trades the two off against the extra error the noise causes.</p>
+</div>
+<ul>
+<li><strong>Principle:</strong> Minimum Description Length (Rissanen). Best model = shortest total message: model bits + misfit bits. <a href="05-mdl-principle.html">Day 05</a> covers MDL properly.</li>
+<li><strong>Weight decay falls out</strong> as the crude case: fixed-precision weights coded with a fixed Gaussian.</li>
+<li><strong>Noisy weights</strong> let imprecise weights be described cheaply, which crude coding ignores.</li>
+<li><strong>Exact gradients</strong> for one hidden layer with linear outputs, no sampling, using lookup tables.</li>
+<li><strong>Result:</strong> on a tiny, high-dimensional task it beat carefully tuned weight decay, slightly. The authors called the results preliminary.</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<p>Total description length is two terms. Each weight <code>w</code> has a posterior <code>Q = N(μ, s²)</code> that learning controls, and both parties agree a prior <code>P = N(μ_p, s_p²)</code>.</p>
+<pre><code>Cost = Σ_weights KL(Q ‖ P)  +  Σ_cases Σ_outputs E_Q[(d − y)²] / (2σ_d²)
+
+KL(Q ‖ P) = log(s_p / s) + (s² + (μ − μ_p)²) / (2 s_p²) − 1/2       # nats</code></pre>
+<ul>
+<li><strong>KL(Q ‖ P)</strong> is the bits to send one weight. Wide <code>s</code> and a mean near the prior make it small.</li>
+<li><strong>E<sub>Q</sub>[(d − y)²]</strong> is expected squared error with weights drawn from Q. Noise adds variance to the outputs, so the error grows with <code>s</code>.</li>
+<li><strong>σ<sub>d</sub></strong> is the width of the Gaussian used to code the errors. Only the ratio between the two widths matters.</li>
+</ul>
+<p><strong>Bits back, in one paragraph.</strong> The sender picks a precise weight by sampling from Q, using random bits, then codes it under P. That costs about <code>−log P(w)</code>, which is a lot. But once the receiver has all weights and errors, he can rerun the same learning algorithm, recover Q, and therefore recover the random bits used to sample. Those bits were sent for free, so they are refunded. Expected cost: <code>E_Q[−log P(w) + log Q(w)] = KL(Q ‖ P)</code>.</p>
+<p>If you set <code>s → 0</code> and fix P, the KL term becomes a scaled <code>μ²</code>: plain weight decay. The paper says weight decay's success is a vindication of this crude MDL view.</p>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>The trade-off, made concrete</h3>
+<p>Take a single weight in a toy linear model <code>y = w·x</code>, keep its mean at the best fit, and vary only its noise <code>s</code>. The KL term falls as <code>s</code> grows. The error term rises as <code>s² Σx²</code>. The best <code>s</code> sits in between, and it shrinks as data grows: more data makes precision worth paying for.</p>
+<div class="card demo">
+<h3>Interactive: how noisy should a weight be?</h3>
+<p class="legend">Toy problem: N points, x uniform in [−1, 1], targets 0.8·x plus noise (σ<sub>d</sub> = 0.5), prior N(0, 1). Curves show the parts of the cost that depend on s, in bits. <b style="color:var(--accent)">Total</b>, <b class="p">weight cost (KL)</b>, <b class="f">extra error from noise</b>.</p>
+<canvas id="nw" width="700" height="220" aria-label="Description length of a noisy weight against its noise level"></canvas>
+<label for="s">Weight noise s: <span id="sv" class="num"></span></label>
+<input id="s" type="range" min="-3" max="0.5" step="0.01" value="-1">
+<label for="n">Training cases N: <span id="nv" class="num"></span></label>
+<input id="n" type="range" min="5" max="500" step="5" value="50">
+<div class="stats">
+  <div class="stat"><div class="k">Weight bits</div><div class="v" id="kb">–</div></div>
+  <div class="stat"><div class="k">Error bits</div><div class="v" id="eb">–</div></div>
+  <div class="stat"><div class="k">Best s</div><div class="v" id="bs">–</div></div>
+  <div class="stat"><div class="k">Bayes posterior sd</div><div class="v" id="ps">–</div></div>
+</div>
+</div>
+<p>The last two numbers always match. Setting the derivative to zero gives <code>1/s² = 1/s_p² + Σx²/σ_d²</code>, which is exactly the posterior precision of Bayesian linear regression. Minimising description length with noisy weights is variational Bayes in disguise.</p>
+
+<h3>Mixture priors and a free-energy bound</h3>
+<p>One Gaussian prior can't model weights that cluster, say, near 0 and near 1. The paper adapts a mixture of Gaussians as the coding prior, extending Nowlan &amp; Hinton's soft weight sharing (1992) to noisy weights. The KL to a mixture has no closed form, so they use an upper bound that has the same form as a Helmholtz free energy. They derive it with a second bits-back argument: picking which mixture component to use also costs random bits that come back.</p>
+
+<h3>Results, read honestly</h3>
+<ul>
+<li>Task: predict the effectiveness of peptide molecules from 128 input features. 105 training cases, 420 test cases. A net with 4 hidden units has 521 weights, far more than the data.</li>
+<li>Relative test error (1.0 = guessing the mean): <strong>0.286</strong> with noisy weights and a 5-component mixture prior, <strong>0.967</strong> with no penalty, <strong>0.317</strong> for the best weight decay chosen by validation.</li>
+<li>They had to ramp the weight-cost coefficient from 0.05 up to 1. At full cost from the start, optimisation collapsed to weights that carry almost no information.</li>
+<li>Embarrassingly, the solution with the lowest total description length was that trivial one, with relative error near 1.0. The authors said so plainly.</li>
+</ul>
+
+<h3>What came after</h3>
+<ul>
+<li><strong>Variational autoencoders</strong> (Kingma &amp; Welling, 2013) use the same "expected error + KL" objective on latent codes, and the same warm-up of the KL weight turns up in VAE training. See <a href="23-variational-lossy-autoencoder.html">Day 23</a>.</li>
+<li><strong>Bayes by Backprop</strong> (Blundell et al., 2015) is this paper scaled up: Gaussian weights trained with the reparameterisation trick and sampled gradients instead of lookup tables.</li>
+<li><strong>Bits-back coding</strong> later became a practical lossless compression method with latent-variable models.</li>
+<li>The diagonal Gaussian ignores correlations between weights. The paper flags this as an open question.</li>
+</ul>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Knowing what you don't know.</strong> A distribution over weights gives a distribution over predictions. A learned dynamics model that says "I'm unsure here" lets a planner avoid or probe that region. In practice, probabilistic ensembles are the more common choice in robot learning, but the reasoning is the same.</li>
+<li><strong>Small data, many inputs.</strong> The paper's setting, 105 examples and 128 features, looks like many real robot tasks: few demonstrations, high-dimensional observations. Controlling information in the weights is what stops memorisation.</li>
+<li><strong>Imprecise weights are cheap weights.</strong> A weight that tolerates noise also tolerates quantisation. That is the same property you need to squeeze a policy onto edge hardware (see <a href="../04-distill-small-models.html#distill">Module 04</a>).</li>
+<li><strong>Honest limit:</strong> exact Bayesian treatment of large policies is still too expensive for real-time control. Use this as a mental model and a source of tools, not a recipe.</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Read the paper (9 short pages). Sections 2–5 are the core. Section 7 (mixture coding) can wait for a second pass.</li>
+<li>Derive the Gaussian KL formula yourself, then derive weight decay as its <code>s → 0</code> limit.</li>
+<li>In the 30u30 Day 4 folder, read <code>implementation.py</code>. It uses the modern sampled-gradient version, not the paper's lookup tables. Run <code>train_minimal.py</code>.</li>
+<li>Do the exercises: reparameterisation, the generalisation gap experiment, the β weight on the KL term, Monte Carlo predictions, and the advanced MDL exercise.</li>
+<li>Stretch: ramp β from 0.05 to 1 as the paper does, and compare against β = 1 from the start.</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>What do the sender and receiver each know?</summary><p>Both know the inputs and the architecture. Only the sender knows the target outputs. She sends weights plus errors so the receiver can reconstruct the targets.</p></details>
+<details><summary>Why do the "bits back" get refunded?</summary><p>The receiver can rerun the learning algorithm, recover the posterior Q, and so recover the random bits used to sample each precise weight. Those bits carried information for free, so they're subtracted from the cost.</p></details>
+<details><summary>Why does more data make the best weight noise smaller?</summary><p>The extra error from noise grows with the number of cases, while the weight cost doesn't. With more data, precision pays for itself.</p></details>
+<details><summary>How does weight decay appear in this framework?</summary><p>Code precise weights under a fixed zero-mean Gaussian. The cost is proportional to the sum of squared weights, which is the weight-decay penalty.</p></details>
+<details><summary>What is the main weakness the authors admit?</summary><p>The global minimum of description length was a useless solution, and the method needed a hand-designed ramp of the weight cost to avoid it. The results were preliminary and on one task.</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://www.cs.toronto.edu/~hinton/absps/colt93.pdf">The original paper</a>, and Blundell et al. (2015), <a href="https://arxiv.org/abs/1505.05424">Weight Uncertainty in Neural Networks</a></li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/04_Minimizing_Description_Length">30u30 Day 4</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Next: <a href="05-mdl-principle.html">Day 05, A Tutorial Introduction to the MDL Principle</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="03-rnn-regularization.html"><small>Previous</small>Day 03 · RNN Regularisation</a>
+  <a class="next" href="05-mdl-principle.html"><small>Next</small>Day 05 · The MDL Principle</a>
+</nav>
+<footer>Module 06 · Day 04 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('nw'), ctx = cv.getContext('2d');
+const sIn = document.getElementById('s'), nIn = document.getElementById('n');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const SP = 1, SD = 0.5, LN2 = Math.LN2, LO = -3, HI = 0.5;
+
+function rng(s) { return () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+function data(N) {
+  const r = rng(3); let sxx = 0, sxd = 0;
+  for (let i = 0; i < N; i++) {
+    const x = 2 * r() - 1, z = Math.sqrt(-2 * Math.log(r() + 1e-12)) * Math.cos(2 * Math.PI * r());
+    const d = 0.8 * x + SD * z; sxx += x * x; sxd += x * d;
+  }
+  return { sxx, mu: sxd / sxx };
+}
+const kl = (s, mu) => (Math.log(SP / s) + (s * s + mu * mu) / (2 * SP * SP) - 0.5) / LN2;
+const err = (s, sxx) => s * s * sxx / (2 * SD * SD) / LN2;
+
+function draw() {
+  const ls = +sIn.value, s = 10 ** ls, N = +nIn.value, { sxx, mu } = data(N);
+  document.getElementById('sv').textContent = s.toFixed(3);
+  document.getElementById('nv').textContent = N;
+  const W = cv.width, H = cv.height, L = 40, R = 12, T = 10, B = 24, YMAX = 14;
+  const x = l => L + (W - L - R) * (l - LO) / (HI - LO), y = v => T + (H - T - B) * (1 - Math.min(v, YMAX) / YMAX);
+  ctx.clearRect(0, 0, W, H); ctx.font = '12px sans-serif'; ctx.lineWidth = 1;
+  for (let v = 0; v <= YMAX; v += 2) {
+    ctx.strokeStyle = css('--line'); ctx.beginPath(); ctx.moveTo(L, y(v)); ctx.lineTo(W - R, y(v)); ctx.stroke();
+    ctx.fillStyle = css('--muted'); ctx.textAlign = 'right'; ctx.fillText(v, L - 6, y(v) + 4);
+  }
+  ctx.textAlign = 'center';
+  for (let e = -3; e <= 0; e++) ctx.fillText('s=' + 10 ** e, x(e), H - 6);
+  let best = Infinity, bl = 0;
+  const curves = [[l => kl(10 ** l, mu), css('--pass')], [l => err(10 ** l, sxx), css('--fail')], [l => kl(10 ** l, mu) + err(10 ** l, sxx), css('--accent')]];
+  curves.forEach(([fn, c]) => {
+    ctx.strokeStyle = c; ctx.lineWidth = 2.5; ctx.beginPath();
+    for (let l = LO; l <= HI + 1e-9; l += 0.01) { const v = fn(l); l === LO ? ctx.moveTo(x(l), y(v)) : ctx.lineTo(x(l), y(v)); }
+    ctx.stroke();
+  });
+  for (let l = LO; l <= HI; l += 0.001) { const v = kl(10 ** l, mu) + err(10 ** l, sxx); if (v < best) { best = v; bl = l; } }
+  ctx.setLineDash([4, 4]); ctx.strokeStyle = css('--muted'); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(x(bl), T); ctx.lineTo(x(bl), H - B); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = css('--fg'); ctx.beginPath(); ctx.arc(x(ls), y(kl(s, mu) + err(s, sxx)), 5, 0, 7); ctx.fill();
+  document.getElementById('kb').textContent = kl(s, mu).toFixed(2);
+  document.getElementById('eb').textContent = err(s, sxx).toFixed(2);
+  document.getElementById('bs').textContent = (10 ** bl).toFixed(3);
+  document.getElementById('ps').textContent = (1 / Math.sqrt(1 / SP ** 2 + sxx / SD ** 2)).toFixed(3);
+}
+sIn.oninput = nIn.oninput = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

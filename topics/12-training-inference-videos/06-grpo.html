@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video 06 · GRPO</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 12 · Training &amp; inference videos</a> › Video 06</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 12 · Video 06</div>
+<h1>From REINFORCE to PPO to GRPO: the RL behind reasoning models</h1>
+<p class="lede">Reasoning models are trained by letting them attempt problems and reinforcing the attempts that work. The algorithms behind that step form a family tree: REINFORCE, then baselines and value functions, actor-critic and GAE, TRPO and PPO, and finally GRPO, which drops the value network and compares each answer with the others in its group. This guide follows the video's chapters, points to the course's in-depth PPO material, and spends its own space on GRPO and the Dr. GRPO correction.</p>
+
+<div class="facts">
+  <div><b>Video length</b>23:31</div>
+  <div><b>Published</b>16 May 2025</div>
+  <div><b>Level</b>Intermediate: expectations, log-probabilities and gradients; some RL vocabulary helps</div>
+  <div><b>Builds on</b><a href="../02-tensortonic.html#rl">Module 02 · RL ladder</a>, <a href="../06-30u30/29-ppo.html">30u30 Day 29 · PPO</a>, <a href="../07-post-training.html#rlvr">Module 07 · RLVR</a></div>
+</div>
+<p class="meta">Video by Jia-Bin Huang · <a href="https://www.youtube.com/watch?v=mg-iU-WxiNs">Watch on YouTube</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">To teach an AI to solve maths problems, you can let it try a problem many times, check which answers are right, and nudge it towards the kind of thinking that produced the right ones. GRPO does this by comparing each answer with the others in the same batch: better than average gets pushed up, worse than average gets pushed down.</p>
+
+<h3>Think of it like this</h3>
+<p>A coach wants to know whether a runner had a good day. One way is to keep a notebook predicting how fast the runner "should" be on each track, and compare against that. Keeping that notebook accurate is a lot of work. Another way: have eight runners race the same track at once, and just compare each with the group's average. Faster than the group is good, slower is bad. No notebook needed. That second way is GRPO; the notebook is PPO's critic.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Give the model one question and let it write several answers (a "group"), say 8.</li>
+<li>A checker scores each answer, for example 1 if the final answer is right and 0 if it's wrong.</li>
+<li>Work out the group's average score. Answers above it get a positive "advantage", answers below it a negative one.</li>
+<li>Make every word in a good answer a bit more likely, and every word in a bad answer a bit less likely.</li>
+<li>Don't change too much in one step (a "clip"), and stay close to the original model (a "KL" leash), so training stays stable.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Robots learn many skills by trial and error in simulation, and the algorithms used there are the same family: policy gradients and PPO. GRPO's trick of comparing several attempts from the same starting point works whenever you can reset to the same situation and try again, which simulators make easy.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Throw 8 paper balls at a bin from the same spot and note which go in. Now work out your average. Each throw that went in is "better than average". If all 8 went in, or all 8 missed, is any throw better than average? What does that tell you about learning from that round?</li>
+<li>In the demo further down, set <b>Success rate</b> to 0.05 and look at <b>Chance the group has no signal</b>. Then press <b>Sample new group</b> a few times and compare the <b>GRPO</b>, <b>Dr. GRPO</b> and <b>Critic</b> bars for a rare correct answer.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Policy</dt><dd>The model's way of choosing what to do (for a language model, which token to write next).</dd>
+<dt>Reward</dt><dd>A score for how well an attempt went.</dd>
+<dt>Advantage</dt><dd>How much better an attempt was than expected.</dd>
+<dt>Critic (value function)</dt><dd>A second model that predicts how well things will go from here, used as the "expected" score.</dd>
+<dt>Clipping</dt><dd>A rule that stops one update from changing the policy too much.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="watch">1. Watch</h2>
+<div class="card"><div style="position:relative;padding-top:56.25%"><iframe style="position:absolute;inset:0;width:100%;height:100%;border:0" src="https://www.youtube-nocookie.com/embed/mg-iU-WxiNs" title="GRPO: The RL Trick Behind DeepSeek-R1's Reasoning (Jia-Bin Huang)" loading="lazy" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div></div>
+
+<h3>Chapter guide</h3>
+<div class="table-wrap"><table>
+<tr><th>Time</th><th>Chapter</th><th>What to look for</th></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=mg-iU-WxiNs&amp;t=0s">0:00</a></td><td>Introduction</td><td>Why RL is the step that turns a pretrained model into a reasoning model.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=mg-iU-WxiNs&amp;t=43s">0:43</a></td><td>Notation</td><td>States, actions, policy π<sub>θ</sub>, trajectories τ and returns. For an LLM: the state is the prompt plus tokens so far, the action is the next token.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=mg-iU-WxiNs&amp;t=161s">2:41</a></td><td>Policy gradient</td><td>The log-derivative trick that turns "maximise expected reward" into a gradient you can estimate from samples.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=mg-iU-WxiNs&amp;t=311s">5:11</a></td><td>Decomposing trajectory into states and actions</td><td>Why the environment's dynamics drop out of the gradient, leaving only the policy's log-probabilities.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=mg-iU-WxiNs&amp;t=425s">7:05</a></td><td>Baseline subtraction</td><td>Subtracting a baseline leaves the gradient unbiased but cuts its variance.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=mg-iU-WxiNs&amp;t=478s">7:58</a></td><td>Value function estimation</td><td>Learning V(s) as the baseline, by regression on observed returns.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=mg-iU-WxiNs&amp;t=511s">8:31</a></td><td>Advantage estimation</td><td>The advantage A = Q − V, TD residuals and Generalized Advantage Estimation's λ knob between bias and variance.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=mg-iU-WxiNs&amp;t=671s">11:11</a></td><td>Actor-critic methods</td><td>Training the policy (actor) and value function (critic) together.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=mg-iU-WxiNs&amp;t=736s">12:16</a></td><td>Trust region policy optimization</td><td>Optimising a surrogate objective under a KL constraint, so one update can't wreck the policy.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=mg-iU-WxiNs&amp;t=1008s">16:48</a></td><td>Proximal Policy Optimization</td><td>Replacing TRPO's constraint with a clipped probability ratio that ordinary SGD can optimise.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=mg-iU-WxiNs&amp;t=1195s">19:55</a></td><td>Group Relative Policy Optimization</td><td>Dropping the critic: the baseline becomes the mean reward of a group of answers to the same prompt.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=mg-iU-WxiNs&amp;t=1318s">21:58</a></td><td>Dr. GRPO</td><td>The two normalisations in GRPO that introduce bias, and what removing them changes.</td></tr>
+</table></div>
+<p class="meta">The video's description also recommends three longer resources: Pieter Abbeel's Foundations of Deep RL lectures, David Silver's UCL course and Sutton and Barto's book. They're listed in the references.</p>
+
+<h2 id="ideas">2. The ideas, explained</h2>
+
+<h3 id="pg">Policy gradient (REINFORCE)</h3>
+<p>Williams (1992) showed how to follow the gradient of expected reward using only samples. Because the environment's transition probabilities don't depend on θ, they vanish from the gradient of the log-probability of a trajectory, and only the policy's own terms remain:</p>
+<pre><code>J(θ) = E_{τ~π_θ}[ R(τ) ]
+∇J(θ) = E_τ[ Σ_t ∇_θ log π_θ(a_t | s_t) · G_t ]      G_t = Σ_{k≥t} γ^{k−t} r_k  (reward-to-go)
+with a baseline:  replace G_t by G_t − b(s_t)          (still unbiased, lower variance)</code></pre>
+<p>The estimate is unbiased but very noisy. The rest of the family tree is mostly about reducing that noise and keeping updates safe. The course derives and codes these steps on <a href="../02-tensortonic.html#rl">Module 02's RL ladder</a>.</p>
+
+<h3 id="adv">Value functions, advantages and GAE</h3>
+<p>The best simple baseline is the state value V(s), the expected return from s. Then G<sub>t</sub> − V(s<sub>t</sub>) estimates the <strong>advantage</strong> A(s, a) = Q(s, a) − V(s): how much better this action was than the policy's average. Actor-critic methods learn V with a second network and use it in the update; Mnih et al.'s A3C (2016) is the reference the video cites. Generalized Advantage Estimation (Schulman, Moritz, Levine, Jordan and Abbeel, 2015) blends short and long look-aheads:</p>
+<pre><code>δ_t = r_t + γ V(s_{t+1}) − V(s_t)                  (TD residual)
+Â_t^GAE(γ,λ) = Σ_{l≥0} (γλ)^l δ_{t+l}
+λ = 0: one-step TD (low variance, biased by V)   λ = 1: Monte Carlo return − V (unbiased, noisy)</code></pre>
+
+<h3 id="trpo">TRPO and PPO</h3>
+<p>Policy gradients can take a step that's too large and collapse the policy. TRPO (Schulman et al., 2015) maximises an importance-weighted surrogate subject to a limit on the average KL divergence from the old policy, solved with conjugate gradients and a line search. PPO (Schulman et al., 2017) gets most of the benefit with a first-order trick: clip the probability ratio so there's no incentive to move it outside [1 − ε, 1 + ε].</p>
+<pre><code>ρ_t(θ) = π_θ(a_t | s_t) / π_θ_old(a_t | s_t)
+TRPO:  max E[ ρ_t Â_t ]   s.t.  E[ KL(π_θ_old ‖ π_θ) ] ≤ δ
+PPO:   L^CLIP = E[ min( ρ_t Â_t, clip(ρ_t, 1−ε, 1+ε) Â_t ) ]</code></pre>
+<p>In LLM fine-tuning (RLHF), PPO usually runs with four models in memory: the policy, a critic of similar size, a frozen reference model for the KL penalty, and a reward model. The PPO mechanics, ε ablations and a full implementation are on <a href="../06-30u30/29-ppo.html">30u30 Day 29</a>; this page doesn't repeat them.</p>
+
+<h3 id="grpo">Group Relative Policy Optimization (GRPO)</h3>
+<p>GRPO was introduced by Shao et al. in the DeepSeekMath paper (2024) as a PPO variant that improves maths reasoning while reducing PPO's memory use. Its key move is to remove the critic. For each question q, sample a group of G outputs o<sub>1</sub>…o<sub>G</sub> from the old policy, score them, and use the group's statistics as the baseline:</p>
+<pre><code>Â_{i,t} = ( r_i − mean(r_1..r_G) ) / std(r_1..r_G)       (outcome reward: same for every token of o_i)
+
+J_GRPO(θ) = E[ (1/G) Σ_i (1/|o_i|) Σ_t {
+              min( ρ_{i,t} Â_{i,t}, clip(ρ_{i,t}, 1−ε, 1+ε) Â_{i,t} )
+              − β · D_KL[ π_θ ‖ π_ref ] } ]
+
+D_KL estimate per token:  π_ref/π_θ − log(π_ref/π_θ) − 1      (non-negative, unbiased)</code></pre>
+<p>Three differences from PPO as used in RLHF:</p>
+<ul>
+<li><strong>No value network.</strong> The group mean plays the role of V(s), which suits LLMs because training a token-level critic for long reasoning traces is hard and doubles memory.</li>
+<li><strong>KL in the loss, not the reward.</strong> PPO-for-RLHF usually subtracts a KL penalty from the reward; GRPO adds it directly to the objective, so it doesn't complicate the advantage.</li>
+<li><strong>Group comparison matches how rewards work.</strong> Reward models and verifiers are often better at comparing answers to the same question than at giving absolute scores. The paper also describes a process-supervision variant, where step-level rewards are normalised the same way.</li>
+</ul>
+<p>DeepSeek-R1 (DeepSeek-AI, 2025) made GRPO famous: its R1-Zero model was trained with large-scale RL using GRPO and rule-based rewards directly on a base model, without supervised fine-tuning first, and long reasoning behaviour emerged. Module 07 covers this RL-with-verifiable-rewards recipe in context (<a href="../07-post-training.html#rlvr">RLVR section</a>).</p>
+
+<div class="card demo">
+<h3>Interactive: GRPO group advantages vs a critic baseline</h3>
+<p class="legend">One prompt, G sampled answers, each scored 1 (correct) or 0 (wrong). For each answer, three bars show its advantage: GRPO (r − mean) / std, Dr. GRPO r − mean, and a PPO-style baseline r − V, where V is a critic's guess of the success rate. Dots above the axis mark correct answers.</p>
+<canvas id="gr" width="700" height="260" aria-label="Advantages of each sampled answer under GRPO, Dr. GRPO and a critic baseline"></canvas>
+<label for="ps">Success rate: <span id="psv" class="num"></span></label>
+<input id="ps" type="range" min="0.05" max="0.95" step="0.05" value="0.3">
+<label for="gs">Group size G: <span id="gsv" class="num"></span></label>
+<input id="gs" type="range" min="2" max="16" step="1" value="8">
+<label for="cv">Critic estimate V: <span id="cvv" class="num"></span></label>
+<input id="cv" type="range" min="0" max="1" step="0.05" value="0.5">
+<p><button id="ng" type="button">Sample new group</button></p>
+<div class="stats">
+  <div class="stat"><div class="k">Group mean, std</div><div class="v" id="sm">–</div></div>
+  <div class="stat"><div class="k">Correct answer: GRPO / Dr. GRPO / Critic</div><div class="v" id="sc">–</div></div>
+  <div class="stat"><div class="k">Chance the group has no signal</div><div class="v" id="sn">–</div></div>
+  <div class="stat"><div class="k">Group</div><div class="v" id="sg">–</div></div>
+</div>
+<p class="meta">Try this: the defaults (success rate 0.3, G = 8, V = 0.5, group #1) draw 2 correct answers out of 8. Mean 0.25, std 0.43, so a correct answer gets +1.73 under GRPO, +0.75 under Dr. GRPO and +0.50 against the critic. Groups where every answer is right or every answer is wrong give zero advantage to everyone, so they teach nothing. That happens with probability p<sup>G</sup> + (1 − p)<sup>G</sup>: 5.8% at the defaults, but 66.3% at success rate 0.05. Press "Sample new group" until you get exactly 1 correct out of 8: GRPO gives it +2.65 while Dr. GRPO gives +0.88. That large boost for rare successes on very hard (or very easy) prompts is the std normalisation that Dr. GRPO removes. Std here is the population standard deviation; implementations differ.</p>
+</div>
+
+<h3 id="drgrpo">Dr. GRPO</h3>
+<p>Liu et al. (2025), in "Understanding R1-Zero-Like Training: A Critical Perspective", identify an optimisation bias in GRPO that artificially increases response length, especially for incorrect outputs, and propose Dr. GRPO ("GRPO Done Right") as an unbiased fix. It removes two normalisations:</p>
+<ul>
+<li><strong>The 1/|o<sub>i</sub>| length term.</strong> Each answer's token losses are averaged over its own length. For a wrong answer (negative advantage), a longer answer spreads the same penalty over more tokens, so each token is punished less. That quietly rewards long wrong answers. For correct answers it favours short ones. Dr. GRPO sums over tokens with a constant normaliser instead.</li>
+<li><strong>The std term in the advantage.</strong> Dividing by the group's std gives prompts whose groups are nearly all right or nearly all wrong (small std) much larger weight, a question-level difficulty bias. Dr. GRPO uses r − mean only. The demo above shows the size of this effect.</li>
+</ul>
+<pre><code>Dr. GRPO:  Â_{i,t} = r_i − mean(r_1..r_G)
+           J = E[ (1/G) Σ_i Σ_t min( ρ_{i,t} Â_{i,t}, clip(ρ_{i,t}, 1−ε, 1+ε) Â_{i,t} ) ] / C   (C constant)</code></pre>
+<p>The paper reports better token efficiency with similar reasoning performance, and a minimal R1-Zero-style recipe reaching 43.3% on AIME 2024 with a 7B base model. With r − mean as the advantage, the group mean is an ordinary REINFORCE baseline again (close to the leave-one-out style), which is a nice way to see that GRPO is still a policy gradient method underneath.</p>
+
+<h3 id="tree">The family tree in one table</h3>
+<div class="table-wrap"><table>
+<tr><th>Method</th><th>Baseline / advantage</th><th>Step-size control</th><th>Extra models</th></tr>
+<tr><td>REINFORCE (1992)</td><td>Return, optional baseline</td><td>Learning rate only</td><td>None</td></tr>
+<tr><td>Actor-critic, A3C (2016)</td><td>Learned V(s)</td><td>Learning rate</td><td>Critic</td></tr>
+<tr><td>GAE (2015)</td><td>λ-weighted TD residuals</td><td>(used inside TRPO/PPO)</td><td>Critic</td></tr>
+<tr><td>TRPO (2015)</td><td>GAE</td><td>Hard KL constraint</td><td>Critic</td></tr>
+<tr><td>PPO (2017)</td><td>GAE</td><td>Clipped ratio</td><td>Critic (+ reference and reward models in RLHF)</td></tr>
+<tr><td>GRPO (2024)</td><td>Group mean, divided by group std</td><td>Clipped ratio + KL to reference</td><td>Reference (+ reward model or verifier)</td></tr>
+<tr><td>Dr. GRPO (2025)</td><td>Group mean only</td><td>Clipped ratio</td><td>As GRPO</td></tr>
+</table></div>
+
+<h2 id="course">3. Where the course goes deeper</h2>
+<div class="table-wrap"><table>
+<tr><th>Topic</th><th>Course page</th></tr>
+<tr><td>Bellman → REINFORCE → A2C → GAE → PPO, as practice problems</td><td><a href="../02-tensortonic.html#rl">Module 02 · RL ladder</a></td></tr>
+<tr><td>PPO in depth: clipping, ε, GAE, a full implementation and robot locomotion</td><td><a href="../06-30u30/29-ppo.html">30u30 Day 29 · PPO</a></td></tr>
+<tr><td>RLHF and the reward model that PPO originally optimised</td><td><a href="../06-30u30/30-rlhf.html">30u30 Day 30 · RLHF</a></td></tr>
+<tr><td>RL with verifiable rewards, the KL leash and where GRPO fits in post-training</td><td><a href="../07-post-training.html#rlvr">Module 07 · RLVR</a>, <a href="../07-post-training.html#kl">Module 07 · KL</a></td></tr>
+<tr><td>DPO and preference optimisation, the RL-free alternative</td><td><a href="../08-ai-research-engineer/05-alignment-preference.html">Module 08 · Stage 05</a></td></tr>
+<tr><td>Book-length treatments of RL for LLMs</td><td><a href="../11-three-book-path.html#raschka">Module 11 · Raschka</a>, <a href="../11-three-book-path.html#rlhf">Module 11 · RLHF book</a></td></tr>
+<tr><td>Dense teacher feedback instead of one reward per answer</td><td><a href="05-on-policy-distillation.html">Video 05 · On-policy distillation</a></td></tr>
+</table></div>
+
+<h2 id="robotics">Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>PPO already runs robotics RL.</strong> Legged-locomotion and dexterous-manipulation policies are commonly trained with PPO and GAE across thousands of parallel simulated robots. Understanding the REINFORCE → PPO line is directly useful there; GRPO is the newer branch.</li>
+<li><strong>GRPO needs resets to the same state.</strong> Its baseline compares several attempts from the same starting point. That's natural for an LLM prompt or a simulator you can reset, and awkward on a real robot, where every attempt starts from a slightly different world. Long-horizon control with dense rewards also still benefits from a learned critic, so GRPO doesn't simply replace PPO there.</li>
+<li><strong>Success detectors as verifiers.</strong> For VLA fine-tuning, a binary "did the task succeed?" signal (from a scripted check in simulation or a learned success classifier) plays the role of a maths answer checker. Group-relative advantages over several rollouts per task are a plausible way to use it; how well this works for real robots is still an active research question.</li>
+<li><strong>Watch the zero-signal groups.</strong> If a robot task succeeds almost never (or almost always) for the current policy, most groups give no gradient, as the demo shows. Curricula that keep success rates in the middle are as important as the algorithm.</li>
+</ul>
+</div>
+
+<h2 id="check">Self-check</h2>
+<details><summary>Why does subtracting a baseline b(s) from the return not bias the policy gradient?</summary><p>Because E<sub>a~π</sub>[∇ log π(a|s) · b(s)] = b(s) · ∇ Σ<sub>a</sub> π(a|s) = b(s) · ∇1 = 0. The baseline doesn't depend on the action, so its contribution averages to zero, while it can greatly reduce variance.</p></details>
+<details><summary>What does GAE's λ trade off?</summary><p>Bias against variance. λ = 0 uses one-step TD residuals, low variance but biased by errors in V. λ = 1 uses the full Monte Carlo return minus V, unbiased but noisy. Values in between weight longer look-aheads geometrically.</p></details>
+<details><summary>What does PPO's clip do for a positive-advantage action whose ratio is already 1.3 with ε = 0.2?</summary><p>The clipped term is capped at 1.2 · Â, and the min picks it, so the gradient with respect to that sample is zero: there's no incentive to push its probability higher in this update.</p></details>
+<details><summary>Rewards in a group of 4 are (1, 0, 0, 0). What are the GRPO and Dr. GRPO advantages?</summary><p>Mean 0.25. Population std = √(0.25 · 0.75) ≈ 0.433. GRPO: correct +0.75 / 0.433 ≈ +1.73, wrong −0.25 / 0.433 ≈ −0.58. Dr. GRPO: +0.75 and −0.25.</p></details>
+<details><summary>Why does the 1/|o<sub>i</sub>| term encourage long wrong answers?</summary><p>A wrong answer's negative advantage is spread over its tokens and averaged by its length, so a longer wrong answer receives a smaller penalty per token. The model learns that rambling softens the punishment for being wrong.</p></details>
+<details><summary>Why is GRPO attractive for LLMs but less obviously so for a real robot?</summary><p>For an LLM, sampling many answers to the same prompt is cheap and removes the need for a large critic. A real robot can't easily restart from exactly the same state many times, and long-horizon control with dense rewards benefits from a learned value function.</p></details>
+
+<h2 id="refs">References</h2>
+<p>From the video's description (resources):</p>
+<ul>
+<li><a href="https://www.youtube.com/playlist?list=PLwRJQ4m4UJjNymuBM9RdmB3Z9N5-0IlY0">Foundations of Deep RL</a>, 6-lecture series by Pieter Abbeel</li>
+<li><a href="https://www.youtube.com/playlist?list=PLqYmG7hTraZDM-OYHWgPebj2MfCFzFObQ">DeepMind x UCL · Introduction to Reinforcement Learning</a> by David Silver</li>
+<li><a href="http://www.incompleteideas.net/book/the-book-2nd.html">Reinforcement Learning: An Introduction</a> (Sutton, Barto, 2nd edition)</li>
+</ul>
+<p>From the video's description (references):</p>
+<ul>
+<li><a href="https://link.springer.com/content/pdf/10.1007/BF00992696.pdf">Simple Statistical Gradient-Following Algorithms for Connectionist Reinforcement Learning (REINFORCE)</a> (Williams, 1992)</li>
+<li><a href="https://arxiv.org/abs/1602.01783">Asynchronous Methods for Deep Reinforcement Learning (A3C)</a> (Mnih et al., 2016)</li>
+<li><a href="https://arxiv.org/abs/1506.02438">High-Dimensional Continuous Control Using Generalized Advantage Estimation</a> (Schulman, Moritz, Levine, Jordan, Abbeel, 2015)</li>
+<li><a href="https://arxiv.org/abs/1502.05477">Trust Region Policy Optimization</a> (Schulman, Levine, Moritz, Jordan, Abbeel, 2015)</li>
+<li><a href="https://arxiv.org/abs/1707.06347">Proximal Policy Optimization Algorithms</a> (Schulman, Wolski, Dhariwal, Radford, Klimov, 2017)</li>
+<li><a href="https://arxiv.org/abs/2402.03300">DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models (GRPO)</a> (Shao et al., 2024)</li>
+<li><a href="https://arxiv.org/abs/2501.12948">DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning</a> (DeepSeek-AI, 2025)</li>
+<li><a href="https://arxiv.org/abs/2503.20783">Understanding R1-Zero-Like Training: A Critical Perspective (Dr. GRPO)</a> (Liu et al., 2025)</li>
+<li><a href="https://www.manim.community/">Manim Community</a>, the animation library used to make the video</li>
+</ul>
+
+<nav class="pager">
+  <a href="05-on-policy-distillation.html"><small>Previous</small>Video 05 · On-policy distillation</a>
+  <a class="next" href="07-adamw.html"><small>Next</small>Video 07 · Optimisers from gradient descent to AdamW</a>
+</nav>
+<footer>Module 12 · Video 06 · a watch guide written for this course from the video's chapter list, its references and the original papers. Video © Jia-Bin Huang.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('gr'), ctx = cv.getContext('2d');
+const el = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const f2 = v => (v > 0 ? '+' : '') + v.toFixed(2);
+
+// seeded RNG (mulberry32)
+const mul = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+const group = (p, G, seed) => { const r = mul(seed); return Array.from({ length: G }, () => r() < p ? 1 : 0); };
+function adv(rw, V) {
+  const G = rw.length, m = rw.reduce((a, b) => a + b, 0) / G;
+  const sd = Math.sqrt(rw.reduce((a, b) => a + (b - m) ** 2, 0) / G);   // population std
+  return { m, sd, grpo: rw.map(r => sd > 1e-9 ? (r - m) / sd : 0), dr: rw.map(r => r - m), crit: rw.map(r => r - V) };
+}
+const noSignal = (p, G) => p ** G + (1 - p) ** G;
+
+let seed = 1;
+function draw() {
+  const p = +el('ps').value, G = +el('gs').value, V = +el('cv').value;
+  el('psv').textContent = p.toFixed(2); el('gsv').textContent = G; el('cvv').textContent = V.toFixed(2);
+  const rw = group(p, G, seed), a = adv(rw, V);
+  const W = cv.width, H = cv.height, l = 40, r = 12, t = 14, b = 14, top = 3;
+  const py = v => t + (top - Math.max(-top, Math.min(top, v))) / (2 * top) * (H - t - b);
+  const cw = (W - l - r) / G, bw = Math.min(cw * 0.26, 22);
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '12px sans-serif'; ctx.strokeStyle = css('--line'); ctx.fillStyle = css('--muted'); ctx.lineWidth = 1; ctx.textAlign = 'right';
+  for (let g = -top; g <= top; g++) { ctx.beginPath(); ctx.moveTo(l, py(g)); ctx.lineTo(W - r, py(g)); ctx.stroke(); ctx.fillText(g > 0 ? '+' + g : g, l - 6, py(g) + 4); }
+  ctx.strokeStyle = css('--fg'); ctx.beginPath(); ctx.moveTo(l, py(0)); ctx.lineTo(W - r, py(0)); ctx.stroke();
+  const cols = [css('--accent'), css('--muted'), css('--warn')];
+  rw.forEach((v, i) => {
+    const x0 = l + i * cw + (cw - 3 * bw) / 2;
+    [a.grpo[i], a.dr[i], a.crit[i]].forEach((y, k) => { ctx.fillStyle = cols[k]; ctx.fillRect(x0 + k * bw, Math.min(py(0), py(y)), bw - 2, Math.abs(py(y) - py(0))); });
+    if (v) { ctx.fillStyle = css('--pass'); ctx.beginPath(); ctx.arc(l + i * cw + cw / 2, t + 6, 5, 0, 7); ctx.fill(); }
+  });
+  const k = rw.indexOf(1);
+  el('sm').textContent = `${a.m.toFixed(2)}, ${a.sd.toFixed(2)}`;
+  el('sc').textContent = k < 0 ? 'no correct answer' : `${f2(a.grpo[k])} / ${f2(a.dr[k])} / ${f2(a.crit[k])}`;
+  el('sn').textContent = (100 * noSignal(p, G)).toFixed(1) + '%';
+  el('sg').textContent = `#${seed} · ${rw.reduce((x, y) => x + y, 0)} of ${G} correct`;
+}
+['ps', 'gs', 'cv'].forEach(id => el(id).oninput = draw);
+el('ng').onclick = () => { seed++; draw(); };
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

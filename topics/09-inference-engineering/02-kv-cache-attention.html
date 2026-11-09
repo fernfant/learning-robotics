@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inference · KV cache and attention</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 09 · Inference engineering</a> › Page 02</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 09 · Problems 3–5</div>
+<h1>KV cache, PagedAttention and FlashAttention</h1>
+<p class="lede">The KV cache decides how many users fit on a GPU. PagedAttention decides how much of that memory is actually used. FlashAttention decides how fast attention runs once the data is there. This page sizes the cache with real numbers, then explains the two ideas that made modern serving possible.</p>
+
+<div class="facts">
+  <div><b>Problems covered</b>3 (size the KV cache) · 4 (PagedAttention) · 5 (why FlashAttention is faster)</div>
+  <div><b>Interview level</b>Mid to senior. Problem 3 is a standard screen; 4 and 5 test whether you understand memory, not just names.</div>
+  <div><b>Key ideas</b>KV bytes per token, GQA, KV precision, fragmentation, block tables, HBM vs SRAM traffic, tiling, online softmax</div>
+  <div><b>Time to prep</b>3–4 h: 2 h reading, 1–2 h working the numbers and the exercise</div>
+</div>
+<p class="meta">Source: <a href="https://x.com/vishalsingh2972/status/2113830444722741637">Vishal Singh's post of 25 inference-engineering interview problems</a> · saved in <code>sources/09-vishal-inference-25.md</code></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">A chatbot keeps notes on every word of every conversation it's having. Those notes fill up the computer's memory. Clever bookkeeping lets the same memory hold many more conversations, and clever reading makes the notes faster to use.</p>
+
+<h3>Think of it like this</h3>
+<p>Picture a school library with one long shelf. The old way: every student who walks in gets a whole metre of shelf "just in case" they write a lot, even if most write two pages. The shelf fills up after a few students, mostly with empty space. The new way: give out small boxes, one at a time, only when a student needs another. Keep a list saying which boxes belong to whom, in any order. Now the same shelf holds many more students' notes. That list of boxes is PagedAttention.</p>
+<p>FlashAttention is about reading, not storing. Instead of carrying every book to a far-away table and back for each question, you bring a few books to your desk, finish all the work on them, and only then fetch the next few. Same answers, far fewer trips.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>For each word in a conversation, the model saves a small "key" and "value" note in every layer. That's the KV cache.</li>
+<li>Notes grow with the length of the conversation and with the number of people chatting at once.</li>
+<li>PagedAttention stores the notes in small fixed-size blocks and keeps a table of where each conversation's blocks are, so no space is reserved and wasted.</li>
+<li>FlashAttention does the attention maths in small tiles inside the chip's fast memory, so it rarely goes back to the slow, big memory.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot's computer has a fixed amount of memory that must also hold the camera pipeline and the model itself. If the model's notes on the last minute of camera frames and instructions don't fit, the robot forgets context or slows down. Each control step must still finish on time, so fast attention matters too.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Give five friends a sheet of paper each to write their name. Then give five other friends one sheet cut into strips, handing out a strip only when someone asks. Count how much paper is left over each way.</li>
+<li>In the demo, change <b>KV precision</b> from 16 to 8 to 4 bits and watch <b>GPUs needed</b> fall. Change <b>KV heads</b> from 8 to 64 to see what the model would cost without grouped-query attention. Then lower <b>Average actual length</b> and compare <b>Requests that fit: contiguous</b> with <b>paged</b>.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>KV cache</dt><dd>Saved keys and values for every earlier token, so they aren't recomputed for each new token.</dd>
+<dt>HBM</dt><dd>The GPU's main memory: big, but slow compared with the chip's on-chip memory.</dd>
+<dt>SRAM</dt><dd>Tiny, very fast memory on the chip itself.</dd>
+<dt>Fragmentation</dt><dd>Memory that's reserved or split up so badly that nobody can use it.</dd>
+<dt>Block table</dt><dd>A list mapping a conversation's token positions to the memory blocks that hold them.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="p3">Problem 3 · Size the KV cache for a Llama-style 70B at 32K context and 100 users, with GQA and precision</h2>
+<p><strong>What the interviewer is testing:</strong> can you write the formula from memory, plug in the right shape (KV heads, not query heads), convert units without slipping, and then turn the answer into a hardware decision with headroom?</p>
+
+<h3>The concepts</h3>
+<p>Every layer stores one key vector and one value vector per KV head per token. Query heads don't count: under grouped-query attention (GQA) several query heads share one KV head. Module 08 derives this; here's the formula to use:</p>
+<pre><code>KV bytes = 2 × L × n_kv × d_head × bytes_per_value × T × users
+           (K and V) (layers) (KV heads) (head dim)  (precision) (tokens) (sequences)
+
+per-token cost = 2 × L × n_kv × d_head × bytes_per_value</code></pre>
+<p>The rest of GPU memory goes to the weights (parameters × bytes per weight), activations and temporary buffers, the CUDA context, and the engine's own overhead. Engines like vLLM reserve a fraction of memory up front and carve the KV pool out of what's left, so plan with headroom. This page assumes 90% of HBM is usable for weights plus KV; that's an assumption to tune.</p>
+
+<h3>A worked answer with real numbers</h3>
+<p><strong>Model shape.</strong> The Llama-2/3 70B published configs: 80 layers, 64 query heads, 8 KV heads, head dim 128 (hidden size 8,192 = 64 × 128). About 70 billion parameters.</p>
+<p><strong>GPUs</strong> (NVIDIA product pages): H100 SXM 80 GB at 3.35 TB/s; H200 141 GB at 4.8 TB/s. Note GB here is 10<sup>9</sup> bytes while the cache maths below lands in GiB (2<sup>30</sup>); mixing them is a classic 7% error.</p>
+<pre><code>Values per token = 2 × 80 × 8 × 128 = 163,840
+
+Per token:  BF16 (2 B)  = 327,680 B = 320 KiB
+            FP8  (1 B)  = 160 KiB
+            4-bit       =  80 KiB  (+ a little for scales)
+
+Per user at 32K (32,768 tokens):
+            BF16 = 320 KiB × 32,768 = 10 GiB
+            FP8  = 5 GiB
+            4-bit = 2.5 GiB
+
+100 users, all at full 32K:
+            BF16 = 1,000 GiB = 1,073.7 GB
+            FP8  =   500 GiB =   536.9 GB
+            4-bit =  250 GiB =   268.4 GB
+
+Without GQA (64 KV heads, BF16): 2.5 MiB/token → 8,000 GiB ≈ 8,590 GB. GQA saves 8×.</code></pre>
+<p>Now add the weights and divide by usable memory per GPU. Weights at FP8 are about 70 GB (at BF16, about 140 GB).</p>
+<div class="table-wrap"><table>
+<tr><th>KV precision (weights FP8, 70 GB)</th><th>KV for 100 × 32K</th><th>Total</th><th>H100 SXM at 72 GB usable</th><th>H200 at 126.9 GB usable</th></tr>
+<tr><td>BF16</td><td>1,073.7 GB</td><td>1,143.7 GB</td><td>15.9 → 16 GPUs</td><td>9.0 → 10 GPUs</td></tr>
+<tr><td>FP8</td><td>536.9 GB</td><td>606.9 GB</td><td>8.4 → 9 GPUs</td><td>4.8 → 5 GPUs</td></tr>
+<tr><td>4-bit</td><td>268.4 GB</td><td>338.4 GB</td><td>4.7 → 5 GPUs</td><td>2.7 → 3 GPUs</td></tr>
+</table></div>
+<p><strong>Turning that into a deployment.</strong> Tensor-parallel groups usually come in powers of two, and 8 GPUs is one node. FP8 weights plus FP8 KV need 9 H100s at 90% usable: just over one node. Options: one 8×H200 node (lots of room), two H100 nodes, or trim the requirement. With TP = 8, each GPU holds exactly one of the 8 KV heads, so per-GPU KV cost is 20 KiB per token at FP8. Beyond TP = 8, KV heads must be replicated, and the per-GPU saving stops scaling.</p>
+<p><strong>The question behind the question.</strong> "100 users at 32K" is the worst case. Real conversations are mostly short. If the average live context is 8K, the FP8 cache for 100 users is 125 GiB, and the whole thing fits on one 8×H100 node with room to spare. Whether you can bank on the average instead of the maximum depends on how the cache is allocated, which is problem 4.</p>
+
+<h3>Trade-offs</h3>
+<div class="table-wrap"><table>
+<tr><th>Lever</th><th>Memory saved</th><th>Cost</th></tr>
+<tr><td>GQA (decided at training time)</td><td>n_q / n_kv, here 8×</td><td>Small quality cost; can't add to a finished model without uptraining</td></tr>
+<tr><td>FP8 KV cache</td><td>2× vs BF16</td><td>Usually small quality loss; check long-context retrieval</td></tr>
+<tr><td>4-bit or 2-bit KV</td><td>4–8×</td><td>Needs careful schemes (per-channel keys); more risk on long contexts</td></tr>
+<tr><td>Shorter max context or fewer users per replica</td><td>Linear</td><td>Product limits, or more replicas</td></tr>
+<tr><td>Offload cold KV to CPU memory</td><td>Frees HBM</td><td>PCIe transfer time when the conversation resumes</td></tr>
+</table></div>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>"KV bytes per token are 2 × layers × KV heads × head dim × bytes. For a Llama-style 70B that's 2 × 80 × 8 × 128 = 163,840 values, so 320 KiB per token in BF16 and 160 KiB in FP8. At 32K tokens that's 10 GiB per user in BF16, so 100 users at full context is 1,000 GiB, or 500 GiB in FP8. Add about 70 GB of FP8 weights and 10% headroom: around nine H100 SXMs or five H200s. GQA is already saving 8× here; without it the BF16 cache would be 8,000 GiB. And 100 × 32K is the worst case; with paged allocation you pay for actual tokens, so I'd size on the measured length distribution."</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Using query heads (64) instead of KV heads (8): an 8× overestimate.</li>
+<li>Forgetting the factor 2 for keys and values.</li>
+<li>Mixing GiB and GB, or forgetting the weights and headroom.</li>
+<li>Assuming tensor parallelism always divides the cache: with more GPUs than KV heads, heads are replicated.</li>
+</ul>
+
+<div class="card demo">
+<h3>Interactive: KV-cache sizer and fragmentation</h3>
+<p class="legend">Top: memory if every user reaches full context. Grey is weights, blue is KV cache; the red line is total GPU memory and the dashed line is the 90% usable share. Bottom: the first 40 simulated requests stored two ways, on the same scale. Contiguous reserves the full context per request (amber is reserved but empty). Paged hands out 16-token blocks as needed (red slivers are the half-empty last blocks).</p>
+<canvas id="kv" width="700" height="300" aria-label="Memory bar for weights and KV cache against GPU memory, and contiguous versus paged KV allocation for simulated requests"></canvas>
+<label for="ly">Layers: <span id="lyv" class="num"></span></label>
+<input id="ly" type="range" min="16" max="128" step="8" value="80">
+<label for="kh">KV heads: <span id="khv" class="num"></span></label>
+<input id="kh" type="range" min="0" max="6" step="1" value="3">
+<label for="hd">Head dim: <span id="hdv" class="num"></span></label>
+<input id="hd" type="range" min="64" max="256" step="64" value="128">
+<label for="kb">KV precision: <span id="kbv" class="num"></span> bits</label>
+<input id="kb" type="range" min="0" max="2" step="1" value="1">
+<label for="cx">Max context: <span id="cxv" class="num"></span> tokens</label>
+<input id="cx" type="range" min="10" max="17" step="1" value="15">
+<label for="us">Users: <span id="usv" class="num"></span></label>
+<input id="us" type="range" min="1" max="256" step="1" value="100">
+<label for="pp">Parameters: <span id="ppv" class="num"></span>B</label>
+<input id="pp" type="range" min="1" max="200" step="1" value="70">
+<label for="wb">Weight precision: <span id="wbv" class="num"></span> bits</label>
+<input id="wb" type="range" min="0" max="2" step="1" value="1">
+<label for="gp">GPU: <span id="gpv" class="num"></span></label>
+<input id="gp" type="range" min="0" max="1" step="1" value="0">
+<label for="gn">GPUs: <span id="gnv" class="num"></span></label>
+<input id="gn" type="range" min="1" max="16" step="1" value="8">
+<label for="al">Average actual length: <span id="alv" class="num"></span> tokens</label>
+<input id="al" type="range" min="256" max="32768" step="256" value="2048">
+<div class="stats">
+  <div class="stat"><div class="k">KV per token</div><div class="v" id="spt">–</div></div>
+  <div class="stat"><div class="k">KV, all users at max</div><div class="v" id="stot">–</div></div>
+  <div class="stat"><div class="k">GPUs needed (90% usable)</div><div class="v" id="sgn">–</div></div>
+  <div class="stat"><div class="k">Requests that fit: contiguous</div><div class="v" id="sct">–</div></div>
+  <div class="stat"><div class="k">Requests that fit: paged</div><div class="v" id="spg">–</div></div>
+</div>
+<p class="meta">Try this: the defaults are problem 3 with FP8 weights and FP8 KV on 8 H100 SXMs. KV is 160 KiB per token and 500 GiB for 100 users at 32K, and 9 GPUs are needed, so the bar crosses the dashed line. Switch <b>GPU</b> to H200: 5 are needed. Set <b>KV heads</b> to 64 (no GQA): 4,000 GiB of cache and 61 H100s. Back at the defaults, the "requests that fit" counts use the KV memory left on your GPUs after weights: contiguous allocation fits 94 requests, paged fits about 1,500, because real requests average 2,048 tokens, not 32K. GPU memory figures are from NVIDIA's product pages; lengths come from a seeded random draw with the average you set; the 90% usable share is an assumption.</p>
+</div>
+
+<h2 id="p4">Problem 4 · Explain PagedAttention and the problem it solves</h2>
+<p><strong>What the interviewer is testing:</strong> whether you know the problem is <em>memory waste</em> limiting batch size, not attention speed. Bonus points for block tables, copy-on-write, and what it costs.</p>
+
+<h3>The concepts</h3>
+<p><strong>The problem.</strong> A sequence's KV cache grows by one token per step, and you don't know in advance how long the answer will be. Early serving systems stored each sequence's cache in one contiguous tensor sized for the maximum length. That wastes memory three ways:</p>
+<ul>
+<li><strong>Reservation:</strong> space for tokens not yet generated sits idle for the whole request.</li>
+<li><strong>Internal fragmentation:</strong> most requests finish far short of the maximum, so most of the slab is never used.</li>
+<li><strong>External fragmentation:</strong> slabs of different sizes leave gaps between them that are too small to reuse.</li>
+</ul>
+<p>Wasted KV memory means fewer sequences in the batch, and in the bandwidth-bound decode phase a bigger batch is almost free throughput. So waste directly caps throughput.</p>
+<p><strong>The idea</strong> (Kwon et al., 2023), borrowed from operating-system virtual memory:</p>
+<ul>
+<li>Split the KV pool into fixed-size <strong>blocks</strong>, each holding the keys and values for a fixed number of tokens (commonly 16) across all layers' heads for that block.</li>
+<li>Each sequence has a <strong>block table</strong> mapping its logical block 0, 1, 2… to physical blocks anywhere in the pool. Blocks are allocated only when the previous one fills.</li>
+<li>The attention kernel reads keys and values through the block table, gathering non-contiguous blocks.</li>
+<li>Because blocks are indirect, sequences can <strong>share</strong> them. Parallel samples or beam-search branches point to the same prompt blocks, with a reference count. On write to a shared block, copy it first (<strong>copy-on-write</strong>). The same mechanism enables prefix caching across requests (page 04).</li>
+<li>When memory runs out, the scheduler can <strong>preempt</strong> a sequence: free its blocks and later recompute its prefix, or swap the blocks to CPU memory.</li>
+</ul>
+<pre><code>logical token position p  →  block = p // B,  offset = p % B
+physical address          =  block_table[seq][block] × block_bytes + offset × token_bytes
+
+waste per sequence        ≤  B − 1 tokens (only the last block is partly empty)
+average waste             ≈  B / 2 tokens</code></pre>
+<p>The paper reports near-zero KV waste and 2–4× higher throughput than the systems it compared against (FasterTransformer, Orca) at the same latency, with larger gains for longer sequences, bigger models and complex decoding.</p>
+
+<h3>A worked answer with real numbers</h3>
+<p><strong>Assumptions.</strong> The 70B shape from problem 3, FP8 weights (70 GB) and FP8 KV (160 KiB per token), one node of 8 H100 SXMs, 90% of HBM usable, max context 32K, real requests averaging 2,048 tokens (an assumed traffic mix).</p>
+<pre><code>KV budget  = 8 × 80 GB × 0.9 − 70 GB = 506 GB ≈ 471 GiB
+
+Contiguous (reserve 32K per request):
+  per request = 32,768 × 160 KiB = 5 GiB
+  fits        = 471 / 5 ≈ 94 requests
+  utilisation = 2,048 / 32,768 ≈ 6% of reserved KV memory holds real tokens
+
+Paged (16-token blocks):
+  per request ≈ (2,048 + 8 wasted) × 160 KiB ≈ 321 MiB
+  fits        ≈ 471 × 1,024 / 321 ≈ 1,500 requests
+  utilisation ≈ 99.6%
+
+One block = 16 tokens × 160 KiB = 2.5 MiB (the whole model; 320 KiB per GPU at TP = 8)</code></pre>
+<p>About 16× more concurrent sequences from the same memory. In practice you won't run 1,500 at once on one node, because TPOT climbs with batch size and you hit compute limits or latency targets first. The point is that memory stops being the binding constraint, and the scheduler can choose the batch size that meets latency targets.</p>
+
+<h3>Trade-offs</h3>
+<div class="table-wrap"><table>
+<tr><th>Choice</th><th>Upside</th><th>Downside</th></tr>
+<tr><td>Small blocks (e.g. 8–16 tokens)</td><td>Less waste per sequence, finer sharing</td><td>Bigger block tables, more scattered reads, less efficient kernels</td></tr>
+<tr><td>Large blocks (e.g. 64–256)</td><td>Contiguous reads, simpler kernels</td><td>More waste in the last block; coarser prefix sharing</td></tr>
+<tr><td>Preempt by recompute</td><td>No CPU memory or PCIe traffic</td><td>Redo the prefill later</td></tr>
+<tr><td>Preempt by swap</td><td>No recompute</td><td>PCIe bandwidth and CPU memory</td></tr>
+</table></div>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>"PagedAttention solves KV-cache memory waste, not attention speed. Contiguous caches reserve the maximum length per request, so most of the memory sits empty: reserving 32K for requests that average 2K uses about 6% of what's reserved. PagedAttention splits the cache into fixed blocks of, say, 16 tokens, and keeps a per-sequence block table so blocks can live anywhere and are allocated on demand. Waste drops to under one block per sequence, and shared prefixes can point to the same blocks with copy-on-write. On a 70B FP8 model on 8 H100s that's roughly 94 versus 1,500 sequences that fit, which lets the scheduler run much bigger batches; the paper reports 2–4× throughput. The cost is an indirection in the attention kernel and an allocator to manage."</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Describing PagedAttention as a faster attention algorithm. Its gain is batch size via memory efficiency.</li>
+<li>Confusing it with offloading to disk or CPU. Paging here is within GPU memory; swapping is an optional extra.</li>
+<li>Forgetting sharing and copy-on-write, which make parallel sampling and prefix caching cheap.</li>
+</ul>
+
+<h2 id="p5">Problem 5 · Explain why FlashAttention is faster when the maths is the same</h2>
+<p><strong>What the interviewer is testing:</strong> whether you think in memory traffic, not FLOPs. The key sentence: standard attention is limited by reading and writing the N×N matrix to HBM; FlashAttention never writes it.</p>
+
+<h3>The concepts</h3>
+<p>Standard attention for one head, sequence length N, head dim d:</p>
+<pre><code>S = Q Kᵀ / √d        N×N   written to HBM
+P = softmax(S)       N×N   read from HBM, written back
+O = P V              N×d   P read again from HBM
+
+FLOPs ≈ 4 N² d (two matmuls)
+HBM traffic ≈ Θ(N d + N²): the N² term dominates</code></pre>
+<p>A GPU has a large, relatively slow HBM and a tiny, very fast on-chip SRAM. Softmax and masking do few FLOPs per byte, so the kernels that read and write S and P are memory-bound. The matmuls are fast; the round trips through HBM are what cost time.</p>
+<p><strong>FlashAttention</strong> (Dao et al., 2022) changes the order of work, not the result:</p>
+<ul>
+<li><strong>Tiling.</strong> Load a block of Q rows and a block of K and V rows into SRAM. Compute that tile of S, use it, discard it. S and P never go to HBM.</li>
+<li><strong>Online softmax.</strong> Softmax needs a row's max and sum over all columns, which you don't have when working tile by tile. Keep a running max m and running sum ℓ per row, and rescale the partial output when the max changes:</li>
+</ul>
+<pre><code>for each K,V tile j:
+    S_j   = Q_i K_jᵀ / √d
+    m_new = max(m, rowmax(S_j))
+    ℓ     = e^(m − m_new) · ℓ + rowsum(e^(S_j − m_new))
+    O     = e^(m − m_new) · O + e^(S_j − m_new) · V_j
+    m     = m_new
+O = O / ℓ                      exact same result as softmax(QKᵀ/√d) V</code></pre>
+<ul>
+<li><strong>Kernel fusion.</strong> Matmul, scale, mask, softmax and the second matmul run in one kernel, so there's one launch and no intermediate tensors.</li>
+<li><strong>Recompute in the backward pass.</strong> For training, it stores only m and ℓ and recomputes S tile by tile during backprop. More FLOPs, much less memory traffic, still faster.</li>
+</ul>
+<p>The paper shows HBM accesses fall to Θ(N² d² / M), where M is the SRAM size, and that this is optimal for a range of SRAM sizes. Memory use goes from quadratic to linear in N, which is what made long contexts practical.</p>
+<p><strong>Versions.</strong> FlashAttention-2 (Dao, 2023) reorganised the work: fewer non-matmul operations, parallelism across the sequence dimension, and better splitting of work between warps. FlashAttention-3 (Shah et al., 2024) targets Hopper GPUs: it overlaps data movement and computation using the Tensor Cores' and TMA's asynchrony, and adds FP8. Its abstract reports 1.5–2.0× over FlashAttention-2 on H100, up to 740 TFLOPS in FP16 (75% utilisation) and close to 1.2 PFLOPS in FP8.</p>
+<p><strong>Serving note.</strong> Decode is different: one query token against a long cache. There's no N×N matrix to avoid, and the cost is reading K and V once. Decode kernels split the long KV sequence across thread blocks so the GPU stays busy at batch 1, and they read through PagedAttention's block table. Modern engines combine both ideas.</p>
+
+<h3>A worked answer with real numbers</h3>
+<p><strong>Assumptions.</strong> One sequence of N = 8,192 tokens, head dim 128, FP16, 32 query heads per layer (an 8B-class shape), one H100 SXM: 3.35 TB/s HBM, about 989 TFLOPS dense FP16 (half the page's 1,979 "with sparsity" figure). Count only the big N×N traffic for standard attention: write S, read S, write P, read P.</p>
+<pre><code>Standard attention, per head:
+  S size         = 8,192² × 2 B = 128 MiB
+  HBM traffic    ≈ 4 × 128 MiB  = 512 MiB ≈ 0.54 GB
+  time at 3.35 TB/s ≈ 160 µs
+  × 32 heads     ≈ 5.1 ms per layer   (memory-bound)
+
+Compute, per layer:
+  FLOPs = 32 × 4 × 8,192² × 128 ≈ 1.1e12
+  time at 989 TFLOPS ≈ 1.1 ms
+
+FlashAttention, per head:
+  HBM traffic ≈ read Q, K, V + write O = 4 × 8,192 × 128 × 2 B = 8 MiB
+  time ≈ 2.5 µs                        → now compute-bound (~1.1 ms per layer)
+
+Memory for S if materialised: 128 MiB × 32 heads = 4 GiB per layer, per sequence</code></pre>
+<p>Same 1.1e12 FLOPs either way. Standard attention spends roughly 5 ms per layer just moving S and P; FlashAttention moves about 64× less data per head and becomes limited by the matmuls. These are idealised floors, but they show the shape of the win. Real speedups depend on N (bigger N, bigger win) and the kernel: the original paper reports 3× on GPT-2 training at 1K tokens.</p>
+
+<h3>Trade-offs</h3>
+<ul>
+<li><strong>Exact vs approximate.</strong> FlashAttention is exact (up to floating-point ordering). Approximate attention methods cut FLOPs but often didn't speed up wall-clock time, a point the paper makes.</li>
+<li><strong>Hardware-specific code.</strong> Peak performance needs kernels tuned per GPU generation (FA3 is Hopper-specific). Portable fallbacks are slower.</li>
+<li><strong>Short sequences gain less.</strong> At small N the N² traffic is small and other overheads dominate.</li>
+<li><strong>Recompute costs FLOPs</strong> in training's backward pass; it pays off because memory, not compute, was the limit.</li>
+</ul>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>"The FLOPs are the same; the memory traffic isn't. Standard attention writes the N×N score matrix to HBM, reads it for softmax, writes the probabilities and reads them again, and those steps are memory-bound. At 8K tokens that matrix is 128 MiB per head in FP16, so on an H100 just moving it costs about 5 ms per layer, versus about 1 ms of actual matmul. FlashAttention tiles Q, K and V into on-chip SRAM, uses an online softmax with a running max and sum so it never needs the full row, and fuses everything into one kernel, so S never touches HBM. That turns attention from memory-bound to compute-bound and makes memory linear in sequence length."</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Saying it "reduces FLOPs" or "approximates attention". It does neither.</li>
+<li>Not mentioning online softmax, the trick that makes tiling possible.</li>
+<li>Assuming the same speedup at decode time. Decode has a different bottleneck: reading the KV cache.</li>
+</ul>
+
+<h2 id="practise">Practise it</h2>
+<ol>
+<li><strong>Check the formula against an engine.</strong> On a GPU with 16–24 GB, start vLLM with a small GQA model (for example a 1B–3B Llama-family instruct model). At startup it logs how many KV-cache blocks or tokens it allocated. Compute the expected number from the formula, the model's config.json (layers, KV heads, head dim) and the memory left after weights. They should agree to within the engine's overheads. Repeat with <code>--kv-cache-dtype fp8</code> and confirm the token capacity roughly doubles.</li>
+<li><strong>Simulate fragmentation.</strong> In 30 lines of Python, draw 10,000 request lengths from a log-normal distribution, then compute utilisation for contiguous max-length allocation and for block sizes 1, 16, 64 and 256. Plot waste against block size.</li>
+<li><strong>Feel FlashAttention on Colab.</strong> On a free T4 GPU, time a naive PyTorch attention (explicit <code>softmax(Q @ K.T) @ V</code>) against <code>torch.nn.functional.scaled_dot_product_attention</code> for N = 512 to 8,192, recording time and peak memory with <code>torch.cuda.max_memory_allocated</code>. Watch the naive version's memory grow with N² and eventually run out. Note which backend PyTorch picks on your GPU; FlashAttention kernels need recent GPUs, so a T4 may use the memory-efficient backend instead.</li>
+<li><strong>Write online softmax.</strong> Implement the tiled loop above in NumPy for one head, check it matches the naive result to 1e-5, and count bytes "moved" with a tile size you choose.</li>
+</ol>
+
+<h2 id="course">In this course</h2>
+<ul>
+<li><a href="../08-ai-research-engineer/08-inference-aware-design.html">Module 08 · Inference-aware design</a>: MHA vs GQA vs MQA, KV quantisation (KIVI, KVQuant), and a KV-memory demo. Read it before this page if the formula is new.</li>
+<li><a href="../05-trillion-scale-architecture.html#serving">Module 05 · Serving</a>: two cache types in one paged pool, prefix caching with checkpoints, and a production-scale serving stack.</li>
+<li><a href="../08-ai-research-engineer/01-tensor-math-autograd.html">Module 08 · Tensor maths and autograd</a>: Triton and FlashAttention-style tiling from the kernel side.</li>
+<li><a href="../08-ai-research-engineer/06-distributed-training.html">Module 08 · Distributed training</a>: tensor parallelism, and why KV heads get replicated beyond TP = n_kv.</li>
+<li><a href="01-request-lifecycle.html">Page 01 · Request lifecycle</a>: where prefill and decode sit in a request.</li>
+</ul>
+
+<h2 id="robotics">Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>On-robot memory is shared and small.</strong> An embedded GPU module splits one memory pool between the OS, perception, weights and the KV cache. The per-token formula tells you how many seconds of camera and instruction history a VLA can hold before something has to give.</li>
+<li><strong>Vision tokens are the big multiplier.</strong> Multi-camera inputs produce thousands of tokens per step (Module 08, Stage 07). At the 8B shape in BF16 (128 KiB per token), 4,000 tokens is about 500 MiB of cache per step; GQA and FP8 KV are often what make it fit.</li>
+<li><strong>Paging matters less at batch 1, but sharing still helps.</strong> One robot runs one sequence, so fragmentation across users is a server problem. Reusing the cached prefix (instruction plus current images) across action steps is the robot version of block sharing.</li>
+<li><strong>Fused attention kernels set the control rate.</strong> Long-context attention without a fused kernel can blow the control-step budget and memory. Check which attention backend your edge runtime actually uses.</li>
+<li><strong>Fleets of robots are a cloud problem.</strong> When many robots share a server model, all of problem 3 and 4 applies exactly as for chat users.</li>
+</ul>
+</div>
+
+<h2 id="check">Self-check</h2>
+<details><summary>KV cache per token for 80 layers, 8 KV heads, head dim 128, in FP8?</summary><p>2 × 80 × 8 × 128 × 1 B = 163,840 B = 160 KiB.</p></details>
+<details><summary>Why use KV heads, not query heads, in the formula?</summary><p>Under GQA several query heads share one stored key and value head. Only KV heads are cached. Using query heads for a 64-query, 8-KV model overestimates by 8×.</p></details>
+<details><summary>What does PagedAttention improve directly, and what improves as a result?</summary><p>Directly: KV memory utilisation, by removing reservation and fragmentation waste. As a result: more sequences fit, so batches are bigger and throughput rises.</p></details>
+<details><summary>What is copy-on-write used for in PagedAttention?</summary><p>Several sequences (parallel samples, beam branches, shared prefixes) point to the same physical blocks. A block is copied only when one of them needs to write to it.</p></details>
+<details><summary>FlashAttention does the same FLOPs. Where does the speedup come from?</summary><p>From not writing and reading the N×N score and probability matrices to HBM. Tiling in SRAM with an online softmax and one fused kernel cuts memory traffic, turning a memory-bound computation into a compute-bound one.</p></details>
+<details><summary>Why does the online softmax need a running max?</summary><p>Softmax is computed with the row max subtracted for numerical stability. When a later tile has a bigger max, the earlier partial sum and output must be rescaled by e^(m_old − m_new) so the final result is exact.</p></details>
+
+<h2 id="resources">Resources</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/2309.06180">Efficient Memory Management for Large Language Model Serving with PagedAttention</a> (Kwon et al., 2023)</li>
+<li><a href="https://docs.vllm.ai/en/latest/design/paged_attention.html">vLLM docs · Paged attention kernel design</a> and <a href="https://docs.vllm.ai/en/latest/">vLLM documentation</a></li>
+<li><a href="https://docs.sglang.ai/">SGLang documentation</a> and <a href="https://nvidia.github.io/TensorRT-LLM/">TensorRT-LLM documentation</a></li>
+<li><a href="https://arxiv.org/abs/2205.14135">FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness</a> (Dao et al., 2022)</li>
+<li><a href="https://arxiv.org/abs/2307.08691">FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning</a> (Dao, 2023)</li>
+<li><a href="https://arxiv.org/abs/2407.08608">FlashAttention-3: Fast and Accurate Attention with Asynchrony and Low-precision</a> (Shah et al., 2024)</li>
+<li><a href="https://github.com/Dao-AILab/flash-attention">flash-attention repository</a> (kernels and supported GPUs)</li>
+<li><a href="https://arxiv.org/abs/2307.09288">Llama 2: Open Foundation and Fine-Tuned Chat Models</a> (Touvron et al., 2023): the 70B model with GQA</li>
+<li><a href="https://docs.nvidia.com/nsight-compute/">NVIDIA Nsight Compute</a>: measure a kernel's memory traffic yourself</li>
+<li>NVIDIA product pages: <a href="https://www.nvidia.com/en-us/data-center/h100/">H100</a> and <a href="https://www.nvidia.com/en-us/data-center/h200/">H200</a> (memory and bandwidth used above)</li>
+</ul>
+
+<nav class="pager">
+  <a href="01-request-lifecycle.html"><small>Previous</small>Page 01 · The request lifecycle</a>
+  <a class="next" href="03-batching-scheduling.html"><small>Next</small>Page 03 · Batching and scheduling</a>
+</nav>
+<footer>Module 09 · Page 02 · written for this course from the source post, official docs and papers.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('kv'), ctx = cv.getContext('2d');
+const ids = ['ly', 'kh', 'hd', 'kb', 'cx', 'us', 'pp', 'wb', 'gp', 'gn', 'al'];
+const el = Object.fromEntries(ids.map(k => [k, document.getElementById(k)]));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = n => Math.round(n).toLocaleString('en-US');
+const BITS = [16, 8, 4], GiB = 2 ** 30, BLOCK = 16, USABLE = 0.9;
+const GPUS = [{ n: 'H100 SXM (80 GB)', gb: 80 }, { n: 'H200 (141 GB)', gb: 141 }];   // NVIDIA product pages
+const sz = b => b >= 1e12 ? (b / 1e12).toFixed(2) + ' TB' : fmt(b / 1e9) + ' GB';
+
+// seeded RNG so the simulated requests are the same on every load
+function rng(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const R = rng(7), Z = Array.from({ length: 2000 }, () => Math.sqrt(-2 * Math.log(1 - R())) * Math.cos(2 * Math.PI * R()));
+const RAW = Z.map(z => Math.exp(0.9 * z)), RAWM = RAW.reduce((a, b) => a + b) / RAW.length;
+const lengths = (avg, ctxT) => RAW.map(x => Math.min(ctxT, Math.max(16, Math.round(x / RAWM * avg))));
+const paged = n => Math.ceil(n / BLOCK) * BLOCK;
+
+function calc(v) {
+  const per = 2 * v.L * v.nkv * v.hd * v.kbits / 8;
+  const kvAll = per * v.T * v.U, w = v.P * 1e9 * v.wbits / 8;
+  const cap = v.gpu.gb * 1e9, need = Math.ceil((kvAll + w) / (cap * USABLE));
+  const budget = Math.max(0, v.G * cap * USABLE - w);
+  const lens = lengths(Math.min(v.avg, v.T), v.T);
+  const meanPaged = lens.reduce((a, n) => a + paged(n), 0) / lens.length;
+  const meanUsed = lens.reduce((a, b) => a + b, 0) / lens.length;
+  return { per, kvAll, w, cap, need, budget, lens, meanUsed, meanPaged,
+    contig: Math.floor(budget / (per * v.T)), pagedFit: Math.floor(budget / (per * meanPaged)) };
+}
+
+function draw() {
+  const v = { L: +el.ly.value, nkv: 2 ** +el.kh.value, hd: +el.hd.value, kbits: BITS[+el.kb.value], T: 2 ** +el.cx.value,
+    U: +el.us.value, P: +el.pp.value, wbits: BITS[+el.wb.value], gpu: GPUS[+el.gp.value], G: +el.gn.value, avg: +el.al.value };
+  const c = calc(v);
+  const shown = { ly: v.L, kh: v.nkv, hd: v.hd, kb: v.kbits, cx: fmt(v.T), us: v.U, pp: v.P, wb: v.wbits, gp: v.gpu.n, gn: v.G, al: fmt(Math.min(v.avg, v.T)) };
+  ids.forEach(k => document.getElementById(k + 'v').textContent = shown[k]);
+
+  const W = cv.width, H = cv.height, l = 16, r = 16;
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '12px sans-serif'; ctx.textAlign = 'left';
+
+  // top: weights + KV at full context against GPU memory
+  const total = c.w + c.kvAll, mem = v.G * c.cap, scale = Math.max(total, mem) * 1.05;
+  const px = b => l + b / scale * (W - l - r);
+  ctx.fillStyle = css('--muted'); ctx.fillText(`All ${v.U} users at ${fmt(v.T)} tokens: ${sz(total)} vs ${v.G} × ${v.gpu.gb} GB = ${sz(mem)}`, l, 16);
+  ctx.fillRect(px(0), 26, px(c.w) - px(0), 34);
+  ctx.fillStyle = css('--accent'); ctx.fillRect(px(c.w), 26, px(total) - px(c.w), 34);
+  ctx.strokeStyle = css('--fail'); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(px(mem), 20); ctx.lineTo(px(mem), 66); ctx.stroke();
+  ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(px(mem * USABLE), 20); ctx.lineTo(px(mem * USABLE), 66); ctx.stroke(); ctx.setLineDash([]);
+
+  // bottom: first 40 requests, contiguous vs paged, on the same token scale
+  const k = Math.min(v.U, 40), sample = c.lens.slice(0, k), span = k * v.T;
+  const tx = t => l + t / span * (W - l - r);
+  const strip = (y, label, slot) => {
+    ctx.fillStyle = css('--muted'); ctx.fillText(label, l, y - 8);
+    let x = 0;
+    sample.forEach(n => {
+      const s = slot(n);
+      ctx.fillStyle = css('--pass'); ctx.fillRect(tx(x), y, Math.max(0.5, tx(x + n) - tx(x)), 40);
+      ctx.fillStyle = s - n > BLOCK ? css('--warn') : css('--fail'); ctx.fillRect(tx(x + n), y, Math.max(0, tx(x + s) - tx(x + n)), 40);
+      ctx.fillStyle = css('--bg'); ctx.fillRect(tx(x + s) - 0.5, y, 1, 40);
+      x += s;
+    });
+  };
+  const used = sample.reduce((a, b) => a + b, 0);
+  strip(110, `Contiguous: reserve ${fmt(v.T)} per request · ${(used / span * 100).toFixed(1)}% holds real tokens`, () => v.T);
+  const pg = sample.reduce((a, n) => a + paged(n), 0);
+  strip(200, `Paged: ${BLOCK}-token blocks · ${(used / pg * 100).toFixed(1)}% holds real tokens · uses ${(pg / span * 100).toFixed(1)}% of the contiguous space`, paged);
+  ctx.fillStyle = css('--muted'); ctx.fillText(`${k} simulated requests, average ${fmt(c.meanUsed)} tokens (green = real tokens)`, l, 268);
+
+  document.getElementById('spt').textContent = c.per >= 2 ** 20 ? (c.per / 2 ** 20).toFixed(2) + ' MiB' : fmt(c.per / 1024) + ' KiB';
+  document.getElementById('stot').textContent = c.kvAll >= 10 * GiB ? fmt(c.kvAll / GiB) + ' GiB' : (c.kvAll / GiB).toFixed(2) + ' GiB';
+  document.getElementById('sgn').textContent = fmt(c.need);
+  document.getElementById('sct').textContent = fmt(c.contig);
+  document.getElementById('spg').textContent = fmt(c.pagedFit);
+}
+ids.forEach(k => el[k].oninput = draw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

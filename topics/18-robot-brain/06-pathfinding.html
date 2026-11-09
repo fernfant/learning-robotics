@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 6 · Finding the way</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 4 · Lesson 6</nav>
+
+<div class="eyebrow"><span class="track robo">Robotics</span>Build a Robot Brain · Week 4 · Lesson 6</div>
+<h1>Finding the way: BFS and A*</h1>
+<p class="lede">Robo-Helper knows where it is and where the bin is. Now it needs a route that doesn't go through walls, and the shortest one. You'll build breadth-first search, which explores like a ripple on a pond, then A*, which aims the ripple at the goal.</p>
+
+<div class="facts">
+  <div><b>Time</b>2–4 hours, plus the challenge</div>
+  <div><b>You'll need</b>Python 3, Lesson 1 finished, squared paper and a pencil</div>
+  <div><b>New words</b>search, queue, frontier, breadth-first search (BFS), heuristic, A*, priority queue</div>
+  <div><b>Project piece</b>Route planning</div>
+</div>
+
+<section class="kid" id="start">
+<h2>Start here</h2>
+<p class="big">To find the shortest route, explore every square 1 step away, then every square 2 steps away, and so on, remembering where you came from. A* does the same but tries the squares that look closer to the goal first.</p>
+
+<h3>The problem</h3>
+<p>Robo-Helper is in the top-left corner of the room at (1, 1). Someone says "put this in the bin". The bin is at (7, 6), and there are walls in between. The robot can step north, south, east or west, one square at a time. Which steps, in which order? It needs a plan before it moves, and the plan should be as short as possible, because every step costs battery.</p>
+
+<h3>The idea in one picture</h3>
+<p>Drop a stone in a pond. The ripple spreads out in rings: everything 1 metre away gets wet at the same moment, then everything 2 metres away. The first ring to touch the goal tells you its distance, and the ripple went around obstacles by itself. That's breadth-first search. A* is like tilting the pond toward the goal so the water runs mostly that way.</p>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Search</dt><dd>Systematically trying possibilities until you find one that works.</dd>
+<dt>Queue</dt><dd>A waiting line: first in, first out, like at a shop.</dd>
+<dt>Frontier</dt><dd>The squares we've found but haven't explored from yet: the edge of the ripple.</dd>
+<dt>BFS (breadth-first search)</dt><dd>Explore all squares at distance 1, then 2, then 3… using a queue. It always finds a shortest route.</dd>
+<dt>Heuristic</dt><dd>A quick guess. Here: the Manhattan distance to the goal, ignoring walls.</dd>
+<dt>A* ("A-star")</dt><dd>Search that always explores the square with the smallest "steps so far + guess of steps left".</dd>
+<dt>Priority queue</dt><dd>A waiting line where the smallest number always goes first, like a hospital A&amp;E where the most urgent case is seen next.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>The rest is the full lesson:</strong> the problem in detail, both algorithms built step by step on the real room, a demo that shows which squares each one explores, the homework, and a challenge in your own home.</p>
+
+<h2 id="problem">1. The problem</h2>
+<p>Here's the room from <code>world.py</code>. <code>#</code> is wall, <code>.</code> is floor, <code>R</code> is the robot, <code>B</code> is the bin:</p>
+<pre><code>  x: 0123456789
+y=0  ##########
+y=1  #R.......#
+y=2  #..##....#
+y=3  #..#.....#
+y=4  #....##..#
+y=5  #........#
+y=6  #.#....B.#
+y=7  ##########</code></pre>
+<p>The obvious approach is "always step toward the goal". It works in an empty room. But try it on this small map, where a wall sits between S and the goal G:</p>
+<pre><code>#######
+#S.#..#        Greedy: only take steps that get closer to G.
+#..#.G#        From S (1,1): east to (2,1), south to (2,2).
+#..#..#        At (2,2): east is a wall. North, south, west all
+#.....#        go FURTHER from G. Stuck, forever.
+#######</code></pre>
+<p>The real route goes down and around, which means moving <em>away</em> from the goal for a while. Greedy can't do that. We need a method that is guaranteed to find the shortest route whenever one exists.</p>
+
+<h2 id="principles">2. First principles</h2>
+
+<h3>Step 1: neighbours</h3>
+<p>From any square, the possible next squares are its 4 neighbours (north, south, east, west) that aren't walls. Using Lesson 1's <code>move</code>: from (1, 1), north is (1, 0), a wall. South is (1, 2), free. East is (2, 1), free. West is (0, 1), a wall. So <code>neighbors(ROOM, (1, 1))</code> is <code>[(1, 2), (2, 1)]</code>, in the order N, S, E, W. The order matters: it decides which of several equally short routes we find.</p>
+
+<h3>Step 2: rings (breadth-first search)</h3>
+<p>Write 0 on the start. Write 1 on its free neighbours. Write 2 on <em>their</em> unnumbered neighbours. Keep going. This is the whole room, numbered:</p>
+<pre><code>## ## ## ## ## ## ## ## ## ##
+##  0  1  2  3  4  5  6  7 ##
+##  1  2 ## ##  5  6  7  8 ##
+##  2  3 ##  7  6  7  8  9 ##
+##  3  4  5  6 ## ##  9 10 ##
+##  4  5  6  7  8  9 10 11 ##
+##  5 ##  7  8  9 10 11 12 ##
+## ## ## ## ## ## ## ## ## ##</code></pre>
+<p>The bin at (7, 6) got the number <strong>11</strong>. So the shortest route is 11 steps. Look at (4, 3): it says 7, even though it's only 3 squares right of the start, because the ripple had to go around the wall.</p>
+<p>To do the numbering in code, use a <strong>queue</strong>. Take the square at the front, add its new neighbours to the back. Because squares join the back of the line, all the 1s are handled before any 2, all the 2s before any 3. Here are the first three turns:</p>
+<pre><code>queue: [(1,1)]
+take (1,1) → neighbours (1,2), (2,1) are new     queue: [(1,2), (2,1)]
+take (1,2) → (1,1) seen; (1,3), (2,2) are new    queue: [(2,1), (1,3), (2,2)]
+take (2,1) → (2,2) seen; (3,1) is new            queue: [(1,3), (2,2), (3,1)]</code></pre>
+
+<h3>Step 3: remember where you came from</h3>
+<p>The numbers tell you the distance but not the route. So every time a square is discovered, write down which square discovered it, in a dictionary <code>came_from</code>. For example <code>came_from[(1, 2)] = (1, 1)</code>. The start gets <code>None</code>. When you reach the goal, follow <code>came_from</code> backwards to the start, then reverse the list:</p>
+<pre><code>(7,6) ← (6,6) ← (5,6) ← (4,6) ← (3,6) ← (3,5) ← (2,5) ← (1,5) ← (1,4) ← (1,3) ← (1,2) ← (1,1)</code></pre>
+<p>Twelve squares, eleven steps. As commands: <code>SSSSEESEEEE</code>. The same <code>came_from</code> dictionary also works as the "already seen" list: if a square is in it, don't add it again.</p>
+
+<details><summary>Predict first: the room has 42 free squares (including the bin). How many does BFS take off the queue before it reaches the bin?</summary>
+<p><strong>40.</strong> The bin is one of the farthest squares from the start. Only (8, 5), also 11 steps away, and (8, 6), 12 steps away, are never taken off the queue. BFS doesn't know where the bin is; it just explores everything closer first. That's thorough, but wasteful when the goal is in an obvious direction.</p>
+</details>
+
+<h3>Step 4: aim the ripple (A*)</h3>
+<p>BFS explores in every direction equally, even away from the goal. Let's give it a hint: the <strong>Manhattan distance</strong> from Lesson 1, <code>|x1 − x2| + |y1 − y2|</code>. It ignores walls, so it's never more than the true number of steps left. It's an optimistic guess.</p>
+<p>For every square we track <code>g</code> = steps taken so far, and <code>h</code> = the Manhattan guess of steps left. Then:</p>
+<pre><code>f = g + h      "the best this route could possibly be, if it goes through here"</code></pre>
+<p>A* always explores the square with the <strong>smallest f</strong> next. To find the smallest quickly, it uses a <strong>priority queue</strong> (Python's <code>heapq</code>). Worked example from the start, with the bin at (7, 6):</p>
+<pre><code>start (1,1):  g = 0, h = |1−7| + |1−6| = 6 + 5 = 11, f = 11
+  (1,2):      g = 1, h = 6 + 4 = 10,               f = 11
+  (2,1):      g = 1, h = 5 + 5 = 10,               f = 11
+  (4,3) later: reached in g = 7, h = 3 + 3 = 6,    f = 13   ← worse than 11, try it last</code></pre>
+<p>Any square where moving there means heading <em>away</em> from the bin gets a bigger f, so A* puts it off. Because <code>h</code> never overestimates, A* still always finds a shortest route. (If the guess were sometimes too big, A* could skip the real best route.)</p>
+<p>One more detail: the same square can enter the priority queue twice, with different <code>g</code>. When you take one out and its <code>g</code> is bigger than the best known cost for that square, it's an out-of-date entry. Skip it, and don't count it.</p>
+
+<details><summary>Predict first: BFS took 40 squares off the queue. How many does A* take, for the same 11-step route?</summary>
+<p><strong>35</strong>, a saving of only 5. Surprised? The robot is in one corner and the bin is in the opposite one, so almost every square is on <em>some</em> 11-step route (any mix of south and east moves). A* skips just (8, 1), (8, 2), (8, 3), (8, 4) and (4, 3). Start the robot at (4, 1) instead, and BFS takes 35 squares while A* takes only 13. A* helps most when the goal is in a clear direction and lots of the map is behind you.</p>
+</details>
+
+<h2 id="play">3. Play with it</h2>
+<div class="card demo">
+<h3>Interactive: BFS vs A* on the real room</h3>
+<p class="legend">The room from <code>world.py</code>. Press a search and watch which squares it takes off the queue, numbered in order. Shaded squares are still waiting in the frontier. The final route is drawn as a line. Click a floor square to drop a box there (a surprise obstacle), or switch the click mode to move the robot.</p>
+<canvas id="gcv" width="600" height="480" aria-label="The robot room grid showing search expansion order and the route"></canvas>
+<p>
+<button id="runbfs">Run BFS</button>
+<button id="runastar">Run A*</button>
+<button id="stepbtn">One step</button>
+<button id="clearbtn">Clear boxes</button>
+</p>
+<p>
+Click to:
+<label><input type="radio" name="mode" value="box" checked> drop/remove a box</label>
+<label><input type="radio" name="mode" value="start"> move the robot</label>
+</p>
+<div class="stats">
+  <div class="stat"><div class="k">Algorithm</div><div class="v" id="galg">–</div></div>
+  <div class="stat"><div class="k">Squares expanded</div><div class="v" id="gexp">–</div></div>
+  <div class="stat"><div class="k">Route length</div><div class="v" id="glen">–</div></div>
+  <div class="stat"><div class="k">Commands</div><div class="v" id="gcmd" style="font-size:0.9rem">–</div></div>
+</div>
+</div>
+<p>Things to try: run BFS, then A*, from the start corner (40 vs 35). Move the robot to (4, 1) and compare again. Drop a box at (1, 5) and watch both find a different 11-step route. Box the robot in completely: both should report no route.</p>
+
+<h2 id="homework">4. Homework</h2>
+<p>Open <code>project/homework/lesson06_paths.py</code>. It imports <code>move</code> and <code>manhattan</code> from your Lesson 1 file, so finish that first. Write these four, in order:</p>
+
+<h3>4.1 <code>neighbors(room, pos, blocked=())</code></h3>
+<p>Return the free squares one step N, S, E, W of <code>pos</code>, in that order, skipping any in <code>blocked</code>. Example: <code>neighbors(ROOM, (1, 1))</code> → <code>[(1, 2), (2, 1)]</code>; with <code>blocked={(2, 1)}</code> → <code>[(1, 2)]</code>.</p>
+<details><summary>Hint 1</summary><p>You already have <code>move(pos, direction)</code> from Lesson 1 and <code>is_free(room, pos)</code> from <code>world.py</code>.</p></details>
+<details><summary>Hint 2</summary><p>A string is a sequence: <code>for d in "NSEW":</code> loops over the four directions in the right order.</p></details>
+<details><summary>Hint 3</summary><p>Make an empty list. For each direction d in "NSEW": p = move(pos, d); if p is free and p not in blocked, append it. Return the list.</p></details>
+
+<h3>4.2 <code>bfs_path(room, start, goal, blocked=())</code></h3>
+<p>Breadth-first search with a <code>deque</code> and a <code>came_from</code> dictionary. Return the list of squares from start to goal (both included), or <code>None</code> if the goal can't be reached. Example: from <code>ROBOT_START</code> to the bin, the list has 12 squares (11 steps).</p>
+<details><summary>Hint 1</summary><p><code>deque([start])</code> makes a queue holding the start. <code>queue.popleft()</code> takes from the front, <code>queue.append(x)</code> adds to the back. Set <code>came_from = {start: None}</code>.</p></details>
+<details><summary>Hint 2</summary><p>Loop <code>while queue:</code>. Take the front square. If it's the goal, build the path. Otherwise, for each neighbour not yet in <code>came_from</code>, record where it came from and add it to the queue. If the loop ends without finding the goal, return <code>None</code>.</p></details>
+<details><summary>Hint 3</summary><p>To build the path: start with an empty list and cur = goal. While cur is not None: append cur, then cur = came_from[cur]. That list runs goal → start, so return it reversed (<code>path[::-1]</code>).</p></details>
+
+<h3>4.3 <code>astar_path(room, start, goal, blocked=())</code></h3>
+<p>Like BFS, but use a priority queue of <code>(f, g, square)</code> tuples with <code>heapq</code>, and keep a <code>cost</code> dictionary of the best <code>g</code> found for each square. Return <code>(path, expanded)</code>, where <code>expanded</code> counts the squares you took off the queue (not counting out-of-date ones). Example: from the start to the bin, the path is 11 steps and <code>expanded</code> is 35.</p>
+<details><summary>Hint 1</summary><p><code>heapq.heappush(frontier, (f, g, square))</code> adds; <code>heapq.heappop(frontier)</code> removes the tuple with the smallest f (ties broken by g, then by the square). Start the frontier as <code>[(manhattan(start, goal), 0, start)]</code> and <code>cost = {start: 0}</code>.</p></details>
+<details><summary>Hint 2</summary><p>After popping <code>(_, g, cur)</code>: if <code>g &gt; cost[cur]</code>, skip it with <code>continue</code>. Otherwise add 1 to <code>expanded</code>, check for the goal, and look at neighbours.</p></details>
+<details><summary>Hint 3</summary><p>For each neighbour nxt: new_g = g + 1. If new_g is smaller than cost.get(nxt, infinity): set cost[nxt] = new_g, came_from[nxt] = cur, and push (new_g + manhattan(nxt, goal), new_g, nxt). If the frontier runs out, return (None, expanded).</p></details>
+
+<h3>4.4 <code>path_to_commands(path)</code></h3>
+<p>Turn a list of squares into a string of letters. Example: <code>[(1, 1), (2, 1), (2, 2), (1, 2)]</code> → <code>"ESW"</code>.</p>
+<details><summary>Hint 1</summary><p>Look at each pair of neighbouring squares in the path. <code>zip(path, path[1:])</code> gives you <code>(a, b)</code> pairs.</p></details>
+<details><summary>Hint 2</summary><p>The change from a to b is <code>(b[0] − a[0], b[1] − a[1])</code>, for example <code>(1, 0)</code>. Lesson 1's <code>DIRECTIONS</code> maps letters to changes. You need the reverse.</p></details>
+<details><summary>Hint 3</summary><p>Build a reversed dictionary {change: letter} from DIRECTIONS. For each pair, look up the change and collect the letter. Join the letters into one string.</p></details>
+
+<h3>Run it</h3>
+<pre><code>cd homework
+python3 lesson06_paths.py</code></pre>
+<p>What you should see (real output from the reference solution; <code>*</code> marks the route, <code>r b g</code> are the blocks):</p>
+<pre><code>##########
+#Rr......#
+#*.##....#
+#*.#..b..#
+#*...##..#
+#g**.....#
+#.#****B.#
+##########
+BFS steps: 11 | commands: SSSSEESEEEE
+A* steps: 11 | squares expanded: 35</code></pre>
+<p>The route passes over the green block at (1, 5), which is drawn on top. Blocks don't block the path in this lesson; surprise obstacles do, through <code>blocked</code>.</p>
+
+<h3>Check it</h3>
+<pre><code>cd ..
+python3 check.py 6</code></pre>
+<p>Hints you might see:</p>
+<pre><code>  ✗ neighbors: neighbors of (1, 1) are (1, 2) then (2, 1), checking N, S, E, W
+  ✗ bfs unreachable: a boxed-in robot should get None</code></pre>
+<p><code>5/5 passed  🎉 lesson complete!</code> means you're done.</p>
+
+<h3>Stretch</h3>
+<ul>
+<li>Change <code>astar_path</code> to use <code>h = 0</code> instead of the Manhattan distance. How many squares does it expand now? (It turns into a slower BFS. Why?)</li>
+<li>Try a cheating heuristic: <code>h = 3 × manhattan</code>. Is the route still always 11 steps? Is it ever wrong from other starting squares?</li>
+<li>Write <code>bfs_expanded</code> that returns how many squares BFS took off the queue. Check you get 40.</li>
+</ul>
+
+<h2 id="challenge">5. Real-world challenge: route-plan your home</h2>
+<ol>
+<li><strong>Draw a map.</strong> On squared paper, draw the floor of two or three rooms of your home, one square ≈ one big step (about 50 cm). Shade furniture and walls. Leave doorways open.</li>
+<li><strong>Pick a start and a goal</strong>, e.g. your bed and the fridge.</li>
+<li><strong>Run BFS by hand.</strong> Write 0 on the start, 1 on its free neighbours, 2 on theirs… in pencil, until you number the goal. Count how many squares you numbered.</li>
+<li><strong>Read the route backwards.</strong> From the goal, step to any neighbour with a number one smaller, until you reach 0. Mark the route.</li>
+<li><strong>Run A* on a fresh copy.</strong> For each square you explore, write <code>g + h</code>. Always continue from the smallest. Count squares again. Which method numbered fewer?</li>
+<li><strong>Walk it.</strong> Walk the planned route counting your steps. Does it match the number on the goal? Then put a bag in the middle of the route (a surprise obstacle) and replan from where you're standing.</li>
+</ol>
+<p><strong>What to record:</strong> your map, the BFS and A* square counts, the planned and walked step counts. <strong>What it teaches:</strong> BFS really is a ripple, the heuristic really does save work, and real routes need replanning when the world surprises you, which is exactly what Robo-Helper does in Lesson 11.</p>
+
+<h2 id="project">6. Your Robo-Helper so far</h2>
+<p>Robo-Helper can now <strong>plan routes</strong>. Given where it is, where it wants to go, and which squares are blocked, <code>astar_path</code> gives it the shortest route, and <code>path_to_commands</code> turns that into moves like the ones you wrote in Lesson 1.</p>
+<ul>
+<li><strong>Lesson 11</strong> (the capstone): <code>drive_to</code> calls <code>astar_path(self.room, self.pos, target, blocked=self.known_blocked)</code>. When the Lesson 4–5 stop detector spots a surprise (say a cat at (4, 1)), that square goes into <code>known_blocked</code> and the robot replans from where it stands.</li>
+<li><strong>Lesson 7</strong> is a side quest: what if the robot has <em>no map</em> at all? Then it can't search like this, and has to learn the way by trial and error.</li>
+</ul>
+
+<h2 id="mistakes">7. Common mistakes</h2>
+<ul>
+<li><strong>Wrong neighbour order.</strong> The checker wants N, S, E, W: <em>"neighbors of (1, 1) are (1, 2) then (2, 1), checking N, S, E, W"</em>.</li>
+<li><strong>Marking squares as seen when you take them out instead of when you put them in.</strong> The same square then joins the queue many times. It still works, but slowly. Add to <code>came_from</code> as soon as you discover a square.</li>
+<li><strong>Forgetting to reverse the path</strong>, so it starts at the goal. Check: <em>"the path must start at the start and end at the goal"</em>.</li>
+<li><strong>Returning <code>[]</code> or crashing when there's no route.</strong> Return <code>None</code>: <em>"a boxed-in robot should get None"</em>.</li>
+<li><strong>Using <code>queue.pop()</code> instead of <code>popleft()</code>.</strong> <code>pop()</code> takes from the back, which turns BFS into a different search (depth-first) that doesn't promise the shortest route.</li>
+</ul>
+
+<h2 id="check">8. Check yourself</h2>
+<details><summary>Why does BFS always find a shortest route?</summary><p>It handles all squares at distance 1 before any at distance 2, and so on. So the first time it reaches the goal, it's through the smallest possible number of steps.</p></details>
+<details><summary>Predict: what does <code>bfs_path(ROOM, (1, 1), (1, 1))</code> return?</summary><p><code>[(1, 1)]</code>. The first square taken off the queue is already the goal, and the path is just the start: zero steps.</p></details>
+<details><summary>What does <code>f = g + h</code> mean in plain words?</summary><p>"Steps I've already taken to get here, plus an optimistic guess of the steps left." It's the best total this route could possibly have.</p></details>
+<details><summary>Why must the heuristic never overestimate?</summary><p>If it overestimated, A* might put off the square that's actually on the best route because it looked too expensive, and finish with a longer route. Manhattan distance can't overestimate on a grid where you only move N/S/E/W.</p></details>
+<details><summary>Predict: <code>path_to_commands([(3, 3), (3, 2), (2, 2)])</code>?</summary><p><code>"NW"</code>. y went from 3 to 2 (up, so N), then x went from 3 to 2 (W).</p></details>
+
+<h2 id="more">9. Go deeper (optional)</h2>
+<ul>
+<li><a href="../17-free-ai-curriculum.html#robotics">Free robotics courses</a>: motion planning is a whole subject, from grids like this to robot arms with many joints.</li>
+<li><a href="../06-30u30/18-pointer-networks.html">Day 18 · Pointer Networks</a>: a neural network that learns to produce routes for problems like the travelling salesman, instead of searching.</li>
+<li><a href="../06-30u30/21-message-passing.html">Day 21 · Message Passing</a>: neural networks that work on graphs, passing information between neighbours, much like the ripple in BFS.</li>
+</ul>
+
+<nav class="pager">
+  <a href="05-evaluation.html"><small>Previous</small>Lesson 5 · Is it any good?</a>
+  <a class="next" href="07-trial-and-error.html"><small>Next</small>Lesson 7 · Q-learning</a>
+</nav>
+<footer>Build a Robot Brain · Week 4 · Lesson 6</footer>
+</main>
+
+<script>
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+// Same data as world.py
+const ROOM = [
+  "##########",
+  "#........#",
+  "#..##....#",
+  "#..#.....#",
+  "#....##..#",
+  "#........#",
+  "#.#....B.#",
+  "##########",
+];
+const DIRS = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] };
+const key = p => p[0] + ',' + p[1];
+const manhattan = (a, b) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
+function findBin(room) {
+  for (let y = 0; y < room.length; y++) { const x = room[y].indexOf('B'); if (x !== -1) return [x, y]; }
+  return null;
+}
+function isFree(room, [x, y]) {
+  if (y < 0 || y >= room.length || x < 0 || x >= room[0].length) return false;
+  return room[y][x] !== '#';
+}
+function neighbors(room, pos, blocked) {
+  const out = [];
+  for (const d of 'NSEW') {
+    const p = [pos[0] + DIRS[d][0], pos[1] + DIRS[d][1]];
+    if (isFree(room, p) && !blocked.has(key(p))) out.push(p);
+  }
+  return out;
+}
+function walkBack(cameFrom, cur) {
+  const path = [];
+  while (cur) { path.push(cur); cur = cameFrom.get(key(cur)); }
+  return path.reverse();
+}
+// Both searches return {path, order, frontiers}: order = squares taken off the queue, in order.
+function bfs(room, start, goal, blocked) {
+  const queue = [start], cameFrom = new Map([[key(start), null]]), order = [], frontiers = [];
+  while (queue.length) {
+    const cur = queue.shift();
+    order.push(cur);
+    if (key(cur) === key(goal)) { frontiers.push(queue.slice()); return { path: walkBack(cameFrom, cur), order, frontiers }; }
+    for (const n of neighbors(room, cur, blocked)) if (!cameFrom.has(key(n))) { cameFrom.set(key(n), cur); queue.push(n); }
+    frontiers.push(queue.slice());
+  }
+  return { path: null, order, frontiers };
+}
+// heapq order: compare (f, g, x, y) tuples
+const less = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2][0] - b[2][0] || a[2][1] - b[2][1];
+function astar(room, start, goal, blocked) {
+  const frontier = [[manhattan(start, goal), 0, start]], cameFrom = new Map([[key(start), null]]);
+  const cost = new Map([[key(start), 0]]), order = [], frontiers = [];
+  while (frontier.length) {
+    let bi = 0;
+    for (let i = 1; i < frontier.length; i++) if (less(frontier[i], frontier[bi]) < 0) bi = i;
+    const [, g, cur] = frontier.splice(bi, 1)[0];
+    if (g > cost.get(key(cur))) continue;
+    order.push(cur);
+    if (key(cur) === key(goal)) { frontiers.push(frontier.map(e => e[2])); return { path: walkBack(cameFrom, cur), order, frontiers }; }
+    for (const n of neighbors(room, cur, blocked)) {
+      const ng = g + 1;
+      if (ng < (cost.has(key(n)) ? cost.get(key(n)) : Infinity)) {
+        cost.set(key(n), ng); cameFrom.set(key(n), cur);
+        frontier.push([ng + manhattan(n, goal), ng, n]);
+      }
+    }
+    frontiers.push(frontier.map(e => e[2]));
+  }
+  return { path: null, order, frontiers };
+}
+function pathToCommands(path) {
+  const names = {}; for (const d in DIRS) names[DIRS[d].join(',')] = d;
+  let s = '';
+  for (let i = 1; i < path.length; i++) s += names[(path[i][0] - path[i - 1][0]) + ',' + (path[i][1] - path[i - 1][1])];
+  return s;
+}
+
+const GOAL = findBin(ROOM), CELL = 60;
+let start = [1, 1], boxes = new Set(), run = null, shown = 0, timer = null, mode = 'box';
+const cv = document.getElementById('gcv'), ctx = cv.getContext('2d');
+
+function draw() {
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const done = run ? run.order.slice(0, shown) : [], doneSet = new Set(done.map(key));
+  const front = run && shown ? new Set(run.frontiers[shown - 1].map(key)) : new Set();
+  for (let y = 0; y < ROOM.length; y++) for (let x = 0; x < ROOM[0].length; x++) {
+    const X = x * CELL, Y = y * CELL, k = key([x, y]);
+    if (ROOM[y][x] === '#') { ctx.fillStyle = css('--muted'); ctx.fillRect(X, Y, CELL, CELL); continue; }
+    ctx.fillStyle = css('--card'); ctx.fillRect(X, Y, CELL, CELL);
+    if (doneSet.has(k)) { ctx.fillStyle = css('--accent-soft'); ctx.fillRect(X, Y, CELL, CELL); }
+    else if (front.has(k)) { ctx.fillStyle = css('--warn-soft'); ctx.fillRect(X, Y, CELL, CELL); }
+    ctx.strokeStyle = css('--line'); ctx.strokeRect(X, Y, CELL, CELL);
+    if (boxes.has(k)) { ctx.fillStyle = css('--warn'); ctx.fillRect(X + 12, Y + 12, CELL - 24, CELL - 24); }
+  }
+  ctx.font = '13px sans-serif'; ctx.fillStyle = css('--fg');
+  done.forEach((p, i) => ctx.fillText(i + 1, p[0] * CELL + CELL - 14, p[1] * CELL + 12));
+  if (run && run.path && shown === run.order.length) {
+    ctx.strokeStyle = css('--accent'); ctx.lineWidth = 4; ctx.beginPath();
+    run.path.forEach((p, i) => { const X = p[0] * CELL + CELL / 2, Y = p[1] * CELL + CELL / 2; i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); });
+    ctx.stroke(); ctx.lineWidth = 1;
+  }
+  ctx.font = 'bold 22px sans-serif';
+  ctx.fillStyle = css('--fail'); ctx.fillText('B', GOAL[0] * CELL + CELL / 2, GOAL[1] * CELL + CELL / 2 + 4);
+  ctx.fillStyle = css('--pass'); ctx.fillText('R', start[0] * CELL + CELL / 2, start[1] * CELL + CELL / 2 + 4);
+}
+
+function stats() {
+  const fin = run && shown === run.order.length;
+  document.getElementById('galg').textContent = run ? run.name : '–';
+  document.getElementById('gexp').textContent = run ? shown + (fin ? '' : ' …') : '–';
+  document.getElementById('glen').textContent = !fin ? '–' : run.path ? (run.path.length - 1) + ' steps' : 'no route';
+  document.getElementById('gcmd').textContent = fin && run.path ? pathToCommands(run.path) || '(already there)' : '–';
+  draw();
+}
+function stop() { if (timer) clearInterval(timer); timer = null; }
+function start_(name) {
+  stop();
+  const r = (name === 'BFS' ? bfs : astar)(ROOM, start, GOAL, boxes);
+  run = Object.assign(r, { name }); shown = 0; stats();
+  timer = setInterval(() => { if (shown < run.order.length) { shown++; stats(); } else stop(); }, 120);
+}
+document.getElementById('runbfs').onclick = () => start_('BFS');
+document.getElementById('runastar').onclick = () => start_('A*');
+document.getElementById('stepbtn').onclick = () => {
+  stop();
+  if (!run) { run = Object.assign(bfs(ROOM, start, GOAL, boxes), { name: 'BFS' }); shown = 0; }
+  if (shown < run.order.length) shown++;
+  stats();
+};
+document.getElementById('clearbtn').onclick = () => { stop(); boxes = new Set(); run = null; stats(); };
+document.querySelectorAll('input[name="mode"]').forEach(r => r.onchange = () => { mode = r.value; });
+cv.onclick = e => {
+  const r = cv.getBoundingClientRect();
+  const x = Math.floor((e.clientX - r.left) * cv.width / r.width / CELL), y = Math.floor((e.clientY - r.top) * cv.height / r.height / CELL);
+  if (!isFree(ROOM, [x, y])) return;
+  const k = key([x, y]);
+  if (mode === 'start') { if (!boxes.has(k)) start = [x, y]; }
+  else if (k !== key(start) && k !== key(GOAL)) { if (boxes.has(k)) boxes.delete(k); else boxes.add(k); }
+  stop(); run = null; stats();
+};
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+stats();
+</script>
+</body>
+</html>

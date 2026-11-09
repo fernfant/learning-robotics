@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video 05 · On-policy distillation</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 12 · Training &amp; inference videos</a> › Video 05</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 12 · Video 05</div>
+<h1>On-policy distillation: small models learning from their own mistakes</h1>
+<p class="lede">Ordinary distillation trains a small model on text the big model wrote. Then, at test time, the small model has to continue from its own text, which it never practised on. On-policy distillation fixes this mismatch. The student writes, the teacher grades every token of what the student wrote, and the student learns from that dense feedback. This guide follows the video's path from soft targets to exposure bias, reinforcement learning, the KL-direction question and the applications.</p>
+
+<div class="facts">
+  <div><b>Video length</b>30:34</div>
+  <div><b>Published</b>15 July 2026</div>
+  <div><b>Level</b>Intermediate: softmax, cross-entropy and the idea of a policy gradient</div>
+  <div><b>Builds on</b><a href="../04-distill-small-models.html#distill">Module 04 · Distillation</a>, <a href="../07-post-training.html#kl">Module 07 · The KL leash</a>, <a href="../02-tensortonic.html#rl">Module 02 · RL ladder</a></div>
+</div>
+<p class="meta">Video by Jia-Bin Huang · <a href="https://www.youtube.com/watch?v=YH0YXgDWZXA">Watch on YouTube</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">A small AI can learn by copying a big AI's answers. But copying perfect answers doesn't teach it what to do after it makes a mistake. In on-policy distillation the small AI writes its own answer, and the big AI marks every word: good, okay or wrong turn. The small AI learns from its own attempts, with detailed marks.</p>
+
+<h3>Think of it like this</h3>
+<p>Learning to ride a bike by watching videos of a champion only shows you a perfect ride. The first time you wobble, you've never seen a wobble before, so you fall. A good coach does something different: you ride, and they jog alongside saying "lean left now", "too fast here", "good". You practise on <em>your</em> wobbles, with tips at every moment. A coach who only says "you fell" at the end is like reinforcement learning: honest, but not much help in knowing what went wrong.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Start with a small "student" model that already knows the basics, often after first copying the teacher's answers.</li>
+<li>The student writes answers to practice questions by itself.</li>
+<li>The big "teacher" model reads each answer and says, word by word, how likely it would have been to write that word.</li>
+<li>Words the teacher strongly disagrees with get pushed down; words it agrees with get pushed up.</li>
+<li>Repeat. The student gets better at exactly the situations it actually gets itself into.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Robots make small mistakes all the time: a gripper slips, a wheel skids. A robot that only ever copied perfect demonstrations doesn't know how to recover, so one small error grows into a big one. Robotics researchers met this problem first, and the fix (let the learner act, and have an expert say what it should have done) is the same idea as on-policy distillation.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Draw a simple shape from memory after looking at a perfect example. Then draw it again while a friend says "good" or "not that way" at each line. Which drawing improves faster over three tries?</li>
+<li>In the demo further down, move <b>Mode separation</b> up and watch the two student fits split apart: the forward-KL student stretches to cover both teacher bumps, and the reverse-KL student picks one. Change <b>Left-mode weight</b> to see which bump the reverse-KL student chooses.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Teacher and student</dt><dd>The big model that knows the task, and the small model learning from it.</dd>
+<dt>Soft targets</dt><dd>The teacher's full set of probabilities for every possible next word, not just its top pick.</dd>
+<dt>On-policy</dt><dd>Learning from data the learner itself produced, rather than data someone else produced.</dd>
+<dt>Exposure bias</dt><dd>The gap between training on perfect text and having to continue your own imperfect text at test time.</dd>
+<dt>KL divergence</dt><dd>A measure of how different two probability distributions are. It isn't symmetric, so the order matters.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="watch">1. Watch</h2>
+<div class="card"><div style="position:relative;padding-top:56.25%"><iframe style="position:absolute;inset:0;width:100%;height:100%;border:0" src="https://www.youtube-nocookie.com/embed/YH0YXgDWZXA" title="How Small Models Learn to Think Like Giants · On-Policy Distillation (Jia-Bin Huang)" loading="lazy" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div></div>
+
+<h3>Chapter guide</h3>
+<div class="table-wrap"><table>
+<tr><th>Time</th><th>Chapter</th><th>What to look for</th></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=YH0YXgDWZXA&amp;t=0s">0:00</a></td><td>Why Distillation Matters</td><td>The motivation: small models are cheaper, faster and can run locally, but are hard to train to high quality directly.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=YH0YXgDWZXA&amp;t=88s">1:28</a></td><td>Soft Targets and Dark Knowledge</td><td>Hinton-style distillation: matching the teacher's whole softened distribution, and why the small probabilities on wrong answers carry information.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=YH0YXgDWZXA&amp;t=251s">4:11</a></td><td>From One Token to Many Tokens</td><td>Going from one prediction to sequences: token-level distillation (match the teacher at every position) versus sequence-level distillation (train on the teacher's generated outputs).</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=YH0YXgDWZXA&amp;t=570s">9:30</a></td><td>Exposure Bias</td><td>Why training on teacher-written prefixes leaves the student unprepared for its own prefixes, and how errors compound over long outputs.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=YH0YXgDWZXA&amp;t=731s">12:11</a></td><td>On-Policy Reinforcement Learning</td><td>RL trains on the student's own samples (fixing the mismatch), but a single reward per sequence is sparse feedback.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=YH0YXgDWZXA&amp;t=848s">14:08</a></td><td>On-Policy Distillation</td><td>The combination: student-generated samples, graded densely by the teacher at every token.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=YH0YXgDWZXA&amp;t=999s">16:39</a></td><td>Why the KL Direction Matters</td><td>Forward KL (mode-covering) versus reverse KL (mode-seeking), and why the reverse direction suits a small student imitating a big teacher. The demo below shows this.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=YH0YXgDWZXA&amp;t=1144s">19:04</a></td><td>Applications and Empirical Results</td><td>The overview of where on-policy distillation has been reported to help.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=YH0YXgDWZXA&amp;t=1230s">20:30</a></td><td>Application 1: Reasoning</td><td>Distilling maths reasoning into a smaller model, compared with more supervised fine-tuning or RL, and the compute each needs.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=YH0YXgDWZXA&amp;t=1363s">22:43</a></td><td>Application 2: Personalization</td><td>Teaching a model new domain knowledge, then using distillation to restore behaviours (like instruction following) that the new training damaged.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=YH0YXgDWZXA&amp;t=1487s">24:47</a></td><td>Application 3: Data Reuse</td><td>Why training many times on the same prompts works better with distillation than with RL, which tends to memorise answers.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=YH0YXgDWZXA&amp;t=1552s">25:52</a></td><td>On-Policy Self-Distillation for Reasoning</td><td>Variants where the teacher is the model itself under different conditions. Watch for what gives the "teacher" copy its advantage.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=YH0YXgDWZXA&amp;t=1755s">29:15</a></td><td>On-Policy Self-Distillation for Continual Learning</td><td>Using a model (or an earlier copy of it) as its own teacher so that learning new things doesn't erase old skills.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=YH0YXgDWZXA&amp;t=1804s">30:04</a></td><td>Recap</td><td>The two-by-two picture: who generates the data (teacher or student) and how dense the feedback is.</td></tr>
+</table></div>
+<p class="meta">The video's description doesn't list references. The sources below are the original papers behind each chapter's topic. The three application titles match the sections of Thinking Machines Lab's "On-Policy Distillation" post, which makes it the natural companion reading.</p>
+
+<h2 id="ideas">2. The ideas, explained</h2>
+
+<h3 id="soft">Soft targets and dark knowledge</h3>
+<p>Hinton, Vinyals and Dean (2015) trained a small model to match a large model's (or an ensemble's) output probabilities instead of only the hard labels. The teacher's logits z are softened with a temperature T so that small probabilities become visible, and the student is trained on a mix of the soft-target loss and the usual hard-label loss:</p>
+<pre><code>p_T(i) = exp(z_i / T) / Σ_j exp(z_j / T)          (teacher, softened)
+L = α · T² · KL(p_T^teacher ‖ p_T^student)  +  (1 − α) · CE(y, p_1^student)</code></pre>
+<p>The T² factor keeps the soft-target gradients on a similar scale as T changes. The information in the wrong-answer probabilities (an image of a 2 that looks a bit like a 3 and a bit like a 7) is often called dark knowledge. It tells the student how the teacher generalises, which hard labels can't.</p>
+
+<h3 id="seq">From one token to many: token-level and sequence-level distillation</h3>
+<p>For a language model, the "label" is a whole sequence. Two classic options:</p>
+<ul>
+<li><strong>Token-level (word-level) distillation:</strong> on a fixed sequence (ground truth or teacher-generated), match the teacher's next-token distribution at every position.</li>
+<li><strong>Sequence-level distillation</strong> (Kim and Rush, 2016): generate outputs with the teacher (they used beam search) and train the student on them with ordinary cross-entropy. This approximates matching the teacher's distribution over whole sequences, and their best student ran 10× faster than its teacher with little loss in quality.</li>
+</ul>
+<pre><code>token-level:     L = Σ_t KL( p_teacher(· | y_&lt;t, x) ‖ q_θ(· | y_&lt;t, x) ),   y fixed
+sequence-level:  L = − Σ_t log q_θ(ŷ_t | ŷ_&lt;t, x),   ŷ ~ teacher</code></pre>
+<p>Supervised fine-tuning on outputs written by a stronger model (as with many open reasoning datasets) is sequence-level distillation. Both forms are <em>off-policy</em>: the prefixes y<sub>&lt;t</sub> come from the data or the teacher, never from the student.</p>
+
+<h3 id="exposure">Exposure bias</h3>
+<p>At training time the student always conditions on a "good" prefix. At inference it conditions on its own, possibly flawed, prefix. One early slip puts it in a state it never trained on, where it is more likely to slip again. Bengio et al. (2015) proposed scheduled sampling, gradually feeding the model its own predictions during training. The same problem was formalised years earlier in imitation learning by Ross, Gordon and Bagnell (2011): a policy trained only on expert states can see its errors grow quadratically with the horizon T, and their algorithm DAgger fixes this by running the learner's policy, asking the expert to label the states the learner actually visits, and training on the growing dataset. On-policy distillation is DAgger for language models, with the teacher's full distribution as the label.</p>
+<pre><code>behaviour cloning:   error can grow like  O(ε · T²)
+DAgger (on-policy):  error grows like     O(ε · T)       (Ross et al., 2011)</code></pre>
+
+<h3 id="rl">On-policy reinforcement learning</h3>
+<p>RL also trains on the student's own samples, so it doesn't suffer exposure bias. The catch is feedback density: a verifier says "correct" or "wrong" once per sequence, so a 2,000-token solution gets one number, with no indication of which step went wrong. Thinking Machines' post puts it as RL teaching O(1) bits per episode, against O(N) bits for distillation, where N is the number of tokens. The policy-gradient machinery (REINFORCE, baselines, PPO, GRPO) is covered in <a href="06-grpo.html">Video 06</a> and <a href="../06-30u30/29-ppo.html">30u30 Day 29</a>.</p>
+
+<h3 id="opd">On-policy distillation</h3>
+<p>Agarwal et al. (Google DeepMind, 2023) introduced Generalized Knowledge Distillation (GKD; the arXiv title is "On-Policy Distillation of Language Models: Learning from Self-Generated Mistakes"). The student is trained on its own sampled outputs, with the teacher's token-level distribution as the target, and the divergence can be chosen freely:</p>
+<pre><code>GKD:  L(θ) = (1 − λ) · E_{(x,y) ~ data}[ D(p_T ‖ q_θ)(y | x) ]
+           +      λ  · E_{x ~ X, y ~ q_θ(·|x)}[ D(p_T ‖ q_θ)(y | x) ]
+
+D(p_T ‖ q_θ)(y|x) = (1/|y|) Σ_t D( p_T(· | y_&lt;t, x) ‖ q_θ(· | y_&lt;t, x) )
+D ∈ { forward KL, reverse KL, generalised JSD(β) }</code></pre>
+<p>λ is the fraction of student-generated data; λ = 1 is fully on-policy. Gradients aren't taken through the sampling step, which keeps training stable and cheap. The paper reports gains on summarisation, translation and arithmetic reasoning, and shows the same loss can be added to RL fine-tuning. MiniLLM (Gu, Dong, Wei and Huang, 2023) reached a related recipe from the reverse-KL side, deriving an on-policy policy-gradient optimisation of sequence-level reverse KL.</p>
+<p>Thinking Machines Lab's post (Kevin Lu and colleagues, October 2025) uses the simplest version: per-token reverse KL on student samples, implemented as RL with the reward set to the negative KL and a discount of zero:</p>
+<pre><code>sample y ~ π_θ(· | x)                                   (student rollout)
+advantage_t = −( log π_θ(y_t | y_&lt;t, x) − log π_teacher(y_t | y_&lt;t, x) )
+update π_θ with the usual importance-sampled policy-gradient loss</code></pre>
+<p>Only one teacher forward pass per rollout is needed, rollouts can be partial, and no reward model is required. The post describes it as a small change to an RL loop with a KL penalty: swap the reference model for the teacher.</p>
+
+<h3 id="sec-kl">Why the KL direction matters</h3>
+<pre><code>forward KL   KL(p ‖ q) = E_{y~p}[ log p(y) − log q(y) ]   samples from the teacher
+reverse KL   KL(q ‖ p) = E_{y~q}[ log q(y) − log p(y) ]   samples from the student</code></pre>
+<p>Forward KL punishes the student heavily wherever the teacher has mass and the student doesn't, so the student spreads out to cover everything the teacher might do: <strong>mode-covering</strong>. A small student that can't represent all the teacher's modes ends up putting mass in the gaps between them, which for text means bland or incoherent mixtures. Reverse KL punishes the student wherever <em>it</em> has mass and the teacher doesn't, so it concentrates on what it can do well: <strong>mode-seeking</strong>. That suits a low-capacity student, and the expectation is over the student's own samples, which is what makes it naturally on-policy. The trade-off is lower diversity; GKD's generalised JSD(β) interpolates between the two. Thinking Machines adds that per-token reverse KL is hard to "hack", since low KL to the teacher means behaviour the teacher itself finds likely.</p>
+
+<div class="card demo">
+<h3>Interactive: forward vs reverse KL on a two-bump teacher</h3>
+<p class="legend">The teacher (filled) is a mix of two bell curves of width 1. The student can only be a single bell curve. Dashed: the student that minimises forward KL(teacher ‖ student). Solid: the student that minimises reverse KL(student ‖ teacher), found by a grid search over mean and width.</p>
+<canvas id="kl" width="700" height="260" aria-label="A bimodal teacher distribution with the best single-Gaussian fits under forward and reverse KL"></canvas>
+<label for="sp">Mode separation: <span id="spv" class="num"></span></label>
+<input id="sp" type="range" min="0" max="8" step="0.5" value="6">
+<label for="wt">Left-mode weight: <span id="wtv" class="num"></span></label>
+<input id="wt" type="range" min="0.5" max="0.9" step="0.05" value="0.6">
+<div class="stats">
+  <div class="stat"><div class="k">Forward-KL fit (mean, width)</div><div class="v" id="sf">–</div></div>
+  <div class="stat"><div class="k">Reverse-KL fit (mean, width)</div><div class="v" id="sr">–</div></div>
+  <div class="stat"><div class="k">Teacher density at forward fit's peak</div><div class="v" id="pf">–</div></div>
+  <div class="stat"><div class="k">Teacher density at reverse fit's peak</div><div class="v" id="pr">–</div></div>
+</div>
+<p class="meta">Try this: at the defaults (separation 6, left weight 0.6) the forward-KL student has mean −0.6 and width about 3.1, so its peak sits in the valley between the bumps, where the teacher has only about 6% of its peak density. The reverse-KL student locks onto the heavier left bump (mean −3.0, width 1.0), where the teacher is at full density. Drop separation to 2 and the two fits agree (mean −0.2, width 1.4), because the teacher is effectively one bump. "Teacher density" is relative to the teacher's highest point. The forward fit is exact (it matches the teacher's mean and variance); the reverse fit is a grid search, so values are to 0.1 in mean and 0.05 in width.</p>
+</div>
+
+<h3 id="apps">Applications and empirical results</h3>
+<p>All numbers in this section are as reported by Thinking Machines Lab's post, which in turn draws on the Qwen3 technical report for one comparison. They are the authors' measurements in specific setups, not general laws.</p>
+<ul>
+<li><strong>Reasoning.</strong> The post quotes the Qwen3 report: from the same off-policy-distilled starting point, RL reached 67.6% on AIME'24 using 17,920 GPU hours, while on-policy distillation reached 74.4% using 1,800 GPU hours. In its own replication (Qwen3-8B-Base student, starting from a 400k-prompt SFT checkpoint at 60%), on-policy distillation reached about 70% in roughly 150 steps, which the post estimates as 9–30× cheaper than continuing SFT to the same score.</li>
+<li><strong>Personalisation.</strong> Mid-training Qwen3-8B on internal company documents raised an internal-knowledge score but lowered instruction following (IF-eval), and no data mix fully preserved it. Running on-policy distillation afterwards, with the original Qwen3-8B as teacher on general chat prompts, brought IF-eval from 79% back to 83% (the original was 85%) while keeping the new knowledge.</li>
+<li><strong>Data reuse.</strong> Training repeatedly on a single maths prompt (20 steps of 256 rollouts) approximately matched the teacher's AIME'24 score. With RL, repeated epochs on the same prompt tend to memorise the final answer; the distillation target is a whole distribution, so it doesn't collapse the same way.</li>
+<li><strong>Dense versus sparse.</strong> Distilling an RL-trained teacher back into its own base model recovered the teacher's performance in about 7–10× fewer gradient steps than the RL run took, which the post estimates as 50–100× less compute overall.</li>
+</ul>
+<p>A practical caveat from the same post: on-policy distillation works best when the student already puts some probability on what the teacher would do, which is why the experiments start from an SFT or mid-trained checkpoint. Reverse KL can only sharpen within the student's existing support; SFT (forward KL) is what adds new support.</p>
+
+<h3 id="self">On-policy self-distillation</h3>
+<p>The last two chapters cover self-distillation, where the teacher is the same model (or a copy of it) rather than a bigger one. The video's description doesn't name the specific papers, so this guide stays general. The common idea is that some version of the model has an advantage the student version lacks: an earlier checkpoint that still has a skill, or the same weights given extra context the student won't have at test time. The student is trained on its own samples to match that teacher token by token. Thinking Machines' personalisation result is one concrete case for continual learning: the earlier Qwen3-8B acted as teacher to restore what fine-tuning had erased, and the post suggests alternating "learn new data" and "distil old behaviour back" phases. It also reports that plain SFT on a model's own samples still degraded instruction following in its tests, which it takes as evidence that the on-policy, teacher-graded signal is what matters, not just training on self-generated text.</p>
+
+<h3 id="table">The two-by-two</h3>
+<div class="table-wrap"><table>
+<tr><th>Method</th><th>Who generates the training sequences</th><th>Feedback</th></tr>
+<tr><td>Supervised fine-tuning / sequence-level KD</td><td>Teacher or dataset (off-policy)</td><td>Dense: every token</td></tr>
+<tr><td>Token-level KD with soft targets</td><td>Teacher or dataset (off-policy)</td><td>Dense: full distribution per token</td></tr>
+<tr><td>RL with a verifier (PPO, GRPO)</td><td>Student (on-policy)</td><td>Sparse: one reward per sequence</td></tr>
+<tr><td>On-policy distillation (GKD, MiniLLM, Thinking Machines)</td><td>Student (on-policy)</td><td>Dense: teacher grades every token</td></tr>
+</table></div>
+
+<h2 id="course">3. Where the course goes deeper</h2>
+<div class="table-wrap"><table>
+<tr><th>Topic</th><th>Course page</th></tr>
+<tr><td>Teacher–student distillation in practice, and the privileged-teacher robotics version</td><td><a href="../04-distill-small-models.html#distill">Module 04 · Distillation deep dive</a></td></tr>
+<tr><td>Multi-teacher on-policy distillation in a frontier model (Kimi K3)</td><td><a href="../05-trillion-scale-architecture.html#serving">Module 05 · Serving</a></td></tr>
+<tr><td>SFT, preference tuning, the KL leash and RL with verifiable rewards</td><td><a href="../07-post-training.html#kl">Module 07 · KL</a>, <a href="../07-post-training.html#rlvr">Module 07 · RLVR</a></td></tr>
+<tr><td>Policy gradients, PPO and GRPO</td><td><a href="06-grpo.html">Video 06 · GRPO</a>, <a href="../06-30u30/29-ppo.html">30u30 Day 29 · PPO</a>, <a href="../02-tensortonic.html#rl">Module 02 · RL ladder</a></td></tr>
+<tr><td>DPO and preference methods (the KL-regularised view)</td><td><a href="../08-ai-research-engineer/05-alignment-preference.html">Module 08 · Stage 05</a></td></tr>
+<tr><td>Book-length treatment of post-training and RL for LLMs</td><td><a href="../11-three-book-path.html#raschka">Module 11 · Raschka</a>, <a href="../11-three-book-path.html#rlhf">Module 11 · RLHF book</a></td></tr>
+</table></div>
+
+<h2 id="robotics">Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>It's DAgger, which came from robotics.</strong> The compounding-error argument and the "let the learner act, have the expert label its states" fix come from imitation learning for control (Ross et al., 2011). On-policy distillation brings the same idea back to language models. If you've trained a robot policy with DAgger, you already know the algorithm.</li>
+<li><strong>Privileged teacher to deployable student.</strong> Legged-locomotion work trains a teacher in simulation with information real robots lack, then trains a sensor-only student (<a href="../04-distill-small-models.html#distill">Module 04</a>). Doing that student training on the student's own rollouts is on-policy distillation with a different reason for the teacher's advantage.</li>
+<li><strong>On-robot models must be small.</strong> Distilling a large VLA or language planner into something that fits robot compute is the obvious use. Reverse-KL, mode-seeking behaviour is arguably what you want for control: commit to one good way of grasping rather than averaging two grasps into a bad one in between. That last point is an analogy; the language-model results above don't test it.</li>
+<li><strong>Keep old skills while learning new ones.</strong> A robot fine-tuned on a new task often loses old ones. Distilling from the earlier checkpoint on old-task data, as in the personalisation result, is a candidate fix. Evidence in robotics specifically is thinner than in LLMs, so treat it as a promising technique rather than a solved problem.</li>
+</ul>
+</div>
+
+<h2 id="check">Self-check</h2>
+<details><summary>Why does a temperature T &gt; 1 help in Hinton-style distillation, and why multiply the loss by T²?</summary><p>Softening raises the small probabilities so the student can learn the teacher's relative preferences among wrong answers. Softening also shrinks the gradients by about 1/T², so the T² factor keeps the soft-target term's scale roughly constant as T changes.</p></details>
+<details><summary>Sequence-level distillation trains on teacher outputs. Why is it still affected by exposure bias?</summary><p>The student only ever conditions on teacher-written prefixes. At test time it conditions on its own, and an early deviation puts it in states it never trained on. The data is off-policy.</p></details>
+<details><summary>RL is on-policy too. What does on-policy distillation give you that RL with a correctness reward doesn't?</summary><p>Dense feedback. A verifier gives one number per sequence; the teacher gives a score at every token, so the student learns which step went wrong. Thinking Machines frames this as O(N) bits per episode against O(1).</p></details>
+<details><summary>A teacher has two equally likely, well-separated modes. Describe the best single-Gaussian student under forward KL and under reverse KL.</summary><p>Forward KL: mean between the modes, width large enough to cover both, so it puts a lot of mass where the teacher has almost none. Reverse KL: it sits on one mode with roughly that mode's width, ignoring the other.</p></details>
+<details><summary>In Thinking Machines' implementation, what is the per-token advantage, and what extra model does it need?</summary><p>The negative per-token reverse KL estimate: −(log π_student(y_t) − log π_teacher(y_t)) on the student's sampled token. It needs only the teacher's log-probabilities on the student's samples (one forward pass); no reward model.</p></details>
+<details><summary>Why does on-policy distillation usually start from an SFT checkpoint rather than a raw base model?</summary><p>Reverse KL on student samples can only sharpen behaviour the student already produces with some probability. If the student never samples the teacher's kind of output, there's nothing to reinforce. SFT (forward KL) first adds that support.</p></details>
+
+<h2 id="refs">References</h2>
+<p>The video's description lists no references. Primary sources for this guide:</p>
+<ul>
+<li><a href="https://arxiv.org/abs/2306.13649">On-Policy Distillation of Language Models: Learning from Self-Generated Mistakes (GKD)</a> (Agarwal, Vieillard, Zhou, Stanczyk et al., 2023)</li>
+<li><a href="https://thinkingmachines.ai/blog/on-policy-distillation/">On-Policy Distillation</a> (Kevin Lu and others, Thinking Machines Lab, October 2025)</li>
+<li><a href="https://arxiv.org/abs/2306.08543">MiniLLM: On-Policy Distillation of Large Language Models</a> (Gu, Dong, Wei, Huang, 2023)</li>
+<li><a href="https://arxiv.org/abs/1503.02531">Distilling the Knowledge in a Neural Network</a> (Hinton, Vinyals, Dean, 2015)</li>
+<li><a href="https://arxiv.org/abs/1606.07947">Sequence-Level Knowledge Distillation</a> (Kim, Rush, 2016)</li>
+<li><a href="https://arxiv.org/abs/1506.03099">Scheduled Sampling for Sequence Prediction with Recurrent Neural Networks</a> (Bengio, Vinyals, Jaitly, Shazeer, 2015)</li>
+<li><a href="https://arxiv.org/abs/1011.0686">A Reduction of Imitation Learning and Structured Prediction to No-Regret Online Learning (DAgger)</a> (Ross, Gordon, Bagnell, 2011)</li>
+<li><a href="https://arxiv.org/abs/2505.09388">Qwen3 Technical Report</a> (Qwen Team, 2025), source of the RL vs on-policy distillation comparison quoted above</li>
+</ul>
+
+<nav class="pager">
+  <a href="04-speculative-decoding.html"><small>Previous</small>Video 04 · Speculative decoding</a>
+  <a class="next" href="06-grpo.html"><small>Next</small>Video 06 · From REINFORCE to PPO to GRPO</a>
+</nav>
+<footer>Module 12 · Video 05 · a watch guide written for this course from the video's chapter list, its references and the original papers. Video © Jia-Bin Huang.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('kl'), ctx = cv.getContext('2d');
+const el = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+const N = (x, m, s) => Math.exp(-0.5 * ((x - m) / s) ** 2) / (s * Math.sqrt(2 * Math.PI));
+const DX = 0.05, XS = Array.from({ length: 481 }, (_, i) => -12 + i * DX);
+const teach = (d, w) => x => w * N(x, -d / 2, 1) + (1 - w) * N(x, d / 2, 1);
+const kl = (a, b) => XS.reduce((s, x) => { const u = a(x), v = b(x); return u > 1e-300 ? s + u * Math.log(u / Math.max(v, 1e-300)) * DX : s; }, 0);
+
+// forward KL over Gaussians = moment matching; reverse KL by grid search
+function fits(d, w) {
+  const p = teach(d, w);
+  const fm = w * (-d / 2) + (1 - w) * (d / 2), fs = Math.sqrt(1 + w * (1 - w) * d * d);
+  let best = [Infinity, 0, 1];
+  for (let m = -8; m <= 8 + 1e-9; m += 0.1) for (let s = 0.3; s <= 4 + 1e-9; s += 0.05) {
+    const r = kl(x => N(x, m, s), p); if (r < best[0]) best = [r, m, s];
+  }
+  return { p, fm, fs, rm: best[1], rs: best[2] };
+}
+
+function draw() {
+  const d = +el('sp').value, w = +el('wt').value;
+  el('spv').textContent = d.toFixed(1); el('wtv').textContent = w.toFixed(2);
+  const { p, fm, fs, rm, rs } = fits(d, w);
+  const W = cv.width, H = cv.height, l = 20, r = 20, t = 14, b = 26, X0 = -8, X1 = 8;
+  const px = x => l + (x - X0) / (X1 - X0) * (W - l - r);
+  const pk = Math.max(...XS.map(p), N(0, 0, fs), N(0, 0, rs));
+  const py = v => H - b - v / pk / 1.08 * (H - t - b);
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '12px sans-serif'; ctx.fillStyle = css('--muted'); ctx.strokeStyle = css('--line'); ctx.lineWidth = 1; ctx.textAlign = 'center';
+  ctx.beginPath(); ctx.moveTo(l, py(0)); ctx.lineTo(W - r, py(0)); ctx.stroke();
+  for (let x = X0; x <= X1; x += 2) ctx.fillText(x, px(x), H - 8);
+  ctx.globalAlpha = 0.3; ctx.fillStyle = css('--muted'); ctx.beginPath(); ctx.moveTo(px(X0), py(0));
+  for (let x = X0; x <= X1 + 1e-9; x += 0.05) ctx.lineTo(px(x), py(p(x)));
+  ctx.lineTo(px(X1), py(0)); ctx.fill(); ctx.globalAlpha = 1;
+  const curve = (m, s, col, dash) => {
+    ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.setLineDash(dash); ctx.beginPath();
+    for (let x = X0; x <= X1 + 1e-9; x += 0.05) x === X0 ? ctx.moveTo(px(x), py(N(x, m, s))) : ctx.lineTo(px(x), py(N(x, m, s)));
+    ctx.stroke(); ctx.setLineDash([]);
+  };
+  curve(fm, fs, css('--warn'), [7, 5]);
+  curve(rm, rs, css('--accent'), []);
+  const pmax = Math.max(...XS.map(p)), rel = x => Math.round(100 * p(x) / pmax) + '%';
+  const f1 = v => (Math.abs(v) < 0.05 ? 0 : v).toFixed(1);
+  el('sf').textContent = `${f1(fm)}, ${fs.toFixed(2)}`;
+  el('sr').textContent = `${f1(rm)}, ${rs.toFixed(2)}`;
+  el('pf').textContent = rel(fm); el('pr').textContent = rel(rm);
+}
+el('sp').oninput = draw; el('wt').oninput = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

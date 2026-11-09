@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>llm.c · Module 20</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 20 · From-scratch repos</a> › llm.c</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 20 · From-scratch code · 4 of 6</div>
+<h1>llm.c: GPT-2 training in plain C, with every gradient written by hand</h1>
+<p class="lede">No PyTorch, no autograd, no Python. One C file runs GPT-2's forward pass, works out every gradient by hand, and updates 124 million numbers. Next to it sits a PyTorch version that checks the C gets the same answers.</p>
+
+<div class="facts">
+  <div><b>Repo</b><a href="https://github.com/karpathy/llm.c">karpathy/llm.c</a></div>
+  <div><b>Licence</b>MIT</div>
+  <div><b>Stars</b>31,406 (7 Nov 2026, GitHub API)</div>
+  <div><b>Core code</b><code>train_gpt2.c</code> 1,182 lines (CPU, fp32), <code>test_gpt2.c</code> 195, PyTorch reference <code>train_gpt2.py</code> 860, CUDA mainline <code>train_gpt2.cu</code> 1,904 (counted with <code>wc -l</code>)</div>
+  <div><b>Status</b>Not marked deprecated. The README calls the CPU file "an even earlier checkpoint" and the fp32 CUDA files "legacy". Last commit 10 May 2025.</div>
+  <div><b>Needs</b>A C compiler. OpenMP for speed (optional). The GPU version needs an NVIDIA GPU and CUDA. Python + PyTorch only to rebuild the data files.</div>
+</div>
+<p class="meta">Tested at commit <code>f1e2ace</code> on 7–8 Nov 2026, on a MacBook with an Apple M4 (4 performance + 6 efficiency cores, 16 GB) and Apple clang 17. Short code excerpts are quoted with credit to Andrej Karpathy and the llm.c contributors (MIT).</p>
+
+<div class="toc">
+<strong>On this page</strong>
+<ol>
+<li><a href="#start">Start here (no maths needed)</a></li>
+<li><a href="#summary">Summary</a></li>
+<li><a href="#code">How the code works</a></li>
+<li><a href="#run">Run it, tested</a></li>
+<li><a href="#robohelper">Connect to Robo-Helper (Module 18): does it fit the time budget?</a></li>
+<li><a href="#robotics">Why it matters for robotics</a></li>
+<li><a href="#reality">Reality check</a></li>
+<li><a href="#check">Self-check</a></li>
+<li><a href="#reading">Further reading</a></li>
+</ol>
+</div>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Most AI code leans on a big helper library that does the hard calculus for it. llm.c throws the helper away and writes every single step by hand, in C. So you can see exactly what a language model does.</p>
+
+<h3>Think of it like this</h3>
+<p>Most people bake a cake from a packet mix: add eggs, stir, done. The packet hides what's inside. llm.c is like baking from scratch: you weigh the flour, sugar and butter yourself. It's more work, but you know what every ingredient does. And because nothing is hidden, a good baker can make it faster. PyTorch is the packet mix. llm.c is the from-scratch recipe, and it comes with the packet version next to it so you can check your cake tastes the same.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Load GPT-2's 124 million numbers from a file straight into one big block of memory.</li>
+<li><b>Forward pass:</b> push the text through each layer, one hand-written function per layer: layer norm, matrix multiply, attention, GELU, add back.</li>
+<li><b>Backward pass:</b> go through the same layers in reverse. Each one has a hand-written function that works out how much every number was to blame for the mistake.</li>
+<li>Nudge all the numbers a little (the AdamW optimiser), and repeat.</li>
+<li>A test program checks that the C answers match PyTorch's answers.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot's computer is often small, and it can't always run Python and a 200 MB library. C runs almost anywhere, from a laptop to a tiny board. Knowing what a model costs, step by step, tells you whether it can think fast enough to stop before it hits the cat.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Look at the step times in <a href="#run">Run it, tested</a>: about 3–4 seconds to train on just 4 short snippets of text. Then look at the Robo-Helper table: our tiny brain decides in about a fifth of a millisecond. How many times faster is that?</li>
+<li>Write the steps for making toast as a list. Now write them backwards, as "what went wrong?" checks (burnt → too long in the toaster → timer too high). That's what a backward pass does.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>C</dt><dd>An old, fast programming language that runs close to the hardware.</dd>
+<dt>Autograd</dt><dd>A library feature that works out gradients for you automatically. llm.c doesn't use one.</dd>
+<dt>Forward / backward pass</dt><dd>Running the model to get an answer, then running backwards to work out how to fix each number.</dd>
+<dt>Kernel</dt><dd>One small, fast function that does one job, like "layer norm" or "multiply these matrices".</dd>
+<dt>fp32 / bf16</dt><dd>Two ways to store a number: 32 bits (precise) or 16 bits (half the size, less precise).</dd>
+<dt>OpenMP</dt><dd>A way to split a C loop across several CPU cores at once.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version. On a first read, look at the real outputs in <a href="#run">Run it, tested</a> and the time-budget table in the Robo-Helper section, then come back.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>llm.c trains GPT-2 "in simple, pure C/CUDA with no need for 245MB of PyTorch or 107MB of cPython" (README). The CPU file <code>train_gpt2.c</code> is about 1,000 lines of fp32 code. Every layer has a forward function and a backward function written by hand, and <code>test_gpt2.c</code> checks them against the PyTorch reference <code>train_gpt2.py</code>. The CUDA mainline is mixed precision (bf16) and, per the README, "a bit faster than PyTorch Nightly (by about 7%)". On this M4, the CPU version fine-tuned GPT-2 (124M) on Tiny Shakespeare at 3–7 s per step. One forward pass for a 16-token command took about 60–110 ms, too slow for Robo-Helper's 0.2 s "stop!" budget once a plan needs 3 tokens.</p>
+</div>
+<ul>
+<li><strong>No autograd.</strong> <code>gpt2_forward</code> calls each layer in order. <code>gpt2_backward</code> calls the matching <code>*_backward</code> functions in reverse.</li>
+<li><strong>One block of memory.</strong> All 124,475,904 parameters live in a single <code>malloc</code>. So do all the activations, with pointers into it.</li>
+<li><strong>A parallel PyTorch reference</strong> writes the starting weights, the data and a "debug state" (inputs, expected logits, loss and gradients) for the C test.</li>
+<li><strong>Hand-written CUDA kernels</strong> live in <code>dev/cuda/</code>, from simple to fast, one file per layer (22 <code>.cu</code> files, including <code>attention_forward.cu</code> and <code>layernorm_backward.cu</code>). The mainline uses cuBLAS/cuDNN where they're faster.</li>
+<li><strong>Precision is a choice:</strong> the starter pack ships GPT-2 as fp32 (497.9 MB) and bf16 (249.0 MB), exactly half.</li>
+</ul>
+
+<h2 id="code">2. How the code works</h2>
+<p><code>train_gpt2.c</code> reads top to bottom like a textbook. First come the layer pairs: <code>encoder_forward/backward</code> (token + position embeddings), <code>layernorm_*</code>, <code>matmul_*</code>, <code>attention_*</code>, <code>gelu_*</code>, <code>residual_*</code>, <code>softmax_forward</code> and <code>crossentropy_*</code>. Then the <code>GPT2</code> struct, the forward and backward passes, <code>gpt2_update</code> (AdamW), a data loader, a sampler and <code>main</code>.</p>
+<p>The forward pass for one layer is just a list of calls. It's the same Block as nanoGPT's <code>x = x + attn(ln_1(x))</code>, spelled out:</p>
+<pre><code>// train_gpt2.c (MIT, Andrej Karpathy): inside gpt2_forward, one layer
+layernorm_forward(l_ln1, l_ln1_mean, l_ln1_rstd, residual, l_ln1w, l_ln1b, B, T, C);
+matmul_forward(l_qkv, l_ln1, l_qkvw, l_qkvb, B, T, C, 3*C);
+attention_forward(l_atty, l_preatt, l_att, l_qkv, B, T, C, NH);
+matmul_forward(l_attproj, l_atty, l_attprojw, l_attprojb, B, T, C, C);
+residual_forward(l_residual2, residual, l_attproj, B*T*C);</code></pre>
+<p>The idea that makes it click: <strong>the backward pass is the forward pass read in reverse, one line at a time</strong>. Every forward line of the form <code>out += a * b</code> becomes two backward lines, "a's gradient gets b × out's gradient" and "b's gradient gets a × out's gradient". The attention backward even keeps the forward line as a comment:</p>
+<pre><code>// train_gpt2.c: attention_backward, through the value accumulation
+// in the forward pass this was:
+// out_bth[i] += att_bth[t2] * value_t2[i];
+// so now we have:
+datt_bth[t2] += value_t2[i] * dout_bth[i];
+dvalue_t2[i] += att_bth[t2] * dout_bth[i];</code></pre>
+<p>That's exactly what you did by hand in Lesson 15's attention stretch, for one head and one query. llm.c does it for 12 heads, every position (with a causal loop <code>t2 &lt;= t</code>), 12 layers and a batch. To make the backward pass possible, the forward pass <em>saves</em> what it will need, such as the attention weights <code>att</code> and layer norm's <code>mean</code> and <code>rstd</code>. That's why the activation memory (73,347,840 floats for B=4, T=64) is about half the size of the model itself.</p>
+<p>OpenMP is the only speed trick in the CPU file. A line like <code>#pragma omp parallel for collapse(2)</code> above a loop splits it across cores. Without OpenMP, the pragmas are ignored and the code still runs, on one core.</p>
+
+<h2 id="run">3. Run it, tested</h2>
+<p>All commands were run on 7–8 Nov 2026 on a MacBook (Apple M4, 16 GB), in a scratch folder. Everything is <strong>CPU</strong>: llm.c's GPU code needs CUDA, which Macs don't have.</p>
+
+<h3>Starter pack: checked first, then a subset</h3>
+<p>The README's <code>download_starter_pack.sh</code> fetches 7 files. We checked their sizes with HTTP HEAD requests before downloading anything:</p>
+<pre><code>gpt2_124M.bin               497,904,640 bytes   (GPT-2 weights, fp32)
+gpt2_124M_bf16.bin          248,952,832         (same weights, bf16)
+gpt2_124M_debug_state.bin   549,369,860         (only for test_gpt2)
+gpt2_tokenizer.bin              372,108
+tiny_shakespeare_train.bin      611,544
+tiny_shakespeare_val.bin         66,560
+hellaswag_val.bin             3,762,386
+total                     ≈ 1.30 GB</code></pre>
+<p>That's over our 1 GB limit, so we skipped the script and downloaded only what <code>train_gpt2</code> needs: the fp32 weights, the tokenizer and Tiny Shakespeare (about 499 MB). That means <strong><code>test_gpt2</code> was not run</strong>: it needs the 549 MB debug state, which would have taken the total to about 1.05 GB. All the <code>.bin</code> files were deleted afterwards.</p>
+
+<h3>Build: the missing OpenMP, handled two ways</h3>
+<pre><code>$ make train_gpt2
+✗ nvcc not found, skipping GPU/CUDA builds
+✗ OpenMP not found
+cc -Ofast ... -march=native train_gpt2.c -lm -o train_gpt2</code></pre>
+<p>Apple's clang has no OpenMP library, and Homebrew's <code>libomp</code> wasn't installed. We didn't install anything system-wide. Instead:</p>
+<ol>
+<li><strong>Single-thread build:</strong> <code>make train_gpt2 NO_OMP=1</code>. It works, and uses one core.</li>
+<li><strong>Multi-thread build, no install:</strong> the PyTorch wheel in our scratch venv ships its own <code>libomp.dylib</code> and <code>omp.h</code>. We copied both into the scratch folder and compiled with the same flags the Makefile uses for Homebrew's libomp. The first attempt, linking straight to the copy inside PyTorch, failed at launch (<code>Library not loaded: /opt/llvm-openmp/lib/libomp.dylib</code>), because that library records a build path that doesn't exist on this Mac. Giving the copy an <code>@rpath</code> name fixed it:</li>
+</ol>
+<pre><code>cp venv/.../torch/lib/libomp.dylib venv/.../torch/include/omp.h omp/
+install_name_tool -id @rpath/libomp.dylib omp/libomp.dylib && codesign -f -s - omp/libomp.dylib
+clang -Ofast -march=native -Xclang -fopenmp -DOMP -Iomp train_gpt2.c \
+      -Lomp -lomp -Wl,-rpath,$PWD/omp -lm -o train_gpt2_omp</code></pre>
+
+<h3>Train: fine-tune GPT-2 (124M) on Tiny Shakespeare, 40 steps</h3>
+<pre><code>$ OMP_NUM_THREADS=8 ./train_gpt2_omp          # 7 Nov 2026 · MacBook (Apple M4) · CPU, 8 threads
+[GPT-2]
+max_seq_len: 1024
+vocab_size: 50257
+padded_vocab_size: 50304
+num_layers: 12
+num_heads: 12
+channels: 768
+num_parameters: 124475904
+train dataset num_batches: 1192
+val dataset num_batches: 128
+num_activations: 73347840
+val loss 5.325528
+step 0: train loss 4.677778 (took 3329.796000 ms)
+step 1: train loss 5.191575 (took 4559.297000 ms)
+...
+val loss 4.416557
+...
+val loss 4.329176
+generating:
+---
+I am pale and ill-smacking
+And just 'with the eyes;
+&lt;|endoftext|&gt;MONTAGUE:
+Fication
+Where we come, feast,
+...
+---
+...
+val loss 4.291537
+generating:
+---
+Being barren savour, grant
+Everyone, every man and woman,
+Is heir to his life in unwritten words:
+The Salmon of the family
+How would gentlerish words indeed bring them
+---
+step 40: train loss 3.953056 (took 3205.787000 ms)
+real 254.29</code></pre>
+<p>Val loss fell from 5.33 to 4.29 in 40 steps (batch 4 × 64 tokens, AdamW, learning rate 1e-4). The whole run, including two rounds of 63-token generation, took 4 min 14 s. Step times wandered between 2.9 and 7.0 s. With 8 threads on a chip with only 4 performance cores, some threads land on the slower efficiency cores.</p>
+<p>The same program with 4 threads took 2.9–4.3 s per step (first 10 steps). The single-thread <code>NO_OMP</code> build took 10.7, 11.5 and 11.3 s for steps 0–2. The losses were identical to 6 decimal places in all three builds. For comparison, the README's M3 Max run shows about 1.3–1.5 s per step with 8 threads, and slightly different starting losses (val 5.252026). We didn't find out why the starting losses differ. A different version of the starter-pack files is one possibility, but we didn't check.</p>
+<p><strong>One measurement we threw away:</strong> a first attempt at the 4-thread and single-thread timings overlapped with the Mac going to sleep, and printed steps "taking" 974 and 2,985 seconds. Those are sleep, not compute. We reran them under <code>caffeinate -i</code>.</p>
+
+<h3>Inference latency: our own small harness</h3>
+<p><code>train_gpt2</code> only times training steps. To time one forward pass at batch 1, we wrote a 50-line harness, <code>llmc_latency.c</code>. It does <code>#define TESTING</code> and then <code>#include "train_gpt2.c"</code>, exactly like the repo's own <code>test_gpt2.c</code>, then times <code>gpt2_forward</code> on T dummy tokens:</p>
+<pre><code>                                  T = 16 tokens            T = 64 tokens
+                                  p50       p95            p50       p95
+1 thread (NO_OMP build)           95.3 ms   113.4 ms       371.7 ms  412.1 ms
+OpenMP, 4 threads                 57.9 ms    81.5 ms       143.5 ms  160.1 ms
+OpenMP, 8 threads                 64.5 ms   129.4 ms       112.5 ms  190.7 ms
+OpenMP, 4 threads (second run)    88.1 ms   107.7 ms       258.7 ms  320.6 ms</code></pre>
+<p>The two 4-thread runs differ by up to 1.8×. The efficiency cores, heat and whatever else the Mac was doing all add noise, so treat these as a range, not one number.</p>
+
+<h2 id="robohelper">4. Connect to Robo-Helper (Module 18): does it fit the time budget?</h2>
+<p>Two Module 18 lessons meet here. <a href="../18-robot-brain/16-speed.html">Lesson 16, How fast is a brain?</a> says a brain only fits if its <em>p95</em> fits the budget: 0.2 s for "stop!". <a href="../18-robot-brain/17-faster.html">Lesson 17, Faster and cheaper</a> showed that storing numbers with fewer bits (quantising) makes a model smaller and faster.</p>
+
+<h3>The measurement</h3>
+<p>Could Robo-Helper run a GPT-2-sized brain on its own small computer? We took llm.c's CPU GPT-2 (124M) as the candidate and used Lesson 16's own functions (<code>time_it</code>, <code>summarize</code>, <code>thinking_distance</code>, <code>fits_budget</code>). One Robo-Helper decision is a short plan such as <code>put red &lt;end&gt;</code>, which is 3 tokens. llm.c's CPU code has no KV cache, so it reruns the whole sequence for every token: <strong>one decision = 3 forward passes</strong>. Note that GPT-2 has never been trained on robot commands. This is only about what a model of that size costs.</p>
+<pre><code>$ python3 llmc_budget.py          # 8 Nov 2026 · MacBook (Apple M4) · CPU, llm.c with 4 OpenMP threads
+brain                                          p50         p95       robot travels (p95, 1 m/s)  fits 0.2 s
+tinylm (Lesson 15, pure Python)                0.27 ms     0.37 ms       0.04 cm                  yes
+llm.c GPT-2 124M, 1 forward, T=16             88.10 ms   107.70 ms      10.77 cm                  yes
+llm.c GPT-2 124M, decision = 3 forwards, T=16  264.30 ms  323.10 ms     32.31 cm                  NO
+llm.c GPT-2 124M, 1 forward, T=64            258.70 ms   320.60 ms      32.06 cm                  NO
+llm.c GPT-2 124M, decision = 3 forwards, T=64  776.10 ms  961.80 ms     96.18 cm                  NO
+network round trip to Claude API (no thinking) 37.43 ms   135.62 ms     13.56 cm                  yes</code></pre>
+<p>For comparison, from the <a href="03-nanogpt.html#robohelper">nanoGPT page</a>: the 61K-parameter nanoGPT brain decided in 1.63 ms p95 on the CPU (6.45 ms on MPS). In the same script run, tinylm took 0.19 ms p95.</p>
+
+<h3>Which brain fits the robot's time budget?</h3>
+<ul>
+<li><strong>The tiny brains fit easily.</strong> tinylm and the nanoGPT brain decide in well under 10 ms, so the robot moves less than 1 cm while thinking.</li>
+<li><strong>GPT-2 (124M) in llm.c does not fit.</strong> A 3-token decision has a p95 of 323 ms in this run. Our best run gave about 3 × 81.5 ≈ 245 ms, still over 0.2 s. The robot rolls about a quarter to a third of a metre before it reacts. With a longer prompt (T = 64), even one forward pass misses the budget. And a robot's onboard computer may well be slower than an M4, although we didn't measure one.</li>
+<li><strong>The network row is only a lower bound.</strong> It's a bare HTTPS request to the Claude API host with no key and no model work (37 ms p50, 136 ms p95 over 10 tries). A real answer adds the model's thinking time on top. Lesson 16's page has no recorded Claude timings yet (the <code>recordings/</code> folder doesn't exist), so we can't give a real number for Claude here, and we haven't made one up.</li>
+<li><strong>So:</strong> "stop!" belongs to a tiny local brain. Big brains, local or in the cloud, are for planning a tidy-up, where a second of thinking is fine.</li>
+</ul>
+
+<h3>fp32 vs bf16, and our quantising lesson</h3>
+<p>llm.c's CPU file is all fp32: 4 bytes per number, so 124,475,904 × 4 = 497.9 MB, which matches the starter-pack file plus its 1,024-byte header. The CUDA mainline trains in bf16 (2 bytes), and the bf16 file is 249.0 MB, exactly half. That's the same trade as Lesson 17's slider. Lesson 17 went from 32-bit to 8 and 4 bits on our 2,225-number model and kept 100% test accuracy, but broke at 2 bits (75%). By the same sum, GPT-2 at 4 bits would be about 62 MB. We didn't test GPT-2's accuracy at 4 bits.</p>
+<p>The difference between bf16 and Lesson 17: bf16 is still a floating-point number (it keeps fp32's range and drops precision), while our quantiser rounds to a few whole numbers with a scale. On a CPU, fewer bytes mostly means less memory to read for every token, which is why quantised models are faster as well as smaller.</p>
+<p><strong>Next-step exercise.</strong> Run <code>llmc_budget.py</code> yourself (its header shows the build commands). Then answer with numbers: (1) How many tokens could GPT-2 write within 0.2 s on your machine? (2) If a KV cache made each extra token cost one position instead of the whole sequence, roughly how much would the T=16 decision shrink? (3) Lesson 17's quantised tinylm-4bit is a fraction of tinylm's size. Time both with <code>time_it</code>. Does fewer bits make pure Python faster, or only smaller? Why?</p>
+
+<h2 id="robotics">5. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Embedded deployment.</strong> Robot computers often run C/C++ with no Python. llm.c shows that a whole Transformer, forward and backward, fits in one dependency-free C file you could compile for an onboard computer.</li>
+<li><strong>Latency is measurable, line by line.</strong> When every layer is a plain loop, you can see where the time goes (matrix multiplies dominate) and decide what to shrink: fewer layers, fewer tokens, fewer bits.</li>
+<li><strong>Hand-written kernels are how real robot stacks get fast.</strong> The <code>dev/cuda/</code> folder shows the path from a simple kernel to a fast one, and the README compares them against cuBLAS. Onboard GPUs need the same skills.</li>
+<li><strong>Don't overclaim:</strong> llm.c is about GPT-2 training. It has no vision, no actions and no real-time scheduler, and the CPU version is a reference, not an optimised inference engine.</li>
+</ul>
+</div>
+
+<h2 id="reality">6. Reality check</h2>
+<ul>
+<li><strong>The CPU code is a teaching reference.</strong> The README describes it as an early checkpoint and warns that on CPU "you're not going to get that far". The real work happens in <code>train_gpt2.cu</code> on NVIDIA GPUs.</li>
+<li><strong>macOS:</strong> no CUDA, so only the CPU path runs. cuDNN flash attention is "not supported on MAC OS" (Makefile). OpenMP needs Homebrew's <code>libomp</code> or a workaround like ours. Without it, the code runs single-threaded and about 3× slower per step here.</li>
+<li><strong>More threads isn't always better</strong> on Apple's mix of performance and efficiency cores. Here, 8 threads gave noisier, sometimes slower, steps than 4.</li>
+<li><strong>No KV cache in the CPU sampler.</strong> The code's own comment says inference "is very wasteful here" because each new token recomputes everything.</li>
+<li><strong>Starter pack size:</strong> about 1.30 GB in all. The test needs the 549 MB debug state.</li>
+<li><strong>Repo activity:</strong> last commit May 2025. It isn't marked deprecated, but for new LLM training projects Karpathy's newer <a href="https://github.com/karpathy/nanochat">nanochat</a> (PyTorch) is where his work has moved.</li>
+</ul>
+
+<h2 id="check">7. Self-check</h2>
+<details><summary>What does "no autograd" mean in practice in llm.c?</summary><p>Every layer has a hand-written <code>*_backward</code> function, and <code>gpt2_backward</code> calls them in reverse order. Nothing records operations or works out derivatives automatically.</p></details>
+<details><summary>Why does the forward pass store things like <code>att</code>, <code>mean</code> and <code>rstd</code>?</summary><p>The backward pass needs them to compute gradients. That's why activation memory grows with batch size and sequence length.</p></details>
+<details><summary>How does llm.c prove the C code is right?</summary><p>The PyTorch reference <code>train_gpt2.py</code> writes a debug state (inputs, expected logits, loss and gradients). <code>test_gpt2.c</code> runs the C forward and backward on it, compares the results within a tolerance, and checks 10 training steps against PyTorch's losses.</p></details>
+<details><summary>Why did a 3-token GPT-2 decision miss the 0.2 s budget when one forward pass at T=16 fit?</summary><p>Without a KV cache, each new token reruns the whole forward pass, so a 3-token plan costs 3 forwards, about 245–323 ms p95 here, over 0.2 s.</p></details>
+<details><summary>How big is GPT-2 (124M) in fp32 vs bf16, and why exactly half?</summary><p>497.9 MB vs 249.0 MB. Same number of parameters, but 4 bytes each vs 2 bytes each.</p></details>
+
+<h2 id="reading">8. Further reading</h2>
+<ul>
+<li><a href="https://github.com/karpathy/llm.c">karpathy/llm.c</a> on GitHub, and its layer norm tutorial, <code>doc/layernorm/layernorm.md</code> in the repo</li>
+<li><a href="https://github.com/karpathy/llm.c/discussions/481">Discussion #481: reproducing GPT-2 (124M) in llm.c</a>, the README's recommended starting point</li>
+<li><a href="https://github.com/openai/gpt-2">OpenAI GPT-2</a> and the <a href="https://arxiv.org/abs/2005.14165">GPT-3 paper</a>, the two model series the repo reproduces</li>
+<li><a href="https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt">Tiny Shakespeare</a>, the dataset used above</li>
+<li><a href="https://huggingface.co/datasets/karpathy/llmc-starter-pack">llmc-starter-pack</a> on Hugging Face (check sizes before downloading)</li>
+<li>Back in this course: <a href="../18-robot-brain/16-speed.html">Lesson 16, How fast is a brain?</a> and <a href="../18-robot-brain/17-faster.html">Lesson 17, Faster and cheaper</a>; the PyTorch side of the same model on <a href="03-nanogpt.html">page 3, nanoGPT</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="03-nanogpt.html"><small>Back</small>3 · nanoGPT</a>
+  <a class="next" href="05-tinygrad.html"><small>Next</small>5 · tinygrad</a>
+</nav>
+<footer>Module 20 · llm.c · added 2026-11-07 · repo MIT-licensed, short excerpts quoted with credit</footer>
+</main>
+</body>
+</html>

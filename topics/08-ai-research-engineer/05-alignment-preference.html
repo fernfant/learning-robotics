@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stage 05 · Alignment &amp; preferences</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 08 · Research-engineer roadmap</a> › Stage 05</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 08 · Stage 05</div>
+<h1>Advanced alignment &amp; preference optimisation</h1>
+<p class="lede">Module 07 showed why preference data works and how DPO falls out of the KL-regularised objective. This stage goes past DPO: KTO learns from plain thumbs-up/thumbs-down labels, ORPO folds alignment into SFT, reward models get trained properly, and reward hacking gets measured and fought instead of just noticed.</p>
+
+<div class="facts">
+  <div><b>Prerequisites</b>SFT, log-probabilities, <a href="../07-post-training.html#pref">Module 07's DPO and KL leash</a>, basic PyTorch</div>
+  <div><b>Time</b>2–3 weeks part-time (about 25–40 h)</div>
+  <div><b>Hardware</b>Colab GPU for a 0.5B model with LoRA · one 80 GB GPU for the 7B version</div>
+  <div><b>Key papers</b>DPO (Rafailov et al., 2023) · KTO (Ethayarajh et al., 2024) · ORPO (Hong et al., 2024) · Reward over-optimisation (Gao et al., 2022)</div>
+</div>
+<p class="meta">Source: Suraj Sharma, <a href="https://x.com/suraj_sharma14/status/2112876560629825734">X post</a> (stage 5) · roadmap hub: <a href="index.html">Module 08</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">After a chatbot learns to talk, we teach it manners by showing it which of its own answers people liked and which they didn't.</p>
+
+<h3>Think of it like this</h3>
+<p>Imagine you're learning to cook for your family. First you copy recipes from a book. That's like the first stage of training. Then, every night, your family says "yum" or "yuck" about dinner. They don't tell you how to fix it. They just give a thumbs up or down. Over weeks, you cook the "yum" dishes more and the "yuck" dishes less. But you still keep the basic cooking skills from the recipe book. And if you notice your little brother says "yum" to anything with extra sugar, you'd better not just pour sugar on everything. That trick is called "reward hacking".</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Start with a model that already answers questions (it learned from examples).</li>
+<li>Let it write several answers to many questions.</li>
+<li>People (or a careful checking program) mark answers as good or bad, or say which of two is better.</li>
+<li>Nudge the model so good answers become more likely and bad ones less likely, but only a little, so it doesn't forget what it knew.</li>
+<li>Check that it really got better, not just better at fooling the judge.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot that tidies a room can be judged the same way. A person watches two tries and says which was better, or just says "good job" or "not like that". The robot can learn from those simple signals. It's much easier than writing down exactly how to fold every shirt.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Ask a friend to rate ten drawings you make with only "like" or "don't like". Then ask them to compare pairs: "which of these two is better?" Which was quicker for them? Which told you more?</li>
+<li>In the demo further down, drag <b>Margin</b> to the far left. That's an answer the model has badly wrong. Watch how hard each method pushes (the "push" numbers). Then change <b>β</b> and the KTO weights <b>λ good</b> and <b>λ bad</b>.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Preference</dt><dd>A judgement that one answer is better than another.</dd>
+<dt>Reward model</dt><dd>A program trained to guess how much people would like an answer.</dd>
+<dt>Reference model</dt><dd>A frozen copy of the model from before this training, used to stop it drifting too far.</dd>
+<dt>Reward hacking</dt><dd>Getting a high score by exploiting a flaw in the judge, not by actually doing better.</dd>
+<dt>Binary feedback</dt><dd>A simple good/bad label, like a thumbs up or down.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. What this stage covers</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Preference optimisation reshapes an SFT model's output distribution toward answers people prefer, while a KL term keeps it near the SFT model. DPO does this from <em>paired</em> comparisons with a simple classification loss. KTO needs only <em>unpaired</em> good/bad labels, which are cheaper and more common in real products. ORPO removes the reference model and the separate alignment phase by adding an odds-ratio penalty to the SFT loss. If you keep an explicit reward model (for RLHF, best-of-n or data filtering), you train it with a Bradley–Terry loss, and you must expect over-optimisation: the proxy score keeps rising while true quality peaks and falls.</p>
+</div>
+<ul>
+<li><strong>Learn:</strong> DPO, KTO, ORPO, reward modelling, and how to detect and reduce reward hacking.</li>
+<li><strong>Practice:</strong> take an SFT model, align it with KTO using only good/bad labels, and measure how its behaviour distribution shifts.</li>
+<li><strong>Why (the post's claim):</strong> SFT teaches content and alignment teaches behaviour, without huge annotation budgets. Section 4 checks that.</li>
+<li><strong>Builds on:</strong> <a href="../07-post-training.html#pref">Module 07</a> for the closed-form optimum π* ∝ π<sub>ref</sub>·exp(r/β) and its reward-hacking demo. This page doesn't repeat them.</li>
+</ul>
+
+<h2 id="concepts">2. Concepts, explained</h2>
+
+<h3>DPO, in one line, and what it leaves open</h3>
+<p>Module 07 derives DPO. The loss you implement is:</p>
+<pre><code>h(x, y_w, y_l) = log π_θ(y_w|x)/π_ref(y_w|x)  −  log π_θ(y_l|x)/π_ref(y_l|x)
+L_DPO = −log σ( β · h )</code></pre>
+<p>The quantity β·log π<sub>θ</sub>/π<sub>ref</sub> acts as an <strong>implicit reward</strong>. That's the "your language model is secretly a reward model" in the title of <a href="https://arxiv.org/abs/2305.18290">Rafailov, Sharma, Mitchell, Ermon, Manning and Finn (2023)</a>. Three practical gaps motivate the rest of this stage:</p>
+<ul>
+<li>It needs <strong>pairs</strong> for the same prompt. Most real feedback is a single thumbs up or down.</li>
+<li>It needs a <strong>reference model</strong> in memory, or precomputed reference log-probs.</li>
+<li>It is <strong>offline</strong>. It learns from a fixed dataset, so it never sees its own new mistakes. <a href="https://arxiv.org/abs/2404.10719">Xu et al. (2024)</a> argue that a well-tuned PPO pipeline can beat DPO on several benchmarks, so "DPO replaced RL" is too strong. IPO (<a href="https://arxiv.org/abs/2310.12036">Azar et al., 2023</a>) is another variant, aimed at DPO's tendency to overfit deterministic preferences.</li>
+</ul>
+
+<h3>KTO: learning from good/bad labels</h3>
+<p><a href="https://arxiv.org/abs/2402.01306">Ethayarajh, Xu, Muennighoff, Jurafsky and Kiela (2024)</a> borrow from Kahneman and Tversky's prospect theory: people judge outcomes relative to a reference point, and losses hurt more than equal gains please. They show that DPO and similar losses already behave like "human-aware losses". KTO then maximises a prospect-theory-style utility of each output directly, so each training example is just (prompt, completion, good or bad).</p>
+<pre><code>r(x, y)  = log π_θ(y|x) / π_ref(y|x)           # implicit reward
+z0       = estimate of KL(π_θ ‖ π_ref)          # reference point, no gradient
+v(x, y)  = λ_D · σ( β·(r − z0) )   if y is desirable
+         = λ_U · σ( β·(z0 − r) )   if y is undesirable
+L_KTO    = E[ λ_y − v(x, y) ]</code></pre>
+<ul>
+<li><strong>z0</strong> is the reference point. In practice it's estimated from mismatched (prompt, completion) pairs inside the batch, which is why tiny per-device batches cause trouble.</li>
+<li><strong>λ<sub>D</sub>, λ<sub>U</sub></strong> weight desirable and undesirable examples. They let you handle imbalanced data (say, 10× more thumbs-up than thumbs-down). The paper suggests choosing them so that λ<sub>D</sub>·n<sub>D</sub> / (λ<sub>U</sub>·n<sub>U</sub>) sits roughly between 1 and 4/3.</li>
+<li><strong>Saturation:</strong> the sigmoid flattens at both ends. An example the model gets badly wrong produces almost no gradient. That makes KTO more tolerant of noisy labels, but it also means it can ignore genuinely hard examples. The demo below shows this.</li>
+<li><strong>Result claimed:</strong> KTO matched or beat preference-based methods at 1B to 30B scale, despite only using a binary signal. Treat this as "competitive", not "always better". The authors themselves argue no single loss wins everywhere.</li>
+</ul>
+
+<h3>ORPO: alignment inside SFT</h3>
+<p><a href="https://arxiv.org/abs/2403.07691">Hong, Lee and Thorne (2024)</a> observe that SFT alone raises the probability of the rejected style too, because it's similar text. Their fix adds a small penalty during SFT itself, with no reference model and no second phase:</p>
+<pre><code>P(y|x)    = exp( mean token log-prob of y )      # length-normalised
+odds(y|x) = P / (1 − P)
+L_OR      = −log σ( log odds(y_w|x) − log odds(y_l|x) )
+L_ORPO    = L_SFT(y_w)  +  λ · L_OR</code></pre>
+<p>Pros: one training run, one model in memory, roughly SFT cost. Cons: there is no explicit KL leash to the starting model, so the SFT term is what keeps the model grounded. You need paired data, and the chosen answers must be good enough to imitate. The paper reports gains for Phi-2, Llama-2 7B and Mistral 7B fine-tuned on UltraFeedback alone.</p>
+
+<h3>Reward modelling</h3>
+<p>A reward model is usually the SFT model with its language-model head swapped for a scalar head. It's trained on comparisons with the Bradley–Terry loss (the same one in <a href="../06-30u30/30-rlhf.html#bt">Day 30</a>):</p>
+<pre><code>L_RM = −log σ( r_φ(x, y_w) − r_φ(x, y_l) )</code></pre>
+<ul>
+<li><strong>InstructGPT</strong> (<a href="https://arxiv.org/abs/2203.02155">Ouyang et al., 2022</a>) had labellers rank several outputs per prompt and trained on all pairs from each ranking together, so one prompt's comparisons don't overfit as separate samples.</li>
+<li>Only <strong>differences</strong> in reward matter, so normalise the scores (for example, mean zero on a reference set) before using them in RL.</li>
+<li>Evaluate it like any classifier: held-out pairwise accuracy, broken down by category and by length difference. A reward model that mostly prefers the longer answer will pass a lazy test. <a href="../01-decision-model-evals.html#calibration">Module 01</a> covers calibration.</li>
+<li>Uses beyond RLHF: best-of-n sampling at inference, ranking synthetic data (<a href="04-synthetic-data.html">Stage 04</a>), and producing labels for DPO or KTO.</li>
+</ul>
+
+<h3>Reward hacking and how to fight it</h3>
+<p>Module 07's demo shows the shape. The measurements come from <a href="https://arxiv.org/abs/2210.10760">Gao, Schulman and Hilton (2022)</a>. They used a large "gold" reward model as stand-in humans, trained smaller proxy reward models on its labels, and optimised against the proxy. Gold score rose, peaked and fell as the policy moved away from the start (measured as d = √KL). The curve's shape differed between best-of-n and RL, and its coefficients changed smoothly with reward-model size. Mitigations that have evidence behind them:</p>
+<ul>
+<li><strong>A KL penalty, and early stopping</strong> on a held-out true metric, not on the proxy reward.</li>
+<li><strong>Bigger, better-trained reward models</strong> over-optimise more slowly in Gao et al.'s setup.</li>
+<li><strong>Reward-model ensembles</strong> with conservative objectives (worst-case or uncertainty-weighted) reduced over-optimisation in <a href="https://arxiv.org/abs/2310.02743">Coste, Anwar, Kirk and Krueger (2023)</a>, including with 25% label noise.</li>
+<li><strong>Control for length.</strong> <a href="https://arxiv.org/abs/2310.03716">Singhal, Goyal, Xu and Durrett (2023)</a> found much of the RLHF reward gain in their settings came from longer outputs, and traced the bias mainly to reward models. Report length alongside every win rate.</li>
+<li><strong>Refresh the data.</strong> Sample from the current policy, relabel, retrain the reward model. Hacks the old model rewarded get caught.</li>
+<li><strong>Use verifiers where you can.</strong> For maths or code, a checker can't be flattered (<a href="../07-post-training.html#rlvr">Module 07, RLVR</a>), though it can still be gamed if the test is weak.</li>
+</ul>
+
+<div class="card demo">
+<h3>Interactive: how hard does each loss push?</h3>
+<p class="legend">x-axis: the margin. For DPO it's h, the chosen-minus-rejected log-ratio. For KTO it's r − z0. Left: DPO loss. Right: KTO loss for a <b class="p">desirable</b> and an <b class="f">undesirable</b> example. The dot is the margin you pick. "Push" is the size of the loss gradient with respect to the margin.</p>
+<canvas id="lc" width="700" height="220" aria-label="DPO and KTO losses plotted against the log-ratio margin"></canvas>
+<label for="beta">β: <span id="bv" class="num"></span></label>
+<input id="beta" type="range" min="0.02" max="0.5" step="0.01" value="0.1">
+<label for="ld">λ good: <span id="ldv" class="num"></span></label>
+<input id="ld" type="range" min="0.5" max="2" step="0.05" value="1">
+<label for="lu">λ bad: <span id="luv" class="num"></span></label>
+<input id="lu" type="range" min="0.5" max="2" step="0.05" value="1">
+<label for="mg">Margin: <span id="mv" class="num"></span></label>
+<input id="mg" type="range" min="-40" max="40" step="0.5" value="-30">
+<div class="stats">
+  <div class="stat"><div class="k">DPO loss</div><div class="v" id="dl">–</div></div>
+  <div class="stat"><div class="k">DPO push</div><div class="v" id="dg">–</div></div>
+  <div class="stat"><div class="k">KTO push, good</div><div class="v" id="kg">–</div></div>
+  <div class="stat"><div class="k">KTO push, bad</div><div class="v" id="kb">–</div></div>
+</div>
+<p class="meta">Try this: at β = 0.1 and margin −30, DPO still pushes at about 0.095, close to its maximum of β. KTO's push on that desirable example is about 0.0045, roughly 20× smaller: it has mostly given up on it. KTO pushes hardest at margin 0, where the push is λ·β/4. That's the robustness-to-noise trade-off in one picture.</p>
+</div>
+
+<h2 id="practice">3. The practice project</h2>
+<h3>(a) The Colab-sized version</h3>
+<p>The trick is to pick a behaviour a program can label, so you don't need human raters and you can measure the shift exactly.</p>
+<ol>
+<li><strong>Model:</strong> a small instruction-tuned model (around 0.5B parameters, such as a Qwen2.5 or SmolLM2 instruct checkpoint). Train LoRA adapters only.</li>
+<li><strong>Behaviour:</strong> choose something checkable, for example "when asked for JSON, return valid JSON with the requested keys and nothing else", or "answer in at most 80 words".</li>
+<li><strong>Data:</strong> write or collect 300–1,000 prompts. Hold out 20% for evaluation. Sample 4 completions per training prompt at temperature 0.8–1.0 from the SFT model. Label each with your checker. You now have unpaired good/bad data, naturally imbalanced.</li>
+<li><strong>Train KTO</strong> with Hugging Face TRL's <code>KTOTrainer</code> (dataset columns <code>prompt</code>, <code>completion</code>, <code>label</code>). Start at β = 0.1. Set the desirable and undesirable weights from your class counts. Check the current TRL docs, as argument names move between versions.</li>
+<li><strong>Measure the shift</strong> on the held-out prompts, sampling several completions each: checker pass rate before and after, length distribution, distinct-n diversity, and the mean sampled log-ratio log π<sub>θ</sub>/π<sub>ref</sub> (a KL estimate). Add a capability canary: 100–200 questions from a general benchmark the behaviour shouldn't touch.</li>
+<li><strong>Ablate:</strong> sweep β, drop the undesirable examples, and compare against DPO trained on pairs built from the same samples (one passing and one failing completion per prompt).</li>
+</ol>
+<pre><code>from datasets import Dataset
+from trl import KTOConfig, KTOTrainer
+from peft import LoraConfig
+
+rows = [{"prompt": p, "completion": c, "label": check(p, c)}
+        for p in train_prompts for c in sample(model, p, n=4)]
+n_good = sum(r["label"] for r in rows)
+n_bad = len(rows) - n_good
+
+cfg = KTOConfig(
+    output_dir="kto-out", beta=0.1,
+    desirable_weight=1.0,
+    undesirable_weight=n_good / n_bad,   # keep the ratio near 1–4/3
+    per_device_train_batch_size=8,       # z0 needs mismatched pairs in-batch
+    learning_rate=5e-6, num_train_epochs=1,
+)
+trainer = KTOTrainer(model=model, args=cfg,
+                     train_dataset=Dataset.from_list(rows),
+                     processing_class=tok,
+                     peft_config=LoraConfig(r=16, target_modules="all-linear"))
+trainer.train()</code></pre>
+<p>What to expect: the pass rate should move if your checker is reasonable and the base model sometimes succeeds. If it starts near 0% or near 100%, there's little signal to learn from, so change the task. Don't trust any single run; use at least two seeds.</p>
+
+<h3>(b) The full version from the post</h3>
+<p>Take a 7B SFT model and align it with KTO on a real binary-feedback dataset (product thumbs data, or a pairwise dataset split into separate good and bad rows). Measure the behaviour shift with a held-out LLM judge plus human spot checks, alongside the measures above.</p>
+<ul>
+<li><strong>Hardware:</strong> with LoRA, one 80 GB GPU holds the policy and a reference (or you precompute the reference log-probs once). Full fine-tuning of 7B with a reference model needs several GPUs and sharding (<a href="06-distributed-training.html">Stage 06</a>).</li>
+<li><strong>Cost:</strong> a LoRA run over tens of thousands of examples is GPU-hours, not GPU-weeks. At common cloud rental prices that's tens of dollars. The judge calls and human checks often cost more than the training.</li>
+</ul>
+
+<h3>(c) Pitfalls</h3>
+<ul>
+<li><strong>Grading with the training signal.</strong> If an LLM judge labelled the data, evaluate with a different judge and with humans, or you measure the hack, not the improvement.</li>
+<li><strong>Length drift.</strong> Report mean length next to every win rate.</li>
+<li><strong>Chat template mismatches</strong> between SFT, sampling and training silently break everything. Print a tokenised example.</li>
+<li><strong>Learning rate too high.</strong> Preference methods usually want much smaller rates than SFT. Watch the KL estimate; if it runs away, stop.</li>
+<li><strong>Tiny batches with KTO</strong> make z0 noisy.</li>
+<li><strong>Chosen and rejected log-probs both falling</strong> under DPO is common. Check absolute likelihoods, not just the margin.</li>
+</ul>
+
+<h2 id="reality">4. Reality check</h2>
+<div class="card note">
+<p><strong>The post's claim:</strong> SFT teaches a model what to say, alignment teaches it how to behave, without millions in annotation.</p>
+<ul>
+<li><strong>Mostly true on cost.</strong> DPO, KTO and ORPO cut out the reward-model-plus-PPO machinery, so compute and engineering costs drop a lot. KTO also accepts cheap binary feedback that products collect anyway. AI feedback, as in Constitutional AI (<a href="https://arxiv.org/abs/2212.08073">Bai et al., 2022</a>), replaces much human labelling.</li>
+<li><strong>Overstated on "no annotation".</strong> Someone still has to decide what "good" means: raters, a rubric, a judge model or a verifier. The quality of that signal limits everything downstream.</li>
+<li><strong>The SFT/alignment split is blurry.</strong> SFT already changes behaviour a lot. Preference tuning mostly reshapes which of the model's existing behaviours it picks, within the KL leash.</li>
+<li><strong>Offline is not the whole story.</strong> Frontier recipes still use online RL with reward models and verifiers. Offline methods are the practical, cheap starting point, not the ceiling.</li>
+</ul>
+</div>
+
+<h2 id="course">5. In this course</h2>
+<ul>
+<li><a href="../07-post-training.html#pref">Module 07 · Preference alignment and the KL leash</a>: the DPO derivation and the reward-hacking demo this page builds on. Also <a href="../07-post-training.html#rlvr">RLVR verifiers</a>.</li>
+<li><a href="../06-30u30/30-rlhf.html">Module 06 · Day 30, RL from human preferences</a>: the original reward model from comparisons, with the Bradley–Terry model.</li>
+<li><a href="../06-30u30/29-ppo.html">Module 06 · Day 29, PPO</a>: the RL step in classic RLHF.</li>
+<li><a href="../01-decision-model-evals.html#calibration">Module 01 · Calibration</a>: a reward model is a classifier, so evaluate it like one.</li>
+<li><a href="../04-distill-small-models.html#eval">Module 04 · Evaluation that doesn't fool you</a>: for measuring the behaviour shift honestly.</li>
+</ul>
+
+<h2 id="robotics">6. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Preferences started in robotics-style control.</strong> <a href="../06-30u30/30-rlhf.html">Day 30</a> trained simulated robots (and Atari agents) from human comparisons of short clips. The same reward-model idea applies to trajectories.</li>
+<li><strong>Binary success labels are the natural robot signal.</strong> "Did the grasp succeed?" is a KTO-shaped label, not a pairwise one. Success detectors play the role of a reward model.</li>
+<li><strong>Reward hacking is physical.</strong> A policy optimised against a learned success classifier can find camera angles or poses that fool it. Ensembles, KL leashes and held-out real evaluations matter even more when mistakes break hardware.</li>
+<li><strong>VLAs inherit language-model post-training.</strong> Vision-language-action models start from a VLM, so preference tuning of the language backbone and its pitfalls carry over. Using DPO-style losses on robot actions is an active research area, not a settled recipe.</li>
+</ul>
+</div>
+
+<h2 id="check">7. Self-check</h2>
+<details><summary>Your product logs 50,000 thumbs-up and 5,000 thumbs-down responses. Which method fits, and how do you set its weights?</summary><p>KTO, since the data is unpaired. With λ<sub>D</sub> = 1, set λ<sub>U</sub> so that λ<sub>D</sub>·n<sub>D</sub> / (λ<sub>U</sub>·n<sub>U</sub>) lands between about 1 and 4/3. Here 50,000 / (λ<sub>U</sub>·5,000) ≤ 4/3 gives λ<sub>U</sub> of roughly 7.5 to 10.</p></details>
+<details><summary>Why does KTO tolerate noisy labels better than DPO?</summary><p>Its value function is a sigmoid of the margin, so the gradient vanishes when the model strongly disagrees with a label. A mislabelled example therefore has little pull. DPO's gradient approaches β on the wrong side and keeps pushing.</p></details>
+<details><summary>What does ORPO give up by dropping the reference model?</summary><p>An explicit KL leash. Only the SFT term on the chosen answers keeps the model grounded, so poor chosen answers or a large λ can push it somewhere strange.</p></details>
+<details><summary>Your reward model has 72% held-out pairwise accuracy but prefers the longer answer 90% of the time. What do you do?</summary><p>Treat length as a likely shortcut. Check accuracy on pairs of matched length, add length-balanced pairs or a length penalty, and report length next to every downstream win rate.</p></details>
+<details><summary>In Gao et al.'s setup, what is the x-axis of the over-optimisation curve, and why that?</summary><p>d = √KL between the optimised policy and the initial one. It measures how far optimisation has moved the policy, so best-of-n and RL can be compared on one scale.</p></details>
+
+<h2 id="courses">8. Courses &amp; content</h2>
+<div class="table-wrap"><table>
+<tr><th>Resource</th><th>Type</th><th>Use it for</th></tr>
+<tr><td><a href="https://rlhfbook.com/">Nathan Lambert · RLHF Book</a></td><td>Free online book</td><td>Reward models, PPO, DPO-family methods, over-optimisation</td></tr>
+<tr><td><a href="https://huggingface.co/docs/trl/index">Hugging Face TRL · DPO / KTO / ORPO trainers</a></td><td>Official docs</td><td>Run each method on a small model</td></tr>
+<tr><td><a href="https://www.deeplearning.ai/short-courses/post-training-of-llms/">DeepLearning.AI · Post-training of LLMs</a></td><td>Short course</td><td>SFT, DPO and online RL, hands-on</td></tr>
+<tr><td><a href="https://www.deeplearning.ai/short-courses/reinforcement-learning-from-human-feedback/">DeepLearning.AI · Reinforcement Learning from Human Feedback</a></td><td>Short course</td><td>The classic reward-model + RL pipeline</td></tr>
+<tr><td><a href="https://github.com/huggingface/smol-course">Hugging Face smol-course · Preference Alignment unit</a></td><td>Course (free)</td><td>DPO in practice on a small model</td></tr>
+<tr><td><a href="https://stanford-cs336.github.io/spring2025/">Stanford CS336 · Assignment 5 (Alignment &amp; reasoning RL)</a></td><td>University course (free materials)</td><td>SFT and RL for maths reasoning; optional DPO</td></tr>
+</table></div>
+<p>Start with the RLHF Book for the concepts, then the TRL docs, because they're what you'll actually run the practice project with.</p>
+<p class="meta"><a href="index.html#courses">Full course map for all 12 stages →</a></p>
+
+<h2 id="papers">9. Papers &amp; docs</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/2305.18290">Direct Preference Optimization</a> (Rafailov et al., 2023)</li>
+<li><a href="https://arxiv.org/abs/2402.01306">KTO: Model Alignment as Prospect Theoretic Optimization</a> (Ethayarajh et al., 2024)</li>
+<li><a href="https://arxiv.org/abs/2403.07691">ORPO: Monolithic Preference Optimization without Reference Model</a> (Hong et al., 2024)</li>
+<li><a href="https://arxiv.org/abs/2310.12036">A General Theoretical Paradigm to Understand Learning from Human Preferences (IPO)</a> (Azar et al., 2023)</li>
+<li><a href="https://arxiv.org/abs/2203.02155">Training language models to follow instructions with human feedback</a> (Ouyang et al., 2022)</li>
+<li><a href="https://arxiv.org/abs/2210.10760">Scaling Laws for Reward Model Overoptimization</a> (Gao et al., 2022)</li>
+<li><a href="https://arxiv.org/abs/2310.02743">Reward Model Ensembles Help Mitigate Overoptimization</a> (Coste et al., 2023)</li>
+<li><a href="https://arxiv.org/abs/2310.03716">A Long Way to Go: Investigating Length Correlations in RLHF</a> (Singhal et al., 2023)</li>
+<li><a href="https://arxiv.org/abs/2404.10719">Is DPO Superior to PPO for LLM Alignment?</a> (Xu et al., 2024)</li>
+<li><a href="https://arxiv.org/abs/2212.08073">Constitutional AI: Harmlessness from AI Feedback</a> (Bai et al., 2022)</li>
+<li><a href="https://huggingface.co/docs/trl/index">Hugging Face TRL documentation</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="04-synthetic-data.html"><small>Previous</small>Stage 04 · Synthetic data</a>
+  <a class="next" href="06-distributed-training.html"><small>Next</small>Stage 06 · Distributed training</a>
+</nav>
+<footer>Module 08 · Stage 05 · written for this course from the source post and primary papers.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('lc'), ctx = cv.getContext('2d');
+const bIn = document.getElementById('beta'), dIn = document.getElementById('ld'), uIn = document.getElementById('lu'), mIn = document.getElementById('mg');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const sig = z => 1 / (1 + Math.exp(-z));
+// losses as a function of margin m; push = |dL/dm|
+const dpo = (m, b) => -Math.log(sig(b * m));
+const dpoG = (m, b) => b * sig(-b * m);
+const ktoD = (m, b, l) => l * (1 - sig(b * m));
+const ktoU = (m, b, l) => l * (1 - sig(-b * m));
+const ktoG = (m, b, l) => l * b * sig(b * m) * sig(-b * m);
+const M0 = -40, M1 = 40;
+
+function panel(x0, w, title, curves, ymax, m) {
+  const H = cv.height, T = 18, B = 22;
+  const px = v => x0 + (v - M0) / (M1 - M0) * w, py = v => T + (1 - v / ymax) * (H - T - B);
+  ctx.strokeStyle = css('--line'); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(x0, py(0)); ctx.lineTo(x0 + w, py(0)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(px(0), T); ctx.lineTo(px(0), H - B); ctx.stroke();
+  ctx.font = '12px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = css('--muted');
+  ctx.fillText(title, x0 + w / 2, T - 4);
+  ctx.fillText(M0, px(M0) + 10, H - 6); ctx.fillText('0', px(0), H - 6); ctx.fillText(M1, px(M1) - 10, H - 6);
+  curves.forEach(([f, col]) => {
+    ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.beginPath();
+    for (let i = 0; i <= 200; i++) {
+      const v = M0 + (M1 - M0) * i / 200, y = py(Math.min(f(v), ymax));
+      i ? ctx.lineTo(px(v), y) : ctx.moveTo(px(v), y);
+    }
+    ctx.stroke();
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(px(m), py(Math.min(f(m), ymax)), 5, 0, 7); ctx.fill();
+  });
+}
+
+function draw() {
+  const b = +bIn.value, ld = +dIn.value, lu = +uIn.value, m = +mIn.value, W = cv.width, gap = 24, w = (W - 3 * gap) / 2;
+  document.getElementById('bv').textContent = b.toFixed(2);
+  document.getElementById('ldv').textContent = ld.toFixed(2);
+  document.getElementById('luv').textContent = lu.toFixed(2);
+  document.getElementById('mv').textContent = m.toFixed(1);
+  ctx.clearRect(0, 0, W, cv.height);
+  panel(gap, w, 'DPO loss', [[v => dpo(v, b), css('--accent')]], Math.max(1, dpo(M0, b)), m);
+  panel(2 * gap + w, w, 'KTO loss', [[v => ktoD(v, b, ld), css('--pass')], [v => ktoU(v, b, lu), css('--fail')]], Math.max(ld, lu), m);
+  document.getElementById('dl').textContent = dpo(m, b).toFixed(3);
+  document.getElementById('dg').textContent = dpoG(m, b).toFixed(4);
+  document.getElementById('kg').textContent = ktoG(m, b, ld).toFixed(4);
+  document.getElementById('kb').textContent = ktoG(m, b, lu).toFixed(4);
+}
+bIn.oninput = dIn.oninput = uIn.oninput = mIn.oninput = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

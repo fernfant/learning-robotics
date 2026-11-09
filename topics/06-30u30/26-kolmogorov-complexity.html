@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 26 · Kolmogorov Complexity</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 26</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Unit 5 · Generative models &amp; scaling · Day 26</div>
+<h1>Kolmogorov Complexity and Algorithmic Randomness</h1>
+<p class="lede">The information in one object is the length of the shortest program that prints it. A string is random when no such program is shorter than the string itself.</p>
+
+<div class="facts">
+  <div><b>Authors</b>Alexander Shen, Vladimir A. Uspensky, Nikolay Vereshchagin</div>
+  <div><b>Year / venue</b>2017 · book, AMS Mathematical Surveys and Monographs vol. 220</div>
+  <div><b>Core idea</b>Complexity = shortest description</div>
+  <div><b>Study time</b>4–6 h (selected chapters)</div>
+</div>
+<p class="meta">Original: <a href="https://www.ams.org/publications/authors/books/postpub/surv-220">AMS book page</a> (the authors also post a draft on <a href="https://www.lirmm.fr/~ashen/">Alexander Shen's homepage</a>) · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/26_kolmogorov_complexity">30u30 Day 26</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">The amount of information in something is the length of the shortest set of instructions that could recreate it, and something is truly random if there's no shortcut.</p>
+
+<h3>Think of it like this</h3>
+<p>You've probably seen a zip file. Zipping a folder makes it smaller by finding patterns. A file that says "ha" a thousand times shrinks to almost nothing, because the computer can just write "ha, 1000 times". A file of random key-mashing hardly shrinks at all, because there's no pattern to use. Kolmogorov complexity is the size of the <em>best possible</em> zip of something. It's the perfect version that no real zip program can always reach.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Pick something to describe, like a long string of letters.</li>
+<li>Look for the shortest computer program that prints exactly that string.</li>
+<li>The length of that program is the string's complexity.</li>
+<li>Patterned strings have short programs. Random ones don't: the shortest program is basically "print this whole thing".</li>
+<li>A surprising fact: no computer can always find the shortest program. So in practice we use real compressors (like zip) to get an estimate.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot that has learned how the world works can describe what it sees with fewer "bits", because it can predict most of it. If a robot's sensor readings suddenly stop matching its predictions and become hard to "compress", something unexpected may be happening, like a slipping wheel.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Describe a chessboard pattern to a friend in one sentence. Now try to describe a random splatter of paint. Which needs more words? That difference is the idea of complexity.</li>
+<li>In the demo further down, press <b>Repeating "ab"</b>, then <b>Shuffle current</b>. Same letters, but the compressed size jumps, because the pattern is gone.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Compression</dt><dd>Making data smaller by using its patterns, like a zip file.</dd>
+<dt>Complexity</dt><dd>Here: the length of the shortest program that recreates something.</dd>
+<dt>Random</dt><dd>Having no shortcut. You can't describe it in fewer bits than it takes up.</dd>
+<dt>Bit</dt><dd>The smallest piece of information: a single 0 or 1.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>This is a 500-page textbook from the Moscow school of algorithmic information theory, not a single paper. Its starting point is Kolmogorov's 1960s idea: measure the information in an individual object, such as one string, by the length of the shortest program that outputs it. Patterned strings have short programs. Most strings don't, and those are the random ones. The quantity can't be computed exactly, but any real compressor gives an upper bound. That's the formal version of "compression is understanding", the intuition behind Sutskever's view that good prediction means finding the shortest description of the data.</p>
+</div>
+<ul>
+<li><strong>Definition:</strong> C(x) is the length of the shortest program p such that a fixed universal machine U prints x from p.</li>
+<li><strong>Language doesn't matter much:</strong> switching universal machine changes C(x) by at most a constant (the invariance theorem).</li>
+<li><strong>Most strings are incompressible:</strong> a counting argument shows fewer than a 2<sup>−k</sup> fraction of n-bit strings can be compressed by k bits.</li>
+<li><strong>C is uncomputable:</strong> no algorithm returns C(x) for every x. Compressors give upper bounds only.</li>
+<li><strong>Randomness gets a definition:</strong> an infinite sequence is random (Martin-Löf) exactly when its prefixes are incompressible, in the prefix-complexity sense.</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<pre><code>C_U(x) = min { |p| : U(p) = x }                  plain complexity
+
+|C_U(x) − C_V(x)| ≤ c_UV       for all x           invariance theorem
+C(x)   ≤ |x| + c                                   "just print it"
+#{ x of length n : C(x) &lt; n − k }  &lt;  2^(n−k)      counting bound
+
+K(x): same, but programs must be prefix-free
+Σ_x 2^(−K(x)) ≤ 1                                  Kraft inequality</code></pre>
+<ul>
+<li><code>U</code> is a universal machine: think of a fixed programming language that can simulate any other.</li>
+<li><code>|p|</code> is the program length in bits. C(x) is the length of the best one.</li>
+<li><strong>Invariance:</strong> any language V can be simulated in U with a fixed-size interpreter, so C<sub>U</sub>(x) ≤ C<sub>V</sub>(x) + (size of the interpreter). The constant depends on U and V, not on x.</li>
+<li><strong>Upper bound:</strong> the program "print the following n bits" always works, so C(x) never exceeds the length of x by more than a constant.</li>
+<li><strong>Counting:</strong> there are only 2<sup>n−k</sup> − 1 programs shorter than n − k bits. Each prints at most one string. So at most that many n-bit strings out of 2<sup>n</sup> can be compressed by k bits. At least one string of every length is fully incompressible.</li>
+<li><strong>Prefix complexity K</strong> requires that no valid program be the start of another, as with self-delimiting codes. Then the weights 2<sup>−K(x)</sup> sum to at most 1 and form a probability-like distribution. Day 27 builds on exactly this weighting.</li>
+</ul>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>Why it can't be computed</h3>
+<p>Suppose a program could compute C(x). Then write a short program: "search strings in order and print the first one with C(x) &gt; n". That program has length about log n plus a constant, yet it prints a string whose complexity exceeds n. For large n, that's a contradiction. This is a formal Berry paradox ("the smallest number not describable in fewer than twelve words"). The practical upshot: you can always find <em>a</em> short description, but you can never certify that it's the shortest.</p>
+
+<h3>Compressors as computable upper bounds</h3>
+<p>Any lossless compressor plus its decompressor is a program that prints x. So C(x) ≤ |compressed(x)| + |decompressor| + O(1). Real compressors only find some kinds of pattern. A frequency-based code (Huffman, order-0 entropy) sees symbol counts only. Dictionary methods such as DEFLATE also catch repeats. Neither finds the pattern in the digits of π, which have tiny Kolmogorov complexity. The demo shows the gap between counting symbols and finding structure.</p>
+<div class="card demo">
+<h3>Interactive: compression as a complexity proxy</h3>
+<p class="legend">Bars, in bits: raw size (8 bits per byte), an order-0 entropy bound (symbol frequencies only), and the size after your browser's built-in DEFLATE. DEFLATE output is a computable upper bound on complexity, up to a constant.</p>
+<canvas id="kc" width="700" height="220" aria-label="Bars comparing raw size, entropy bound and compressed size"></canvas>
+<div>
+  <button data-p="rep">Repeating "ab"</button>
+  <button data-p="count">Counting 1 2 3 …</button>
+  <button data-p="text">English text</button>
+  <button data-p="rand">Random letters</button>
+  <button id="shuf">Shuffle current</button>
+</div>
+<div class="stats">
+  <div class="stat"><div class="k">Length (chars)</div><div class="v" id="len">–</div></div>
+  <div class="stat"><div class="k">Entropy bits/char</div><div class="v" id="ent">–</div></div>
+  <div class="stat"><div class="k">DEFLATE bits/char</div><div class="v" id="dfl">–</div></div>
+  <div class="stat"><div class="k">Ratio vs raw</div><div class="v" id="rat">–</div></div>
+</div>
+<p class="meta" id="kmsg">Try this: load "Repeating ab". Entropy says 1 bit per character, but DEFLATE gets far below that, because it finds the repeat. Now press Shuffle. The letter counts, and so the entropy bound, stay the same. The compressed size jumps, because the pattern is gone. Then try "Counting": a three-line program prints it, yet DEFLATE does worse than even the symbol-count bound. The compressor's bound is valid, just very loose.</p>
+</div>
+
+<h3>Randomness, MDL and learning</h3>
+<p>For infinite binary sequences the book develops Martin-Löf randomness: a sequence is random if it passes every effective statistical test. The Levin–Schnorr theorem shows this is the same as saying that the prefix complexity of its first n bits stays above n minus a constant. Two very different definitions agree, which is good evidence the concept is right.</p>
+<p>For machine learning the useful idea is two-part coding: describe a model, then the data given the model. The total length is an upper bound on complexity, and minimising it is the Minimum Description Length principle of <a href="05-mdl-principle.html">Day 05</a> and <a href="04-mdl-noisy-weights.html">Day 04</a>. Cross-entropy loss on a dataset is a code length too: a model with loss L nats per token can compress the data to about L/ln 2 bits per token with arithmetic coding. Lower loss on <a href="25-scaling-laws.html">Day 25</a> literally means a shorter description. <a href="06-complexodynamics.html">Days 06</a> and <a href="07-coffee-automaton.html">07</a> use compressed size as a practical stand-in for complexity in physical systems.</p>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<p>The link is conceptual. Nobody computes Kolmogorov complexity on a robot. But the ideas show up in practical tools.</p>
+<ul>
+<li><strong>Model selection for system identification:</strong> choosing between a simple and a detailed dynamics model is a description-length trade-off. Fit plus model size, not fit alone.</li>
+<li><strong>World models are compressors:</strong> a model that predicts the next sensor frame well encodes it in few bits. Better prediction and better compression are the same thing.</li>
+<li><strong>Anomaly detection by surprise:</strong> a log segment or sensor trace that compresses much worse than usual under a trained model is a cheap fault signal.</li>
+<li><strong>Honest limit:</strong> uncomputability means "simplest explanation" is always approximated by some chosen model class. The choice of class decides what counts as simple.</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Don't read all 500 pages. Read the introduction and the opening chapters on plain complexity (definition, invariance, counting, uncomputability). About 2 h.</li>
+<li>Then skim the material on prefix complexity and Martin-Löf randomness for the Levin–Schnorr theorem. Skip proofs on the first pass.</li>
+<li>In the 30u30 Day 26 folder, read <code>implementation.py</code> (Huffman coding, arithmetic coding, entropy and normalized compression distance). Run <code>train_minimal.py</code> and compare the estimators on different strings.</li>
+<li>Work through <code>notebook.ipynb</code> and the five exercises, ending with the incompressibility one.</li>
+<li>Stretch: compute the normalized compression distance between short texts in two languages and see whether it clusters them.</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>Why does the choice of programming language only shift C(x) by a constant?</summary><p>Any language can be simulated in the reference language by a fixed interpreter. Prepending that interpreter to the best program costs the same number of bits for every x.</p></details>
+<details><summary>Prove that some string of length n has C(x) ≥ n.</summary><p>There are 2<sup>n</sup> strings of length n but only 2<sup>n</sup> − 1 programs shorter than n bits. Each program prints at most one string, so at least one string is left over.</p></details>
+<details><summary>Why can't a compressor tell you the true C(x)?</summary><p>C is uncomputable. A compressor gives a valid description, so an upper bound, but it can miss patterns, and no algorithm can prove a description is the shortest.</p></details>
+<details><summary>The digits of π look random. Are they Kolmogorov-random?</summary><p>No. A short program generates as many digits as you want, so the first n digits have complexity around log n plus a constant. They pass many statistical tests, but they're highly compressible in principle.</p></details>
+<details><summary>Why would shuffling a string leave its entropy bound unchanged but increase its compressed size?</summary><p>Order-0 entropy depends only on symbol counts, which shuffling preserves. Order and repeats are destroyed, and those are what a dictionary compressor exploits.</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://www.ams.org/publications/authors/books/postpub/surv-220">Shen, Uspensky and Vereshchagin (2017)</a>, the book itself</li>
+<li>Li and Vitányi, <em>An Introduction to Kolmogorov Complexity and Its Applications</em>, the standard Western reference</li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/26_kolmogorov_complexity">30u30 Day 26</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Next: <a href="27-machine-super-intelligence.html">Day 27, Machine Super Intelligence</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="25-scaling-laws.html"><small>Previous</small>Day 25 · Scaling Laws</a>
+  <a class="next" href="27-machine-super-intelligence.html"><small>Next</small>Day 27 · Machine Super Intelligence</a>
+</nav>
+<footer>Module 06 · Day 26 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('kc'), ctx = cv.getContext('2d');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let seed = 26;
+const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const TEXT = 'A robot arm reaches for a cup on the table. The camera sees the cup, the planner picks a path, and the controller moves each joint a little at a time. ' +
+  'When the cup is closer than expected, the arm slows down and tries again. Most of the time the grasp works on the first try, but sometimes the cup slips and the robot has to look again. ' +
+  'Engineers log every attempt, then read the logs to find out why a grasp failed. Short logs that repeat the same steps are easy to read. Long logs full of surprises take much more time. ';
+const PRESETS = {
+  rep: () => 'ab'.repeat(1000),
+  count: () => { let s = ''; for (let i = 1; s.length < 2000; i++) s += i + ' '; return s; },
+  text: () => TEXT,
+  rand: () => { seed = 26; let s = ''; for (let i = 0; i < 2000; i++) s += String.fromCharCode(97 + Math.floor(rnd() * 26)); return s; }
+};
+let cur = '', res = null;
+
+function entropyBits(s) {
+  const c = {};
+  for (const ch of s) c[ch] = (c[ch] || 0) + 1;
+  let h = 0;
+  for (const k in c) { const p = c[k] / s.length; h -= p * Math.log2(p); }
+  return h;
+}
+
+async function deflateBytes(s) {
+  if (typeof CompressionStream === 'undefined') return null;
+  const stream = new Blob([s]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+  return (await new Response(stream).arrayBuffer()).byteLength;
+}
+
+async function analyse(s) {
+  cur = s;
+  const raw = new TextEncoder().encode(s).length * 8, n = [...s].length, h = entropyBits(s), z = await deflateBytes(s);
+  res = { raw, n, h, ent: h * n, dfl: z === null ? null : z * 8 };
+  if (z === null) document.getElementById('kmsg').textContent = 'Your browser has no CompressionStream, so only the entropy bound is shown.';
+  draw();
+  return res;
+}
+
+function shuffle(s) {
+  const a = [...s];
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a.join('');
+}
+
+function draw() {
+  if (!res) return;
+  const W = cv.width, H = cv.height, pad = 24, bars = [['raw', res.raw, css('--muted')], ['entropy bound', res.ent, css('--pass')], ['DEFLATE', res.dfl, css('--accent')]];
+  const bw = (W - 2 * pad) / 3;
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
+  bars.forEach(([name, v, col], i) => {
+    const x = pad + i * bw + bw / 2;
+    ctx.fillStyle = css('--fg'); ctx.fillText(name, x, H - 6);
+    if (v === null) return;
+    const h = v / res.raw * (H - 2 * pad - 16);
+    ctx.fillStyle = col; ctx.fillRect(x - bw / 2 + 24, H - pad - h, bw - 48, h);
+    ctx.fillStyle = css('--muted'); ctx.fillText(Math.round(v) + ' bits', x, H - pad - h - 6);
+  });
+  document.getElementById('len').textContent = res.n;
+  document.getElementById('ent').textContent = res.h.toFixed(2);
+  document.getElementById('dfl').textContent = res.dfl === null ? 'n/a' : (res.dfl / res.n).toFixed(2);
+  document.getElementById('rat').textContent = res.dfl === null ? 'n/a' : (res.dfl / res.raw * 100).toFixed(0) + '%';
+}
+
+document.querySelectorAll('button[data-p]').forEach(b => b.onclick = () => analyse(PRESETS[b.dataset.p]()));
+document.getElementById('shuf').onclick = () => analyse(shuffle(cur));
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+analyse(PRESETS.rep());
+</script>
+</body>
+</html>

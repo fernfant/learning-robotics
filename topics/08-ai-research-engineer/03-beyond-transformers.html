@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stage 03 · Next-gen architectures</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 08 · Research-engineer roadmap</a> › Stage 03</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 08 · Stage 03</div>
+<h1>Next-gen architectures: MoE, state-space models, linear &amp; ring attention</h1>
+<p class="lede">Standard attention costs grow with the square of the sequence length, and dense models pay for every parameter on every token. This stage covers the four main ways around that: route each token to a few experts, replace attention with a recurrent state, make attention linear, or spread one long sequence across many GPUs.</p>
+
+<div class="facts">
+  <div><b>Prerequisites</b><a href="01-tensor-math-autograd.html">Stage 01</a>, a working Transformer (<a href="../06-30u30/14-annotated-transformer.html">06 Day 14</a>), basic RNNs</div>
+  <div><b>Time</b>20–30 h (reading 8–10 h, MoE project 10–15 h, SSM notebook 4–6 h)</div>
+  <div><b>Hardware</b>Laptop for the reading and demo · Colab GPU (T4 or better) for the MoE project · multi-GPU only for the full version</div>
+  <div><b>Key papers</b>Shazeer et al. 2017 · Fedus et al. 2021 (Switch) · Gu et al. 2021 (S4) · Gu &amp; Dao 2023 (Mamba) · Katharopoulos et al. 2020 · Liu et al. 2023 (Ring Attention)</div>
+</div>
+<p class="meta">Source: Suraj Sharma, <a href="https://x.com/suraj_sharma14/status/2112876560629825734">X post</a>, stage 3 · MoE routing at frontier scale and linear attention (KDA) are covered in depth in <a href="../05-trillion-scale-architecture.html">Module 05</a>. This page links to it and focuses on what's new.</p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Big AI models are slow because every part of the model works on every word, and every word looks back at every other word. New designs let only a few parts work at a time, or keep a short summary instead of rereading everything.</p>
+
+<h3>Think of it like this</h3>
+<p>Think of a big hospital. A patient doesn't see every doctor. A receptionist sends them to the one or two specialists who fit their problem. That's a <b>mixture of experts</b>. But if the receptionist sends everyone to the same doctor, that doctor gets a huge queue and the others sit idle. So the receptionist gets a rule: spread people out. That's <b>load balancing</b>.</p>
+<p>Now think of reading a long book. One way is to flip back through every earlier page each time you read a new sentence. That gets slower and slower. Another way is to keep a small notebook of what matters and update it as you go. That's a <b>state-space model</b>: a fixed-size memory, updated one step at a time.</p>
+
+<h3>How it works</h3>
+<ol>
+<li><b>Experts:</b> a model has many small "expert" blocks. A tiny router picks one or two of them for each word.</li>
+<li><b>Balancing:</b> during training, an extra penalty punishes the router if it keeps choosing the same experts.</li>
+<li><b>Notebook memory:</b> a state-space model reads words in order and keeps a fixed-size summary, so long texts cost the same per word.</li>
+<li><b>Sharing the reading:</b> ring attention splits a very long text across many computers sitting in a ring. They pass their pages round the ring until everyone has seen everything.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot's camera sends new pictures many times a second, for hours. A model that has to look back at every past picture gets slower the longer the robot runs. A model with a small, fixed notebook memory runs at the same speed whether the robot has been on for a minute or a day.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>The notebook game: someone reads a short story aloud, one sentence at a time. Player A may only keep 5 words on a sticky note, rubbing out old words to add new ones. Player B can reread the whole story. Then ask questions about the story. Which questions does Player A get wrong? That's the trade-off between a fixed memory and full attention.</li>
+<li>In the demo below, push <b>Router skew</b> up and watch one or two experts get swamped. Then raise <b>Capacity factor</b> and see how many dropped tokens it rescues, and at what cost in empty slots.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Expert</dt><dd>One of many small sub-networks. Only a few are used for each word.</dd>
+<dt>Router</dt><dd>The tiny part that decides which experts each word goes to.</dd>
+<dt>Load balancing</dt><dd>Making sure work is spread evenly across experts.</dd>
+<dt>State</dt><dd>A fixed-size memory that gets updated as each new word arrives.</dd>
+<dt>Context length</dt><dd>How much text the model can look at in one go.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings, try the demo, and read the reality check.</p>
+
+<h2 id="covers">1. What this stage covers</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Two different costs limit Transformers. <strong>Width cost:</strong> a dense model uses every weight for every token. Mixture-of-experts layers decouple total parameters from per-token compute, at the price of routing, load balancing and communication. <strong>Length cost:</strong> attention is O(L²) in compute and its KV cache grows with L. State-space models and linear attention swap the growing cache for a fixed-size recurrent state. Ring attention keeps exact attention but spreads the sequence across devices. In 2026 the frontier mostly uses MoE plus a <em>hybrid</em> of cheap recurrent layers and a few full-attention layers, not a clean replacement of attention.</p>
+</div>
+<ul>
+<li><strong>Learn:</strong> MoE routing, SSMs (S4, Mamba), linear attention and ring attention.</li>
+<li><strong>Practice:</strong> write a sparse MoE layer with a load-balancing loss from scratch and benchmark its throughput against a dense Transformer.</li>
+<li><strong>Why (the post's claim):</strong> quadratic attention is being replaced, so you need to understand the alternatives from first principles. Section 4 tests that claim.</li>
+</ul>
+
+<h2 id="concepts">2. Concepts, explained</h2>
+
+<h3 id="moe">Mixture-of-experts routing and the auxiliary load-balancing loss</h3>
+<p>An MoE layer replaces the Transformer's single feed-forward block with E expert feed-forward blocks and a router. The router is a linear layer that gives each token a score per expert. The token goes to its top-k experts, and their outputs are summed, weighted by the router's gate values. Shazeer et al. (2017, "Outrageously Large Neural Networks") made this work at scale with a noisy top-k gate between LSTM layers. Switch Transformer (Fedus, Zoph &amp; Shazeer, 2021) simplified it to <strong>top-1</strong>: one expert per token, less compute and less communication, and reported up to 7× faster pre-training than a dense T5 baseline at the same compute.</p>
+<p>The failure mode is <strong>collapse</strong>. Early in training, a few experts get slightly better, so the router sends them more tokens, so they get better still. The rest starve. Switch's fix is an auxiliary loss added to the training loss:</p>
+<pre><code>f_i = fraction of tokens in the batch whose top-1 choice is expert i     (hard counts)
+P_i = mean router probability for expert i over the batch               (soft, differentiable)
+
+L_aux = α · E · Σ_i f_i · P_i          α ≈ 0.01 in the Switch paper
+
+uniform routing:     f_i = P_i = 1/E   →  E · Σ f_i P_i = 1   (the minimum)
+total collapse:      f_1 = P_1 ≈ 1     →  E · Σ f_i P_i ≈ E</code></pre>
+<p>Why both f and P? The counts f aren't differentiable, but the probabilities P are. Multiplying them means the gradient pushes down the probability of experts that are <em>already overloaded</em>. The factor E keeps the loss scale the same whatever the number of experts.</p>
+<p><strong>Capacity factor.</strong> For efficient batched kernels each expert gets a fixed number of slots: <code>capacity = (tokens / E) × capacity_factor</code>. Tokens routed to a full expert are <strong>dropped</strong>: they skip the layer and pass through on the residual connection only. A capacity factor above 1 leaves headroom for imbalance but wastes slots and memory when routing is balanced. The demo below shows both effects.</p>
+<p><strong>What Module 05 adds.</strong> The auxiliary loss is a trade-off: too weak and experts collapse, too strong and it fights the language-modelling loss. Newer models often drop it in favour of a per-expert bias that only affects selection. <a href="../05-trillion-scale-architecture.html#width">Module 05's routing deep dive</a> explains that approach and Kimi K3's Quantile Balancing for 896 experts, with its own demo. Read it after this section.</p>
+
+<div class="card demo">
+<h3>Interactive: Switch-style load balancing and capacity</h3>
+<p class="legend">512 tokens, top-1 routing. Bars: f<sub>i</sub>, the share of tokens each expert receives (accent) and P<sub>i</sub>, its mean router probability (muted). The dashed line is each expert's capacity. Token logits are random per token plus a fixed per-expert "popularity" scaled by Router skew (seeded, so results are repeatable).</p>
+<canvas id="mc" width="700" height="240" aria-label="Per-expert token share and router probability, with capacity line"></canvas>
+<label for="ne">Experts E: <span id="nev" class="num"></span></label>
+<input id="ne" type="range" min="4" max="32" step="4" value="8">
+<label for="sk">Router skew: <span id="skv" class="num"></span></label>
+<input id="sk" type="range" min="0" max="3" step="0.1" value="1">
+<label for="cf">Capacity factor: <span id="cfv" class="num"></span></label>
+<input id="cf" type="range" min="1" max="2" step="0.05" value="1.25">
+<div class="stats">
+  <div class="stat"><div class="k">E · Σ f·P</div><div class="v" id="la">–</div></div>
+  <div class="stat"><div class="k">L_aux (α = 0.01)</div><div class="v" id="lx">–</div></div>
+  <div class="stat"><div class="k">Tokens dropped</div><div class="v" id="dr">–</div></div>
+  <div class="stat"><div class="k">Empty slots</div><div class="v" id="es">–</div></div>
+</div>
+<p class="meta">Try this: at skew 0 the loss sits close to its minimum of 1 and only a few tokens drop. At skew 3 the loss climbs and a large share of tokens is dropped even at capacity factor 2. The loss can never go below 1, and it reaches E only if every token goes to one expert.</p>
+</div>
+
+<h3 id="ssm">State-space models: S4 and Mamba</h3>
+<p>A state-space model comes from control theory, which is why it feels familiar to roboticists. A continuous input u(t) drives a hidden state x(t) of size N, and the output reads from the state:</p>
+<pre><code>continuous:   x'(t) = A x(t) + B u(t)        y(t) = C x(t)
+discretised:  x_k = Ā x_{k-1} + B̄ u_k        y_k = C x_k      (Ā, B̄ from A, B and a step size Δ)
+
+as a convolution (when A, B, C don't depend on the input):
+  y = K * u,   K = (C B̄, C Ā B̄, C Ā² B̄, …)</code></pre>
+<p>The same layer has two forms. For <strong>training</strong>, compute the kernel K once and apply it as a long convolution over the whole sequence, which parallelises well (via FFT). For <strong>generation</strong>, run the recurrence: one fixed-size state update per token, no growing cache.</p>
+<p><strong>S4</strong> (Gu, Goel &amp; Ré, 2021) made this work for long sequences. Two ingredients: initialising A from HiPPO theory, so the state stores a compressed history of the input, and a structured parameterisation of A that makes computing K fast. S4 did very well on the Long Range Arena benchmark, including tasks with sequences of thousands of steps that Transformers struggled with.</p>
+<p><strong>Mamba</strong> (Gu &amp; Dao, 2023) fixed S4's weakness on language. In S4, A, B, C and Δ are the same for every token, so the model can't decide to remember <em>this</em> token and ignore <em>that</em> one. Mamba makes B, C and Δ functions of the current input. This is the "selective" SSM. A large Δ means "reset and take in this token"; a small Δ means "ignore it and keep the state". The cost: with input-dependent parameters there's no single kernel K, so the convolution trick is gone. Mamba instead uses a hardware-aware parallel scan that keeps the expanded state in fast on-chip memory. The paper reports about 5× higher inference throughput than Transformers and a 3B model that matches Transformers twice its size. A follow-up, Mamba-2 (Dao &amp; Gu, 2024), showed a close mathematical link between selective SSMs and a form of linear attention.</p>
+
+<h3 id="linear">Linear attention</h3>
+<p>Softmax attention computes softmax(QKᵀ)V, which needs the full L×L score matrix. Katharopoulos et al. (2020, "Transformers are RNNs") replaced the softmax with a feature map φ and used associativity:</p>
+<pre><code>softmax attention:   o_t = Σ_{s≤t} exp(q_t·k_s) v_s / Σ_{s≤t} exp(q_t·k_s)        O(L²)
+linear attention:    o_t = φ(q_t)ᵀ S_t / φ(q_t)ᵀ z_t
+                     S_t = S_{t-1} + φ(k_t) v_tᵀ     (a d×d matrix state)
+                     z_t = z_{t-1} + φ(k_t)                                       O(L)</code></pre>
+<p>The causal version is literally an RNN with a matrix-valued state. That is the same shape as an SSM, which is why the two families have merged. Plain linear attention only <em>adds</em> to its state and never forgets, so it degrades on long text. Modern variants add decay (gating) and the delta rule, which overwrites old associations instead of piling new ones on top. Kimi Delta Attention is one such variant. <a href="../05-trillion-scale-architecture.html#length">Module 05's length deep dive</a> explains it and why K3 still keeps one full-attention layer in four.</p>
+
+<h3 id="ring">Ring attention</h3>
+<p>Ring attention (Liu, Zaharia &amp; Abbeel, 2023) attacks a different problem. It doesn't change what attention computes. It keeps <strong>exact</strong> softmax attention and spreads the memory across devices.</p>
+<ol>
+<li>Split a sequence of length L into D blocks, one per device. Each device keeps its own query block.</li>
+<li>Each device computes attention between its queries and the key/value block it currently holds, using the blockwise "online softmax" trick (keep a running max and running sum, as in FlashAttention), so partial results can be combined exactly.</li>
+<li>Each device passes its K/V block to the next device in the ring and receives one from the previous device.</li>
+<li>After D steps every query block has seen every K/V block. The send for the next step overlaps with the compute of the current one, so if each block is big enough, communication is hidden.</li>
+</ol>
+<pre><code>per-device activation memory  ∝ L / D        (one block of Q, K, V at a time)
+total attention compute       ∝ L²           (unchanged: it's still exact attention)
+max context                   ≈ D × (what one device can hold)</code></pre>
+<p>The paper's title says "near-infinite". The honest reading: context grows linearly with the number of devices, and the paper reports sequences of millions of tokens. The total compute is still quadratic. Ring attention is a training and long-prefill tool for clusters. It does nothing for a single GPU.</p>
+
+<h2 id="practice">3. The practice project</h2>
+
+<h3>(a) Laptop / Colab version: a Switch MoE in a tiny GPT</h3>
+<ol>
+<li>Start from a small character-level GPT (nanoGPT-style): 4 layers, d<sub>model</sub> = 256, context 256, on Tiny Shakespeare. Train it dense as the baseline.</li>
+<li>Swap the feed-forward block in every other layer for the MoE layer below, with E = 8 experts, top-1, each expert the same size as the dense feed-forward block. Active compute per token stays roughly the same; total parameters in those layers grow about 8×.</li>
+<li>Train three variants for the same number of steps: dense; MoE with α = 0; MoE with α = 0.01.</li>
+<li>Measure: validation loss against steps; tokens per second (forward + backward, after warm-up, with <code>torch.cuda.synchronize()</code> around the timer); per-expert load histogram every 200 steps; fraction of dropped tokens.</li>
+<li>Repeat at capacity factor 1.0 and 1.5.</li>
+</ol>
+<pre><code>import torch, torch.nn as nn, torch.nn.functional as F
+
+class SwitchMoE(nn.Module):
+    def __init__(s, d, h, E, cf=1.25):
+        super().__init__()
+        s.E, s.cf = E, cf
+        s.router = nn.Linear(d, E, bias=False)
+        s.w1 = nn.Parameter(torch.randn(E, d, h) * d**-0.5)
+        s.w2 = nn.Parameter(torch.randn(E, h, d) * h**-0.5)
+
+    def forward(s, x):                       # x: (B, T, d)
+        B, T, d = x.shape
+        x = x.reshape(-1, d)
+        p = F.softmax(s.router(x), -1)        # (N, E)
+        gate, idx = p.max(-1)                # top-1
+        f = F.one_hot(idx, s.E).float().mean(0)
+        aux = s.E * (f * p.mean(0)).sum()    # Switch loss, multiply by α outside
+        cap = int(s.cf * x.shape[0] / s.E)
+        out = torch.zeros_like(x)
+        for e in range(s.E):                 # simple loop, fine for E=8
+            sel = (idx == e).nonzero().squeeze(-1)[:cap]   # drop overflow
+            h = F.gelu(x[sel] @ s.w1[e])
+            out[sel] = gate[sel, None] * (h @ s.w2[e])
+        return out.reshape(B, T, d), aux</code></pre>
+<p>What to expect, honestly. With α = 0 you should see the load histogram skew, sometimes badly, and dropped tokens rise. With α = 0.01 the loads should stay much flatter. On loss per step, the MoE will usually match or beat the dense baseline, since it has more parameters at similar compute. On <strong>tokens per second</strong>, the MoE will very likely be <em>slower</em> than dense at this size. The Python loop, the gather/scatter and the small per-expert matmuls dominate. That's a real finding, not a bug: MoE throughput wins need grouped-matmul kernels and large batches.</p>
+
+<h3>(b) The full version from the post</h3>
+<p>Benchmarking MoE throughput "against a dense transformer" properly means a GPT-2-scale or larger model, many experts (16–64), and expert parallelism: experts live on different GPUs and tokens move with an all-to-all collective. Use an existing kernel library (for example MegaBlocks-style grouped/block-sparse matmuls) rather than the loop above. Compare against two baselines: a dense model with the same <em>active</em> parameters (same FLOPs per token) and one with the same <em>total</em> parameters. Report tokens/s, loss at fixed tokens, peak memory and all-to-all time from a profiler. Hardware: one multi-GPU node is enough to see the communication cost. Cost scales with tokens trained; estimate it with the 6 × N<sub>active</sub> × D FLOPs rule from <a href="../06-30u30/25-scaling-laws.html">Day 25</a> before renting anything.</p>
+
+<h3>(c) Pitfalls</h3>
+<ul>
+<li><strong>Comparing at the wrong baseline.</strong> "MoE beats dense" means nothing unless you say whether dense matches active or total parameters.</li>
+<li><strong>Router in low precision.</strong> Switch kept the router computation in float32 for stability. Do the same if you train in bf16.</li>
+<li><strong>Measuring the first steps.</strong> Warm up, synchronise the GPU, and time many steps.</li>
+<li><strong>Ignoring dropped tokens.</strong> A good loss with 15% of tokens skipping the layer isn't the model you think it is.</li>
+<li><strong>Loss weight too high.</strong> A large α flattens the loads but forces the router to ignore content. Watch the main loss, not just the histogram.</li>
+<li><strong>For SSMs:</strong> the naive sequential scan in Python is extremely slow. Use the reference Mamba kernels, or stick to S4's convolution form for learning.</li>
+</ul>
+
+<h2 id="reality">4. Reality check</h2>
+<div class="card note">
+<p><strong>The post's claim: quadratic attention is being replaced.</strong> Half true.</p>
+<ul>
+<li><strong>True:</strong> most new large models are MoE, and many long-context models now use cheap recurrent layers (linear attention, SSM or sliding-window) for most of their depth. Module 05's Kimi K3 uses 3 KDA layers for every full-attention layer.</li>
+<li><strong>Overstated:</strong> full attention hasn't been removed. Hybrids keep some global-attention layers because fixed-size states lose exact recall: copying a long string or finding one fact in a huge context. Pure SSM and pure linear-attention models have generally trailed attention on those tasks.</li>
+<li><strong>Different problems:</strong> MoE has nothing to do with the quadratic bottleneck. It addresses parameter cost, not sequence length. Ring attention doesn't remove the quadratic cost either; it splits it across devices.</li>
+<li><strong>"Physics of the alternatives"</strong> is a good instinct. The useful skill is to reason about FLOPs, memory traffic and communication per token for each design, which is exactly what the demo and the project make you do.</li>
+</ul>
+</div>
+
+<h2 id="course">5. In this course</h2>
+<ul>
+<li><a href="../05-trillion-scale-architecture.html#width">Module 05 · width</a>: routing 896 experts, why auxiliary losses are being replaced, and Quantile Balancing (with a demo).</li>
+<li><a href="../05-trillion-scale-architecture.html#length">Module 05 · length</a>: hybrid linear + global attention, Kimi Delta Attention, why no positional encoding is needed.</li>
+<li><a href="../05-trillion-scale-architecture.html#serving">Module 05 · serving</a>: what a mixed fixed-state / growing-cache model means for inference memory.</li>
+<li><a href="../06-30u30/13-attention.html">06 Day 13 · Attention</a> and <a href="../06-30u30/14-annotated-transformer.html">Day 14 · The Annotated Transformer</a>: the baseline everything here modifies.</li>
+<li><a href="../06-30u30/01-rnn-effectiveness.html">06 Day 1</a> and <a href="../06-30u30/02-lstm.html">Day 2 · LSTM</a>: recurrent state, the ancestor of SSMs and linear attention.</li>
+<li><a href="../06-30u30/24-gpipe.html">06 Day 24 · GPipe</a>: another way to split one model across devices, useful context for ring attention.</li>
+<li><a href="../06-30u30/25-scaling-laws.html">06 Day 25 · Scaling laws</a>: the FLOPs accounting you need to compare MoE with dense fairly.</li>
+</ul>
+
+<h2 id="robotics">6. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Fixed-size state suits streaming sensors.</strong> A robot policy that conditions on a long history of camera frames and joint states can't keep an ever-growing attention cache on an embedded GPU. SSM or linear-attention layers give constant memory and constant time per control step.</li>
+<li><strong>SSMs are control theory again.</strong> x<sub>k</sub> = Āx<sub>k-1</sub> + B̄u<sub>k</sub> is the same linear state update used in classical state estimators. Mamba's selectivity is a learned, input-dependent version of choosing how much to trust each new measurement.</li>
+<li><strong>MoE is a mixed blessing on a robot.</strong> It cuts compute per step, but all experts must sit in memory. On-board memory, not FLOPs, is often the binding limit, so a dense distilled model (see <a href="../04-distill-small-models.html">Module 04</a>) can be the better fit for the robot itself.</li>
+<li><strong>Ring attention is a training-side tool.</strong> It helps train on very long robot or video episodes across a cluster. It doesn't run on the robot.</li>
+</ul>
+</div>
+
+<h2 id="check">7. Self-check</h2>
+<details><summary>Why does the Switch auxiliary loss multiply f<sub>i</sub> by P<sub>i</sub> instead of using f<sub>i</sub> alone?</summary><p>f<sub>i</sub> comes from a hard argmax count, so it has no gradient. P<sub>i</sub> is a mean of softmax probabilities and is differentiable. The product lets gradients reduce the probability mass on experts that are already receiving many tokens.</p></details>
+<details><summary>With E experts and perfectly uniform routing, what is E·Σ f<sub>i</sub>P<sub>i</sub>? And with total collapse?</summary><p>Uniform: E · E · (1/E)(1/E) = 1, the minimum. Total collapse onto one expert with probability near 1: about E.</p></details>
+<details><summary>What happens to a token routed to an expert that's already at capacity?</summary><p>It's dropped from that layer: the expert doesn't process it and it continues only through the residual connection. Raising the capacity factor reduces drops but wastes slots and memory.</p></details>
+<details><summary>Why can S4 train with a convolution but Mamba can't?</summary><p>In S4, Ā, B̄ and C are the same at every step, so the output is a fixed kernel convolved with the input. Mamba makes B, C and Δ depend on each token, so there's no single kernel. It uses a parallel scan instead.</p></details>
+<details><summary>Does ring attention make attention cost linear in sequence length?</summary><p>No. Total compute is still quadratic. It divides activation memory across D devices, so maximum context grows roughly D times, and it hides communication behind computation.</p></details>
+<details><summary>Why do hybrid models keep some full-attention layers?</summary><p>A fixed-size state must compress the past, so it loses exact recall of arbitrary earlier tokens. A few global-attention layers restore precise retrieval while the cheap layers handle most of the depth.</p></details>
+
+<h2 id="courses">8. Courses &amp; content</h2>
+<div class="table-wrap"><table>
+<tr><th>Resource</th><th>Type</th><th>Use it for</th></tr>
+<tr><td><a href="https://stanford-cs336.github.io/spring2025/">Stanford CS336 lectures</a></td><td>University course (free materials)</td><td>Architecture variants and mixture of experts</td></tr>
+<tr><td><a href="https://huggingface.co/blog/moe">Hugging Face · Mixture of Experts Explained</a></td><td>Blog guide</td><td>Routing, load-balancing loss, capacity factor</td></tr>
+<tr><td><a href="https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-mixture-of-experts">A Visual Guide to Mixture of Experts</a></td><td>Illustrated guide</td><td>MoE intuition with diagrams</td></tr>
+<tr><td><a href="https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-mamba-and-state">A Visual Guide to Mamba and State Space Models</a></td><td>Illustrated guide</td><td>From RNNs to S4 to Mamba's selective scan</td></tr>
+<tr><td><a href="https://srush.github.io/annotated-s4/">The Annotated S4</a></td><td>Annotated code</td><td>S4 implemented step by step</td></tr>
+<tr><td><a href="https://web.stanford.edu/class/cs25/">Stanford CS25 · Transformers United</a></td><td>Seminar talks (free)</td><td>Talks from the people building new architectures</td></tr>
+</table></div>
+<p>Start with the Hugging Face MoE guide: it maps directly onto the practice project. Then do the Annotated S4 for the SSM half.</p>
+<p class="meta"><a href="index.html#courses">Full course map for all 12 stages →</a></p>
+
+<h2 id="papers">9. Papers &amp; docs</h2>
+<ul>
+<li>Shazeer et al. (2017), <a href="https://arxiv.org/abs/1701.06538">Outrageously Large Neural Networks: The Sparsely-Gated Mixture-of-Experts Layer</a></li>
+<li>Fedus, Zoph &amp; Shazeer (2021), <a href="https://arxiv.org/abs/2101.03961">Switch Transformers: Scaling to Trillion Parameter Models with Simple and Efficient Sparsity</a></li>
+<li>Gu, Goel &amp; Ré (2021), <a href="https://arxiv.org/abs/2111.00396">Efficiently Modeling Long Sequences with Structured State Spaces</a> (S4)</li>
+<li>Gu &amp; Dao (2023), <a href="https://arxiv.org/abs/2312.00752">Mamba: Linear-Time Sequence Modeling with Selective State Spaces</a></li>
+<li>Katharopoulos, Vyas, Pappas &amp; Fleuret (2020), <a href="https://arxiv.org/abs/2006.16236">Transformers are RNNs: Fast Autoregressive Transformers with Linear Attention</a></li>
+<li>Liu, Zaharia &amp; Abbeel (2023), <a href="https://arxiv.org/abs/2310.01889">Ring Attention with Blockwise Transformers for Near-Infinite Context</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="02-scaling-data-mixing.html"><small>Previous</small>Stage 02 · Scaling laws &amp; data mixing</a>
+  <a class="next" href="04-synthetic-data.html"><small>Next</small>Stage 04 · Synthetic data &amp; curation</a>
+</nav>
+<footer>Module 08 · Stage 03 · written for this course from the source post and primary papers.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('mc'), ctx = cv.getContext('2d');
+const nIn = document.getElementById('ne'), sIn = document.getElementById('sk'), cIn = document.getElementById('cf');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const T = 512;
+
+function rng(seed) {
+  return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+const gauss = r => Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(2 * Math.PI * r());
+
+function route(E, skew, cf) {
+  const r = rng(7), pop = Array.from({ length: E }, () => gauss(r));
+  const cnt = new Array(E).fill(0), P = new Array(E).fill(0);
+  for (let t = 0; t < T; t++) {
+    const z = pop.map(p => skew * p + gauss(r)), m = Math.max(...z);
+    const ex = z.map(v => Math.exp(v - m)), s = ex.reduce((a, b) => a + b, 0);
+    ex.forEach((v, i) => P[i] += v / s / T);
+    cnt[z.indexOf(m)]++;
+  }
+  const f = cnt.map(c => c / T), cap = Math.floor(cf * T / E);
+  const kept = cnt.reduce((a, c) => a + Math.min(c, cap), 0);
+  const aux = E * f.reduce((a, v, i) => a + v * P[i], 0);
+  return { f, P, cap, aux, dropped: (T - kept) / T, empty: 1 - kept / (cap * E) };
+}
+
+function draw() {
+  const E = +nIn.value, skew = +sIn.value, cf = +cIn.value, res = route(E, skew, cf);
+  document.getElementById('nev').textContent = E;
+  document.getElementById('skv').textContent = skew.toFixed(1);
+  document.getElementById('cfv').textContent = cf.toFixed(2);
+  const W = cv.width, H = cv.height, L = 40, B = 24, top = 12;
+  const ymax = Math.max(0.3, ...res.f, ...res.P, res.cap / T) * 1.1;
+  const py = v => H - B - v / ymax * (H - B - top), bw = (W - L - 10) / E;
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = css('--line'); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(L, py(0)); ctx.lineTo(W - 10, py(0)); ctx.stroke();
+  ctx.font = '12px sans-serif'; ctx.fillStyle = css('--muted'); ctx.textAlign = 'right';
+  [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9].filter(v => v <= ymax).forEach(v => ctx.fillText(v.toFixed(1), L - 6, py(v) + 4));
+  ctx.textAlign = 'center';
+  res.f.forEach((v, i) => {
+    const x = L + i * bw;
+    ctx.fillStyle = css('--accent'); ctx.fillRect(x + bw * 0.1, py(v), bw * 0.4, py(0) - py(v));
+    ctx.fillStyle = css('--muted'); ctx.fillRect(x + bw * 0.5, py(res.P[i]), bw * 0.4, py(0) - py(res.P[i]));
+    if (E <= 16) ctx.fillText(i + 1, x + bw / 2, H - 8);
+  });
+  ctx.strokeStyle = css('--fail'); ctx.setLineDash([6, 5]); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(L, py(res.cap / T)); ctx.lineTo(W - 10, py(res.cap / T)); ctx.stroke(); ctx.setLineDash([]);
+  document.getElementById('la').textContent = res.aux.toFixed(2);
+  document.getElementById('lx').textContent = (0.01 * res.aux).toFixed(4);
+  document.getElementById('dr').textContent = (100 * res.dropped).toFixed(1) + '%';
+  document.getElementById('es').textContent = (100 * res.empty).toFixed(1) + '%';
+}
+nIn.oninput = sIn.oninput = cIn.oninput = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

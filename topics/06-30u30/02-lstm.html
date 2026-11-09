@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 02 · Understanding LSTMs</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 02</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Unit 1 · The foundations · Day 02</div>
+<h1>Understanding LSTM Networks</h1>
+<p class="lede">Give the network a memory lane that is updated by addition, guarded by learned gates, and it can carry information across hundreds of steps.</p>
+
+<div class="facts">
+  <div><b>Author</b>Christopher Olah</div>
+  <div><b>Year / venue</b>2015 · blog post</div>
+  <div><b>Core idea</b>Gated, additive memory</div>
+  <div><b>Study time</b>2–3 h</div>
+</div>
+<p class="meta">Original: <a href="https://colah.github.io/posts/2015-08-Understanding-LSTMs/">colah.github.io</a> · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/02_Understanding_LSTM">30u30 Day 2</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">An LSTM is a computer memory that can decide what to keep, what to forget and what to use, so it can remember things for a long time.</p>
+
+<h3>Think of it like this</h3>
+<p>Think of a school backpack. Every morning you decide what to take out (old homework you no longer need), what to put in (today's books), and what to pull out in class (only the book for this lesson). If you emptied the whole bag every hour, you would lose everything. If you never took anything out, it would overflow. An LSTM has little "gates" that make these three choices for its memory at every step.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>The program reads one new piece of information, like a word.</li>
+<li>A "forget gate" decides which old memories to throw away.</li>
+<li>An "input gate" decides which new things are worth saving.</li>
+<li>The kept memories and the new ones are added together into the memory.</li>
+<li>An "output gate" picks which memories to use right now. Then the next piece arrives and it all repeats.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot hand turning a block cannot see everything at once. Its fingers may hide part of the block. With an LSTM, the robot can remember what it felt and saw a moment ago, and use that to guess how the block is moving now.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Ask a friend to read you a long list of 20 random words. Afterwards, write down what you remember. You will probably keep the first few and the last few, and forget the middle. A plain RNN is worse than you at this. The LSTM's gates help it keep the important ones.</li>
+<li>In the demo further down, move the <b>Forget gate f</b> slider close to 1, then down to 0.5. Watch how far the LSTM memory line reaches before it fades. Then push the <b>RNN gain g</b> slider above 1 and watch the RNN line shoot upwards instead.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Memory (cell state)</dt><dd>The long-term notes the LSTM carries from step to step.</dd>
+<dt>Gate</dt><dd>A dial from 0 (block everything) to 1 (let everything through).</dd>
+<dt>Forget gate</dt><dd>The gate that decides which old memories to wipe.</dd>
+<dt>RNN</dt><dd>A neural network that reads things one step at a time and carries a memory along.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Olah's post is not a research paper. It is the explanation of the Long Short-Term Memory cell that most people learned from. A plain RNN overwrites its whole state at every step, so old information fades fast. An LSTM adds a second vector, the <em>cell state</em>, that is changed only by element-wise multiply and add. Three sigmoid gates decide what to erase, what to write and what to expose. Because the default is "keep", long-range memory becomes easy to learn instead of nearly impossible.</p>
+</div>
+<ul>
+<li><strong>Problem:</strong> RNNs struggle with long-term dependencies. Hochreiter (1991) and Bengio et al. (1994) showed why: gradients shrink or blow up over many steps.</li>
+<li><strong>Fix:</strong> the LSTM, from Hochreiter &amp; Schmidhuber (1997), later refined by others. The forget gate, now standard, was a later addition.</li>
+<li><strong>Mechanism:</strong> forget gate, input gate plus candidate, output gate. Four small layers per cell instead of one.</li>
+<li><strong>Variants:</strong> peepholes, coupled forget/input gates, and the GRU (Cho et al., 2014). Large comparisons found them roughly equal.</li>
+<li><strong>Closing note:</strong> the post points at attention as the next big step. That's Days 13–15.</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<p>At step <em>t</em> the cell sees the new input <code>x_t</code> and its previous output <code>h_{t−1}</code>. Write <code>[h, x]</code> for the two vectors stacked together and <code>σ</code> for the sigmoid.</p>
+<pre><code>f_t = σ(W_f · [h_{t−1}, x_t] + b_f)       # forget gate, 0..1 per unit
+i_t = σ(W_i · [h_{t−1}, x_t] + b_i)       # input gate
+g_t = tanh(W_g · [h_{t−1}, x_t] + b_g)    # candidate values, −1..1
+o_t = σ(W_o · [h_{t−1}, x_t] + b_o)       # output gate
+
+c_t = f_t ⊙ c_{t−1} + i_t ⊙ g_t           # cell state: erase, then add
+h_t = o_t ⊙ tanh(c_t)                     # what the rest of the net sees</code></pre>
+<p>Term by term:</p>
+<ul>
+<li><code>f_t</code> is a per-unit "keep" fraction. 1 keeps the old memory, 0 wipes it.</li>
+<li><code>g_t</code> is what <em>could</em> be written. <code>i_t</code> decides how much of it actually is.</li>
+<li><code>c_t</code> is the long-term memory. Note the update is a weighted sum, not a squashing function of the old state.</li>
+<li><code>o_t</code> picks which parts of memory are relevant right now. <code>h_t</code> is short-term, working output.</li>
+<li><code>⊙</code> is element-wise multiplication. Each memory unit has its own gates.</li>
+</ul>
+<p>Compare the vanilla RNN of <a href="01-rnn-effectiveness.html">Day 01</a>: <code>h_t = tanh(W·[h_{t−1}, x_t])</code>. There the whole state passes through a matrix and a squashing function every step. In the LSTM, the cell path has neither.</p>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>Why the additive path fixes vanishing gradients</h3>
+<p>Back-propagating one step along the cell state, the direct path gives <code>∂c_t / ∂c_{t−1} = f_t</code>. Over <em>k</em> steps that becomes the product of the forget gates. If the network wants to remember, it learns <code>f ≈ 1</code> and the gradient survives almost untouched. In a vanilla RNN the per-step factor is the recurrent matrix times the <code>tanh</code> slope. Unless that product sits at exactly 1, it shrinks or grows geometrically. The LSTM doesn't remove the problem by magic: it gives the optimiser a knob that sits naturally at "keep". This idea, a protected identity-like path, returns in ResNets (<a href="09-resnet.html">Day 09</a>, <a href="10-resnet-identity-mappings.html">Day 10</a>) and in the attention residuals of <a href="../05-trillion-scale-architecture.html#depth">Module 05</a>.</p>
+
+<div class="card demo">
+<h3>Interactive: what survives k steps</h3>
+<p class="legend">Fraction of a signal (or gradient) from step 0 still present after k steps. <b style="color:var(--accent)">LSTM cell path</b> scales by the forget gate f each step. <b class="f">Vanilla RNN</b> scales by an effective gain g (recurrent weight × tanh slope). Log scale.</p>
+<canvas id="mem" width="700" height="220" aria-label="Log-scale plot of signal retention over 100 steps for an LSTM and a vanilla RNN"></canvas>
+<label for="f">Forget gate f: <span id="fv" class="num"></span></label>
+<input id="f" type="range" min="0.5" max="1" step="0.005" value="0.97">
+<label for="g">RNN gain g: <span id="gv" class="num"></span></label>
+<input id="g" type="range" min="0.5" max="1.2" step="0.005" value="0.9">
+<div class="stats">
+  <div class="stat"><div class="k">LSTM steps to 1%</div><div class="v" id="sl">–</div></div>
+  <div class="stat"><div class="k">RNN steps to 1%</div><div class="v" id="sr">–</div></div>
+</div>
+</div>
+<p>Try g slightly above 1: the RNN signal explodes instead. That's why vanilla RNNs need gradient clipping and still learn long gaps poorly. The forget gate is bounded by 1, so the cell path can't explode, though the gate paths still can, so clipping remains common practice.</p>
+
+<h3>Initialisation and the forget-gate bias</h3>
+<p>If <code>b_f</code> starts near 0, the forget gate starts near 0.5 and memory halves every step at the start of training. A common fix is to initialise <code>b_f</code> to 1 or more so the cell remembers by default, a choice Jozefowicz et al. (2015) found important. It is a small detail with a large effect, and it's worth testing yourself in the exercises.</p>
+
+<h3>Variants, and what came next</h3>
+<ul>
+<li><strong>Peepholes</strong> (Gers &amp; Schmidhuber, 2000) let gates read the cell state directly.</li>
+<li><strong>GRU</strong> merges forget and input into one update gate and drops the separate cell state. Fewer parameters, often similar results.</li>
+<li><strong>Greff et al. (2015)</strong> compared popular variants and found them about the same. <strong>Jozefowicz et al. (2015)</strong> searched over 10,000 architectures and found a few that beat the LSTM on some tasks.</li>
+<li><strong>Attention</strong> (Days 13–15) lets each step look back at any earlier step instead of squeezing the past into one vector. Transformers replaced LSTMs for most language work. Recurrent ideas returned in linear-attention and state-space layers, as in <a href="../05-trillion-scale-architecture.html#length">Kimi K3's hybrid design</a>.</li>
+</ul>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Partial observability.</strong> A single sensor frame rarely tells a robot everything: velocity, contact history, payload mass and friction are hidden. A recurrent policy can integrate them from history. OpenAI's 2018 dexterous-hand controller, for example, used an LSTM policy.</li>
+<li><strong>A learned filter.</strong> An LSTM over IMU and joint readings plays the role a Kalman filter plays in classical control: it keeps a running estimate of state from noisy measurements. The gates decide what to trust and what to forget.</li>
+<li><strong>Constant cost per step.</strong> An LSTM does the same small amount of work each control tick, whatever the history length. That suits embedded control loops with hard deadlines (see <a href="../04-distill-small-models.html#latency">Module 04 on latency</a>), where a transformer's growing context would not.</li>
+<li><strong>Intent over time.</strong> Inferring what a human operator wants means accumulating evidence across many inputs and dropping it when they change their mind, which is exactly what a forget gate does (compare <a href="../03-shared-autonomy.html#intent">Module 03</a>).</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Read Olah's post with a pen. Redraw the cell diagram from memory, then write the six equations next to it.</li>
+<li>In the 30u30 Day 2 folder, read <code>implementation.py</code> and follow one forward step by hand. Then run <code>train_minimal.py</code>.</li>
+<li>Work through <code>notebook.ipynb</code> and the five exercises: building the cell, gate analysis, ablations, long-range dependencies, and LSTM vs GRU.</li>
+<li>Ablation to try: set the forget-gate bias to 0 and then to 2. Compare how fast training learns a long-gap copy task.</li>
+<li>Stretch: train an LSTM to estimate velocity from noisy position readings of a simulated pendulum.</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>Which operation makes the cell state good at keeping information?</summary><p>The update <code>c_t = f ⊙ c_{t−1} + i ⊙ g</code> is element-wise and additive. There's no matrix multiply or squashing function on the direct path, so with <code>f ≈ 1</code> the memory and its gradient pass through nearly unchanged.</p></details>
+<details><summary>What do the input gate and the candidate each do?</summary><p>The candidate <code>g_t</code> (tanh) proposes new values. The input gate <code>i_t</code> (sigmoid) scales how much of each proposed value actually gets written.</p></details>
+<details><summary>Why initialise the forget-gate bias to around 1?</summary><p>With bias 0 the gate starts near 0.5, so memory decays by half each step and early gradients vanish. A positive bias makes "remember" the default until training learns otherwise.</p></details>
+<details><summary>How does a GRU differ from an LSTM?</summary><p>It merges the forget and input gates into a single update gate and merges cell state and hidden state into one vector. It is simpler and often performs about the same.</p></details>
+<details><summary>Does an LSTM fully solve exploding gradients?</summary><p>No. The cell path is bounded because <code>f ≤ 1</code>, but gradients through the gates and <code>h</code> can still grow, so gradient clipping remains standard.</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://colah.github.io/posts/2015-08-Understanding-LSTMs/">The original post</a>, and Hochreiter &amp; Schmidhuber (1997), "Long Short-Term Memory", <em>Neural Computation</em></li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/02_Understanding_LSTM">30u30 Day 2</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Next: <a href="03-rnn-regularization.html">Day 03, Recurrent Neural Network Regularization</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="01-rnn-effectiveness.html"><small>Previous</small>Day 01 · RNN Effectiveness</a>
+  <a class="next" href="03-rnn-regularization.html"><small>Next</small>Day 03 · RNN Regularisation</a>
+</nav>
+<footer>Module 06 · Day 02 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('mem'), ctx = cv.getContext('2d');
+const fIn = document.getElementById('f'), gIn = document.getElementById('g');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const K = 100, LO = -6, HI = 2;   // y axis: 10^-6 .. 10^2
+
+function stepsTo1pct(r) {
+  if (r >= 1) return r > 1 ? 'explodes' : 'never';
+  return Math.ceil(Math.log(0.01) / Math.log(r));
+}
+
+function draw() {
+  const f = +fIn.value, g = +gIn.value;
+  document.getElementById('fv').textContent = f.toFixed(3);
+  document.getElementById('gv').textContent = g.toFixed(3);
+  const W = cv.width, H = cv.height, L = 44, R = 12, T = 12, B = 26;
+  const x = k => L + (W - L - R) * k / K;
+  const y = v => T + (H - T - B) * (HI - Math.max(LO, Math.min(HI, Math.log10(v)))) / (HI - LO);
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '12px sans-serif'; ctx.lineWidth = 1;
+  for (let e = LO; e <= HI; e += 2) {
+    ctx.strokeStyle = css('--line'); ctx.beginPath(); ctx.moveTo(L, y(10 ** e)); ctx.lineTo(W - R, y(10 ** e)); ctx.stroke();
+    ctx.fillStyle = css('--muted'); ctx.textAlign = 'right'; ctx.fillText('1e' + e, L - 6, y(10 ** e) + 4);
+  }
+  ctx.setLineDash([4, 4]); ctx.strokeStyle = css('--muted');
+  ctx.beginPath(); ctx.moveTo(L, y(0.01)); ctx.lineTo(W - R, y(0.01)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.textAlign = 'center'; ctx.fillStyle = css('--muted');
+  for (let k = 0; k <= K; k += 20) ctx.fillText(k, x(k), H - 8);
+  [[f, css('--accent')], [g, css('--fail')]].forEach(([r, c]) => {
+    ctx.strokeStyle = c; ctx.lineWidth = 2.5; ctx.beginPath();
+    for (let k = 0; k <= K; k++) { const v = r ** k; k ? ctx.lineTo(x(k), y(v)) : ctx.moveTo(x(k), y(v)); }
+    ctx.stroke();
+  });
+  document.getElementById('sl').textContent = stepsTo1pct(f);
+  document.getElementById('sr').textContent = stepsTo1pct(g);
+}
+fIn.oninput = gIn.oninput = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 16 · Order Matters</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 16</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Unit 3 · The Transformer era · Day 16</div>
+<h1>Order Matters: Sequence to Sequence for Sets</h1>
+<p class="lede">Seq2seq models care about the order you feed them, even when the data has no natural order. This paper measures that, then shows how to read a set without caring about order.</p>
+
+<div class="facts">
+  <div><b>Authors</b>Oriol Vinyals, Samy Bengio, Manjunath Kudlur</div>
+  <div><b>Year / venue</b>2015 arXiv · ICLR 2016</div>
+  <div><b>Core idea</b>Order-invariant set encoding; learn the output order</div>
+  <div><b>Study time</b>3–4 h</div>
+</div>
+<p class="meta">Original: <a href="https://arxiv.org/abs/1511.06391">arXiv:1511.06391</a> · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/16_order_matters">30u30 Day 16</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Some things are just a group with no real order, like the toys on a table, and a computer should give the same answer however that group is listed.</p>
+
+<h3>Think of it like this</h3>
+<p>Your shopping list "milk, eggs, bread" is the same list as "bread, milk, eggs". But if a friend reads it one item at a time, the order can still change what they remember best. This paper shows that computers that read one item at a time have the same problem. It then builds a reader that looks at the whole group at once, so the order stops mattering. It also shows that when the computer has to give its answer one item at a time, some orders are easier to learn, just like packing a bag is easier if the heavy things go in first.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Read: turn each item into a note, using the same method for every item.</li>
+<li>Process: a "thinker" looks over all the notes at once, several times, using attention. Because it mixes everything together, shuffling the items doesn't change its result.</li>
+<li>Write: it answers by pointing at items one at a time, for example from smallest to largest.</li>
+<li>When the answer itself is a group, the computer is allowed to learn which order of answers is easiest, instead of being forced into one.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot's camera might list the objects on a table as "cup, apple, toy" one time and "toy, cup, apple" the next. The robot should make the same choice either way. And when clearing the table, it has to pick an order: taking the top box off a stack first is much easier than pulling out the bottom one.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Write six numbers on cards. Shuffle them a few times and add them up each time. The total never changes: adding doesn't care about order. Now sort the cards from smallest to largest.</li>
+<li>In the demo further down, press <b>Shuffle order</b> a few times. The "RNN final state" changes, but the "Readout" stays the same. Press <b>New set</b> for new numbers, and try the <b>Processing steps T</b> slider.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Set</dt><dd>A group of things where order doesn't matter.</dd>
+<dt>Sequence</dt><dd>A list where order does matter, like the words in a sentence.</dd>
+<dt>Order-invariant</dt><dd>Gives the same answer no matter how the input is shuffled.</dd>
+<dt>Read, Process, Write</dt><dd>The three parts of this paper's model: take in, think, answer.</dd>
+<dt>Pointer</dt><dd>Answering by picking one of the input items.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>An LSTM encoder reads its input one element at a time, so the order of the input shapes what it learns. That is fine for sentences and wrong for sets, like "the numbers to sort" or "the objects on the table". The paper makes three points. First, ordering choices change results even when, in theory, they shouldn't. Second, a <strong>Read–Process–Write</strong> model with content-based attention can encode a set so that shuffling it changes nothing. Third, when the <em>output</em> is a set, you can let the model search for the order that is easiest to produce during training.</p>
+</div>
+<ul>
+<li><strong>Input order matters in practice:</strong> reversing source sentences helped translation, and sorting convex-hull points by angle first improved accuracy by up to 10% absolute.</li>
+<li><strong>Read:</strong> embed each element with the same small network. These embeddings form a memory.</li>
+<li><strong>Process:</strong> an LSTM with no inputs repeatedly attends over the memory for T steps. Attention is a weighted sum, so the result ignores memory order.</li>
+<li><strong>Write:</strong> a pointer network (<a href="18-pointer-networks.html">Day 18</a>) outputs indices into the set.</li>
+<li><strong>Output order matters too:</strong> for parse trees, depth-first linearisation reached 89.5% F1 versus 81.5% for breadth-first.</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<p>Given memories <code>m_1 … m_n</code> (one per set element, from the Read block), the Process block runs for t = 1 … T:</p>
+<pre><code>q_t   = LSTM(q*_{t−1})               # query, from the previous step
+e_i,t = f(m_i, q_t)                  # score each memory, e.g. dot product
+a_i,t = exp(e_i,t) / Σ_j exp(e_j,t)   # attention weights
+r_t   = Σ_i a_i,t · m_i               # readout
+q*_t  = [q_t ; r_t]                   # next LSTM state input</code></pre>
+<ul>
+<li><code>q_t</code> is the LSTM's query. The LSTM has no external input: its only information about the set comes through <code>r_t</code>.</li>
+<li><code>f</code> returns one number per memory. Dot product is the simple choice.</li>
+<li><code>r_t</code> is a weighted sum. Sums don't depend on the order of their terms, so permuting the memories leaves <code>r_t</code>, and therefore every later <code>q_t</code>, unchanged.</li>
+<li>After T steps, <code>q*_T</code> is a permutation-invariant embedding of the whole set. More steps let the model "think" about the set before writing.</li>
+</ul>
+<p>For outputs that are sets, the paper trains with the best ordering instead of a fixed one:</p>
+<pre><code>θ* = argmax_θ  Σ_i  max_π  log p( Y_π(X_i) | X_i ; θ )</code></pre>
+<p>Searching all n! orderings is impossible, and picking the max greedily from the start locks in a random early choice. The fix: pretrain with uniformly random orderings, then sample orderings in proportion to their probability under the model.</p>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>Evidence that order matters</h3>
+<ul>
+<li><strong>Language modelling (Penn Treebank):</strong> natural and fully reversed word order gave matching perplexity, but reversing every group of 3 words cost about 10 perplexity points.</li>
+<li><strong>Parsing:</strong> the same model, two ways of flattening the tree: 89.5% vs 81.5% F1.</li>
+<li><strong>Toy graphical models:</strong> with one "head" variable that the others depend on, putting the head first was always at least as easy to learn.</li>
+</ul>
+<p>In principle the chain rule works in any order. In practice the optimiser and the LSTM's inductive bias prefer some orders. That's the paper's main warning.</p>
+
+<h3>The sorting experiment</h3>
+<p>Task: sort N random numbers between 0 and 1, outputting indices. The baseline reads the numbers into an LSTM, then points. Read–Process–Write replaces that LSTM with the attention-based Process block. For N = 10 the baseline sorted 8% of test sets correctly (28% with "glimpses", an extra attention read before each pointer step). With 5 processing steps and glimpses, Read–Process–Write reached 57%. With zero processing steps it was mostly worse than the baseline: the set embedding needs some computation. All models struggled at N = 15 (10% at best).</p>
+<div class="card demo">
+<h3>Interactive: a sequential encoder vs an attention readout</h3>
+<p class="legend">Six numbers in [0, 1], drawn in their current order. A toy RNN (h ← tanh(0.9h + 2x − 1)) reads them left to right. A toy Process block attends over embeddings m_i = (cos πx, sin πx) for T steps, with a fixed update standing in for the LSTM. Shuffle: the RNN state changes, the readout does not. Bar height is x; the <b class="p">green</b> bar fill shows the last step's attention weight.</p>
+<canvas id="set" width="700" height="220" aria-label="A set of six numbers with attention weights"></canvas>
+<label for="ts">Processing steps T: <span id="tsv" class="num"></span></label>
+<input id="ts" type="range" min="1" max="6" step="1" value="3">
+<p><button id="shuf">Shuffle order</button> <button id="nw">New set</button></p>
+<div class="stats">
+  <div class="stat"><div class="k">RNN final state</div><div class="v" id="rnn">–</div></div>
+  <div class="stat"><div class="k">Readout r (x, y)</div><div class="v" id="ro">–</div></div>
+  <div class="stat"><div class="k">Shuffles so far</div><div class="v" id="ns">0</div></div>
+</div>
+</div>
+
+<h3>Where this went</h3>
+<p>Read–Process–Write is a small attention model over a set with no positional information. The Transformer encoder (<a href="13-attention.html">Day 13</a>) without positional encodings has the same property: self-attention is permutation-equivariant, and a pooled output is invariant. Later set models (Deep Sets, Set Transformer) and object-centric models build on that. Removing positional encoding is a deliberate choice in long-context models too: see NoPE in <a href="../05-trillion-scale-architecture.html#length">Module 05</a>, where order comes from elsewhere. Relation Networks (<a href="19-relational-reasoning.html">Day 19</a>) treat objects as a set in a different way: by summing over all pairs.</p>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>A scene is a set.</strong> Detected objects, point-cloud points and keypoints have no natural order. A policy that encodes them with an LSTM in detection order will behave differently when the detector lists them differently. An attention or pooling encoder avoids that bug by construction.</li>
+<li><strong>Task order is an output-ordering problem.</strong> "Clear the table" gives a set of objects to remove, but the robot must pick a sequence. Some orders are physically easier (top of a stack first). Learning the order, rather than fixing it by index, is exactly the paper's second idea.</li>
+<li><strong>Multi-robot and multi-sensor inputs.</strong> A fleet controller or a fusion module with a variable number of cameras or agents needs an encoder that accepts any count in any order.</li>
+<li><strong>Check invariance as a unit test.</strong> Shuffle the object list and assert the policy's output is unchanged (or permuted accordingly). It's a cheap test that catches real bugs.</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Read sections 2–4 of the paper for the model, then section 5 on output ordering. Table 1 (sorting) is the key result.</li>
+<li>In the 30u30 Day 16 folder, read <code>implementation.py</code> and identify the Read, Process and Write parts. Then run <code>train.py</code>.</li>
+<li>Write a test: shuffle the input set and confirm the Process output is identical to floating-point precision.</li>
+<li>Do exercises 1–5, and use <code>visualization.py</code> or the notebook to plot attention over the set.</li>
+<li>Note: write-ups of this paper sometimes mix in Pointer Network results (convex hull, TSP). Those belong to Day 18. Keep the original's tables as your reference.</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>Why is the Process block's output unchanged when the input set is shuffled?</summary><p>The only path from memories to the LSTM is the readout r_t, a weighted sum whose weights depend only on each memory's content. Reordering the terms of a sum doesn't change it.</p></details>
+<details><summary>Why did Read–Process–Write with zero processing steps mostly do worse than the LSTM baseline?</summary><p>With no processing steps the writer gets no real summary of the set before it starts pointing. The set embedding needs at least one round of attention to be useful.</p></details>
+<details><summary>If the chain rule works for any order, why does output order matter?</summary><p>Because learning is not exact. Some factorisations are much easier for an LSTM to fit and for SGD to find. The paper shows big gaps, like 89.5% vs 81.5% F1 for two parse-tree orders.</p></details>
+<details><summary>Why not just take the max over orderings from the first step of training?</summary><p>The untrained model's favourite ordering is arbitrary, and training on it reinforces it. Pretraining on uniformly random orders, then sampling orders by model probability, avoids locking in a bad choice.</p></details>
+<details><summary>What property does a Transformer encoder share with the Process block?</summary><p>Without positional encodings, self-attention treats its input as a set: permuting the inputs permutes the outputs the same way, and any pooled summary is unchanged.</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/1511.06391">The original paper</a> (arXiv; published at ICLR 2016)</li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/16_order_matters">30u30 Day 16</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Next: <a href="17-neural-turing-machines.html">Day 17, Neural Turing Machines</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="15-bahdanau-attention.html"><small>Previous</small>Day 15 · Bahdanau attention</a>
+  <a class="next" href="17-neural-turing-machines.html"><small>Next</small>Day 17 · Neural Turing Machines</a>
+</nav>
+<footer>Module 06 · Day 16 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('set'), ctx = cv.getContext('2d'), tIn = document.getElementById('ts');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const rng = s => () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+const r = rng(16);
+let xs = Array.from({ length: 6 }, r), shuffles = 0;
+
+function rnn(x) { return x.reduce((h, v) => Math.tanh(0.9 * h + 2 * v - 1), 0); }
+
+// stand-in Process block: dot-product attention, fixed query update instead of an LSTM
+function proc(x, T) {
+  const m = x.map(v => [Math.cos(Math.PI * v), Math.sin(Math.PI * v)]);
+  let q = [1, 0], a = [], rd = [0, 0];
+  for (let t = 0; t < T; t++) {
+    const e = m.map(k => 3 * (k[0] * q[0] + k[1] * q[1])), mx = Math.max(...e), z = e.map(v => Math.exp(v - mx)), s = z.reduce((p, c) => p + c);
+    a = z.map(v => v / s);
+    rd = m.reduce((p, k, i) => [p[0] + a[i] * k[0], p[1] + a[i] * k[1]], [0, 0]);
+    const n = [Math.tanh(q[0] + rd[1]), Math.tanh(q[1] - rd[0])], l = Math.hypot(...n) || 1;
+    q = [n[0] / l, n[1] / l];
+  }
+  return { a, rd };
+}
+
+function draw() {
+  const T = +tIn.value, { a, rd } = proc(xs, T);
+  document.getElementById('tsv').textContent = T;
+  const W = cv.width, H = cv.height, pad = 24, bw = (W - 2 * pad) / xs.length;
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+  xs.forEach((v, i) => {
+    const h = v * (H - 2 * pad - 14), x0 = pad + i * bw + 14, w = bw - 28;
+    ctx.strokeStyle = css('--line'); ctx.strokeRect(x0, H - pad - h, w, h);
+    ctx.fillStyle = css('--pass'); ctx.fillRect(x0, H - pad - h * a[i], w, h * a[i]);
+    ctx.fillStyle = css('--fg'); ctx.fillText(v.toFixed(2), x0 + w / 2, H - pad - h - 6);
+    ctx.fillStyle = css('--muted'); ctx.fillText((a[i] * 100).toFixed(0) + '%', x0 + w / 2, H - 6);
+  });
+  document.getElementById('rnn').textContent = rnn(xs).toFixed(4);
+  document.getElementById('ro').textContent = rd[0].toFixed(4) + ', ' + rd[1].toFixed(4);
+  document.getElementById('ns').textContent = shuffles;
+}
+document.getElementById('shuf').onclick = () => {
+  for (let i = xs.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [xs[i], xs[j]] = [xs[j], xs[i]]; }
+  shuffles++; draw();
+};
+document.getElementById('nw').onclick = () => { xs = Array.from({ length: 6 }, r); shuffles = 0; draw(); };
+tIn.oninput = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

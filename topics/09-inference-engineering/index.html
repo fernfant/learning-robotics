@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inference Engineering: 25 Problems</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">← LLMs &amp; Robotics</a> · Module 09</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 09 · Interview prep</div>
+<h1>LLM inference engineering: 25 interview problems, worked through with real numbers</h1>
+<p class="lede">How a model actually gets served: from one request to a million users. Ten pages cover all 25 problems, each with the concepts, a worked answer with real arithmetic, trade-offs, a model interview answer and an interactive demo.</p>
+<p class="meta">Source: Vishal Singh, <a href="https://x.com/vishalsingh2972/status/2113830444722741637">X post</a>, 24 Oct 2026 · saved in <code>sources/09-vishal-inference-25.md</code></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Training makes a model smart. Inference is using it, for lots of people, fast and cheaply. That's a big engineering job of its own.</p>
+<h3>Think of it like this</h3>
+<p>Think of a busy restaurant kitchen. The recipe (the model) is already written. Now the kitchen must cook it for hundreds of diners at once. The chef keeps ingredients ready on the counter (the memory cache), cooks several orders on one stove (batching), starts serving the first bite fast so nobody waits too long, and keeps the gas bill down (cost). Inference engineers run that kitchen.</p>
+<h3>How it works</h3>
+<ol>
+<li>A question arrives and joins a queue.</li>
+<li>The model reads the whole question in one go (this is called "prefill").</li>
+<li>Then it writes the answer one word-piece at a time, sending each as it goes (this is called "decode").</li>
+<li>To avoid re-reading everything for every new word, it keeps a memory of what it has read (the KV cache).</li>
+<li>The server juggles many people's requests on the same chips so none are left idle.</li>
+</ol>
+<h3>Why robots care</h3>
+<p>A robot's brain has the same steps, but on a small computer inside the robot with a hard time limit. If it takes too long to think, the robot keeps moving in the meantime. Module 04's "how far does the robot travel after you say stop" calculator shows why.</p>
+<h3>Try it</h3>
+<p>Next time you're in a queue at a café, notice: does the barista make one drink at a time, or start several at once? Which way gets everyone served sooner? That's the batching question in Problems 6 and 7.</p>
+<h3>Words to know</h3>
+<dl>
+<dt>Inference</dt><dd>Running a trained model to get answers.</dd>
+<dt>Token</dt><dd>A word-piece the model reads or writes.</dd>
+<dt>Latency</dt><dd>How long you wait.</dd>
+<dt>Throughput</dt><dd>How much work gets done per second, across everyone.</dd>
+<dt>GPU</dt><dd>The chip that does the model's maths.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> the rest of this page is the map of all 25 problems. The author's advice applies: don't memorise answers. Understand the concepts, work through real numbers and focus on the trade-offs.</p>
+
+<h2>Progress</h2>
+<div class="stats">
+  <div class="stat"><div class="k">Pages done</div><div class="v" id="done">0 / 10</div></div>
+  <div class="stat"><div class="k">Next up</div><div class="v" id="next" style="font-size:1rem">–</div></div>
+</div>
+
+<h2>The 10 pages (25 problems)</h2>
+<div class="paper-row"><span class="d">01</span><div><label><input type="checkbox" data-d="01"><a href="01-request-lifecycle.html">The request lifecycle and streaming</a><span class="track llm">LLM</span></label><p>1 · From request to first token. 2 · Streaming over SSE, disconnects and cancellation.</p></div></div>
+<div class="paper-row"><span class="d">02</span><div><label><input type="checkbox" data-d="02"><a href="02-kv-cache-attention.html">KV cache, PagedAttention and FlashAttention</a><span class="track both">LLM + Robotics</span></label><p>3 · Size the KV cache for a 70B model at 32K × 100 users. 4 · PagedAttention. 5 · Why FlashAttention is faster with the same maths.</p></div></div>
+<div class="paper-row"><span class="d">03</span><div><label><input type="checkbox" data-d="03"><a href="03-batching-scheduling.html">Batching and scheduling</a><span class="track llm">LLM</span></label><p>6 · Continuous vs static batching. 7 · Chunked prefill for a 100K-token prompt. 21 · Multi-tenant fairness and admission control.</p></div></div>
+<div class="paper-row"><span class="d">04</span><div><label><input type="checkbox" data-d="04"><a href="04-prefix-caching-disaggregation.html">Prefix caching and disaggregation</a><span class="track llm">LLM</span></label><p>8 · Prefix caching and cache-aware routing. 22 · Splitting prefill and decode, and moving the KV cache.</p></div></div>
+<div class="paper-row"><span class="d">05</span><div><label><input type="checkbox" data-d="05"><a href="05-latency.html">Latency</a><span class="track both">LLM + Robotics</span></label><p>9 · Cut inter-token latency without losing throughput. 10 · When speculative decoding helps or hurts. 17 · p99 is 10× p50.</p></div></div>
+<div class="paper-row"><span class="d">06</span><div><label><input type="checkbox" data-d="06"><a href="06-quantization-hardware.html">Quantisation and choosing GPUs</a><span class="track both">LLM + Robotics</span></label><p>11 · FP8 vs INT8 vs INT4 vs NVFP4. 12 · H100 vs H200 vs B200 vs L40S.</p></div></div>
+<div class="paper-row"><span class="d">07</span><div><label><input type="checkbox" data-d="07"><a href="07-profiling-kernels.html">Profiling, utilisation and kernels</a><span class="track both">LLM + Robotics</span></label><p>13 · Profile with Nsight. 14 · GPU at 30% utilisation. 15 · A fused Triton RMSNorm.</p></div></div>
+<div class="paper-row"><span class="d">08</span><div><label><input type="checkbox" data-d="08"><a href="08-engines-observability.html">Serving engines and observability</a><span class="track llm">LLM</span></label><p>16 · TTFT, TPOT, queue depth, cache hit rate, cost per request. 18 · Benchmarking vLLM vs TensorRT-LLM vs SGLang.</p></div></div>
+<div class="paper-row"><span class="d">09</span><div><label><input type="checkbox" data-d="09"><a href="09-production-operations.html">Safe rollouts and GPU autoscaling</a><span class="track llm">LLM</span></label><p>19 · Rolling out a new model or quantisation with rollback. 20 · Autoscaling with slow cold starts.</p></div></div>
+<div class="paper-row"><span class="d">10</span><div><label><input type="checkbox" data-d="10"><a href="10-scale-cost-capstone.html">MoE serving, cost and the capstone</a><span class="track llm">LLM</span></label><p>23 · Serving a large MoE: tensor, pipeline and expert parallelism. 24 · Cut cost per million tokens by 70%. 25 · ChatGPT-style serving for 1M daily users.</p></div></div>
+
+<h2>A 24-hour prep plan</h2>
+<div class="table-wrap"><table>
+<tr><th>Hours</th><th>Pages</th><th>Goal</th></tr>
+<tr><td>0–4</td><td>01, 02</td><td>Explain prefill vs decode, and size a KV cache on paper without notes.</td></tr>
+<tr><td>4–8</td><td>03, 04</td><td>Explain why continuous batching wins, and sketch prefix caching and disaggregation.</td></tr>
+<tr><td>8–12</td><td>05, 06</td><td>Do the speculative-decoding and bandwidth-bound arithmetic. Pick a GPU and a precision, and justify both.</td></tr>
+<tr><td>12–16</td><td>07, 08</td><td>Explain the roofline, debug "30% utilisation", and name the dashboards you'd build.</td></tr>
+<tr><td>16–20</td><td>09, 10</td><td>Operations, MoE parallelism, and the cost-reduction levers.</td></tr>
+<tr><td>20–24</td><td>10 (Problem 25)</td><td>Do the 1M-user capstone out loud, twice, with different assumptions.</td></tr>
+</table></div>
+
+<h2>Where this course already covers it</h2>
+<ul>
+<li><a href="../05-trillion-scale-architecture.html#serving">Module 05, serving Kimi K3</a>: two caches in one paged pool, prefix caching, speculative decoding, fleet scheduling.</li>
+<li><a href="../08-ai-research-engineer/08-inference-aware-design.html">Module 08, Stage 08</a>: KV-cache maths, MHA/GQA/MQA, KV quantisation.</li>
+<li><a href="../08-ai-research-engineer/06-distributed-training.html">Module 08, Stage 06</a>: tensor, pipeline and expert parallelism.</li>
+<li><a href="../08-ai-research-engineer/01-tensor-math-autograd.html">Module 08, Stage 01</a>: Triton and FlashAttention tiling.</li>
+<li><a href="../04-distill-small-models.html#latency">Module 04</a>: latency as a safety number on robots.</li>
+<li><a href="../08-ai-research-engineer/index.html#courses">Module 08 course map</a>: Stage 08 resources (How To Scale Your Model, vLLM docs, MIT 6.5940, Efficiently Serving LLMs).</li>
+</ul>
+
+<footer>Module 09 · added 2026-10-24 · <a href="../../index.html">Back to course index</a></footer>
+</main>
+
+<script>
+const KEY = 'lr-inference-done';
+const boxes = [...document.querySelectorAll('input[data-d]')];
+let done = {};
+try { done = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) {}
+
+function render() {
+  document.getElementById('done').textContent = boxes.filter(b => b.checked).length + ' / 10';
+  const nxt = boxes.find(b => !b.checked);
+  document.getElementById('next').innerHTML = nxt ? `<a href="${nxt.nextElementSibling.getAttribute('href')}">Page ${nxt.dataset.d}</a>` : 'All done 🎉';
+}
+boxes.forEach(b => {
+  b.checked = !!done[b.dataset.d];
+  b.onchange = () => {
+    done[b.dataset.d] = b.checked;
+    try { localStorage.setItem(KEY, JSON.stringify(done)); } catch (e) {}
+    render();
+  };
+});
+render();
+</script>
+</body>
+</html>

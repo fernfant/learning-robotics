@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>minimalRL · Module 20</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 20 · From-scratch repos</a> › minimalRL</nav>
+
+<div class="eyebrow"><span class="track robo">Robotics</span>Module 20 · From-scratch code · 6 of 6</div>
+<h1>minimalRL: reinforcement learning in one file each</h1>
+<p class="lede">Eleven reinforcement learning algorithms, each in a single PyTorch file of about 70–190 lines, all aimed at the same pole-balancing game.</p>
+
+<div class="facts">
+  <div><b>Repo</b><a href="https://github.com/seungeunrho/minimalRL">seungeunrho/minimalRL</a></div>
+  <div><b>Licence</b>MIT</div>
+  <div><b>Stars</b>3,252 (7 Nov 2026, GitHub API)</div>
+  <div><b>Core code</b>12 Python files, 1,606 lines in total (counted with <code>wc -l</code>). REINFORCE 66, DQN 115, PPO 118.</div>
+  <div><b>Status</b>Not archived, but quiet: the last commit was 22 Apr 2023. The README requires gym &gt; 0.26.2.</div>
+  <div><b>Needs</b>Python 3, PyTorch, Gym (we used Gymnasium, see below). CPU is enough.</div>
+</div>
+<p class="meta">Tested at commit <code>c8efed8</code> on a MacBook with an Apple M4, Python 3.14.5, torch 2.15.0, gymnasium 1.4.0. Short code excerpts are quoted with credit to seungeunrho (MIT).</p>
+
+<div class="toc">
+<strong>On this page</strong>
+<ol>
+<li><a href="#start">Start here (no maths needed)</a></li>
+<li><a href="#summary">Summary</a></li>
+<li><a href="#code">How the code works: the algorithm ladder</a></li>
+<li><a href="#run">Run it, tested (CartPole)</a></li>
+<li><a href="#robohelper">Connect to Robo-Helper: DQN vs A* in our room</a></li>
+<li><a href="#robotics">Why it matters for robotics</a></li>
+<li><a href="#reality">Reality check</a></li>
+<li><a href="#check">Self-check</a></li>
+<li><a href="#reading">Further reading</a></li>
+</ol>
+</div>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">A program can learn to balance a stick on a moving cart just by trying, falling, and keeping score. Nobody tells it the rules of balancing.</p>
+
+<h3>Think of it like this</h3>
+<p>Balance a broom upright on your palm. When it tips left, you move your hand left. Nobody gave you an equation. You dropped it a lot, and slowly your hand learned what works. CartPole is that game for a computer. A pole stands on a cart. Each moment the program pushes the cart left or right. It gets 1 point for every moment the pole stays up, up to 500. Reinforcement learning (RL) is the "drop it a lot and learn" part.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>The program looks at four numbers: where the cart is, how fast it moves, the pole's angle, and how fast the pole is tipping.</li>
+<li>It picks "push left" or "push right".</li>
+<li>The game says how many points that was worth, and whether the pole fell.</li>
+<li>After many tries, it nudges its neural network so good choices become more likely.</li>
+<li>Different algorithms (REINFORCE, DQN, PPO…) are different ways of doing step 4.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A pole on a cart is a tiny version of a robot keeping its balance: a two-wheeled robot, a walking robot, an arm holding a full cup. The same algorithms, especially PPO, are used to teach simulated robots to walk.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Balance a ruler on one finger. Then try with your eyes closed for one second. Feeling how fast you lose it shows why the program needs to see the pole's speed, not just its angle.</li>
+<li>Look at the real training scores in <a href="#run">Run it, tested</a>. Notice they go up and down. Learning is wobbly.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Episode</dt><dd>One try, from start until the pole falls or time runs out.</dd>
+<dt>Reward</dt><dd>Points the game gives after each move.</dd>
+<dt>Policy</dt><dd>The program's rule for choosing a move.</dd>
+<dt>Q-value</dt><dd>"How many points do I expect if I do this move now and play well after?"</dd>
+<dt>Replay memory</dt><dd>A big notebook of past moves the program re-reads to learn from them again.</dd>
+<dt>Environment</dt><dd>The game or world the program acts in. Here, CartPole.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version. On a first read, look at the real scores and the Robo-Helper experiment, then come back for the code.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>minimalRL puts each classic deep RL algorithm in one short PyTorch file, with the environment fixed so you can focus on the algorithm. We ran REINFORCE, DQN and PPO on CartPole-v1 for 3 minutes each. All three learned: REINFORCE peaked at an average of 317, DQN and PPO both hit the maximum of 500. PPO got there fastest in episodes (a perfect 20-episode average at episode 320), then partly collapsed to about 150. Then we wrapped Robo-Helper's room as an environment and trained a DQN to drive to a block. It matched A* exactly, but it broke when the cat moved, unless the cat was part of what it could see.</p>
+</div>
+<ul>
+<li><strong>One file each:</strong> REINFORCE, Actor-Critic, DQN, PPO, DDPG, A3C, ACER, A2C, SAC, PPO-Continuous, V-trace, plus a PPO-LSTM file not listed in the README.</li>
+<li><strong>Install snag:</strong> "gym &gt; 0.26.2" doesn't exist. 0.26.2 was the last Gym. It installs on Python 3.14 but crashes with numpy 2. We used Gymnasium, Gym's maintained successor, by changing one import.</li>
+<li><strong>Real results:</strong> every run used the full 180-second cap, because each script loops for 10,000 episodes. All three scored 200+ within the cap.</li>
+<li><strong>Robo-Helper:</strong> a DQN learned the 9-step route around the cat in about 200 episodes, and was optimal from all 40 start squares. A* needs no training and plans in microseconds.</li>
+<li><strong>Where each wins:</strong> learned control coped with wheel slip as well as A* replanning every step, and far better than a plan followed blindly. Planning won when the world changed (the cat moved).</li>
+</ul>
+
+<h2 id="code">2. How the code works: the algorithm ladder</h2>
+<p>Every file has the same shape: a small network class, a <code>train_net</code> (or <code>train</code>) function, and a <code>main()</code> loop that plays episodes and prints the average score every 20 episodes. The algorithms differ only in what the network predicts and what loss it learns from.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Rung</th><th>File</th><th>What it learns</th><th>The new idea</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><code>REINFORCE.py</code></td><td>A policy (probabilities of left/right)</td><td>After an episode, make each action more likely in proportion to the total reward that followed it.</td></tr>
+<tr><td>2</td><td><code>actor_critic.py</code></td><td>Policy + a value estimate</td><td>A "critic" guesses how good a state is, so the actor learns from "better or worse than expected", every few steps instead of every episode.</td></tr>
+<tr><td>3</td><td><code>a3c.py</code>, <code>a2c.py</code></td><td>Same, with many workers</td><td>Several copies of the game play at once (asynchronously in A3C, in lockstep in A2C) for steadier learning.</td></tr>
+<tr><td>4</td><td><code>ppo.py</code></td><td>Policy + value</td><td>Reuse each batch for several updates, but clip how far the policy may move per update. Uses GAE to estimate advantages.</td></tr>
+<tr><td>side</td><td><code>dqn.py</code></td><td>Q-values only</td><td>Q-learning with a neural net, a replay memory and a frozen target network.</td></tr>
+<tr><td>side</td><td><code>acer.py</code>, <code>vtrace.py</code></td><td>Policy + value, from older data</td><td>Corrections that let the learner use data from a slightly older policy.</td></tr>
+<tr><td>continuous</td><td><code>ddpg.py</code>, <code>sac.py</code>, <code>ppo-continuous.py</code></td><td>Actions as real numbers</td><td>For torques and speeds, not left/right. These three use Pendulum-v1, not CartPole.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>REINFORCE in three lines</h3>
+<pre><code># REINFORCE.py (MIT, seungeunrho)
+for r, prob in self.data[::-1]:
+    R = r + gamma * R
+    loss = -torch.log(prob) * R</code></pre>
+<p>Walk the episode backwards, adding up discounted reward <code>R</code>. Then push up the log-probability of each action, scaled by <code>R</code>. Good episodes make their actions more likely. That's the whole algorithm.</p>
+
+<h3>DQN: the one idea that makes it click</h3>
+<pre><code># dqn.py (MIT, seungeunrho)
+q_a = q_out.gather(1,a)
+max_q_prime = q_target(s_prime).max(1)[0].unsqueeze(1)
+target = r + gamma * max_q_prime * done_mask</code></pre>
+<p>This is exactly the Q-learning target from <a href="../18-robot-brain/07-trial-and-error.html">Lesson 7</a>: reward plus γ times the best Q at the next state, and just the reward if the episode ended (<code>done_mask</code> = 0). Three things are new:</p>
+<ul>
+<li><strong>A neural network instead of a table.</strong> CartPole's four numbers are continuous, so you can't list every state as a dictionary key. The network fills in Q for states it has never seen.</li>
+<li><strong>Replay memory</strong> (<code>ReplayBuffer</code>, up to 50,000 moves). It trains on random old moves, not only the latest ones, so the examples aren't all near-copies of each other.</li>
+<li><strong>A target network</strong> (<code>q_target</code>), copied from <code>q</code> only every 20 episodes. The target stays still for a while, so the network isn't chasing its own moving guess.</li>
+</ul>
+
+<h3>PPO's clip</h3>
+<pre><code># ppo.py (MIT, seungeunrho)
+surr1 = ratio * advantage
+surr2 = torch.clamp(ratio, 1-eps_clip, 1+eps_clip) * advantage
+loss = -torch.min(surr1, surr2) + F.smooth_l1_loss(self.v(s) , td_target.detach())</code></pre>
+<p><code>ratio</code> is "how much more likely is this action now than when we collected the data". Clamping it to 0.9–1.1 (<code>eps_clip = 0.1</code>) stops one update from changing the policy too much. That is what lets PPO safely reuse each batch 3 times (<code>K_epoch = 3</code>).</p>
+
+<h2 id="run">3. Run it, tested (CartPole)</h2>
+<p>All runs on 7 Nov 2026, MacBook (Apple M4), <strong>CPU</strong>, Python 3.14.5, torch 2.15.0, in a private venv in a scratch folder. Other jobs were running on the laptop at the same time, so on a quiet machine more episodes would fit in 3 minutes.</p>
+
+<h3>The Gym problem</h3>
+<pre><code>$ pip install "gym>0.26.2"
+ERROR: Could not find a version that satisfies the requirement gym>0.26.2 (from versions: 0.0.2, ... 0.26.1, 0.26.2)
+
+$ pip install "gym==0.26.2"        # installs, then:
+AttributeError: module 'numpy' has no attribute 'bool8'. Did you mean: 'bool'?</code></pre>
+<p>Gym stopped at 0.26.2 and uses <code>np.bool8</code>, which numpy 2 removed. Gym's own install message points to Gymnasium: "replace 'import gym' with 'import gymnasium as gym'". So we made <strong>modified copies</strong> of three files in the scratch folder only. The clone stays untouched. Two changes per file:</p>
+<pre><code>$ diff minimalRL/dqn.py mrl-mod/dqn.py
+1c1
+&lt; import gym
+---
+&gt; import gymnasium as gym
+95a96
+&gt;             done = done or truncated</code></pre>
+<p>The second change is a bug fix. Since Gym 0.26, hitting the 500-step time limit sets <code>truncated</code>, not <code>done</code>. The original loops only stop on <code>done</code>. Once the pole is balanced well, they would keep calling <code>step()</code> past the limit. The comment in <code>REINFORCE.py</code>, "CartPole-v1 forced to terminates at 500 step", is from before that API change. We found this by reading the code. We didn't run the unfixed version.</p>
+<pre><code>pip install torch gymnasium
+python runcap.py mrl-mod/REINFORCE.py 180     # runs a script, kills it after 180 s, prints wall time
+python runcap.py mrl-mod/dqn.py 180
+python runcap.py mrl-mod/ppo.py 180</code></pre>
+
+<h3>REINFORCE</h3>
+<pre><code># 7 Nov 2026, MacBook (Apple M4), CPU. Selected lines (one every 200 episodes) + the end.
+# of episode :20, avg score : 21.65
+# of episode :200, avg score : 31.65
+# of episode :400, avg score : 53.1
+# of episode :600, avg score : 59.35
+# of episode :800, avg score : 104.45
+# of episode :1000, avg score : 136.5
+# of episode :1200, avg score : 177.0
+# of episode :1400, avg score : 200.05
+# of episode :1600, avg score : 194.65
+# of episode :1800, avg score : 241.1
+# of episode :1900, avg score : 286.45
+# of episode :1920, avg score : 292.2
+[wall time 180.1s, cap 180s]</code></pre>
+<p>Slow and steady. First 20-episode average above 200 at episode 1,140 (221.7). Best: 317.05 at episode 1,700. It never reached 500 in 3 minutes.</p>
+
+<h3>DQN</h3>
+<pre><code># 7 Nov 2026, MacBook (Apple M4), CPU. Selected lines + the end.
+n_episode :20, score : 10.2, n_buffer : 203, eps : 7.9%
+n_episode :200, score : 9.6, n_buffer : 1976, eps : 7.0%
+n_episode :300, score : 13.9, n_buffer : 3110, eps : 6.5%
+n_episode :320, score : 30.8, n_buffer : 3726, eps : 6.4%
+n_episode :340, score : 101.4, n_buffer : 5754, eps : 6.3%
+n_episode :360, score : 207.9, n_buffer : 9913, eps : 6.2%
+n_episode :560, score : 160.9, n_buffer : 45130, eps : 5.2%
+n_episode :960, score : 314.1, n_buffer : 50000, eps : 3.2%
+n_episode :1760, score : 478.8, n_buffer : 50000, eps : 1.0%
+n_episode :1960, score : 485.1, n_buffer : 50000, eps : 1.0%
+n_episode :2560, score : 286.1, n_buffer : 50000, eps : 1.0%
+n_episode :2840, score : 475.4, n_buffer : 50000, eps : 1.0%
+[wall time 180.1s, cap 180s]</code></pre>
+<p>Nothing happens for 200 episodes. That's on purpose: training only starts once the replay memory holds 2,000 moves. Then it jumps from about 10 to 208 in 60 episodes. It hit a perfect 500.0 average at episode 1,900, and wobbled between about 290 and 485 after that. (DQN prints "score", not "avg score", but it is the same 20-episode average.)</p>
+
+<h3>PPO</h3>
+<pre><code># 7 Nov 2026, MacBook (Apple M4), CPU. Every line to episode 340, then selected lines.
+# of episode :20, avg score : 33.0
+# of episode :40, avg score : 35.5
+# of episode :60, avg score : 45.4
+# of episode :80, avg score : 68.2
+# of episode :100, avg score : 81.2
+# of episode :120, avg score : 137.3
+# of episode :140, avg score : 212.9
+# of episode :160, avg score : 275.7
+# of episode :180, avg score : 371.2
+# of episode :200, avg score : 279.7
+# of episode :220, avg score : 338.6
+# of episode :240, avg score : 196.4
+# of episode :260, avg score : 269.9
+# of episode :280, avg score : 448.9
+# of episode :300, avg score : 482.6
+# of episode :320, avg score : 500.0
+# of episode :340, avg score : 497.2
+# of episode :400, avg score : 500.0
+# of episode :560, avg score : 334.7
+# of episode :640, avg score : 499.1
+# of episode :720, avg score : 152.3
+# of episode :800, avg score : 149.2
+# of episode :820, avg score : 170.2
+[wall time 180.1s, cap 180s]</code></pre>
+<p>Fastest learner by episodes: above 200 at episode 140, a perfect 500.0 at episode 320. Fewer episodes fit in 3 minutes (820) because good episodes are long, up to 500 steps each. Then it partly <strong>collapsed</strong>, to about 150 by episode 720. This is a known RL failure. Nothing in the file saves the best policy or lowers the learning rate, so it can unlearn. Real projects save checkpoints and evaluate them separately.</p>
+<p>Both DQN and PPO also printed a PyTorch warning that building a tensor from a list of numpy arrays "is extremely slow". It's harmless here.</p>
+
+<h2 id="robohelper">4. Connect to Robo-Helper: DQN vs A* in our room</h2>
+<p><a href="../18-robot-brain/07-trial-and-error.html">Lesson 7</a> did tabular Q-learning in a maze. <code>dqn.py</code> is the next rung: the same target rule, plus a neural network, replay memory and a target network. So we tested it on Robo-Helper's real room, against the A* planner from <a href="../18-robot-brain/06-pathfinding.html">Lesson 6</a>.</p>
+
+<h3>The setup</h3>
+<ul>
+<li><strong>Room:</strong> <code>world.ROOM</code> (10×8, 42 free squares). Start <code>ROBOT_START</code> = (1, 1). Goal: the blue block at (6, 3). The cat sits at <code>sim.CAT</code> = (4, 1), right on the shortest route.</li>
+<li><strong>Environment</strong> (<code>RoomEnv</code> in <code>grid_dqn.py</code>, gym-like <code>reset</code>/<code>step</code>): state = the robot's square as a one-hot list of 80 numbers (plus the cat's square in one version). Actions = N, S, E, W using Lesson 1's <code>move</code>. Reward: −1 per step, −5 for bumping a wall, −10 for bumping the cat (you stay put), +20 for reaching the block. Maximum 60 steps.</li>
+<li><strong>DQN:</strong> the same network shape, replay size (50,000), batch (32), γ (0.98), learning rate, smooth L1 loss and target copy every 20 episodes as <code>dqn.py</code>. Two changes, both honest: exploration starts at 100% and falls to 5% (<code>dqn.py</code> uses 8%→1%, too little to find a block in a room), and each training episode starts on a random free square ("exploring starts").</li>
+<li><strong>Baselines:</strong> <code>lesson06_paths.astar_path</code> told where the cat is, and Lesson 11's real <code>RoboHelper.drive_to</code>, which only discovers the cat when its sensor sees it, then replans.</li>
+</ul>
+
+<h3>Results</h3>
+<pre><code>$ SOLUTIONS=…/18-robot-brain/project/solutions python -I grid_dqn.py
+# 7 Nov 2026, MacBook (Apple M4), CPU, torch 2.15.0
+room 10x8, 42 free squares, start (1, 1), goal blue block (6, 3), cat (4, 1)
+A* knowing the cat: 9 steps, 14 us per plan, 0 training
+Lesson 11 drive_to (finds the cat on the way, replans): ok=True, 11 moves, 0.10 ms
+DQN (position only): trained 1500 episodes in 9.3 s; first optimal greedy run at episode 200
+  from start: ok=True, 9 steps, 0 bumps | from every free square: reaches block 40/40, shortest path 40/40
+  twist, cat moves to (5, 3): DQN ok=False, 60 steps, 53 bumps | A* 7 steps
+  twist, cat leaves the room: DQN ok=True, 9 steps, 0 bumps | A* 7 steps
+  twist, 10% wheel slip (200 runs): DQN success 100% (10.2 steps) | A* open-loop 50% (9.0) | A* replanning every step 100% (10.0)
+  twist, 20% wheel slip (200 runs): DQN success 100% (11.8 steps) | A* open-loop 22% (9.0) | A* replanning every step 100% (11.6)
+DQN (position + cat), 4000 episodes in 78.8 s: reaches the block for 40/40 cat positions, shortest path on 40/40 | A*: 40/40</code></pre>
+<p>A second run with the same seeds gave identical results, but different times (DQN training 39.7 s and 165.7 s, A* 54 µs per plan), because the laptop was busy with other jobs (load average about 20). Times here are rough. The step counts and success rates are exact.</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Test</th><th>A* (Lesson 6/11)</th><th>DQN, sees only its position</th><th>DQN, also sees the cat</th></tr></thead>
+<tbody>
+<tr><td>Training needed</td><td>none</td><td>~200 episodes to the first optimal run; 1,500 run (9–40 s)</td><td>4,000 episodes (79–166 s)</td></tr>
+<tr><td>Start → blue block, cat at (4, 1)</td><td>9 steps if it knows the cat; 11 if it discovers it on the way</td><td>9 steps, 0 bumps</td><td>9 steps</td></tr>
+<tr><td>From all 40 start squares</td><td>40/40 shortest</td><td>40/40 shortest</td><td>not tested</td></tr>
+<tr><td>Cat moves to (5, 3)</td><td>replans: 7 steps</td><td><strong>fails</strong>: 53 bumps in 60 steps</td><td>trained for it: 40/40 cat squares, all shortest</td></tr>
+<tr><td>Cat leaves</td><td>7 steps</td><td>9 steps (still detours)</td><td>(covered above)</td></tr>
+<tr><td>20% wheel slip, 200 runs</td><td>open-loop 22%; replanning 100%, 11.6 steps</td><td>100%, 11.8 steps</td><td>not tested</td></tr>
+</tbody>
+</table>
+</div>
+<p>What it shows:</p>
+<ul>
+<li><strong>In a room you have a map of, planning wins.</strong> A* gives the same 9-step route with zero training, in microseconds. DQN needed hundreds of episodes to learn what A* computes instantly. That's the same honest note as Lesson 7.</li>
+<li><strong>A learned policy reacts.</strong> With 20% wheel slip, a plan followed blindly reached the block only 22% of the time. The DQN reached it 100% of the time, because it picks a move from wherever it actually is. A* matched it only when we made it replan every step. A policy is a closed-loop controller for free.</li>
+<li><strong>A learned policy only knows what it was shown.</strong> When the cat moved onto its route, the position-only DQN drove into the cat 53 times. It cannot see the cat, so it has no reason to change. A* just replanned. When the cat was put into the state and the cat moved around during training, the DQN handled all 40 cat positions with the shortest path. That took 2.7× more episodes and a 160-number input. In a bigger world, "train on every situation" stops being possible. That's where planning, or a learned model plus planning, comes back.</li>
+</ul>
+<p><strong>And PPO?</strong> In <a href="../18-robot-brain/12-preferences.html">Lesson 12, RLHF by hand</a>, Robo-Helper learned a reward model from a person's route choices, then used best-of-n to pick a route. The lesson explains that real RLHF goes one step further: it trains the policy itself with PPO (or GRPO) on the learned reward, with a KL penalty as a leash. <code>ppo.py</code> is that update in 118 lines. The clip in the loss above is a second leash of the same kind: "improve, but don't move too far from the policy that collected the data".</p>
+
+<div class="card note">
+<h3>Next-step exercise</h3>
+<p>In <code>grid_dqn.py</code>, set the goal to the <code>red block</code> at (2, 1), which is only 1 step from the start. Predict before running: will the position-only DQN need more or fewer episodes than for the blue block? Then add a second cat and see whether the cat-aware DQN still gets 40/40, without changing the number of episodes.</p>
+</div>
+
+<h2 id="robotics">5. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>CartPole is balance control.</strong> It is the classic inverted pendulum: keep an unstable thing upright by moving its base. Segway-style robots, legged robots and a waiter-robot carrying a tray all face versions of it. Control engineers solve the plain version with a hand-designed controller (for example, LQR), without learning. RL is worth it when the dynamics are too messy to write down.</li>
+<li><strong>PPO and SAC are workhorses for simulated locomotion.</strong> Teaching a simulated legged robot to walk is commonly done with PPO (on-policy, easy to run on many parallel simulators) or SAC (off-policy, more sample-efficient). minimalRL's <code>ppo-continuous.py</code> and <code>sac.py</code> are the continuous-action versions those use, shown here on Pendulum-v1.</li>
+<li><strong>Sim first, then real.</strong> Training needs thousands of falls. Robots learn in simulation, then transfer the policy to hardware. Our room test is a small example of the main risk: a policy can fail badly on something it never saw in training.</li>
+<li><strong>Don't overclaim.</strong> These files are for learning. Real robot RL adds many parallel environments, observation normalisation, domain randomisation and careful reward design.</li>
+</ul>
+</div>
+
+<h2 id="reality">6. Reality check</h2>
+<ul>
+<li><strong>Gym is dead; use Gymnasium.</strong> The README's "gym &gt; 0.26.2" can't be installed. Swap the import, and handle <code>truncated</code> as well as <code>terminated</code>.</li>
+<li><strong>"Every algorithm can be trained within 30 seconds."</strong> We didn't timestamp each line, so we can't say exactly when each passed a given score. All three runs used their full 3-minute cap, because each script loops for 10,000 episodes and never stops on its own.</li>
+<li><strong>Not every file is CartPole.</strong> The README says environments are fixed to CartPole-v1, but <code>ddpg.py</code>, <code>sac.py</code> and <code>ppo-continuous.py</code> use Pendulum-v1.</li>
+<li><strong>No seeds, so results vary.</strong> The files don't set random seeds. Your numbers will differ from ours.</li>
+<li><strong>Learning can collapse.</strong> Our PPO hit 500 then fell to about 150. Save the best checkpoint.</li>
+<li><strong>For real projects:</strong> use a maintained library such as Stable-Baselines3 or CleanRL (single-file implementations with logging). minimalRL is for reading.</li>
+</ul>
+
+<h2 id="check">7. Self-check</h2>
+<details><summary>What three things does DQN add to the Lesson 7 Q-learning table?</summary><p>A neural network that estimates Q for any state, a replay memory of past moves to sample training batches from, and a target network that is only copied every so often, so the target doesn't move with every update.</p></details>
+<details><summary>Why did DQN's score stay around 10 for the first 200 episodes?</summary><p>It doesn't train until the replay memory holds more than 2,000 moves. Before that, it is acting with random starting weights.</p></details>
+<details><summary>What does PPO's clip do, and why does it help?</summary><p>It limits how much more or less likely an action can become in one update (here between 0.9× and 1.1×). That makes it safe to reuse the same batch for several updates.</p></details>
+<details><summary>In our room, why did the position-only DQN fail when the cat moved?</summary><p>The cat wasn't part of its state, so it couldn't know anything changed. It kept choosing the move it learned, into the cat. A* replans with the new obstacle. Adding the cat to the state and training with the cat in many places fixed it.</p></details>
+<details><summary>With 20% wheel slip, why did "A* open-loop" fail but the DQN succeed?</summary><p>Open-loop A* follows a fixed list of moves, so one slip puts it off its path for good. The DQN chooses from wherever it actually is. A* that replans every step does just as well.</p></details>
+
+<h2 id="reading">8. Further reading</h2>
+<ul>
+<li><a href="https://github.com/seungeunrho/minimalRL">minimalRL on GitHub</a>: start with <a href="https://github.com/seungeunrho/minimalRL/blob/master/REINFORCE.py">REINFORCE.py</a>, <a href="https://github.com/seungeunrho/minimalRL/blob/master/dqn.py">dqn.py</a> and <a href="https://github.com/seungeunrho/minimalRL/blob/master/ppo.py">ppo.py</a></li>
+<li><a href="https://gymnasium.farama.org/introduction/migration_guide/">Gymnasium migration guide</a> (linked from Gym's own install warning)</li>
+<li>Robo-Helper: <a href="../18-robot-brain/07-trial-and-error.html">Lesson 7, Q-learning</a> (the table version of DQN) and <a href="../18-robot-brain/12-preferences.html">Lesson 12, RLHF by hand</a>. Real RLHF trains the language model with PPO (or GRPO) on a learned reward, with a KL leash. That is <code>ppo.py</code>'s clipped update, at a much larger scale.</li>
+<li><a href="05-tinygrad.html">Page 5, tinygrad</a>: the previous page in this module</li>
+</ul>
+
+<nav class="pager">
+  <a href="05-tinygrad.html"><small>Back</small>5 · tinygrad</a>
+  <a class="next" href="index.html"><small>Next</small>Module 20 hub</a>
+</nav>
+<footer>Module 20 · minimalRL · added 2026-11-07 · repo MIT-licensed, short excerpts quoted with credit</footer>
+</main>
+</body>
+</html>

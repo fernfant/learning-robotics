@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 14 · Annotated Transformer</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 14</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Unit 3 · The Transformer era · Day 14</div>
+<h1>The Annotated Transformer</h1>
+<p class="lede">The Day 13 paper, rewritten as one runnable notebook. Reading it is the fastest way to find out which parts of the paper are easy to get wrong in code.</p>
+
+<div class="facts">
+  <div><b>Authors</b>Sasha (Alexander) Rush; 2022 update by Austin Huang, Suraj Subramanian, Jonathan Sum, Khalid Almubarak, Stella Biderman</div>
+  <div><b>Year / venue</b>2018 (updated 2022) · Harvard NLP blog post and notebook</div>
+  <div><b>Core idea</b>The paper as line-by-line PyTorch</div>
+  <div><b>Study time</b>4–5 h</div>
+</div>
+<p class="meta">Original: <a href="https://nlp.seas.harvard.edu/annotated-transformer/">nlp.seas.harvard.edu/annotated-transformer</a> · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/14_annotated_transformer">30u30 Day 14</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">This page takes the famous Transformer paper and puts working computer code under every paragraph, so you can see exactly how each idea is built.</p>
+
+<h3>Think of it like this</h3>
+<p>A recipe in a cookbook says "make the sauce". A good cooking show actually makes it in front of you, step by step, and shows the parts the recipe skipped: how hot the pan is, how long to stir. The Annotated Transformer is the cooking show for the Day 13 paper. It also shows a trick every athlete knows: warm up gently before going full speed.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Take each paragraph of the paper and write the code that does exactly what it says.</li>
+<li>Add the details the paper left out, like the size of every list of numbers and the "masks" that hide words the model shouldn't see yet.</li>
+<li>Test it first on a very easy job: copying a list of digits. If it can't copy, something in the code is broken.</li>
+<li>Train with a warm-up: learn in small steps at first, then bigger, then slowly smaller again.</li>
+<li>Finally, train it on a real job: translating German to English.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Many robot brains reuse these same building blocks. Before training a robot on hours of recorded demonstrations, engineers first check that it can replay just one demo. If it can't, the bug is in the code, not the data. Masks matter too: they stop the robot from "peeking" at the future while it learns, which would make it look great in practice and fail for real.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Write a recipe for a sandwich and have a friend follow it exactly, word for word. Which steps did you forget to write down? Those gaps are why this code-under-every-paragraph guide exists.</li>
+<li>In the demo further down, move the <b>Warmup steps</b> slider and watch the peak of the curve move with it. Then move the <b>d_model</b> slider: bigger models get a smaller learning rate.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Code</dt><dd>Instructions written for a computer to follow.</dd>
+<dt>Notebook</dt><dd>A document that mixes explanations with code you can run.</dd>
+<dt>Learning rate</dt><dd>How big a step the model takes each time it corrects itself.</dd>
+<dt>Warmup</dt><dd>Starting with small learning steps, then speeding up.</dd>
+<dt>Mask</dt><dd>A cover that hides some words from the model, such as future words.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>The Annotated Transformer takes the text of "Attention Is All You Need", reorders and trims it, and puts working PyTorch under each paragraph. The whole page is a notebook: run it top to bottom and you get a trained translation model. It adds what the paper leaves out: tensor shapes, masks, batching, the exact learning-rate curve, how label smoothing is computed, and a small task to check the model works before spending GPU hours.</p>
+</div>
+<ul>
+<li><strong>Part 1, the model:</strong> encoder and decoder stacks, residual sublayers, multi-head attention, feed-forward layers, embeddings, positional encoding.</li>
+<li><strong>Part 2, training:</strong> masked batches, the training loop, the warmup learning-rate schedule, label smoothing, and a synthetic copy task with greedy decoding.</li>
+<li><strong>Part 3, a real example:</strong> German→English on the small Multi30k dataset, with multi-GPU training and attention visualisations.</li>
+<li><strong>One deliberate deviation:</strong> the code puts layer norm <em>before</em> each sublayer (pre-norm) for simplicity, while the paper normalises after the residual add.</li>
+<li>The 30u30 folder re-implements the same pieces with its own exercises on attention, multi-head, encoder, training and inference.</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<p>This is a guide, not a new model, so the "core" is the set of definitions the code must get exactly right. Written as maths rather than code:</p>
+<pre><code>Model      = EncoderDecoder(encoder, decoder, src_embed, tgt_embed, generator)
+Sublayer   x ← x + Dropout(F(LayerNorm(x)))          # pre-norm, as in the notebook
+                                                      # paper: x ← LayerNorm(x + Dropout(F(x)))
+Causal mask  M[i][j] = 1 if j ≤ i else 0             # token i sees itself and the past
+Pad mask     M[j]    = 1 if token j ≠ &lt;pad&gt;
+Masked score s_ij ← −∞ where M = 0, before softmax
+
+lr(step) = factor · d_model^(−0.5) · min(step^(−0.5), step · warmup^(−1.5))
+
+Smoothed target: (1 − ε) on the true token, ε spread over the rest, 0 on &lt;pad&gt;</code></pre>
+<ul>
+<li><code>EncoderDecoder</code>: one wrapper that embeds source and target, encodes, decodes, and projects to vocabulary scores. Every later piece slots into it.</li>
+<li><code>F</code>: either an attention block or the feed-forward block. The residual add means each layer only learns a correction to its input, the ResNet trick from <a href="09-resnet.html">Day 09</a>.</li>
+<li><strong>Masks</strong> do two jobs. The pad mask stops attention to filler tokens in a batch of uneven sentences. The causal mask stops the decoder peeking at future target tokens.</li>
+<li><strong>lr</strong>: linear warmup for <code>warmup</code> steps, then decay as 1/√step. The peak is exactly at <code>step = warmup</code>. The paper used <code>warmup</code> = 4000 and <code>d_model</code> = 512.</li>
+<li><strong>ε</strong> = 0.1 in the paper. The notebook computes the loss as a KL divergence against this softened target.</li>
+</ul>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>Shapes are the whole game</h3>
+<p>Multi-head attention in code is mostly reshaping. A batch of size <em>B</em> with length <em>n</em> and width 512 is projected, split into 8 heads of 64, moved so heads act like an extra batch dimension, attended, then merged back. Most bugs in home-made Transformers are a transpose in the wrong place, or a mask broadcast over the wrong axis. Write the shape next to every line as you read. The <a href="../02-tensortonic.html#track">TensorTonic</a> attention problems (Module 02) drill exactly this.</p>
+
+<h3>The learning-rate schedule</h3>
+<p>Transformers are fragile early in training. Big updates while the attention weights are still random can push the softmax into saturation. Warmup keeps steps small until the statistics settle, then the 1/√step decay takes over. Play with it:</p>
+<div class="card demo">
+<h3>Interactive: the warmup schedule</h3>
+<p class="legend">Learning rate over the first 40,000 steps, with factor = 1. Change warmup and model width. The peak sits at step = warmup, and wider models get a smaller rate.</p>
+<canvas id="lr" width="700" height="220" aria-label="Learning-rate curve with linear warmup and inverse square root decay"></canvas>
+<label for="wu">Warmup steps: <span id="wuv" class="num"></span></label>
+<input id="wu" type="range" min="200" max="16000" step="200" value="4000">
+<label for="dm">d_model: <span id="dmv" class="num"></span></label>
+<input id="dm" type="range" min="0" max="3" step="1" value="2">
+<div class="stats">
+  <div class="stat"><div class="k">Peak step</div><div class="v" id="pk">–</div></div>
+  <div class="stat"><div class="k">Peak rate</div><div class="v" id="pr">–</div></div>
+  <div class="stat"><div class="k">Rate at 100k</div><div class="v" id="end">–</div></div>
+</div>
+</div>
+
+<h3>Test on a toy before the real task</h3>
+<p>Before any translation, the notebook trains a small model to copy random digit sequences, then decodes greedily (always pick the most likely next token). If a model can't learn to copy, something structural is broken: a mask, a shift between decoder input and target, a shape. This "overfit something trivial first" habit is worth keeping for any model, including robot policies. Then it moves to Multi30k German→English, a dataset far smaller than the WMT data of the paper, and shows the encoder self-attention, decoder self-attention and cross-attention maps per layer and head.</p>
+
+<h3>From notebook to paper numbers</h3>
+<p>The notebook is honest that its small run is not the paper's result. It notes that a full OpenNMT-py replication, with byte-pair encoding, beam search and checkpoint averaging, reaches 26.9 BLEU on WMT English→German, versus 27.3 for the paper's base model. Those extras matter. Beam search and averaging are cheap at inference or after training. The KV cache that makes decoding fast is the same structure <a href="../05-trillion-scale-architecture.html#serving">Module 05</a> shows being compressed at trillion-parameter scale.</p>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Robot policy code looks like this notebook.</strong> ACT, Diffusion Policy's Transformer variant and many VLAs reuse these exact modules: a Transformer encoder over observation tokens, a decoder with cross-attention, masks and positional embeddings. Reading this once makes their repos readable.</li>
+<li><strong>Masks encode what the robot is allowed to see.</strong> A causal mask over time stops a policy from conditioning on future frames in training, which otherwise produces a policy that looks great offline and fails on the robot.</li>
+<li><strong>The copy-task habit transfers.</strong> Before training on hours of teleoperation data, overfit a single demo. If the policy can't replay one trajectory, the bug is in the pipeline, not the data.</li>
+<li><strong>Warmup and label smoothing show up again</strong> when you fine-tune a VLA on discretised action tokens. Small datasets plus big pretrained models are exactly where early instability bites.</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Read the Annotated Transformer with the Day 13 paper open beside it. For each code block, find the paper sentence it implements.</li>
+<li>Run the original notebook (or a Colab copy) as far as the copy task. Write the tensor shape next to each line of the attention function.</li>
+<li>In the 30u30 Day 14 folder, read <code>implementation.py</code>, run <code>train_minimal.py</code>, and use <code>visualization.py</code> to plot attention maps.</li>
+<li>Do the five exercises: attention, multi-head, encoder, training, inference. Compare against <code>solutions/</code> only after a real attempt.</li>
+<li>Experiment: switch pre-norm to post-norm and remove warmup. Note which change makes training unstable.</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>Which two masks does a Transformer use, and what does each protect against?</summary><p>A padding mask, so attention ignores filler tokens in uneven batches. A causal (subsequent) mask in the decoder, so position i can't see target tokens after i during teacher-forced training.</p></details>
+<details><summary>At what step does the learning rate peak, and what is its value?</summary><p>At step = warmup. The value there is factor · d_model^−0.5 · warmup^−0.5, for example about 7×10⁻⁴ with d_model 512 and warmup 4000.</p></details>
+<details><summary>How does the notebook's layer norm placement differ from the paper's?</summary><p>The notebook normalises the input of each sublayer and adds the raw residual (pre-norm). The paper adds first and normalises the sum (post-norm). Pre-norm is generally easier to train deep.</p></details>
+<details><summary>Why train on a copy task first?</summary><p>It is trivially learnable, so failure points to a code bug (masks, shifted targets, shapes) rather than to data or capacity.</p></details>
+<details><summary>Why does label smoothing hurt perplexity but help BLEU?</summary><p>It stops the model putting all probability on one token. That makes its probabilities less sharp, which raises perplexity, but it reduces overconfidence and generalises better.</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://nlp.seas.harvard.edu/annotated-transformer/">The Annotated Transformer</a> (2022 version, with a link to the 2018 original)</li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/14_annotated_transformer">30u30 Day 14</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Next: <a href="15-bahdanau-attention.html">Day 15, Neural Machine Translation by Jointly Learning to Align and Translate</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="13-attention.html"><small>Previous</small>Day 13 · Attention Is All You Need</a>
+  <a class="next" href="15-bahdanau-attention.html"><small>Next</small>Day 15 · Bahdanau attention</a>
+</nav>
+<footer>Module 06 · Day 14 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('lr'), ctx = cv.getContext('2d');
+const wuIn = document.getElementById('wu'), dmIn = document.getElementById('dm');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const DMS = [128, 256, 512, 1024], MAXS = 40000, YMAX = 4e-3;
+const rate = (s, d, w) => d ** -0.5 * Math.min(s ** -0.5, s * w ** -1.5);
+
+function draw() {
+  const w = +wuIn.value, d = DMS[+dmIn.value];
+  document.getElementById('wuv').textContent = w.toLocaleString();
+  document.getElementById('dmv').textContent = d;
+  const W = cv.width, H = cv.height, L = 50, B = 22, T = 10;
+  const x = s => L + (s / MAXS) * (W - L - 10), y = v => H - B - (v / YMAX) * (H - B - T);
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = css('--line'); ctx.beginPath(); ctx.moveTo(L, T); ctx.lineTo(L, H - B); ctx.lineTo(W - 10, H - B); ctx.stroke();
+  ctx.fillStyle = css('--muted'); ctx.font = '12px sans-serif'; ctx.textAlign = 'right';
+  [0, 1e-3, 2e-3, 3e-3, 4e-3].forEach(v => ctx.fillText(v ? (v * 1e3) + 'e-3' : '0', L - 6, y(v) + 4));
+  ctx.textAlign = 'center';
+  [0, 10000, 20000, 30000, 40000].forEach(s => ctx.fillText(s / 1000 + 'k', x(s), H - 6));
+  ctx.strokeStyle = css('--muted'); ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(x(w), T); ctx.lineTo(x(w), H - B); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = css('--accent'); ctx.lineWidth = 2; ctx.beginPath();
+  for (let s = 50; s <= MAXS; s += 50) { const v = Math.min(rate(s, d, w), YMAX); s === 50 ? ctx.moveTo(x(s), y(v)) : ctx.lineTo(x(s), y(v)); }
+  ctx.stroke(); ctx.lineWidth = 1;
+  document.getElementById('pk').textContent = w.toLocaleString();
+  document.getElementById('pr').textContent = rate(w, d, w).toExponential(2);
+  document.getElementById('end').textContent = rate(100000, d, w).toExponential(2);
+}
+wuIn.oninput = dmIn.oninput = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

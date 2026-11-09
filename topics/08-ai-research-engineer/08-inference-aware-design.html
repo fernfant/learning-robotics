@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stage 08 · Inference-aware design</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 08 · Research-engineer roadmap</a> › Stage 08</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 08 · Stage 08</div>
+<h1>Inference-aware model design</h1>
+<p class="lede">Choices you make before training (how many key-value heads, what precision the cache uses, whether a draft model can ride along) decide how much memory each token costs and how fast the model can answer. This stage is about doing that arithmetic first.</p>
+
+<div class="facts">
+  <div><b>Prerequisites</b>Stage 01, self-attention and the KV cache at the level of 30u30 Day 13, basic GPU memory awareness</div>
+  <div><b>Time</b>15–25 h: 5 h reading, 10–20 h for the GQA project and benchmarks</div>
+  <div><b>Hardware</b>Laptop or free Colab GPU for the small version · one 24–80 GB GPU for the vLLM benchmark</div>
+  <div><b>Key papers</b>MQA (Shazeer 2019), GQA (Ainslie et al. 2023), PagedAttention (Kwon et al. 2023), KIVI and KVQuant (2024)</div>
+</div>
+<p class="meta">Source: <a href="https://x.com/suraj_sharma14/status/2112876560629825734">Suraj Sharma's roadmap post</a>, stage 8 · saved in <code>sources/08-suraj-ai-research-engineer.md</code></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">When a language model writes, it keeps notes on every word so far. Those notes take lots of memory. Smart model design makes the notes smaller, so the model answers faster and fits on smaller computers.</p>
+
+<h3>Think of it like this</h3>
+<p>Picture a class of 32 students reading a long story together. Each student keeps their own full set of notes about every page. That's a lot of paper. Now split the class into 4 groups of 8, and each group shares one set of notes. That's 4 sets instead of 32, and everyone can still look things up. If the whole class shares one set, it's even smaller, but students start missing details they cared about. Grouped sharing is the sweet spot.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>For every word it reads, the model writes a "key" (what this word is about) and a "value" (what it says) for each layer.</li>
+<li>It keeps these in a memory store called the KV cache, so it doesn't redo the work for every new word.</li>
+<li>Each layer has many "heads" that look for different things. Normally each head keeps its own keys and values.</li>
+<li>Grouped-query attention lets several heads share one set of keys and values, so the cache shrinks.</li>
+<li>Storing the notes in fewer bits (like writing with smaller handwriting) shrinks it again.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot's computer has much less memory than a data centre, and it must decide fast. If the model stops to think for half a second while the arm is moving, the arm keeps moving. Smaller notes mean the model fits on the robot and answers in time.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Write a 10-line summary of a story you know, one line per page. Then try again with a friend, sharing one summary between you. Is the shared one still good enough for both of you?</li>
+<li>In the demo further down, move <b>KV heads</b> from 32 down to 1 and watch the memory fall. Then change <b>KV precision</b> from 16 to 4 bits, and stretch <b>Context</b> to see when the notes no longer fit in the <b>Memory budget</b>.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Inference</dt><dd>Using a trained model to answer, as opposed to training it.</dd>
+<dt>KV cache</dt><dd>The stored keys and values for every earlier token, so they aren't recomputed.</dd>
+<dt>Attention head</dt><dd>One of several parallel "lookups" inside an attention layer.</dd>
+<dt>Quantisation</dt><dd>Storing numbers with fewer bits, trading a little accuracy for memory.</dd>
+<dt>Latency</dt><dd>How long you wait for an answer.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="covers">1. What this stage covers</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>During generation, each new token reads every model weight and the whole KV cache from GPU memory. At long contexts or large batches the cache, not the weights, dominates both memory and bandwidth. Its size is 2 × layers × KV heads × head dim × tokens × bytes. Multi-query attention (one shared KV head) and grouped-query attention (a few shared KV heads) cut the "KV heads" term by 4–32× at a small quality cost. KV-cache quantisation cuts the "bytes" term by 2–8×. Both must be decided with serving in mind, and both interact with paging and speculative decoding, which <a href="../05-trillion-scale-architecture.html#serving">Module 05</a> covers.</p>
+</div>
+<ul>
+<li><strong>Learn:</strong> GQA, MQA, KV-cache quantisation, and what makes a model work well with speculative decoding.</li>
+<li><strong>Practice:</strong> convert a standard transformer to GQA, measure the KV-cache memory saved, and benchmark latency and throughput in vLLM.</li>
+<li><strong>Why (the post's claim):</strong> a model too slow or expensive to serve is useless, and architecture sets the inference costs. Largely true; see section 4.</li>
+</ul>
+
+<h2 id="concepts">2. Concepts, explained</h2>
+
+<h3 id="kvmath">First, the KV-cache arithmetic</h3>
+<p>In a decoder, each layer computes keys and values for every token. Generating token t+1 needs the keys and values of tokens 1…t, so servers keep them instead of recomputing. The size is exact and worth memorising:</p>
+<pre><code>KV bytes = 2 × L × n_kv × d_head × T × B × bytes_per_value
+           (K and V) (layers) (KV heads) (head dim) (tokens) (batch)
+
+Llama-2-7B shape (L=32, n_kv=32, d_head=128), fp16:
+  per token = 2 × 32 × 32 × 128 × 2 B = 512 KiB
+  4,096 tokens = 2 GiB per sequence
+
+Llama-3-8B shape (L=32, n_kv=8, d_head=128), fp16:
+  per token = 128 KiB  →  8,192 tokens = 1 GiB per sequence</code></pre>
+<p>Why it matters for speed: decoding one token at batch 1 is memory-bandwidth bound. The GPU must stream all weights plus the cache from memory for very little arithmetic. A rough floor is (weight bytes + KV bytes) ÷ bandwidth. For a 7B fp16 model (about 14 GB of weights) on a GPU with 1 TB/s, that's about 14 ms per token before the cache. At short contexts the weights dominate. At long contexts or large batches the cache overtakes them, because weights are read once per step for the whole batch while each sequence brings its own cache. So shrinking the cache buys bigger batches (throughput) and longer contexts, and only buys per-token latency once the cache is a large share of the bytes read.</p>
+
+<h3 id="mqa">Multi-query attention (MQA)</h3>
+<p>Noam Shazeer's 2019 paper "Fast Transformer Decoding: One Write-Head is All You Need" kept many query heads but shared a <em>single</em> key head and value head across all of them. The cache shrinks by a factor of n_heads (32× for a 32-head model). The paper reports much faster decoding and only minor quality loss. In practice MQA can hurt quality and training stability at scale, and with tensor parallelism the single KV head has to be duplicated on every GPU, which gives back some of the saving.</p>
+
+<h3 id="gqa">Grouped-query attention (GQA)</h3>
+<p>GQA (Ainslie, Lee-Thorp, de Jong, Zemlyanskiy, Lebrón and Sanghai, 2023) is the middle ground: split the query heads into G groups, and give each group one shared KV head. G = n_heads is ordinary multi-head attention (MHA); G = 1 is MQA.</p>
+<pre><code>MHA:  n_q = 32, n_kv = 32   cache × 1
+GQA:  n_q = 32, n_kv = 8    cache × 1/4    (each KV head serves 4 query heads)
+MQA:  n_q = 32, n_kv = 1    cache × 1/32
+
+attention for query head h uses K, V of KV head  ⌊h / (n_q / n_kv)⌋</code></pre>
+<p>The paper's second contribution is <strong>uptraining</strong>: you don't need to retrain from scratch. Mean-pool the key and value projection weights of the heads in each group into one head, then continue pre-training for about 5% of the original compute. Uptrained GQA came close to MHA quality at a speed close to MQA. Eight KV heads has become a common choice: Llama 2 70B, Llama 3 and Mistral 7B all use it.</p>
+<p>A further step is to compress the cache rather than share it. DeepSeek's Multi-head Latent Attention (MLA) caches one small latent vector per token and reconstructs keys and values from it. Module 05 explains MLA and how Kimi K3 mixes it with linear-attention layers whose state doesn't grow at all; <a href="../05-trillion-scale-architecture.html#length">see the length section there</a>.</p>
+
+<h3 id="kvq">KV-cache quantisation</h3>
+<p>Weights are fixed and can be quantised offline with care. The cache is created on the fly, so its quantisation must be cheap and must cope with whatever activations appear. Two findings shape the methods:</p>
+<ul>
+<li><strong>Keys have outlier channels.</strong> A few channels of the key vectors carry much larger values than the rest, consistently across tokens. Quantising keys <em>per channel</em> isolates them. Values have no such pattern and are quantised <em>per token</em>. This is the core finding of <strong>KIVI</strong> (Liu et al., 2024), a tuning-free 2-bit scheme that also keeps the most recent tokens in full precision until a group fills.</li>
+<li><strong>Rotary embeddings mix channels.</strong> <strong>KVQuant</strong> (Hooper et al., 2024) quantises keys <em>before</em> RoPE is applied, uses non-uniform per-layer data types, and stores outliers separately in a sparse format. It reports under 0.1 perplexity loss at 3 bits on Llama-family models.</li>
+</ul>
+<pre><code>q = round((x − min) / scale),  scale = (max − min) / (2^bits − 1)
+keys:   min/max/scale per channel (over a group of tokens)
+values: min/max/scale per token   (over its channels)
+memory ≈ bits/16 of fp16, plus a small overhead for the scales</code></pre>
+<p>In production the common, safe step is <strong>FP8 KV cache</strong>, which vLLM supports through <code>--kv-cache-dtype</code>. It halves the cache with usually small quality impact. Going to 4 or 2 bits needs the tricks above and careful evaluation, especially on long-context retrieval tasks, where small errors in old keys can make the model attend to the wrong place.</p>
+
+<h3 id="spec">Speculative-decoding compatibility</h3>
+<p>Speculative decoding (Leviathan, Kalman and Matias, 2022) lets a cheap draft propose several tokens and the large model verify them in one forward pass, with an acceptance rule that leaves the output distribution exactly unchanged. Module 05 covers the mechanism and how K3 trained its draft for acceptance rate (<a href="../05-trillion-scale-architecture.html#serving">serving section</a>). The design questions for this stage are what make a model easy to speculate with:</p>
+<ul>
+<li><strong>Same tokenizer.</strong> A separate draft model must share the target's vocabulary. Plan a small sibling model at training time.</li>
+<li><strong>Built-in drafts.</strong> Extra prediction heads (Medusa, EAGLE) or multi-token prediction trained alongside the main model give a draft for free, but only if they're designed in.</li>
+<li><strong>Cheap verification.</strong> Verifying k tokens is a short prefill that reads the whole cache. GQA and KV quantisation make that cheaper too.</li>
+<li><strong>Memory for two caches.</strong> The draft has its own KV cache, which counts against the same budget.</li>
+<li><strong>Predictable outputs.</strong> Acceptance is higher on predictable text (code, structured output) and lower at high sampling temperature, so the gain depends on the workload.</li>
+</ul>
+
+<div class="card demo">
+<h3>Interactive: KV-cache memory for MHA, GQA and MQA</h3>
+<p class="legend">Total KV cache (GiB, log scale) against context length, for the whole batch. Dashed: MHA (KV heads = query heads). Solid: your KV-head setting. Dotted: MQA (1 KV head). The horizontal line is your memory budget for the cache. The marker is your context length.</p>
+<canvas id="kc" width="700" height="260" aria-label="KV-cache memory against context length for MHA, the chosen GQA setting and MQA"></canvas>
+<label for="ly">Layers: <span id="lyv" class="num"></span></label>
+<input id="ly" type="range" min="8" max="96" step="4" value="32">
+<label for="qh">Query heads: <span id="qhv" class="num"></span></label>
+<input id="qh" type="range" min="8" max="64" step="8" value="32">
+<label for="kh">KV heads: <span id="khv" class="num"></span></label>
+<input id="kh" type="range" min="0" max="6" step="1" value="3">
+<label for="hd">Head dim: <span id="hdv" class="num"></span></label>
+<input id="hd" type="range" min="64" max="256" step="64" value="128">
+<label for="cx">Context: <span id="cxv" class="num"></span> tokens</label>
+<input id="cx" type="range" min="9" max="17" step="1" value="13">
+<label for="bs">Batch (sequences): <span id="bsv" class="num"></span></label>
+<input id="bs" type="range" min="1" max="64" step="1" value="1">
+<label for="bt">KV precision: <span id="btv" class="num"></span> bits</label>
+<input id="bt" type="range" min="0" max="3" step="1" value="0">
+<label for="bg">Memory budget: <span id="bgv" class="num"></span> GiB</label>
+<input id="bg" type="range" min="1" max="80" step="1" value="8">
+<div class="stats">
+  <div class="stat"><div class="k">KV per token</div><div class="v" id="spt">–</div></div>
+  <div class="stat"><div class="k">KV total</div><div class="v" id="stot">–</div></div>
+  <div class="stat"><div class="k">Smaller than MHA fp16</div><div class="v" id="srat">–</div></div>
+  <div class="stat"><div class="k">Tokens that fit in budget</div><div class="v" id="sfit">–</div></div>
+</div>
+<p class="meta">Try this: the defaults are the Llama-3-8B shape (32 layers, 32 query heads, 8 KV heads, head dim 128) at 8,192 tokens: 128 KiB per token, 1 GiB total. Set KV heads to 32 for the Llama-2-7B shape: 4 GiB. Now set batch to 16 and KV precision to 4 bits: GQA fits in the 8 GiB budget at 4 GiB, while MHA at the same precision needs 16 GiB. Scale factors for quantisation ignore the small overhead of storing scales.</p>
+</div>
+
+<h2 id="practice">3. The practice project</h2>
+<h3>(a) Laptop/Colab version: MHA vs GQA vs MQA on a tiny model</h3>
+<p>Train three tiny character-level GPTs that differ only in KV heads, then measure quality, cache size and decode speed. This runs on a laptop CPU in a few hours or a Colab GPU in under one.</p>
+<ol>
+<li><strong>Start from nanoGPT</strong> (or your Stage 01 transformer) on Tiny Shakespeare: 6 layers, 8 query heads, embedding 256, context 256.</li>
+<li><strong>Swap the attention</strong> for the GQA module below. Train three models with n_kv = 8, 2 and 1 for the same number of steps and seed.</li>
+<li><strong>Measure quality:</strong> validation loss for each. Expect GQA-2 to be close to MHA and MQA a little worse, but check rather than assume; at this tiny scale the differences may be within seed noise, so run two seeds.</li>
+<li><strong>Measure memory:</strong> compute KV bytes with the formula, then confirm by summing the sizes of the cached tensors during generation. They should agree exactly.</li>
+<li><strong>Measure speed:</strong> tokens per second when generating 2,000 tokens at batch 1 and batch 32. Expect little gain at batch 1 on a tiny model, and a clearer gain at larger batch and context.</li>
+<li><strong>Uptraining exercise:</strong> take the trained MHA model, mean-pool its KV heads into 2 groups, measure the loss jump, then fine-tune for 5% of the original steps and measure again.</li>
+</ol>
+<pre><code>import torch, torch.nn as nn, torch.nn.functional as F
+
+class GQA(nn.Module):
+    def __init__(s, d, n_q, n_kv):
+        super().__init__()
+        s.n_q, s.n_kv, s.hd = n_q, n_kv, d // n_q
+        s.q = nn.Linear(d, n_q * s.hd, bias=False)
+        s.kv = nn.Linear(d, 2 * n_kv * s.hd, bias=False)
+        s.o = nn.Linear(d, d, bias=False)
+
+    def forward(s, x, cache=None):                     # x: [B, T, d]
+        B, T, _ = x.shape
+        q = s.q(x).view(B, T, s.n_q, s.hd).transpose(1, 2)
+        k, v = s.kv(x).view(B, T, 2, s.n_kv, s.hd).permute(2, 0, 3, 1, 4)
+        if cache is not None:                          # [B, n_kv, T_past, hd]
+            k, v = torch.cat([cache[0], k], 2), torch.cat([cache[1], v], 2)
+        new_cache = (k, v)                             # the part GQA shrinks
+        r = s.n_q // s.n_kv
+        k, v = k.repeat_interleave(r, 1), v.repeat_interleave(r, 1)
+        y = F.scaled_dot_product_attention(q, k, v, is_causal=cache is None)
+        return s.o(y.transpose(1, 2).reshape(B, T, -1)), new_cache
+
+def pool_heads(W, n_q, n_kv):                          # W: [n_q*hd, d] → [n_kv*hd, d]
+    hd = W.shape[0] // n_q
+    return W.view(n_kv, n_q // n_kv, hd, -1).mean(1).reshape(n_kv * hd, -1)</code></pre>
+<p>Note that <code>repeat_interleave</code> copies data at compute time; only the cache is smaller. Real kernels (and recent PyTorch's <code>enable_gqa</code> option) index the shared heads without copying.</p>
+
+<h3>(b) The full version</h3>
+<p>The post asks for a GQA conversion benchmarked in vLLM. A realistic plan: take an open MHA checkpoint of about 1B parameters, convert it to 4 or 8 KV heads by mean-pooling, uptrain on a few billion tokens of similar data, and serve both versions in vLLM on one 24–80 GB GPU. Uptraining a 1B model on a few billion tokens is a multi-GPU-day job, so budget roughly tens to low hundreds of dollars of rented compute. Then:</p>
+<ul>
+<li>Record the KV-cache capacity vLLM reports at startup for each model. With the same memory setting, the GQA model should hold n_q/n_kv times more tokens.</li>
+<li>Benchmark with vLLM's benchmarking tools across concurrency levels and prompt lengths. Report time to first token, inter-token latency and output tokens per second.</li>
+<li>Repeat with <code>--kv-cache-dtype fp8</code> on both.</li>
+<li>Evaluate quality on the same tasks before and after, including at least one long-context retrieval test.</li>
+</ul>
+
+<h3>(c) Pitfalls</h3>
+<ul>
+<li><strong>Measuring VRAM with nvidia-smi.</strong> vLLM pre-allocates a fixed share of GPU memory, so total usage looks the same for both models. Compare KV-cache token capacity instead.</li>
+<li><strong>Expecting latency wins at batch 1, short prompts.</strong> There the weights dominate the bytes read. GQA's gains show up as larger batches, longer contexts and higher throughput.</li>
+<li><strong>"The exact drop".</strong> The cache saving is exactly n_q/n_kv by construction. The interesting measurements are the quality cost and the end-to-end throughput change.</li>
+<li><strong>Skipping uptraining.</strong> Mean-pooled heads without further training lose noticeable quality. The GQA paper's result depends on uptraining.</li>
+<li><strong>Tensor parallelism.</strong> With more GPUs than KV heads, KV heads are replicated, and the saving per GPU shrinks.</li>
+</ul>
+
+<h2 id="reality">4. Reality check</h2>
+<p>The post says a model too slow or expensive to serve is useless, and that architecture dictates inference physics.</p>
+<ul>
+<li><strong>True:</strong> serving cost is a design constraint, not an afterthought. GQA became near-universal in open models because it changes how many users fit on a GPU, and Module 05 shows Kimi K3's attention design was shaped by serving.</li>
+<li><strong>Overstated:</strong> architecture is one lever among several. Quantisation of weights, batching, paged memory, prefix caching, speculative decoding and the kernel stack often matter as much, and they can be added after training. "Useless" is too strong: slow, accurate models are routinely distilled into fast ones (<a href="../04-distill-small-models.html">Module 04</a>).</li>
+<li><strong>Missing:</strong> the cache is not the bottleneck for every workload. Short chats at small batch are bound by weights; that's why weight quantisation and smaller models come first for edge and robot deployment.</li>
+</ul>
+
+<h2 id="course">5. In this course</h2>
+<ul>
+<li><a href="../05-trillion-scale-architecture.html#serving">Module 05 · Serving</a>: MLA, the paged KV pool shared by two cache types, and speculative decoding with a draft trained for acceptance rate. Read this before or after this page; it's the production version of these ideas.</li>
+<li><a href="../05-trillion-scale-architecture.html#length">Module 05 · Length</a>: linear-attention layers whose state doesn't grow with context.</li>
+<li><a href="../04-distill-small-models.html#latency">Module 04 · Latency is a safety number</a>: how milliseconds turn into metres on a moving robot.</li>
+<li><a href="../02-tensortonic.html#track">Module 02 · TensorTonic</a>: KV cache, quantisation and speculative decoding practice problems.</li>
+<li><a href="../06-30u30/13-attention.html">30u30 Day 13 · The Transformer</a>: multi-head attention, the starting point for GQA.</li>
+<li><a href="07-multimodal-fusion.html">Stage 07 · Multimodal fusion</a>: why multi-camera robot models produce so many tokens to cache.</li>
+</ul>
+
+<h2 id="robotics">6. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Robot computers are memory-poor.</strong> Embedded GPU modules share a modest memory pool between weights, cache, perception and everything else. Per-token cache cost decides how much camera history and instruction context a VLA can keep on board.</li>
+<li><strong>Vision tokens fill the cache fast.</strong> Stage 07's demo shows a multi-camera setup reaching thousands of tokens per step. With the Llama-3-8B shape at fp16, 4,374 tokens is about 547 MiB of cache per control step, before any history.</li>
+<li><strong>Reuse the prefix.</strong> The instruction and current images are the same for every action decoded in one step. The π0 paper (Black et al., 2024) describes this: its action expert attends to the VLM prefix, whose keys and values are computed once and reused across the action expert's integration steps. Designing so the expensive part is cached is an inference-aware choice.</li>
+<li><strong>Batch 1 is normal on a robot.</strong> One robot runs one episode, so it sits in the weight-bound regime. Weight quantisation and smaller distilled models usually come first; GQA and KV quantisation matter most for long histories and for server-side fleets of robots.</li>
+<li><strong>Latency is a control-rate budget.</strong> Autoregressive action tokens (Stage 07) multiply decode steps per action. Action chunking and parallel decoding exist largely to fit the control loop.</li>
+</ul>
+</div>
+
+<h2 id="check">7. Self-check</h2>
+<details><summary>A model has 80 layers, 8 KV heads and head dim 128. How big is its fp16 KV cache at 128k (131,072) tokens for one sequence?</summary><p>Per token: 2 × 80 × 8 × 128 × 2 B = 327,680 B = 320 KiB. Times 131,072 tokens = 40 GiB.</p></details>
+<details><summary>What do G = n_heads and G = 1 correspond to in GQA?</summary><p>G = n_heads is ordinary multi-head attention, one KV head per query head. G = 1 is multi-query attention, one KV head shared by all.</p></details>
+<details><summary>Why might switching to GQA barely change latency for a single short chat?</summary><p>At batch 1 and short context, decode time is dominated by reading the weights from memory. The cache is a small share of the bytes, so shrinking it changes little. Gains appear at long contexts and large batches.</p></details>
+<details><summary>Why do KV quantisation methods treat keys and values differently?</summary><p>Keys have a few consistent outlier channels, so they're quantised per channel. Values have no such channel pattern and are quantised per token. KIVI's analysis found this split works best.</p></details>
+<details><summary>How do you convert an MHA checkpoint to GQA without retraining from scratch?</summary><p>Mean-pool the key and value projection heads within each group into one head, then uptrain for a small fraction of the original compute (about 5% in the GQA paper).</p></details>
+<details><summary>Name two design choices that make a model easier to use with speculative decoding.</summary><p>Training a small sibling draft model with the same tokenizer, or building in extra prediction heads or multi-token prediction. Smaller KV caches also make the verification pass cheaper.</p></details>
+
+<h2 id="courses">8. Courses &amp; content</h2>
+<div class="table-wrap"><table>
+<tr><th>Resource</th><th>Type</th><th>Use it for</th></tr>
+<tr><td><a href="https://jax-ml.github.io/scaling-book/">Google DeepMind · How To Scale Your Model (inference chapters)</a></td><td>Free online book</td><td>KV-cache maths, batching and latency vs throughput</td></tr>
+<tr><td><a href="https://huggingface.co/blog/kv-cache">Hugging Face · KV cache explained</a></td><td>Blog guide</td><td>What the KV cache stores and why it dominates memory</td></tr>
+<tr><td><a href="https://docs.vllm.ai/en/latest/">vLLM docs</a></td><td>Official docs</td><td>Paged KV cache, quantisation, speculative decoding in a real server</td></tr>
+<tr><td><a href="https://www.deeplearning.ai/short-courses/efficiently-serving-llms/">DeepLearning.AI · Efficiently Serving LLMs</a></td><td>Short course</td><td>KV caching, batching, quantisation, LoRA serving</td></tr>
+<tr><td><a href="https://hanlab.mit.edu/courses/2024-fall-65940">MIT 6.5940 · TinyML and Efficient Deep Learning Computing</a></td><td>University course (free lectures)</td><td>Quantisation, pruning, efficient attention, on-device and edge, which matters for robots too</td></tr>
+<tr><td><a href="https://www.philipkiely.com/">Philip Kiely · Inference Engineering (book)</a></td><td>Book</td><td>Production inference from the Baseten side (see Module 05)</td></tr>
+</table></div>
+<p>Start with the inference chapters of How To Scale Your Model: they teach the bandwidth-versus-compute arithmetic this whole stage rests on, with worked examples. Then use the vLLM docs for the benchmark.</p>
+<p class="meta"><a href="index.html#courses">Full course map for all 12 stages →</a></p>
+
+<h2 id="papers">9. Papers &amp; docs</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/1911.02150">Fast Transformer Decoding: One Write-Head is All You Need (MQA)</a> (Shazeer, 2019)</li>
+<li><a href="https://arxiv.org/abs/2305.13245">GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints</a> (Ainslie et al., 2023)</li>
+<li><a href="https://arxiv.org/abs/2309.06180">Efficient Memory Management for LLM Serving with PagedAttention (vLLM)</a> (Kwon et al., 2023)</li>
+<li><a href="https://arxiv.org/abs/2402.02750">KIVI: A Tuning-Free Asymmetric 2bit Quantization for KV Cache</a> (Liu et al., 2024)</li>
+<li><a href="https://arxiv.org/abs/2401.18079">KVQuant: Towards 10 Million Context Length LLM Inference with KV Cache Quantization</a> (Hooper et al., 2024)</li>
+<li><a href="https://arxiv.org/abs/2211.17192">Fast Inference from Transformers via Speculative Decoding</a> (Leviathan, Kalman, Matias, 2022)</li>
+<li><a href="https://arxiv.org/abs/2410.24164">π0: A Vision-Language-Action Flow Model for General Robot Control</a> (Black et al., 2024)</li>
+<li>Docs: <a href="https://docs.vllm.ai/en/latest/">vLLM documentation</a> (quantised KV cache, speculative decoding, benchmarking)</li>
+</ul>
+
+<nav class="pager">
+  <a href="07-multimodal-fusion.html"><small>Previous</small>Stage 07 · Multimodal fusion</a>
+  <a class="next" href="09-mech-interp.html"><small>Next</small>Stage 09 · Mechanistic interpretability</a>
+</nav>
+<footer>Module 08 · Stage 08 · written for this course from the source post and primary papers.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('kc'), ctx = cv.getContext('2d');
+const ids = ['ly', 'qh', 'kh', 'hd', 'cx', 'bs', 'bt', 'bg'];
+const el = Object.fromEntries(ids.map(k => [k, document.getElementById(k)]));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const BITS = [16, 8, 4, 2], GiB = 2 ** 30;
+const fmt = n => Math.round(n).toLocaleString('en-US');
+
+// KV heads slider picks a power of two, capped at the query-head count
+const kvHeads = (i, nq) => Math.min(2 ** i, nq);
+const kvBytes = (L, nkv, hd, T, B, bits) => 2 * L * nkv * hd * T * B * bits / 8;
+const gb = b => b >= 10 * GiB ? fmt(b / GiB) + ' GiB' : b >= GiB ? (b / GiB).toFixed(2) + ' GiB' : fmt(b / 2 ** 20) + ' MiB';
+
+function draw() {
+  const L = +el.ly.value, nq = +el.qh.value, nkv = kvHeads(+el.kh.value, nq), hd = +el.hd.value;
+  const T = 2 ** +el.cx.value, B = +el.bs.value, bits = BITS[+el.bt.value], bud = +el.bg.value * GiB;
+  const shown = { ly: L, qh: nq, kh: nkv, hd, cx: fmt(T), bs: B, bt: bits, bg: el.bg.value };
+  ids.forEach(k => document.getElementById(k + 'v').textContent = shown[k]);
+
+  const W = cv.width, H = cv.height, l = 60, r = 20, t = 14, b = 30;
+  const X0 = 9, X1 = 17, Y0 = -4, Y1 = 12;            // log2 tokens; log2 GiB
+  const px = v => l + (v - X0) / (X1 - X0) * (W - l - r);
+  const py = v => t + (Y1 - Math.min(Math.max(v, Y0), Y1)) / (Y1 - Y0) * (H - t - b);
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = css('--line'); ctx.lineWidth = 1; ctx.font = '12px sans-serif'; ctx.fillStyle = css('--muted');
+  for (let e = Y0; e <= Y1; e += 4) {
+    ctx.beginPath(); ctx.moveTo(l, py(e)); ctx.lineTo(W - r, py(e)); ctx.stroke();
+    ctx.textAlign = 'right'; ctx.fillText(e < 0 ? `1/${2 ** -e}` : `${2 ** e}`, l - 6, py(e) + 4);
+  }
+  ctx.textAlign = 'center';
+  for (let e = X0; e <= X1; e += 2) ctx.fillText(e >= 10 ? `${2 ** (e - 10)}k` : `${2 ** e}`, px(e), H - 10);
+  ctx.save(); ctx.translate(14, H / 2); ctx.rotate(-Math.PI / 2); ctx.fillText('GiB', 0, 0); ctx.restore();
+
+  const curve = (n, col, dash) => {
+    ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.setLineDash(dash); ctx.beginPath();
+    for (let e = X0; e <= X1 + 1e-9; e += 0.1) {
+      const y = Math.log2(kvBytes(L, n, hd, 2 ** e, B, bits) / GiB);
+      e === X0 ? ctx.moveTo(px(e), py(y)) : ctx.lineTo(px(e), py(y));
+    }
+    ctx.stroke(); ctx.setLineDash([]);
+  };
+  curve(nq, css('--muted'), [6, 5]);
+  curve(1, css('--muted'), [2, 4]);
+  curve(nkv, css('--accent'), []);
+  ctx.strokeStyle = css('--fail'); ctx.lineWidth = 1.5; ctx.beginPath();
+  ctx.moveTo(l, py(Math.log2(bud / GiB))); ctx.lineTo(W - r, py(Math.log2(bud / GiB))); ctx.stroke();
+
+  const tot = kvBytes(L, nkv, hd, T, B, bits);
+  ctx.fillStyle = tot <= bud ? css('--pass') : css('--fail');
+  ctx.beginPath(); ctx.arc(px(Math.log2(T)), py(Math.log2(tot / GiB)), 6, 0, 7); ctx.fill();
+
+  const per = kvBytes(L, nkv, hd, 1, 1, bits);
+  document.getElementById('spt').textContent = per >= 2 ** 20 ? (per / 2 ** 20).toFixed(2) + ' MiB' : fmt(per / 1024) + ' KiB';
+  document.getElementById('stot').textContent = gb(tot);
+  document.getElementById('srat').textContent = fmt(kvBytes(L, nq, hd, 1, 1, 16) / per) + '×';
+  document.getElementById('sfit').textContent = fmt(Math.floor(bud / per));
+}
+ids.forEach(k => el[k].oninput = draw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

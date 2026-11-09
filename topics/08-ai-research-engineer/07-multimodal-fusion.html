@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stage 07 · Multimodal fusion</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 08 · Research-engineer roadmap</a> › Stage 07</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 08 · Stage 07</div>
+<h1>Multimodal fusion &amp; projection</h1>
+<p class="lede">How a language model learns to see: encode the image into vectors, translate those vectors into the language model's own embedding space, and decide where in the network the two streams meet. Add an action output and you have the core of a robot vision-language-action model.</p>
+
+<div class="facts">
+  <div><b>Prerequisites</b>Stage 01 (tensors, shapes), a working grasp of transformers and attention, basic PyTorch training loops</div>
+  <div><b>Time</b>20–30 h: about 8 h of reading, 12–20 h for the projector project</div>
+  <div><b>Hardware</b>Laptop for the reading and demo · free Colab GPU for the small project · one 8-GPU node for a full LLaVA-scale run</div>
+  <div><b>Key papers</b>CLIP (2021), SigLIP (2023), Flamingo (2022), LLaVA (2023), RT-2 (2023), OpenVLA (2024), π0 (2024)</div>
+</div>
+<p class="meta">Source: <a href="https://x.com/suraj_sharma14/status/2112876560629825734">Suraj Sharma's roadmap post</a>, stage 7 · saved in <code>sources/08-suraj-ai-research-engineer.md</code></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">A language model only understands words. To let it see, we put a picture-reading model in front of it and a small "translator" in between, so the picture arrives looking like words the language model already knows.</p>
+
+<h3>Think of it like this</h3>
+<p>Imagine a brilliant storyteller who is blindfolded, and a friend who can see but only speaks a different language. The friend looks at a photo and describes it in their own language. A translator sits between them and turns each description into words the storyteller understands. Now the storyteller can talk about the photo. The friend is the vision encoder, the translator is the projection layer, and the storyteller is the language model.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Cut the picture into a grid of small squares, called patches.</li>
+<li>A vision model turns each patch into a list of numbers that describes what's in it.</li>
+<li>A small translator network (the projector) reshapes those numbers so they look like word-numbers to the language model.</li>
+<li>The language model reads the picture-words and the real words together, and writes an answer.</li>
+<li>For a robot, the model also writes out movements, for example "move the gripper 2 cm left and close it".</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>This is how robots that follow spoken instructions are built. You say "put the red cup in the sink". The robot's cameras supply the picture, the language model understands "red cup" and "sink", and the model's output is turned into arm movements. These models are called vision-language-action models, or VLAs.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Take a photo and cover it with a grid of sticky notes, 4 across and 4 down. Lift one note at a time and write one word for what's under it. Could a friend guess the picture from your 16 words? Now try a 2 × 2 grid. Fewer notes is faster, but you lose detail. That's the trade-off every vision model makes.</li>
+<li>In the demo further down, move the <b>Image size</b> and <b>Patch size</b> sliders and watch the token count. Then add <b>Camera views</b> and <b>History frames</b>, like a robot with three cameras, and see how fast it grows. <b>Token merge</b> squeezes neighbouring patches together to win some back.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Vision encoder</dt><dd>A model that turns a picture into a list of number-vectors, one per patch.</dd>
+<dt>Patch</dt><dd>One small square of the picture, for example 14 × 14 pixels.</dd>
+<dt>Projector</dt><dd>A small network that translates picture-vectors into the language model's word-vector space.</dd>
+<dt>Fusion</dt><dd>The point where picture information and word information are combined.</dd>
+<dt>VLA</dt><dd>Vision-language-action model: sees, reads instructions, and outputs robot movements.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="covers">1. What this stage covers</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Most open vision-language models are three parts glued together: a pretrained image encoder (usually CLIP or SigLIP), a small projector, and a pretrained LLM. The projector maps each image-patch vector into the LLM's token-embedding space, and the LLM reads the result as if it were a run of extra tokens. That's "early" fusion at the input. The alternative is to keep the LLM's input pure text and let it look at the image through added cross-attention layers (Flamingo-style). Robot VLAs reuse exactly this stack, then add a way to emit actions: either as discrete tokens in the vocabulary (RT-2, OpenVLA) or through a separate continuous action head or "expert" (π0 and others).</p>
+</div>
+<ul>
+<li><strong>Learn:</strong> how contrastive image encoders (CLIP, SigLIP) are trained and why their features line up with language; cross-attention as a fusion mechanism; how audio becomes tokens; and the early-versus-late fusion design choice.</li>
+<li><strong>Practice:</strong> freeze a SigLIP encoder and a small LLM, and train only an MLP projector between them so the LLM can caption images. This is the LLaVA recipe in miniature.</li>
+<li><strong>Why (the post's claim):</strong> text is only part of the data in the world, and the leading models increasingly reason over images, audio and text together. Mostly true, with caveats in section 4.</li>
+</ul>
+
+<h2 id="concepts">2. Concepts, explained</h2>
+
+<h3 id="encoders">Vision encoders: CLIP and SigLIP</h3>
+<p>A Vision Transformer (ViT) cuts an image into P × P patches, flattens each, applies a linear layer, adds a position embedding and runs a standard transformer. The output is one vector per patch. What makes CLIP and SigLIP special is how they're trained: on huge sets of image–caption pairs, with a text encoder alongside, so that an image and its caption land near each other in a shared space. Those patch features are already "close to language", which is why a small projector is enough to hand them to an LLM.</p>
+<p><strong>CLIP</strong> (Radford et al., 2021) scores every image against every caption in a batch and applies a softmax in both directions. Each image must pick out its own caption from all the others.</p>
+<p><strong>SigLIP</strong> (Zhai, Mustafa, Kolesnikov and Beyer, 2023) replaces the softmax with an independent sigmoid on each image–text pair: "do these two match, yes or no?" No batch-wide normalisation is needed, which makes very large batches cheaper and also works better at small batch sizes. The paper found gains from growing the batch fade quickly, and that around 32k is enough.</p>
+<pre><code>CLIP  (softmax, per image i):  −log  exp(t·xᵢ·yᵢ) / Σⱼ exp(t·xᵢ·yⱼ)     (plus the text→image direction)
+SigLIP (sigmoid, every pair):  −Σᵢⱼ log σ( zᵢⱼ · (t·xᵢ·yⱼ + b) ),   zᵢⱼ = +1 if i = j else −1
+
+x, y = normalised image / text embeddings,  t = learned temperature,  b = learned bias</code></pre>
+<p>Token count is set by geometry: an image of side H with patch size P gives (H/P)² tokens. A 224-pixel image with 14-pixel patches is 16 × 16 = 256 tokens. At 384 pixels it's 27 × 27 = 729. The demo below makes this concrete, because for robots with several cameras it becomes the dominant cost.</p>
+
+<h3 id="projection">Projection: the bridge into the LLM</h3>
+<p>The encoder's vectors have its own width (say 768 or 1152) and live in its own space. The LLM expects vectors of its hidden size, in its embedding space. A projector learns that map. <strong>LLaVA</strong> (Liu, Li, Wu and Lee, 2023) used a single linear layer from a CLIP ViT-L/14 into Vicuna. Its follow-up, LLaVA-1.5, switched to a two-layer MLP and found it better. Training is two stages: first train only the projector on image–caption pairs (feature alignment), then unfreeze the LLM and fine-tune on visual instruction data, which LLaVA generated with text-only GPT-4.</p>
+<pre><code>v   = Encoder(image)            # [N_patches, d_vision]
+h   = W₂ · GELU(W₁ · v)         # [N_patches, d_llm]   the projector
+seq = [h ; Embed(prompt_tokens)]   # image tokens first, then text
+LLM(seq) → next-token loss on the answer tokens only</code></pre>
+<p>Other bridges compress the image into a fixed, smaller set of tokens. A <em>Q-Former</em> (BLIP-2) or <em>Perceiver resampler</em> (Flamingo) uses a few dozen learned queries that cross-attend to the patches. <em>Pixel shuffle</em> (used in SmolVLM-style small models) folds each 2 × 2 block of neighbouring patches into one wider vector, cutting tokens by 4×. Fewer tokens means cheaper inference and a less precise view of small details.</p>
+
+<h3 id="xattn">Cross-attention as fusion</h3>
+<p>In cross-attention, queries come from one stream and keys and values from another. <strong>Flamingo</strong> (Alayrac et al., 2022) keeps a pretrained LLM frozen and inserts new cross-attention layers between its blocks. Text hidden states form the queries; resampled image tokens form the keys and values. Each new layer's output passes through a tanh gate initialised at zero, so at the start of training the model behaves exactly like the original LLM and the visual pathway fades in.</p>
+<pre><code>Q = H_text · W_Q      K = V_img · W_K      V = V_img · W_V
+H_text ← H_text + tanh(α) · softmax(Q Kᵀ / √d) · V       # α starts at 0</code></pre>
+<p>The trade-off against LLaVA-style input fusion: cross-attention leaves the text context short (image tokens never enter the sequence) and protects the LLM's text skills, but it adds parameters and a more complex architecture. Input-token fusion is simpler and lets every layer of the LLM attend to the image, at the cost of a longer sequence.</p>
+
+<h3 id="audio">Audio tokenisation</h3>
+<p>Audio is handled in two broad ways. For <em>understanding</em>, an encoder such as Whisper's (Radford et al., 2022) turns a log-mel spectrogram into a sequence of vectors, which are then projected into the LLM exactly as with images. For <em>generation</em>, a neural codec such as EnCodec (Défossez et al., 2022) compresses the waveform into discrete codes using residual vector quantisation: several codebooks, each encoding what the previous ones missed. Those integer codes can then be predicted like text tokens. The same split, continuous features to read and discrete codes to write, reappears with robot actions below.</p>
+
+<h3 id="fusion">Early versus late fusion</h3>
+<p>The terms are used loosely, so be precise about which you mean:</p>
+<ul>
+<li><strong>Late fusion:</strong> each modality has its own model, and they meet only at the end, for example CLIP's dot product between an image vector and a text vector, or averaging two classifiers' scores. Cheap and modular, but the modalities can't inform each other's processing.</li>
+<li><strong>Intermediate (deep) fusion:</strong> separate encoders, then mixing inside the network. Flamingo's cross-attention layers, and LLaVA's "encoder, then projected tokens into the LLM", both sit here. Most open VLMs and VLAs use this.</li>
+<li><strong>Early fusion:</strong> all modalities become tokens in one shared vocabulary and one transformer processes them from the first layer. <strong>Chameleon</strong> (Chameleon Team, Meta, 2024) quantises images into discrete tokens and trains on interleaved image and text from scratch, so it can also generate images. The paper spends real effort on training stability, a known difficulty of this approach.</li>
+</ul>
+<p>The direction of travel at the frontier is towards models trained natively on several modalities, rather than bolting a frozen encoder onto a finished LLM. <a href="../05-trillion-scale-architecture.html#why-robotics">Module 05</a> records that Kimi K3 trained its vision encoder from scratch inside the language model and reported that a pretrained SigLIP-style encoder was unnecessary and less stable. That's a real counterpoint to this stage's recipe. It comes from a lab with trillion-token budgets, though. With a small dataset, reusing a pretrained encoder is still the sensible default.</p>
+
+<div class="card demo">
+<h3>Interactive: how many tokens does the robot's view cost?</h3>
+<p class="legend">The square is one image cut into patches. Shaded blocks show patches merged by token merging. The stats count tokens across all cameras and history frames, and compare attention cost (which grows with the square of sequence length) to a single 224-pixel image at patch 14.</p>
+<canvas id="vc" width="700" height="260" aria-label="Image patch grid and vision-token count for the chosen image size, patch size, camera views and history frames"></canvas>
+<label for="isz">Image size: <span id="iszv" class="num"></span> px</label>
+<input id="isz" type="range" min="112" max="1024" step="16" value="224">
+<label for="psz">Patch size: <span id="pszv" class="num"></span> px</label>
+<input id="psz" type="range" min="8" max="32" step="2" value="14">
+<label for="mrg">Token merge (s × s patches → 1): <span id="mrgv" class="num"></span></label>
+<input id="mrg" type="range" min="1" max="4" step="1" value="1">
+<label for="cam">Camera views: <span id="camv" class="num"></span></label>
+<input id="cam" type="range" min="1" max="4" step="1" value="1">
+<label for="his">History frames: <span id="hisv" class="num"></span></label>
+<input id="his" type="range" min="1" max="4" step="1" value="1">
+<div class="stats">
+  <div class="stat"><div class="k">Patches per side</div><div class="v" id="sps">–</div></div>
+  <div class="stat"><div class="k">Tokens per image</div><div class="v" id="spi">–</div></div>
+  <div class="stat"><div class="k">Total vision tokens</div><div class="v" id="stt">–</div></div>
+  <div class="stat"><div class="k">Attention cost vs 256 tokens</div><div class="v" id="sat">–</div></div>
+</div>
+<p class="meta">Try this: 224 px at patch 14 is 256 tokens. Raise the image to 384 px: 729 tokens. Now set 3 cameras and 2 history frames: 4,374 tokens, and attention costs about 292× the single-image case. Set token merge to 2 and the total drops about 4× (an odd grid loses its last row and column). Then see <a href="08-inference-aware-design.html">Stage 08</a> for what those tokens cost in KV-cache memory.</p>
+</div>
+
+<h2 id="practice">3. The practice project</h2>
+<h3>(a) Laptop/Colab version: a tiny captioning VLM</h3>
+<p>Freeze a small SigLIP and a small LLM. Train only the projector. This runs on a free Colab GPU in an hour or two.</p>
+<ol>
+<li><strong>Models:</strong> <code>google/siglip-base-patch16-224</code> (196 patch tokens) and <code>HuggingFaceTB/SmolLM2-135M</code>. Read both hidden sizes from their configs; don't hard-code them.</li>
+<li><strong>Data:</strong> a few thousand image–caption pairs (a slice of COCO Captions or Flickr30k). Keep 500 pairs aside for validation.</li>
+<li><strong>Cache the vision features</strong> once, since the encoder is frozen. Training then only touches the projector and is fast.</li>
+<li><strong>Train</strong> the two-layer MLP with AdamW (learning rate around 1e-3), loss on caption tokens only.</li>
+<li><strong>Measure</strong> validation caption loss under three conditions: the true image, a <em>shuffled</em> image from another example, and no image. The gap between "true" and "shuffled" is the only number that proves the projector passes visual information. Also read 20 generated captions by eye.</li>
+</ol>
+<pre><code>import torch, torch.nn as nn
+from transformers import AutoModel, AutoModelForCausalLM
+
+vis = AutoModel.from_pretrained("google/siglip-base-patch16-224").vision_model.eval()
+lm = AutoModelForCausalLM.from_pretrained("HuggingFaceTB/SmolLM2-135M").eval()
+for p in [*vis.parameters(), *lm.parameters()]:
+    p.requires_grad = False
+
+dv, dt = vis.config.hidden_size, lm.config.hidden_size
+proj = nn.Sequential(nn.Linear(dv, dt), nn.GELU(), nn.Linear(dt, dt))
+opt = torch.optim.AdamW(proj.parameters(), lr=1e-3)
+
+def loss_fn(pix, ids, pad_id):
+    with torch.no_grad():
+        v = vis(pixel_values=pix).last_hidden_state      # [B, 196, dv]
+    img = proj(v)                                         # [B, 196, dt]
+    txt = lm.get_input_embeddings()(ids)                  # [B, T, dt]
+    lab = ids.masked_fill(ids == pad_id, -100)            # no loss on padding
+    lab = torch.cat([torch.full(img.shape[:2], -100), lab], 1)  # or on image slots
+    return lm(inputs_embeds=torch.cat([img, txt], 1), labels=lab).loss</code></pre>
+<p>Don't expect fluent captions from a 135M model. Expect short, roughly topical ones ("a man riding a horse") and a clear loss gap over shuffled images. If the gap is near zero, the LLM is just writing generic captions from its language prior.</p>
+
+<h3>(b) The full version</h3>
+<p>The post's project at full size is LLaVA-1.5: a CLIP or SigLIP encoder at 336–384 px, an MLP projector and a 7B LLM. Stage 1 trains the projector on several hundred thousand caption pairs. Stage 2 unfreezes the LLM for visual instruction tuning. The LLaVA-1.5 authors report about a day of training on a single 8×A100 node. Rented, that's a few hundred dollars per run, before the failed runs. The <a href="https://github.com/huggingface/nanoVLM">nanoVLM</a> repo is the middle ground: a complete, readable VLM trainable on one GPU.</p>
+<p>For a robotics follow-on, fine-tune OpenVLA on a small task with LoRA, or train a SmolVLA-sized policy with LeRobot on a simulated task. Both are in the course list below.</p>
+
+<h3>(c) Pitfalls</h3>
+<ul>
+<li><strong>Wrong preprocessing.</strong> Use the encoder's own processor (resize, normalisation). SigLIP and CLIP normalise differently, and a mismatch silently degrades features.</li>
+<li><strong>Loss on the wrong tokens.</strong> Mask image positions, the prompt and padding. Otherwise the model learns to predict its own inputs.</li>
+<li><strong>Scale mismatch.</strong> Projected vectors can have a very different norm from text embeddings. Check both norms at the start; a large mismatch slows or destabilises training.</li>
+<li><strong>Trusting fluent output.</strong> A strong LLM writes plausible captions with no image at all. Always run the shuffled-image control.</li>
+<li><strong>CLS versus patch tokens.</strong> SigLIP has no CLS token; CLIP does. Know which tokens you're passing and how many.</li>
+</ul>
+
+<h2 id="reality">4. Reality check</h2>
+<p>The post says text is only half the internet and the current meta is models that natively reason over vision, audio and text together.</p>
+<ul>
+<li><strong>True:</strong> the leading models are multimodal, and a large share of useful data (video, images, audio, sensor streams) isn't text. For robotics this isn't a trend, it's the job: a robot has no text input except the instruction.</li>
+<li><strong>Overstated:</strong> "natively" is doing a lot of work. Most open VLMs and nearly all VLAs are still the bolt-on recipe in this stage: pretrained encoder, projector, pretrained LLM. Natively trained multimodal models exist (Chameleon, and Kimi K3's from-scratch vision encoder), but they need budgets few teams have.</li>
+<li><strong>Missing:</strong> the projector exercise teaches the plumbing, not the hard parts. Data quality, image resolution strategy, and evaluating whether the model actually looks at the image matter more for results than the projector's shape.</li>
+<li><strong>"Half the internet"</strong> is a slogan, not a measured figure.</li>
+</ul>
+
+<h2 id="course">5. In this course</h2>
+<ul>
+<li><a href="../05-trillion-scale-architecture.html#why-robotics">Module 05 · LLM architecture at scale</a>: Kimi K3 training its vision encoder from scratch, the counterpoint to the SigLIP recipe.</li>
+<li><a href="../06-30u30/28-cs231n.html">30u30 Day 28 · CS231n</a>: conv shapes, strides and why robot vision reuses pretrained backbones.</li>
+<li><a href="../06-30u30/13-attention.html">30u30 Day 13 · The Transformer</a> and <a href="../06-30u30/14-annotated-transformer.html">Day 14 · The Annotated Transformer</a>: the attention maths that cross-attention reuses.</li>
+<li><a href="../04-distill-small-models.html#why-robotics">Module 04 · Big teacher, small student</a>: distilling large VLAs into smaller, faster policies.</li>
+<li><a href="../03-shared-autonomy.html">Module 03 · Human–AI help levels</a>: what happens around a VLA when a human shares control.</li>
+</ul>
+
+<h2 id="robotics">6. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>A VLA is a VLM with an action output.</strong> Camera images go through a vision encoder and projector into a pretrained LLM, together with the language instruction. Robot state (joint angles, gripper) is usually projected in as well, through its own small MLP. The new part is how actions come out, and there are two main designs.</li>
+<li><strong>Design 1: actions as tokens.</strong> RT-2 (Brohan et al., 2023) discretises each action dimension into 256 bins and writes the bin numbers as text tokens, then co-fine-tunes the VLM on robot trajectories mixed with ordinary web vision-language data, which helps it keep its web knowledge. OpenVLA (Kim et al., 2024) does the same openly: a 7B model on Llama 2, with a vision encoder that fuses DINOv2 and SigLIP features, trained on 970k real robot demonstrations, and the 256 least-used tokens of the vocabulary repurposed as action bins. It reports beating the 55B RT-2-X by 16.5 points of absolute success across 29 tasks. The cost: one decoding step per action dimension, which is slow, and bins limit precision. Later work compressed action tokens (FAST) or decoded whole action chunks in parallel (OpenVLA-OFT).</li>
+<li><strong>Design 2: a separate action expert.</strong> π0 (Black et al., Physical Intelligence, 2024) keeps a PaliGemma VLM as the backbone and adds a smaller transformer "action expert" that attends to the VLM's tokens and outputs a chunk of future continuous actions with flow matching, a diffusion-like method. This avoids bins and produces smooth, high-rate control suited to dexterous tasks such as laundry folding. Octo and Diffusion Policy use related diffusion heads. Some humanoid systems go further and split a slow VLM "planner" from a fast low-level controller.</li>
+<li><strong>Vision tokens are the latency budget.</strong> Three cameras with history frames can produce thousands of vision tokens per control step (see the demo). Resolution, token merging and how many past frames to keep are real design levers, and they connect straight to <a href="08-inference-aware-design.html">Stage 08</a>.</li>
+<li><strong>Freezing is a choice to test, not assume.</strong> VLM recipes often freeze the vision encoder. The OpenVLA authors report that fine-tuning it mattered for robot control, probably because web images say little about precise gripper geometry. Kimi K3 goes further and drops the pretrained encoder entirely. Robot teams with small datasets usually keep the pretrained encoder and fine-tune it.</li>
+</ul>
+</div>
+
+<h2 id="check">7. Self-check</h2>
+<details><summary>Why does a small projector work at all, rather than needing a large network?</summary><p>CLIP and SigLIP features were trained to align with text, so they already encode concepts language talks about. The projector mostly has to rotate and rescale them into the LLM's embedding space, which a linear layer or two-layer MLP can do.</p></details>
+<details><summary>What does SigLIP change compared with CLIP, and why does it help?</summary><p>It scores each image–text pair with an independent sigmoid instead of a batch-wide softmax. No global normalisation is needed, so large batches are cheaper and small batches work better.</p></details>
+<details><summary>A 384-pixel image with patch size 14, three cameras and two history frames: how many vision tokens?</summary><p>384/14 rounds down to 27, so 729 tokens per image. 729 × 3 × 2 = 4,374 tokens per control step.</p></details>
+<details><summary>Why does Flamingo initialise its cross-attention gates at zero?</summary><p>So the model starts out identical to the frozen pretrained LLM. The visual pathway is added gradually and doesn't wreck the language ability at the start of training.</p></details>
+<details><summary>Name two ways a VLA can output actions and one weakness of each.</summary><p>Discrete action tokens (RT-2, OpenVLA): simple and reuse the LLM head, but slow per-dimension decoding and limited precision from binning. A separate continuous action expert (π0, flow matching): smooth, fast action chunks, but more architecture and a second training objective.</p></details>
+<details><summary>Your captioning VLM writes fluent captions. How do you check it's actually using the image?</summary><p>Compare validation loss and outputs with the true image against a shuffled image from another example. If they're about the same, the LLM is relying on its language prior.</p></details>
+
+<h2 id="courses">8. Courses &amp; content</h2>
+<div class="table-wrap"><table>
+<tr><th>Resource</th><th>Type</th><th>Use it for</th></tr>
+<tr><td><a href="https://github.com/huggingface/nanoVLM">Hugging Face · nanoVLM</a></td><td>Code (free)</td><td>A small VLM: vision encoder + projection + language model, trainable on one GPU</td></tr>
+<tr><td><a href="https://huggingface.co/blog/vlms">Hugging Face · Vision Language Models Explained</a></td><td>Blog guide</td><td>Architectures and how to fine-tune them</td></tr>
+<tr><td><a href="https://github.com/huggingface/smol-course">Hugging Face smol-course · Vision Language Models unit</a></td><td>Course (free)</td><td>Adapting and using multimodal models</td></tr>
+<tr><td><a href="https://llava-vl.github.io/">LLaVA project</a></td><td>Paper + code</td><td>The classic 'vision encoder + projector + LLM' recipe</td></tr>
+<tr><td><a href="https://huggingface.co/learn/robotics-course">Hugging Face · Robotics Course + LeRobot</a></td><td>Course (free)</td><td>Robotics track: from classical robotics to learned policies on real hardware</td></tr>
+<tr><td><a href="https://openvla.github.io/">OpenVLA</a></td><td>Paper + code</td><td>Robotics track: a VLM turned into a robot policy that outputs actions</td></tr>
+</table></div>
+<p>Start with nanoVLM: it's the practice project already built, small enough to read in an evening, and you can swap its projector for your own. Then move to OpenVLA for the robotics side.</p>
+<p class="meta"><a href="index.html#courses">Full course map for all 12 stages →</a></p>
+
+<h2 id="papers">9. Papers &amp; docs</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/2103.00020">CLIP: Learning Transferable Visual Models From Natural Language Supervision</a> (Radford et al., 2021)</li>
+<li><a href="https://arxiv.org/abs/2303.15343">SigLIP: Sigmoid Loss for Language Image Pre-Training</a> (Zhai, Mustafa, Kolesnikov, Beyer, 2023)</li>
+<li><a href="https://arxiv.org/abs/2204.14198">Flamingo: a Visual Language Model for Few-Shot Learning</a> (Alayrac et al., 2022)</li>
+<li><a href="https://arxiv.org/abs/2304.08485">Visual Instruction Tuning (LLaVA)</a> (Liu, Li, Wu, Lee, 2023) and <a href="https://arxiv.org/abs/2310.03744">Improved Baselines with Visual Instruction Tuning (LLaVA-1.5)</a> (Liu et al., 2023)</li>
+<li><a href="https://arxiv.org/abs/2405.09818">Chameleon: Mixed-Modal Early-Fusion Foundation Models</a> (Chameleon Team, 2024)</li>
+<li><a href="https://arxiv.org/abs/2212.04356">Whisper: Robust Speech Recognition via Large-Scale Weak Supervision</a> (Radford et al., 2022) and <a href="https://arxiv.org/abs/2210.13438">EnCodec: High Fidelity Neural Audio Compression</a> (Défossez et al., 2022)</li>
+<li><a href="https://arxiv.org/abs/2307.15818">RT-2: Vision-Language-Action Models Transfer Web Knowledge to Robotic Control</a> (Brohan et al., 2023)</li>
+<li><a href="https://arxiv.org/abs/2406.09246">OpenVLA: An Open-Source Vision-Language-Action Model</a> (Kim et al., 2024)</li>
+<li><a href="https://arxiv.org/abs/2410.24164">π0: A Vision-Language-Action Flow Model for General Robot Control</a> (Black et al., 2024)</li>
+<li>Docs: <a href="https://huggingface.co/docs/transformers/model_doc/siglip">Transformers · SigLIP</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="06-distributed-training.html"><small>Previous</small>Stage 06 · Distributed training</a>
+  <a class="next" href="08-inference-aware-design.html"><small>Next</small>Stage 08 · Inference-aware design</a>
+</nav>
+<footer>Module 08 · Stage 07 · written for this course from the source post and primary papers.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('vc'), ctx = cv.getContext('2d');
+const ids = ['isz', 'psz', 'mrg', 'cam', 'his'];
+const el = Object.fromEntries(ids.map(k => [k, document.getElementById(k)]));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = n => Math.round(n).toLocaleString('en-US');
+
+function tokens(H, P, s, cams, hist) {
+  const side = Math.floor(H / P);
+  const per = Math.floor(side / s) ** 2;
+  const total = per * cams * hist;
+  return { side, per, total, att: (total / 256) ** 2 };
+}
+
+function draw() {
+  const H = +el.isz.value, P = +el.psz.value, s = +el.mrg.value, cams = +el.cam.value, hist = +el.his.value;
+  ['isz', 'psz', 'mrg', 'cam', 'his'].forEach(k => document.getElementById(k + 'v').textContent = el[k].value);
+  const t = tokens(H, P, s, cams, hist);
+  const W = cv.width, Hc = cv.height;
+  ctx.clearRect(0, 0, W, Hc);
+
+  // left: one image with its patch grid
+  const sz = Hc - 30, x0 = 20, y0 = 10, c = sz / t.side;
+  ctx.fillStyle = css('--card'); ctx.fillRect(x0, y0, sz, sz);
+  const g = Math.floor(t.side / s) * s;
+  for (let i = 0; i < g; i += s) for (let j = 0; j < g; j += s)
+    if (s > 1 && ((i + j) / s) % 2 === 0) { ctx.fillStyle = css('--line'); ctx.fillRect(x0 + j * c, y0 + i * c, s * c, s * c); }
+  ctx.strokeStyle = css('--muted'); ctx.lineWidth = t.side > 48 ? 0.3 : 0.8;
+  for (let i = 0; i <= t.side; i++) {
+    ctx.beginPath(); ctx.moveTo(x0 + i * c, y0); ctx.lineTo(x0 + i * c, y0 + sz); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x0, y0 + i * c); ctx.lineTo(x0 + sz, y0 + i * c); ctx.stroke();
+  }
+  ctx.font = '12px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = css('--muted');
+  ctx.fillText(`${t.side} × ${t.side} patches`, x0 + sz / 2, Hc - 6);
+
+  // right: token bar against the 256-token reference
+  const bx = x0 + sz + 50, bw = W - bx - 20, maxT = Math.max(t.total, 256);
+  const bar = (y, n, col, lab) => {
+    ctx.fillStyle = col; ctx.fillRect(bx, y, Math.max(2, bw * n / maxT), 28);
+    ctx.fillStyle = css('--fg'); ctx.textAlign = 'left'; ctx.fillText(lab, bx, y - 6);
+  };
+  bar(50, 256, css('--muted'), 'Reference: 224 px, patch 14 = 256 tokens');
+  bar(130, t.total, css('--accent'), `Your setup: ${fmt(t.total)} tokens (${cams} camera × ${hist} frame)`);
+  document.getElementById('sps').textContent = t.side;
+  document.getElementById('spi').textContent = fmt(t.per);
+  document.getElementById('stt').textContent = fmt(t.total);
+  document.getElementById('sat').textContent = t.att >= 10 ? fmt(t.att) + '×' : t.att.toFixed(2) + '×';
+}
+ids.forEach(k => el[k].oninput = draw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

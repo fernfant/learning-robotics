@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stage 11 · Paper to production</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 08 · Research-engineer roadmap</a> › Stage 11</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 08 · Stage 11</div>
+<h1>Paper-to-production prototyping</h1>
+<p class="lede">Read a new paper, find the small piece of code that carries its idea, drop it into a strong baseline, and measure honestly whether it helps. The last step is where most reproductions go wrong.</p>
+
+<div class="facts">
+  <div><b>Prerequisites</b>Stage 01 (PyTorch fluency), Stage 10 (evals); comfortable reading equations</div>
+  <div><b>Time</b>1–3 weeks per small reproduction, part-time. It's a habit, not a stage you finish.</div>
+  <div><b>Hardware</b>Laptop or one Colab GPU for the small version; the full version depends entirely on the paper</div>
+  <div><b>Key papers</b>Henderson et al. 2017 · Melis et al. 2017 · Engstrom et al. 2020 · Narang et al. 2021 · Agarwal et al. 2021</div>
+</div>
+<p class="meta">Source: <a href="https://x.com/suraj_sharma14/status/2112876560629825734">Suraj Sharma's roadmap post on X</a>, stage 11</p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Scientists write papers about new ideas. A research engineer turns the idea into working code quickly, then checks fairly whether it's really better.</p>
+
+<h3>Think of it like this</h3>
+<p>A famous chef publishes a new cake recipe and says it's "the fluffiest ever". You want to test it. First you find the one trick that's actually new (maybe whipping the eggs longer); the rest is a normal cake. You bake your usual cake and the new one side by side, same oven, same eggs. Then you ask several friends to taste both, without telling them which is which. If only one friend prefers the new cake, that proves nothing. If most of them do, every time you bake, the trick is real.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Read the paper and find the one new idea. Most of the paper is setup and background.</li>
+<li>Write that idea as a small piece of code with an on/off switch.</li>
+<li>Start from a model that already works well (the "baseline").</li>
+<li>Train with the switch off and with it on, the same way, several times.</li>
+<li>Compare fairly: is the difference bigger than the normal wobble between runs?</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Testing a robot is slow. If a robot picks up a cup 15 times out of 20 with a new method and 12 times out of 20 with the old one, that looks like a win. It isn't proof. A difference that small, from so few tries, happens by luck quite often. Robot teams have to know this before they switch to a new method.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Flip a coin 20 times and count heads. A friend does the same. You'll probably get different counts, even though the coins are identical. That gap is pure luck, and any "new method" has to beat it.</li>
+<li>In the demo further down, set <b>True gain</b> to 0 and press <b>New test set</b> a few times. Watch the observed difference jump around even though the two models are equally good. Then raise <b>Test examples</b> and watch the jumps shrink.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Paper</dt><dd>A write-up of a new idea and the tests that show it works.</dd>
+<dt>Reproduce</dt><dd>Build the idea yourself and check you get the same result.</dd>
+<dt>Baseline</dt><dd>The normal, well-tuned method you compare the new idea against.</dd>
+<dt>Seed</dt><dd>The starting number for a computer's "random" choices. Different seeds give slightly different results.</dd>
+<dt>Noise</dt><dd>Differences that come from luck, not from a real improvement.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version. On a first read, skim the headings, try the demo and read the "Why it matters for robotics" box.</p>
+
+<h2 id="covers">1. What this stage covers</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>The post asks you to learn fast reproduction, to strip a paper down to what matters, and to find its "minimum viable kernel". Then it asks you to implement a brand-new paper's core idea in under 500 lines of PyTorch and benchmark it against a baseline. The coding part is the easy half. The hard half is the comparison: a tuned baseline, the same budget for both arms, several seeds, and an interval rather than a single number. The literature is full of "improvements" that vanished once someone did this.</p>
+</div>
+<ul>
+<li><strong>Learn:</strong> reading a paper for its mechanism rather than its story; separating the new idea from the scaffolding around it; isolating it as a small, switchable kernel.</li>
+<li><strong>Practice:</strong> pick a paper from this week, write the core algorithm in under 500 lines, and benchmark it against the baseline it claims to beat.</li>
+<li><strong>Why (the post's claim):</strong> how quickly you can turn academic maths into working code is your main value to an AI lab. Section 4 argues that speed matters, but correctness and honest measurement matter more.</li>
+</ul>
+
+<h2 id="concepts">2. Concepts, explained</h2>
+
+<h3>Rapid arXiv reproduction</h3>
+<p>Reading for reproduction is different from reading to learn. You're looking for an executable spec. A workable order:</p>
+<ol>
+<li><strong>Abstract, main figure, main results table.</strong> Write down the claim in one sentence, with its number: "X improves Y on benchmark Z by N points at the same compute."</li>
+<li><strong>The method section and any algorithm box.</strong> Translate each equation into tensor shapes. If you can't say the shape of every symbol, you don't understand it yet.</li>
+<li><strong>The appendix.</strong> Hyperparameters, initialisation, warmup, data processing and evaluation details live here. Most reproduction failures trace back to something in the appendix, or missing from it.</li>
+<li><strong>Code, if released.</strong> Diff the code against the paper. Where they disagree, the code is what produced the numbers.</li>
+</ol>
+<p>Henderson et al. (2017), <a href="https://arxiv.org/abs/1709.06560"><em>Deep Reinforcement Learning that Matters</em></a>, showed how fragile this is in RL. Random seeds, environment non-determinism and implementation choices moved reported results enough to change conclusions, and the authors called for significance testing and standard reporting.</p>
+
+<h3>Stripping academic fluff</h3>
+<p>Papers are written to be accepted, so the framing often outgrows the mechanism. Stripping means separating three things: <strong>the mechanism</strong> (the change in the computation), <strong>the scaffolding</strong> (everything else the authors changed while they were at it) and <strong>the story</strong> (why they say it works). Only the first is what you reproduce. The ablation table is your best friend: it shows which parts carry the gain.</p>
+<p>Be careful, though. The "fluff" is sometimes load-bearing. Engstrom et al. (2020), <a href="https://arxiv.org/abs/2005.12729"><em>Implementation Matters in Deep Policy Gradients</em></a>, found that code-level optimisations, details found only in implementations or mentioned in passing, accounted for most of PPO's reward gain over TRPO. Strip too much and your "faithful" reproduction underperforms for reasons that have nothing to do with the idea. The cure is to keep a list of every deviation you make and test the suspicious ones.</p>
+
+<h3>The minimum viable kernel</h3>
+<p>The post's phrase means the smallest piece of code that, swapped into a strong baseline, carries the claimed effect. For most papers this is a function or a module: a new attention variant, a normalisation, an optimiser update, a loss term, a sampling rule. A good kernel has three properties:</p>
+<ul>
+<li><strong>A switch.</strong> One flag turns it on or off, and nothing else differs between the two runs.</li>
+<li><strong>A reduction test.</strong> With its new hyperparameter at a neutral value, it should give exactly the baseline's output. That one unit test catches a surprising number of bugs.</li>
+<li><strong>Shape and gradient tests.</strong> Check output shapes, and check gradients numerically on a tiny input (<code>torch.autograd.gradcheck</code> in double precision).</li>
+</ul>
+<pre><code>class Block(nn.Module):
+    def __init__(s, cfg):
+        super().__init__()
+        s.attn = NewAttn(cfg) if cfg.use_new else Attn(cfg)   # the only change
+        ...
+
+def test_reduces_to_baseline():
+    torch.manual_seed(0); x = torch.randn(2, 16, 64)
+    new = NewAttn(cfg, alpha=0.0); old = Attn(cfg)
+    new.load_state_dict(old.state_dict(), strict=False)
+    assert torch.allclose(new(x), old(x), atol=1e-6)</code></pre>
+<p>Narang et al. (2021), <a href="https://arxiv.org/abs/2102.11972"><em>Do Transformer Modifications Transfer Across Implementations and Applications?</em></a>, is the cautionary tale. They tested many published Transformer modifications in one shared codebase and found most didn't meaningfully improve performance. Many of those that helped were developed in that same codebase or were minor changes. A kernel that wins in its home codebase may not win in yours.</p>
+
+<h3>Benchmarking against a baseline honestly</h3>
+<p>This isn't on the post's Learn list, but its Practice step depends on it. Four rules:</p>
+<ol>
+<li><strong>Tune the baseline as hard as the new method.</strong> Melis, Dyer and Blunsom (2017), <a href="https://arxiv.org/abs/1707.05589"><em>On the State of the Art of Evaluation in Neural Language Models</em></a>, re-tuned standard LSTMs with large-scale hyperparameter search and found they beat several newer architectures. Many "wins" were really tuning-budget gaps.</li>
+<li><strong>Match the budget.</strong> Same tokens, same steps or same FLOPs, stated explicitly. A method that wins only because it ran longer hasn't won.</li>
+<li><strong>Run several seeds.</strong> Bouthillier et al. (2021), <a href="https://arxiv.org/abs/2103.03098"><em>Accounting for Variance in Machine Learning Benchmarks</em></a>, show data sampling, initialisation and hyperparameter choice all move results markedly, and recommend varying them when comparing.</li>
+<li><strong>Report intervals, not points.</strong> Agarwal et al. (2021), <a href="https://arxiv.org/abs/2108.13264"><em>Deep RL at the Edge of the Statistical Precipice</em></a>, found point estimates from a few runs led to conclusions that a proper statistical analysis didn't support. They recommend bootstrap confidence intervals and robust aggregates such as the interquartile mean.</li>
+</ol>
+<p>When both models are scored on the same test examples, use a <strong>paired</strong> comparison. Take the per-example difference, then bootstrap over examples:</p>
+<pre><code>d_i  = score_B(x_i) − score_A(x_i)              for each test example i
+Δ̂    = mean(d)
+repeat R times: resample n indices with replacement → mean of d at those indices
+95% CI = 2.5th and 97.5th percentiles of the R resampled means
+"B beats A" only if the whole CI is above 0</code></pre>
+<p>Pairing removes the shared difficulty of each example: if both models fail the same hard questions, that doesn't add noise to the difference. Two overlapping unpaired intervals don't mean "no difference". A paired interval that crosses zero does mean you can't tell. Module 04 makes the same point about <a href="../04-distill-small-models.html#eval">bootstrapping over clips</a>.</p>
+
+<div class="card demo">
+<h3>Interactive: is that win real? A paired bootstrap</h3>
+<p class="legend">Model A gets 70% of test examples right. Model B's true accuracy is A's plus the <b>True gain</b>. <b>Agreement</b> sets how often the two models share the same per-example difficulty. Each test set is a random draw; the bootstrap uses 1,000 resamples. Filled bars: paired bootstrap of B − A. Outline: unpaired bootstrap (A and B resampled separately). Shaded band: paired 95% interval. Vertical line: zero.</p>
+<canvas id="bc" width="700" height="240" aria-label="Histogram of bootstrap differences between two models, paired and unpaired, with the 95 percent interval and zero marked"></canvas>
+<label for="n">Test examples: <span id="nv" class="num"></span></label>
+<input id="n" type="range" min="20" max="2000" step="20" value="200">
+<label for="d">True gain (accuracy points): <span id="dv" class="num"></span></label>
+<input id="d" type="range" min="-5" max="10" step="0.5" value="3">
+<label for="rho">Agreement: <span id="rv" class="num"></span></label>
+<input id="rho" type="range" min="0" max="0.95" step="0.05" value="0.5">
+<p><button id="seed" type="button">New test set</button> <span class="meta">Test set #<span id="sv" class="num"></span></span></p>
+<div class="stats">
+  <div class="stat"><div class="k">Observed B − A</div><div class="v" id="ob">–</div></div>
+  <div class="stat"><div class="k">Paired 95% CI</div><div class="v" id="pci">–</div></div>
+  <div class="stat"><div class="k">Unpaired 95% CI</div><div class="v" id="uci">–</div></div>
+  <div class="stat"><div class="k">Verdict</div><div class="v" id="ver">–</div></div>
+</div>
+<p class="meta">Try this: at the defaults (200 examples, true gain +3 points, agreement 0.5), the first test set shows B ahead by 3.5 points, but the paired interval runs from about −3.5 to +10. Over 40 simulated test sets, B came out ahead about three times in four, yet the paired interval cleared zero only about one time in twenty. Raise test examples to 2,000 and it clears zero most of the time. Raise agreement and the paired interval narrows while the unpaired one doesn't move.</p>
+</div>
+
+<h2 id="project">3. The practice project</h2>
+<h3>(a) Laptop / Colab version: one kernel, one baseline, honest numbers</h3>
+<ol>
+<li><strong>Baseline.</strong> Clone <a href="https://github.com/karpathy/nanoGPT">nanoGPT</a> and train its character-level Shakespeare config. The README describes a GPU run of a few minutes and a smaller CPU setting. Record validation loss. Run it with three seeds to see your noise floor before you change anything.</li>
+<li><strong>Pick a paper.</strong> Choose a recent one whose core idea is a local change: an attention or normalisation variant, an optimiser, a loss term, a positional encoding. Write the claim in one sentence, with its number.</li>
+<li><strong>Write the kernel</strong> behind a <code>use_new</code> flag, with the reduction and gradient tests above. Keep a deviations list in the README.</li>
+<li><strong>Match budgets and tune both.</strong> Same iterations, same batch, same data. Give the baseline and the new method the same small learning-rate sweep (for example three values each).</li>
+<li><strong>Compare.</strong> At least three seeds per arm; report mean and range of validation loss, and a paired bootstrap over evaluation batches if you score both on the same batches.</li>
+<li><strong>Write it up</strong> (that's <a href="12-open-source-portfolio.html">Stage 12</a>): claim, setup, result with intervals, deviations, and what this does not show.</li>
+</ol>
+<p><strong>What to expect:</strong> no promise. Given Narang et al.'s findings, a common honest outcome at this scale is "within seed noise". That's a valid result if your baseline was tuned and your kernel passed its tests. A tiny character model also may not show effects that only appear at scale, so say so.</p>
+<pre><code>import numpy as np
+
+def paired_ci(a, b, R=2000, seed=0):
+    d = np.asarray(b, float) - np.asarray(a, float)   # per-example B - A
+    rng = np.random.default_rng(seed)
+    idx = rng.integers(0, len(d), (R, len(d)))
+    means = d[idx].mean(axis=1)
+    lo, hi = np.percentile(means, [2.5, 97.5])
+    return d.mean(), lo, hi
+
+obs, lo, hi = paired_ci(scores_a, scores_b)
+print(f"B-A = {obs:+.3f}  95% CI [{lo:+.3f}, {hi:+.3f}]",
+      "real" if lo &gt; 0 or hi &lt; 0 else "can't tell")</code></pre>
+
+<h3>(b) The full version from the post</h3>
+<p>Take a paper from this week, implement its core algorithm in under 500 lines of PyTorch, and benchmark it against its baseline at the scale the paper used. Cost depends entirely on the paper. An optimiser or attention tweak tested on GPT-2-small-sized models fits on a single rented GPU over days. A claim made at 7B parameters and hundreds of billions of tokens is out of reach for an individual; then reproduce the trend at small scale and say clearly that you didn't test the paper's scale. <a href="https://stanford-cs336.github.io/spring2025/">CS336</a>'s assignments are good preparation: little scaffolding, real budgets.</p>
+<p>The 500-line target is realistic for the kernel plus a minimal training loop. It isn't realistic for data pipelines, distributed training or evaluation harnesses. Reuse those from a trusted baseline repo rather than rewriting them.</p>
+
+<h3>(c) Pitfalls</h3>
+<ul>
+<li><strong>Weak baseline.</strong> Untuned, under-trained or an older version. The single most common way to "win".</li>
+<li><strong>Unequal budgets.</strong> The new method silently gets more steps, more parameters or a better learning rate.</li>
+<li><strong>One seed.</strong> A single run per arm says almost nothing about small differences.</li>
+<li><strong>Picking by test score.</strong> Choose checkpoints and hyperparameters on a dev split; touch the test set once.</li>
+<li><strong>Unlisted deviations.</strong> If you changed the tokenizer, the warmup or the eval script, write it down, or nobody, including you, can interpret the result.</li>
+<li><strong>Too-fresh papers.</strong> A paper from this week has no code, no reviews and maybe errors. That's part of the exercise, but budget time for emailing authors and for "the paper is ambiguous here".</li>
+</ul>
+
+<h2 id="reality">4. Reality check</h2>
+<p>The post's claim is that translation speed, from maths to working code, is your main value to an AI lab.</p>
+<ul>
+<li><strong>True:</strong> research engineers spend much of their time implementing ideas (their own team's and others') and turning them into experiments. Being fast and fluent in PyTorch matters, and practice on real papers is the best way to get it.</li>
+<li><strong>Overstated:</strong> a fast wrong reproduction has negative value. It can kill a good idea or promote a bad one. Engstrom et al. and Narang et al. are both, in effect, about the cost of fast but uncontrolled comparisons. The scarcer skills are judgement (which ideas are worth trying at all), debugging at scale, and measurement people can trust.</li>
+<li><strong>Missing:</strong> in a lab, most new ideas come from inside, not arXiv. Reproducing external papers is practice for implementing your team's ideas, where nobody has a reference number to check against.</li>
+</ul>
+
+<h2 id="course">5. In this course</h2>
+<ul>
+<li><a href="../06-30u30/index.html">Module 06 · 30u30</a>: thirty from-scratch reproductions with exercises. The best structured practice for this stage. Start with <a href="../06-30u30/14-annotated-transformer.html">Day 14 (the Annotated Transformer)</a>, a line-by-line paper-to-code translation.</li>
+<li><a href="../06-30u30/29-ppo.html">Module 06 · Day 29, PPO</a>: the algorithm at the centre of Engstrom et al.'s implementation-matters study.</li>
+<li><a href="../06-30u30/25-scaling-laws.html">Module 06 · Day 25, Scaling laws</a>: why a small-scale win may not hold at scale, and vice versa.</li>
+<li><a href="../04-distill-small-models.html#eval">Module 04 · Evaluation that doesn't fool you</a>: paired bootstrap, honest splits, never choosing by test score.</li>
+<li><a href="../01-decision-model-evals.html#tuning">Module 01 · Tuning without fooling yourself</a>: the dev/test discipline behind every comparison.</li>
+<li><a href="../02-tensortonic.html#track">Module 02 · TensorTonic</a>: implementation drills for the PyTorch fluency this stage assumes.</li>
+</ul>
+
+<h2 id="robotics">6. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Robot evaluations are small, so intervals are wide.</strong> 15 successes out of 20 against 12 out of 20 looks like a 15-point win. Fisher's exact test gives p ≈ 0.5 for that table, and the 95% Wilson intervals (about 53–89% and 39–78%) overlap heavily. Run both policies on the same start states so you can pair them, and plan more trials before claiming a win.</li>
+<li><strong>RL reproducibility work came from robot-style benchmarks.</strong> Henderson et al. and Engstrom et al. studied continuous-control (MuJoCo) tasks, the same family as sim-trained locomotion. Their lessons about seeds and code-level details apply directly to anyone porting a new RL method to a robot.</li>
+<li><strong>Kernels port into robot-learning stacks.</strong> New policy ideas (an action head, a tokenisation of actions, a training loss) are usually small changes to an existing policy codebase such as LeRobot. Writing them as a switchable kernel and testing reduction-to-baseline is the same discipline.</li>
+<li><strong>Few-run reporting is the norm in robotics too.</strong> Agarwal et al.'s advice (intervals, robust aggregates, performance profiles) was written for RL with a handful of runs, which is exactly the regime of real-robot experiments.</li>
+</ul>
+</div>
+
+<h2 id="check">7. Self-check</h2>
+<details><summary>What's a "minimum viable kernel", and what single test catches the most bugs in one?</summary><p>The smallest switchable piece of code that carries a paper's idea when dropped into a strong baseline. The reduction test: with the new hyperparameter at a neutral value, it must reproduce the baseline's output exactly.</p></details>
+<details><summary>Your new method beats the baseline by 0.02 validation loss on one seed each. What do you do before claiming anything?</summary><p>Check the budgets match, give both the same tuning sweep, run several seeds per arm, and report the spread or an interval. If the seed-to-seed spread is around 0.02, you can't tell them apart yet.</p></details>
+<details><summary>Why is a paired bootstrap usually tighter than comparing two separate confidence intervals?</summary><p>Both models are scored on the same examples, and their errors are correlated: hard examples are hard for both. The per-example difference cancels that shared difficulty, so its variance is smaller. In the demo, raising agreement narrows the paired interval but not the unpaired one.</p></details>
+<details><summary>What did Engstrom et al. (2020) find about PPO versus TRPO?</summary><p>Code-level optimisations, details found only in implementations or treated as auxiliary, were responsible for most of PPO's gain in cumulative reward over TRPO. Attribution of gains to the "core algorithm" can be wrong.</p></details>
+<details><summary>What did Melis et al. (2017) show, and what's the lesson?</summary><p>Properly regularised and tuned standard LSTMs beat several newer architectures on language modelling. The lesson: tune your baseline as hard as your new method, or the comparison measures tuning effort, not ideas.</p></details>
+
+<h2 id="courses">8. Courses &amp; content</h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Resource</th><th>Type</th><th>Use it for</th></tr></thead>
+<tbody>
+<tr><td><a href="https://nn.labml.ai/">labml.ai annotated paper implementations</a></td><td>Annotated code (free)</td><td>Many papers implemented with side-by-side notes</td></tr>
+<tr><td><a href="https://github.com/karpathy/nanoGPT">Karpathy · nanoGPT</a></td><td>Code (free)</td><td>A minimal, hackable baseline to drop new ideas into</td></tr>
+<tr><td><a href="https://github.com/Ojhaharsh/30u30">30u30 (this course's Module 06)</a></td><td>Exercises (free)</td><td>Thirty from-scratch reproductions to practise on</td></tr>
+<tr><td><a href="https://stanford-cs336.github.io/spring2025/">Stanford CS336</a></td><td>University course (free materials)</td><td>Low-scaffolding assignments: the closest thing to lab work</td></tr>
+</tbody>
+</table>
+</div>
+<p>Start with nanoGPT: it's the baseline you'll drop kernels into for the laptop project, and it's small enough to read in an afternoon.</p>
+<p class="meta"><a href="index.html#courses">Full course map for all 12 stages →</a></p>
+
+<h2 id="papers">9. Papers &amp; docs</h2>
+<ul>
+<li>Henderson, Islam, Bachman, Pineau, Precup, Meger (2017). <a href="https://arxiv.org/abs/1709.06560">Deep Reinforcement Learning that Matters</a></li>
+<li>Melis, Dyer, Blunsom (2017). <a href="https://arxiv.org/abs/1707.05589">On the State of the Art of Evaluation in Neural Language Models</a></li>
+<li>Engstrom, Ilyas, Santurkar, Tsipras, Janoos, Rudolph, Madry (2020). <a href="https://arxiv.org/abs/2005.12729">Implementation Matters in Deep Policy Gradients: A Case Study on PPO and TRPO</a></li>
+<li>Narang, Chung, Tay, Fedus et al. (2021). <a href="https://arxiv.org/abs/2102.11972">Do Transformer Modifications Transfer Across Implementations and Applications?</a></li>
+<li>Bouthillier, Delaunay, Bronzi et al. (2021). <a href="https://arxiv.org/abs/2103.03098">Accounting for Variance in Machine Learning Benchmarks</a></li>
+<li>Agarwal, Schwarzer, Castro, Courville, Bellemare (2021). <a href="https://arxiv.org/abs/2108.13264">Deep Reinforcement Learning at the Edge of the Statistical Precipice</a></li>
+<li>PyTorch docs: <a href="https://pytorch.org/docs/stable/generated/torch.autograd.gradcheck.gradcheck.html">torch.autograd.gradcheck</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="10-evals-red-teaming.html"><small>Previous</small>Stage 10 · Evals &amp; red teaming</a>
+  <a class="next" href="12-open-source-portfolio.html"><small>Next</small>Stage 12 · Open-source portfolio</a>
+</nav>
+<footer>Module 08 · Stage 11 · written for this course from the source post and primary papers.</footer>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const cv = $('bc'), ctx = cv.getContext('2d');
+const nIn = $('n'), dIn = $('d'), rIn = $('rho');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const PA = 0.7, R = 1000;
+let seed = 1;
+
+// mulberry32: small seeded RNG so every test set is reproducible
+function rng(s) {
+  return () => {
+    s = s + 0x6D2B79F5 | 0;
+    let t = Math.imul(s ^ s >>> 15, 1 | s);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+// per-example correctness; with prob rho, B sees the same difficulty draw as A
+function sim(n, d, rho, s) {
+  const r = rng(s), a = new Int8Array(n), b = new Int8Array(n);
+  for (let i = 0; i < n; i++) {
+    const u = r(), v = r() < rho ? u : r();
+    a[i] = u < PA; b[i] = v < PA + d;
+  }
+  return { a, b };
+}
+
+function boot(a, b, s) {
+  const n = a.length, r = rng(s * 7919 + 1), pd = new Float64Array(R), ud = new Float64Array(R);
+  for (let k = 0; k < R; k++) {
+    let sp = 0, sa = 0, sb = 0;
+    for (let i = 0; i < n; i++) {
+      const j = r() * n | 0;
+      sp += b[j] - a[j];
+      sa += a[r() * n | 0]; sb += b[r() * n | 0];
+    }
+    pd[k] = sp / n; ud[k] = (sb - sa) / n;
+  }
+  pd.sort(); ud.sort();
+  return { pd, ud };
+}
+
+const q = (s, p) => s[Math.min(s.length - 1, Math.floor(p * s.length))];
+const pts = v => (v >= 0 ? '+' : '−') + Math.abs(v * 100).toFixed(1);
+
+function run() {
+  const n = +nIn.value, d = +dIn.value / 100, rho = +rIn.value;
+  const { a, b } = sim(n, d, rho, seed);
+  let o = 0;
+  for (let i = 0; i < n; i++) o += b[i] - a[i];
+  const { pd, ud } = boot(a, b, seed);
+  return { obs: o / n, pd, ud, plo: q(pd, 0.025), phi: q(pd, 0.975), ulo: q(ud, 0.025), uhi: q(ud, 0.975) };
+}
+
+function hist(s, lo, hi, bins) {
+  const h = new Array(bins).fill(0);
+  for (const v of s) { const k = Math.floor((v - lo) / (hi - lo) * bins); if (k >= 0 && k < bins) h[k]++; }
+  return h;
+}
+
+function draw() {
+  $('nv').textContent = nIn.value;
+  $('dv').textContent = (+dIn.value >= 0 ? '+' : '') + (+dIn.value).toFixed(1);
+  $('rv').textContent = (+rIn.value).toFixed(2);
+  $('sv').textContent = seed;
+  const res = run(), W = cv.width, H = cv.height, L = 20, Rm = 20, T = 14, B = 26, bins = 40;
+  const span = Math.max(Math.abs(res.ud[0]), Math.abs(res.ud[R - 1]), 0.02) * 1.05, lo = -span, hi = span;
+  const px = v => L + (v - lo) / (hi - lo) * (W - L - Rm);
+  const hp = hist(res.pd, lo, hi, bins), hu = hist(res.ud, lo, hi, bins);
+  const top = Math.max(...hp, ...hu), bw = (W - L - Rm) / bins, py = c => H - B - c / top * (H - T - B);
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = css('--line');
+  ctx.fillRect(px(res.plo), T, px(res.phi) - px(res.plo), H - T - B);
+  ctx.fillStyle = css('--accent');
+  hp.forEach((c, k) => ctx.fillRect(L + k * bw + 1, py(c), bw - 2, H - B - py(c)));
+  ctx.strokeStyle = css('--muted'); ctx.lineWidth = 1.5;
+  hu.forEach((c, k) => { if (c) ctx.strokeRect(L + k * bw + 1, py(c), bw - 2, H - B - py(c)); });
+  ctx.strokeStyle = css('--fail'); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(px(0), T); ctx.lineTo(px(0), H - B); ctx.stroke();
+  ctx.strokeStyle = css('--fg'); ctx.setLineDash([5, 4]);
+  ctx.beginPath(); ctx.moveTo(px(res.obs), T); ctx.lineTo(px(res.obs), H - B); ctx.stroke(); ctx.setLineDash([]);
+  ctx.font = '12px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = css('--muted');
+  [lo, lo / 2, 0, hi / 2, hi].forEach(v => ctx.fillText(pts(v), px(v), H - 8));
+  ctx.textAlign = 'left'; ctx.fillText('B − A (accuracy points); dashed = observed', L, T + 2);
+  $('ob').textContent = pts(res.obs);
+  $('pci').textContent = `[${pts(res.plo)}, ${pts(res.phi)}]`;
+  $('uci').textContent = `[${pts(res.ulo)}, ${pts(res.uhi)}]`;
+  $('ver').textContent = res.plo > 0 ? 'B better' : res.phi < 0 ? 'A better' : "Can't tell";
+}
+
+nIn.oninput = dIn.oninput = rIn.oninput = draw;
+$('seed').onclick = () => { seed++; draw(); };
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stage 01 · Tensor maths &amp; autograd</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 08 · Research-engineer roadmap</a> › Stage 01</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 08 · Stage 01</div>
+<h1>Tensor maths &amp; custom autograd</h1>
+<p class="lede">Open the box. Learn how a tensor really sits in memory, how gradients flow backwards through each operation, and how to write your own GPU kernel when the built-in one is too slow.</p>
+
+<div class="facts">
+  <div><b>Prerequisites</b>Python, NumPy, basic calculus (chain rule), matrix multiplication</div>
+  <div><b>Time</b>40–80 h part-time: ~2 weeks for autograd and strides, 2–4 weeks for Triton</div>
+  <div><b>Hardware</b>Laptop for autograd and strides · a CUDA GPU (Colab is fine) for Triton</div>
+  <div><b>Key papers</b>PyTorch (Paszke et al., 2019) · FlashAttention (Dao et al., 2022) · Triton (Tillet, Kung &amp; Cox, 2019)</div>
+</div>
+<p class="meta">Source: <a href="https://x.com/suraj_sharma14/status/2112876560629825734">Suraj Sharma's roadmap post on X</a>, stage 1 · <a href="index.html">all 12 stages</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">A neural network is a long chain of simple maths steps. To make it learn, the computer runs the chain forwards, then walks it backwards to work out which knobs to turn. This stage is about building that backwards walk yourself.</p>
+
+<h3>Think of it like this</h3>
+<p>Imagine a row of dominoes that ends by knocking a cup off a table. The cup lands in the wrong place. To fix it, you walk back along the row: "the last domino pushed the cup too far left, because the one before it was tilted, because the one before that..." Each domino only needs to know how it passed the push on. Walking back along the chain and blaming each piece a little is exactly what "backpropagation" does.</p>
+<p>There's a second idea: where things are kept. A tensor is a grid of numbers, but the computer stores it as one long line. Picture a class photo stored as one long list of names, row by row. To flip the photo sideways, you don't need to rewrite the list. You just change the rule for how you read it. That reading rule is called the <em>stride</em>.</p>
+
+<h3>How it works</h3>
+<ol>
+<li><strong>Forward:</strong> numbers go in, each step does a little maths, and an answer comes out. The computer remembers what each step saw.</li>
+<li><strong>Score:</strong> compare the answer with the right one. The difference is the "loss".</li>
+<li><strong>Backward:</strong> starting from the loss, each step works out how much its inputs were to blame, using only what it remembered. This is the chain rule.</li>
+<li><strong>Update:</strong> nudge every knob a tiny bit in the direction that lowers the loss. Repeat millions of times.</li>
+<li><strong>Speed up:</strong> on a graphics chip, moving numbers around is slower than doing maths on them. So experts "fuse" several steps into one, so the numbers are fetched only once.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot arm's brain runs this same forward step dozens of times every second on a small computer inside the robot. If one step is slow because data is stored in an awkward order, the arm reacts late. And when a robot's training suddenly goes wrong (its scores jump to "NaN", meaning "not a number"), the person who can read the backward pass step by step is the one who finds the bug.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Write the numbers 0 to 11 in one line on a strip of paper. Now read them as a grid with 3 rows and 4 columns: jump 4 to go down a row, 1 to go right. Next, read the same strip as a 4-row, 3-column grid that is the first one flipped: jump 1 to go down, 4 to go right. You didn't rewrite a single number.</li>
+<li>In the demo further down, use the <b>Rows</b> and <b>Cols</b> sliders, then press <b>Transpose (.T)</b>, <b>Slice [:, ::2]</b> and <b>Drop first row [1:]</b>. Move <b>Row i</b> and <b>Col j</b> to pick a cell and watch which box in the memory line lights up.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Tensor</dt><dd>A grid of numbers with any number of directions (a list, a table, a stack of tables...).</dd>
+<dt>Gradient</dt><dd>For each knob, how much the loss would change if you nudged it.</dd>
+<dt>Backpropagation</dt><dd>Working out all the gradients by walking the chain of steps backwards.</dd>
+<dt>Stride</dt><dd>How far to jump in the memory line to move one step along a direction of the grid.</dd>
+<dt>Kernel</dt><dd>A small program that runs on the graphics chip, on many numbers at once.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths and code. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. What this stage covers</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Learn what PyTorch does underneath <code>loss.backward()</code>. A tensor is a flat block of memory plus a shape, strides and an offset. Most "reshaping" operations only change that metadata. Autograd records a graph of operations during the forward pass and applies each operation's backward rule in reverse. You can plug in your own operation with a forward and a hand-written backward. When an operation is limited by memory traffic rather than arithmetic, you write a fused kernel, today usually in Triton, so data crosses the slow GPU memory once instead of many times. FlashAttention is the classic example.</p>
+</div>
+<ul>
+<li><strong>Learn:</strong> PyTorch internals (storage, views, the autograd graph), custom forward and backward passes, Triton programming, and how memory layout and strides decide whether an operation is free, a copy, or an error.</li>
+<li><strong>Practice:</strong> two projects. A fused attention kernel in Triton. And a backward pass you derive and code yourself for a new activation function, without leaning on PyTorch's autograd to do it for you.</li>
+<li><strong>Why (the post's claim):</strong> if the network is a black box to you, you can't diagnose a loss curve that falls apart. We test this claim in the reality check.</li>
+</ul>
+
+<h2 id="concepts">2. Concepts, explained</h2>
+
+<h3>PyTorch internals: storage, views and the autograd graph</h3>
+<p>A PyTorch tensor is a <em>view</em> onto a <em>storage</em>: a flat, typed block of memory. The view adds a shape, a stride for each dimension, and a storage offset. Element <code>[i, j]</code> lives at:</p>
+<pre><code>address(i, j) = offset + i·stride[0] + j·stride[1]
+
+x = torch.arange(12).view(3, 4)   # shape (3, 4), stride (4, 1), offset 0
+x.T                               # shape (4, 3), stride (1, 4): same memory, no copy
+x[:, ::2]                         # shape (3, 2), stride (4, 2)
+x[1:]                             # shape (2, 4), stride (4, 1), offset 4</code></pre>
+<p>When you run operations on tensors with <code>requires_grad=True</code>, PyTorch records each one as a node in a graph (you can see it in <code>y.grad_fn</code>). Each node keeps what it needs for its backward rule, such as its inputs. Calling <code>backward()</code> walks this graph in reverse topological order. It multiplies the incoming gradient by each node's local derivative and adds up the contributions where paths merge. The graph is rebuilt on every forward pass ("define-by-run", Paszke et al., 2019). This is <em>reverse-mode automatic differentiation</em>. Baydin et al.'s survey (2015, revised 2018) explains how it differs from symbolic and numerical differentiation.</p>
+<p>Why reverse mode? A network has millions of inputs (the weights) and one output (the loss). Reverse mode gets the gradient with respect to all of them for a small constant multiple of the forward cost. Forward mode would need one pass per input.</p>
+
+<h3>Custom forward and backward passes</h3>
+<p>You need your own backward when the automatic one is slow, uses too much memory, or is numerically unstable. Sometimes there's no automatic one at all, because the forward calls a custom kernel. In PyTorch you subclass <code>torch.autograd.Function</code>:</p>
+<pre><code>class Squareplus(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x, b=4.0):
+        r = torch.sqrt(x * x + b)
+        ctx.save_for_backward(x, r)     # keep only what backward needs
+        return 0.5 * (x + r)
+
+    @staticmethod
+    def backward(ctx, g):               # g = dLoss/dOutput
+        x, r = ctx.saved_tensors
+        return g * 0.5 * (1 + x / r), None   # one gradient per forward input
+
+torch.autograd.gradcheck(Squareplus.apply, torch.randn(8, dtype=torch.double, requires_grad=True))</code></pre>
+<p>The rule to remember: <code>backward</code> receives the gradient of the loss with respect to your output and returns the gradient with respect to each input. That's the vector-Jacobian product. For an element-wise function it's just <code>g * f'(x)</code>. Always check a hand-written backward against finite differences in float64. <code>gradcheck</code> does this for you.</p>
+<p>Squareplus is a real activation, from Barron (2021). It looks like softplus but uses only addition, multiplication and a square root. It's a good "novel" function for the practice project because nobody hands you its derivative in a library.</p>
+
+<h3>Triton programming</h3>
+<p>Triton (Tillet, Kung &amp; Cox, 2019; now developed in the open by OpenAI and contributors) is a Python-embedded language for GPU kernels. In CUDA you program one thread. In Triton you program one <em>block</em> of data. Each program instance gets an ID from <code>tl.program_id</code>. It loads a tile with <code>tl.load</code> (using a mask at the edges), computes on it as if it were a small array, and writes with <code>tl.store</code>. The compiler handles the thread layout, shared memory and much of the vectorisation. You launch a kernel over a grid of program instances: <code>kernel[grid](...)</code>.</p>
+<p>The reason to write kernels at all is the memory hierarchy. A GPU has large but slow off-chip memory (HBM) and a small, fast on-chip memory (SRAM). Many operations (softmax, layer norm, activations) do only a few flops per byte they read. Their speed is set by memory traffic, not maths. Fusing three such ops into one kernel reads and writes the data once instead of three times.</p>
+
+<h3>Fused attention (the FlashAttention trick)</h3>
+<p>Standard attention builds the full <em>n × n</em> score matrix in HBM, softmaxes it, then multiplies by V. FlashAttention (Dao, Fu, Ermon, Rudra &amp; Ré, 2022) never stores that matrix. It loops over tiles of K and V, keeps each block of Q in SRAM, and uses the <em>online softmax</em>: keep a running row maximum and a running denominator, and rescale the partial output whenever the maximum grows. That idea goes back to Milakov &amp; Gimelshein (2018). The result is exact attention with memory linear in sequence length. In the backward pass, it recomputes the attention tiles from Q, K and V instead of storing them, trading cheap flops for expensive memory traffic. The paper reports a 3× training speedup on GPT-2 at sequence length 1K. FlashAttention-2 (Dao, 2023) reworked how the work is split across thread blocks and warps, for roughly another 2×.</p>
+<pre><code>for each tile (K_j, V_j):
+    S    = Q · K_jᵀ / √d
+    m'   = max(m, rowmax(S))
+    P    = exp(S − m')
+    l    = l · exp(m − m') + rowsum(P)
+    O    = O · exp(m − m') + P · V_j
+    m    = m'
+O = O / l</code></pre>
+
+<h3>Memory layouts and stride calculations</h3>
+<p>A tensor is <em>contiguous</em> (row-major, "C order") when its strides are exactly what a freshly allocated tensor of that shape would have. Each stride equals the product of the sizes to its right. Size-1 dimensions don't count. Three consequences you will meet constantly:</p>
+<ul>
+<li><code>.view()</code> never copies. It fails if the new shape can't be expressed with strides over the existing memory, which is common after a transpose. <code>.reshape()</code> falls back to a copy. <code>.contiguous()</code> forces one.</li>
+<li>A transposed or strided view makes the innermost loop jump around in memory. GPUs read memory fastest when neighbouring threads touch neighbouring addresses ("coalesced" access). A kernel that is fast on a contiguous input can be several times slower on a transposed one.</li>
+<li>Layout is a choice. PyTorch's <code>channels_last</code> gives an NCHW-shaped image tensor NHWC strides, which many convolution kernels prefer.</li>
+</ul>
+
+<div class="card demo">
+<h3>Interactive: strides and contiguity</h3>
+<p class="legend">Top: the tensor as you see it (logical view). Bottom: the one flat line of memory (storage). Each cell shows the number stored there. The highlighted cell is element [i, j]. Shaded memory cells are ones this view can reach.</p>
+<canvas id="sc" width="700" height="300" aria-label="Logical tensor grid above its flat memory storage, with the selected element highlighted in both"></canvas>
+<label for="rows">Rows: <span id="rowsv" class="num"></span></label>
+<input id="rows" type="range" min="2" max="6" step="1" value="3">
+<label for="cols">Cols: <span id="colsv" class="num"></span></label>
+<input id="cols" type="range" min="2" max="8" step="1" value="4">
+<p><button id="tr">Transpose (.T)</button> <button id="sl">Slice [:, ::2]</button> <button id="dr">Drop first row [1:]</button> <button id="rs">Reset</button></p>
+<label for="ii">Row i: <span id="iv" class="num"></span></label>
+<input id="ii" type="range" min="0" max="2" step="1" value="1">
+<label for="jj">Col j: <span id="jv" class="num"></span></label>
+<input id="jj" type="range" min="0" max="3" step="1" value="2">
+<div class="stats">
+  <div class="stat"><div class="k">Shape</div><div class="v" id="shp">–</div></div>
+  <div class="stat"><div class="k">Stride</div><div class="v" id="str">–</div></div>
+  <div class="stat"><div class="k">Offset</div><div class="v" id="off">–</div></div>
+  <div class="stat"><div class="k">Address of [i, j]</div><div class="v" id="adr">–</div></div>
+  <div class="stat"><div class="k">Contiguous?</div><div class="v" id="ctg">–</div></div>
+</div>
+<p class="meta">Try this: with a 3 × 4 tensor, press Transpose. Shape becomes (4, 3), stride (1, 4), and it is no longer contiguous, though nothing moved in memory. Press Reset, then Drop first row: the offset becomes 4 and it stays contiguous. Slice [:, ::2] leaves gaps in memory, so it is never contiguous.</p>
+</div>
+
+<h2 id="practice">3. The practice project</h2>
+<h3>(a) Laptop / Colab version</h3>
+<p><strong>Part 1: a backward pass with no autograd (laptop, NumPy only, an evening).</strong> Build a two-layer MLP with squareplus as the activation. Write the forward pass, derive the backward pass on paper, code it, and check it against finite differences.</p>
+<pre><code>import numpy as np
+B = 4.0
+sq  = lambda x: 0.5 * (x + np.sqrt(x * x + B))
+dsq = lambda x: 0.5 * (1 + x / np.sqrt(x * x + B))
+
+def forward(W1, W2, x, y):
+    h = x @ W1; a = sq(h); p = a @ W2
+    return ((p - y) ** 2).mean(), (x, h, a, p)
+
+def backward(W1, W2, y, cache):
+    x, h, a, p = cache
+    dp = 2 * (p - y) / len(y)
+    dW2 = a.T @ dp
+    dh = (dp @ W2.T) * dsq(h)      # chain rule through the activation
+    return x.T @ dh, dW2
+
+rng = np.random.default_rng(0)
+x, y = rng.normal(size=(32, 3)), rng.normal(size=(32, 1))
+W1, W2 = rng.normal(size=(3, 8)), rng.normal(size=(8, 1))
+dW1, _ = backward(W1, W2, y, forward(W1, W2, x, y)[1])
+eps, E = 1e-6, np.zeros_like(W1); E[1, 2] = eps
+num = (forward(W1 + E, W2, x, y)[0] - forward(W1 - E, W2, x, y)[0]) / (2 * eps)
+print(dW1[1, 2], num)              # should agree to ~1e-8</code></pre>
+<p>We ran this sketch: the analytic and numerical gradients agreed to about 2 × 10<sup>−9</sup>. Then wrap the same maths in a <code>torch.autograd.Function</code> (section 2) and pass <code>gradcheck</code>.</p>
+<p><strong>Part 2: fused attention, first in NumPy, then in Triton (Colab GPU, a weekend or two).</strong> Write the tiled online-softmax loop from section 2 in NumPy and check it matches naive attention to about 1e-12 in float64. (Our version, with 64 queries, head dimension 32 and tiles of 16 keys, matched to ~7 × 10<sup>−16</sup>.) Then work through the official Triton tutorials in order: vector add, fused softmax, matmul, fused attention. Write your own forward-only attention kernel, test it against <code>torch.nn.functional.scaled_dot_product_attention</code> with <code>torch.testing.assert_close</code>, and time it with <code>triton.testing.do_bench</code> across sequence lengths. Triton has an interpreter mode (<code>TRITON_INTERPRET=1</code>) that runs kernels on the CPU for debugging, slowly.</p>
+<p><strong>What to measure:</strong> maximum absolute error against the reference in fp32 and fp16. Runtime and peak memory (<code>torch.cuda.max_memory_allocated</code>) as sequence length doubles. The naive version's memory should grow with the square of the length. Yours should grow linearly. Don't expect to beat PyTorch's built-in fused attention. Matching it within a small factor is a good result.</p>
+
+<h3>(b) The full version from the post</h3>
+<ul>
+<li><strong>Fused attention with a backward pass</strong>, causal masking and fp16/bf16 support, the way CS336 Assignment 2 sets it up. Then verify gradients against the reference implementation and profile it.</li>
+<li><strong>Hardware:</strong> one modern NVIDIA GPU is enough. Triton targets NVIDIA, and AMD GPUs are also supported. Colab's free GPU works for learning. For realistic benchmarks, rent an A100- or H100-class GPU for a few hours, at the usual cloud rate of a few dollars an hour. Some of Triton's newest features need recent GPU generations, so read each tutorial's notes.</li>
+<li><strong>The activation project, in full:</strong> a custom <code>autograd.Function</code> with a hand-written backward, then the same activation fused into a Triton kernel with the matmul before it. Benchmark against the eager PyTorch composition and <code>torch.compile</code>.</li>
+</ul>
+
+<h3>(c) Pitfalls</h3>
+<ul>
+<li><strong>Gradient checks in float32</strong> give noisy false alarms. Use float64 and central differences.</li>
+<li><strong>Forgetting the masked edges</strong> in Triton when the size isn't a multiple of the block size. Out-of-bounds loads give garbage, not errors.</li>
+<li><strong>Online softmax without the max subtraction</strong> overflows in fp16 almost immediately.</li>
+<li><strong>Benchmarking wrongly:</strong> GPU calls are asynchronous. Synchronise, warm up (the first call compiles), and repeat. Use <code>do_bench</code>.</li>
+<li><strong>Silent copies:</strong> <code>.contiguous()</code> or <code>.reshape()</code> inside a hot loop can cost more than the kernel you just optimised.</li>
+</ul>
+
+<h2 id="reality">4. Reality check</h2>
+<p>The post's claim: you can't optimise or debug a collapsing loss curve if you treat networks as black-box APIs.</p>
+<ul>
+<li><strong>Mostly true for debugging.</strong> Many loss blow-ups trace back to things this stage teaches you to see. Examples: an op that overflows in fp16, a softmax without max subtraction, a bad custom gradient, a silent broadcast or transpose bug. Knowing what <code>backward</code> does lets you inspect gradient norms per layer and find the culprit.</li>
+<li><strong>Overstated as stated.</strong> Plenty of loss-curve problems have nothing to do with kernels: learning rate and warmup, bad data batches, initialisation, optimiser settings. Those are diagnosed with logging and ablations more than with internals. Stage 02 covers part of that.</li>
+<li><strong>Writing Triton kernels is a specialist skill.</strong> Most research engineers rarely write one. They use FlashAttention, <code>torch.compile</code> and library kernels. Knowing <em>why</em> those are fast matters more than writing them. Do the attention kernel once to learn it, not to replace the library.</li>
+<li><strong>Hand-written backward passes are rare in practice</strong>, but the derivation skill isn't. It's how you read papers that propose new layers, and how you spot numerically unstable gradients.</li>
+</ul>
+
+<h2 id="course">5. In this course</h2>
+<ul>
+<li><a href="../02-tensortonic.html#track">Module 02 · TensorTonic</a>: implement-from-scratch practice, including its CUDA kernel and Triton exercises. The <a href="../02-tensortonic.html#math">maths section</a> covers the linear algebra you need here.</li>
+<li><a href="../06-30u30/01-rnn-effectiveness.html">30u30 Day 01 · RNN Effectiveness</a>: backprop through time, worked by hand.</li>
+<li><a href="../06-30u30/14-annotated-transformer.html">30u30 Day 14 · The Annotated Transformer</a>: the attention layer you will fuse, written out in plain PyTorch.</li>
+<li><a href="../05-trillion-scale-architecture.html#serving">Module 05 · Serving</a>: why memory traffic, not flops, sets the cost of running a big model.</li>
+<li><a href="../04-distill-small-models.html#latency">Module 04 · Latency</a>: why kernel speed matters for small on-device models.</li>
+</ul>
+
+<h2 id="robotics">6. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>On-robot inference is memory-bound.</strong> Policies and VLAs run on embedded GPUs (Jetson-class boards) with modest memory bandwidth. Fused kernels, avoiding hidden copies and choosing layouts like <code>channels_last</code> for the vision backbone directly cut control-loop latency.</li>
+<li><strong>Custom backward passes show up in robot learning.</strong> Examples are differentiable kinematics, a quaternion normalisation that's unstable near zero, or a clipped action squashing function. A hand-written, gradcheck-tested backward is often the fix.</li>
+<li><strong>Debugging policy training.</strong> RL and imitation runs collapse for the same low-level reasons as LLM runs, such as NaNs, fp16 overflow or exploding gradients. Reading per-layer gradient norms is the same skill.</li>
+</ul>
+</div>
+
+<h2 id="check">7. Self-check</h2>
+<details><summary>A tensor of shape (3, 4) has stride (4, 1). What are the shape and stride of its transpose, and is it contiguous?</summary><p>Shape (4, 3), stride (1, 4). It's not contiguous: a fresh (4, 3) tensor would have stride (3, 1). No data moved. Only the metadata changed.</p></details>
+<details><summary>Why does <code>x.T.view(-1)</code> raise an error while <code>x.T.reshape(-1)</code> works?</summary><p>Flattening needs the elements to be evenly spaced in memory in row-major order. The transposed view's elements aren't, so no single stride can describe them. <code>view</code> refuses to copy. <code>reshape</code> silently makes a contiguous copy.</p></details>
+<details><summary>Your <code>autograd.Function</code> takes <code>(x, b)</code> where <code>b</code> is a Python float. What must <code>backward</code> return?</summary><p>Two values: the gradient with respect to <code>x</code> (same shape as <code>x</code>) and <code>None</code> for <code>b</code>.</p></details>
+<details><summary>Why is reverse-mode autodiff the right choice for training networks?</summary><p>There are millions of inputs (the parameters) and one scalar output (the loss). Reverse mode gives all the partial derivatives for a small constant multiple of one forward pass. Forward mode would need one pass per input.</p></details>
+<details><summary>How does FlashAttention avoid storing the n × n attention matrix, even in the backward pass?</summary><p>Forward: it processes K/V in tiles and uses the online softmax (running max and running sum), so only O(n) statistics per row are kept. Backward: it recomputes the attention tiles from Q, K, V and those statistics instead of reading a stored matrix.</p></details>
+
+<h2 id="courses">8. Courses &amp; content</h2>
+<div class="table-wrap"><table>
+<tr><th>Resource</th><th>Type</th><th>Use it for</th></tr>
+<tr><td><a href="https://stanford-cs336.github.io/spring2025/">Stanford CS336 · Assignment 1 (Basics) + Assignment 2 (Systems)</a></td><td>University course (free materials)</td><td>Build tokenizer, Transformer and optimizer from scratch; then write FlashAttention2 in Triton and profile it</td></tr>
+<tr><td><a href="https://karpathy.ai/zero-to-hero.html">Karpathy · Neural Networks: Zero to Hero</a></td><td>Video course (free)</td><td>Backprop by hand with micrograd, then up to a GPT</td></tr>
+<tr><td><a href="https://docs.pytorch.org/docs/stable/notes/extending.html">PyTorch docs · Extending PyTorch (custom autograd.Function)</a></td><td>Official docs</td><td>Writing your own forward/backward</td></tr>
+<tr><td><a href="https://triton-lang.org/main/getting-started/tutorials/index.html">Triton tutorials</a></td><td>Official tutorials</td><td>Vector add → fused softmax → matmul → fused attention</td></tr>
+<tr><td><a href="https://github.com/gpu-mode/lectures">GPU MODE lectures</a></td><td>Lecture series (free)</td><td>Profiling, CUDA and Triton kernels, memory layout</td></tr>
+</table></div>
+<p>Start with Karpathy's micrograd video: in about two hours you build autograd yourself. Everything else on this page then feels like a bigger version of that.</p>
+<p class="meta"><a href="index.html#courses">Full course map for all 12 stages →</a></p>
+
+<h2 id="papers">9. Papers &amp; docs</h2>
+<ul>
+<li>Paszke et al., 2019. <a href="https://arxiv.org/abs/1912.01703">PyTorch: An Imperative Style, High-Performance Deep Learning Library</a></li>
+<li>Baydin, Pearlmutter, Radul &amp; Siskind, 2015/2018. <a href="https://arxiv.org/abs/1502.05767">Automatic differentiation in machine learning: a survey</a></li>
+<li>Dao, Fu, Ermon, Rudra &amp; Ré, 2022. <a href="https://arxiv.org/abs/2205.14135">FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness</a></li>
+<li>Dao, 2023. <a href="https://arxiv.org/abs/2307.08691">FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning</a></li>
+<li>Milakov &amp; Gimelshein, 2018. <a href="https://arxiv.org/abs/1805.02867">Online normalizer calculation for softmax</a></li>
+<li>Barron, 2021. <a href="https://arxiv.org/abs/2112.11687">Squareplus: A Softplus-Like Algebraic Rectifier</a></li>
+<li>Tillet, Kung &amp; Cox, 2019. Triton: an intermediate language and compiler for tiled neural network computations (MAPL workshop). <a href="https://triton-lang.org/main/index.html">Triton docs</a></li>
+<li><a href="https://docs.pytorch.org/docs/stable/notes/extending.html">PyTorch: Extending PyTorch</a> and <a href="https://docs.pytorch.org/docs/stable/notes/autograd.html">Autograd mechanics</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="index.html"><small>Previous</small>Module 08 hub</a>
+  <a class="next" href="02-scaling-data-mixing.html"><small>Next</small>Stage 02 · Scaling laws &amp; data mixing</a>
+</nav>
+<footer>Module 08 · Stage 01 · written for this course from the source post and primary papers.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('sc'), ctx = cv.getContext('2d');
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let v;
+
+function reset() {
+  const R = +$('rows').value, C = +$('cols').value;
+  v = { shape: [R, C], stride: [C, 1], offset: 0, n: R * C };
+  sync();
+}
+// contiguous if each stride equals the product of sizes to its right (size-1 dims ignored)
+const contig = t => {
+  let e = 1;
+  for (let d = t.shape.length - 1; d >= 0; d--) {
+    if (t.shape[d] !== 1 && t.stride[d] !== e) return false;
+    e *= t.shape[d];
+  }
+  return true;
+};
+const addr = (t, i, j) => t.offset + i * t.stride[0] + j * t.stride[1];
+const transpose = t => ({ ...t, shape: [t.shape[1], t.shape[0]], stride: [t.stride[1], t.stride[0]] });
+const slice2 = t => ({ ...t, shape: [t.shape[0], Math.ceil(t.shape[1] / 2)], stride: [t.stride[0], t.stride[1] * 2] });
+const drop1 = t => t.shape[0] < 2 ? t : ({ ...t, shape: [t.shape[0] - 1, t.shape[1]], offset: t.offset + t.stride[0] });
+
+function sync() {
+  $('ii').max = v.shape[0] - 1; $('jj').max = v.shape[1] - 1;
+  if (+$('ii').value > v.shape[0] - 1) $('ii').value = v.shape[0] - 1;
+  if (+$('jj').value > v.shape[1] - 1) $('jj').value = v.shape[1] - 1;
+  draw();
+}
+
+function draw() {
+  const i = +$('ii').value, j = +$('jj').value, W = cv.width, H = cv.height;
+  $('rowsv').textContent = $('rows').value; $('colsv').textContent = $('cols').value;
+  $('iv').textContent = i; $('jv').textContent = j;
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const reach = new Set();
+  for (let a = 0; a < v.shape[0]; a++) for (let b = 0; b < v.shape[1]; b++) reach.add(addr(v, a, b));
+  const sel = addr(v, i, j);
+  const cell = (x, y, s, val, hot, used) => {
+    ctx.fillStyle = hot ? css('--accent') : used ? css('--line') : 'transparent';
+    ctx.fillRect(x, y, s, s);
+    ctx.strokeStyle = css('--muted'); ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, s - 1, s - 1);
+    ctx.fillStyle = hot ? css('--bg') : css('--fg'); ctx.fillText(val, x + s / 2, y + s / 2 + 1);
+  };
+  // logical grid
+  const gs = Math.min(30, 180 / v.shape[0]), gx = (W - gs * v.shape[1]) / 2;
+  ctx.fillStyle = css('--muted'); ctx.fillText('logical view  shape (' + v.shape.join(', ') + ')', W / 2, 12);
+  for (let a = 0; a < v.shape[0]; a++) for (let b = 0; b < v.shape[1]; b++)
+    cell(gx + b * gs, 26 + a * gs, gs, addr(v, a, b), a === i && b === j, true);
+  // storage strip
+  const ms = Math.min(34, (W - 20) / v.n), mx = (W - ms * v.n) / 2, my = H - ms - 22;
+  ctx.fillStyle = css('--muted'); ctx.fillText('storage (flat memory, address 0 … ' + (v.n - 1) + ')', W / 2, my - 14);
+  for (let k = 0; k < v.n; k++) cell(mx + k * ms, my, ms, k, k === sel, reach.has(k));
+  $('shp').textContent = '(' + v.shape.join(', ') + ')';
+  $('str').textContent = '(' + v.stride.join(', ') + ')';
+  $('off').textContent = v.offset;
+  $('adr').textContent = v.offset + ' + ' + i + '·' + v.stride[0] + ' + ' + j + '·' + v.stride[1] + ' = ' + sel;
+  $('ctg').textContent = contig(v) ? 'yes' : 'no';
+}
+
+$('rows').oninput = $('cols').oninput = reset;
+$('ii').oninput = $('jj').oninput = draw;
+$('tr').onclick = () => { v = transpose(v); sync(); };
+$('sl').onclick = () => { v = slice2(v); sync(); };
+$('dr').onclick = () => { v = drop1(v); sync(); };
+$('rs').onclick = reset;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+reset();
+</script>
+</body>
+</html>

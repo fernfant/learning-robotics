@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stage 02 · Scaling &amp; data mixing</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 08 · Research-engineer roadmap</a> › Stage 02</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 08 · Stage 02</div>
+<h1>Scaling laws &amp; data mixing</h1>
+<p class="lede">Before you train, decide three things: how big the model should be, how many tokens to feed it, and what those tokens should be. Scaling laws answer the first two. Deduplication, domain weights and the learning-rate schedule decide how much each token is worth.</p>
+
+<div class="facts">
+  <div><b>Prerequisites</b>Stage 01, training a small Transformer (nanoGPT level), log-log plots</div>
+  <div><b>Time</b>30–60 h part-time, most of it waiting for training runs</div>
+  <div><b>Hardware</b>Colab GPU for the small version · one rented A100/H100 for the 100M-parameter runs</div>
+  <div><b>Key papers</b>Kaplan et al. (2020) · Chinchilla, Hoffmann et al. (2022) · DoReMi, Xie et al. (2023) · FineWeb, Penedo et al. (2024)</div>
+</div>
+<p class="meta">Source: <a href="https://x.com/suraj_sharma14/status/2112876560629825734">Suraj Sharma's roadmap post on X</a>, stage 2 · <a href="index.html">all 12 stages</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Training an AI costs a fixed amount of computer time. You have to choose how to spend it: a bigger brain that reads less, or a smaller brain that reads more. And you have to choose what it reads.</p>
+
+<h3>Think of it like this</h3>
+<p>Imagine you have exactly one month to get ready for a big exam. You could buy a huge, thick textbook and only get through a quarter of it. Or a thin one you can read cover to cover. The best choice is somewhere in the middle. Then there's the question of <em>what</em> you read. If half your notes are the same page photocopied twenty times, you're wasting time. If the exam is half maths and you only studied history, the mix was wrong. Scaling laws are the rules for the first choice. Data mixing is the second.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Train many small practice models of different sizes, each for a different amount of time.</li>
+<li>Plot how good each one got. The points fall on surprisingly smooth curves.</li>
+<li>Use the curves to predict the best size and reading amount for your big, expensive model.</li>
+<li>Clean the reading pile: throw out copies and near-copies, and junk pages.</li>
+<li>Choose the recipe: what share of the reading is web pages, code, maths and so on. Then train, slowing the learning down gently towards the end.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Robot "brains" are trained on a mixture too: videos from many different robots, some simulation, some internet pictures with captions. If a robot learns mostly from one kind of arm, it may be clumsy with another. Choosing how much of each kind of data to use is the same puzzle as choosing between web text, code and maths.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Take a pile of 20 photos from a phone and count how many are near-duplicates (the same scene taken twice). That share is wasted study time for an AI. Web data has lots of it.</li>
+<li>In the demo further down, move the <b>Compute budget</b> slider, then drag <b>Model size</b> along the curve. The lowest point is the best size for that budget. Notice how flat the bottom of the curve is.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Parameter</dt><dd>One adjustable number inside the model. Big models have billions.</dd>
+<dt>Token</dt><dd>A chunk of text, roughly three-quarters of a word, that the model reads.</dd>
+<dt>Compute</dt><dd>The total amount of maths spent on training, counted in operations.</dd>
+<dt>Deduplication</dt><dd>Removing copies and near-copies from the training data.</dd>
+<dt>Data mix</dt><dd>The recipe: what share of training data comes from each source.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths and code. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. What this stage covers</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>For a fixed training budget C ≈ 6·N·D (N parameters, D tokens), Chinchilla found that N and D should grow in roughly equal proportion, which works out to about 20 tokens per parameter. That's the compute-optimal point for training cost alone. Then the data itself: near-duplicates waste compute and increase memorisation, so you remove them with MinHash. The share of each domain (web, code, maths, books) shifts what the model is good at, and can be tuned by hand, by small-proxy ablations, or by methods like DoReMi. Finally, the learning-rate schedule (warmup then cosine decay, with restarts or a warmup-stable-decay variant) has to match the run length, or every comparison above is biased.</p>
+</div>
+<ul>
+<li><strong>Learn:</strong> Chinchilla's compute-optimal model size, near-duplicate removal with MinHash, domain weighting, and learning-rate schedules including cosine with warm restarts.</li>
+<li><strong>Practice:</strong> train a ~100M-parameter model three times with different code/maths/web ratios, and plot how the loss curves separate.</li>
+<li><strong>Why (the post's claim):</strong> that in 2026 architecture matters less than the exact ratio of the training data. We test this in the reality check.</li>
+</ul>
+
+<h2 id="concepts">2. Concepts, explained</h2>
+
+<h3>Chinchilla-optimal compute</h3>
+<p>Kaplan et al. (2020) showed that loss falls as a power law in model size, data and compute, and concluded that extra compute should go mostly into a bigger model. Their setup, though, used one learning-rate schedule length for runs of different lengths. Hoffmann et al. (2022) redid the study with over 400 models (70M to 16B parameters, 5B to 500B tokens) and schedules matched to each run's length. Their answer: <strong>scale parameters and tokens equally</strong>. Double the model, double the data. They tested it by training Chinchilla (70B parameters, 1.4T tokens) on the same compute as Gopher (280B parameters, 300B tokens). Chinchilla beat Gopher on a wide range of tasks.</p>
+<p>The paper used three estimation methods. The third fits a parametric loss surface:</p>
+<pre><code>L(N, D) = E + A / N^α + B / D^β
+published fit: E = 1.69, A = 406.4, B = 410.7, α = 0.34, β = 0.28
+
+C ≈ 6·N·D           (training FLOPs: ~2N forward + ~4N backward per token)
+rule of thumb:  D ≈ 20·N   →   N ≈ √(C / 120)</code></pre>
+<p>E is the irreducible loss of the data. The A term is the penalty for a model that's too small. The B term is the penalty for too little data. Two caveats matter. First, the methods don't agree exactly: the first two give roughly equal exponents, while the published third fit leans toward smaller models. Besiroglu et al. (2024) tried to replicate the third method and found the published fit inconsistent with the paper's own data. Their refit agrees with the first two methods. Second, the loss constants depend on the dataset and tokenizer, so they don't transfer to your data. Fit your own on small runs (that's CS336 Assignment 3).</p>
+<p>"Compute-optimal" means optimal for <em>training</em> cost. If a model will serve billions of queries, a smaller model trained on far more tokens is cheaper overall. Meta's Llama 3 8B, for example, was trained on about 15T tokens, nearly 2,000 tokens per parameter. Read Chinchilla as the starting point for an ablation budget, not a law about production models.</p>
+
+<div class="card demo">
+<h3>Interactive: compute-optimal model size</h3>
+<p class="legend">The curve is predicted loss against model size for one fixed compute budget (an "IsoFLOP" curve), using Chinchilla's published parametric fit. Every point spends the same compute: a bigger model gets fewer tokens. Ring: the fit's minimum. Square: the 20-tokens-per-parameter rule. Filled dot: your choice.</p>
+<canvas id="cc" width="700" height="260" aria-label="Predicted loss against model size at a fixed compute budget, with the fit minimum, the 20 tokens per parameter rule and the selected model size marked"></canvas>
+<label for="lc">Compute budget C: <span id="lcv" class="num"></span> FLOPs</label>
+<input id="lc" type="range" min="17" max="25" step="0.02" value="18.08">
+<label for="ln">Model size N: <span id="lnv" class="num"></span> parameters</label>
+<input id="ln" type="range" min="6" max="12" step="0.05" value="8">
+<div class="stats">
+  <div class="stat"><div class="k">Tokens D = C / 6N</div><div class="v" id="dd">–</div></div>
+  <div class="stat"><div class="k">Tokens per parameter</div><div class="v" id="tp">–</div></div>
+  <div class="stat"><div class="k">Predicted loss</div><div class="v" id="pl">–</div></div>
+  <div class="stat"><div class="k">20× rule: N, D</div><div class="v" id="r20">–</div></div>
+  <div class="stat"><div class="k">Fit minimum: N, D</div><div class="v" id="fo">–</div></div>
+  <div class="stat"><div class="k">Loss above minimum</div><div class="v" id="gap">–</div></div>
+</div>
+<p class="meta">Try this: the default, about 1.2 × 10<sup>18</sup> FLOPs, is the budget for the 100M-parameter practice project at 20 tokens per parameter (2B tokens). The fit's minimum sits a little lower, near 90M parameters, and the two predicted losses differ by less than 0.002. Now move N a factor of 3 either way and see how slowly the loss rises. Push C to about 5.8 × 10<sup>23</sup> (Gopher and Chinchilla's budget): the rule says ~69B parameters, while the published fit says ~32B. That gap is the inconsistency Besiroglu et al. pointed out. The losses are only meaningful for the paper's own dataset and tokenizer.</p>
+</div>
+
+<h3>Data deduplication with MinHash</h3>
+<p>Web crawls are full of exact and near-exact copies: boilerplate, mirrored pages, templated spam. Lee et al. (2021) found a single 61-word sentence repeated over 60,000 times in C4. They showed deduplication cut verbatim memorised output roughly tenfold, needed fewer training steps for the same or better accuracy, and reduced train/test overlap. That overlap had affected over 4% of some validation sets.</p>
+<p>Exact duplicates are easy: hash each document. Near-duplicates need MinHash (Broder, 1997). Turn each document into a set of shingles (for example word 5-grams). Similarity is the Jaccard index |A ∩ B| / |A ∪ B|. For a random hash function, the probability that two sets have the same minimum hash value equals their Jaccard similarity. So a signature of k minimum hashes estimates it. To avoid comparing every pair, split the signature into b bands of r rows and only compare documents that match exactly on at least one band (locality-sensitive hashing):</p>
+<pre><code>P(candidate pair | Jaccard s) = 1 − (1 − s^r)^b
+
+with b = 16 bands, r = 8 rows (k = 128 hashes):
+s = 0.5 → 0.06    s = 0.7 → 0.61    s = 0.8 → 0.95    s = 0.9 → 1.00</code></pre>
+<p>That S-shaped curve is the point: pairs above the threshold are almost always caught, pairs well below it almost never. You tune b and r to move the threshold. The FineWeb team (Penedo et al., 2024) ran ablations on MinHash settings and found that deduplicating each Common Crawl snapshot separately worked better than deduplicating across all snapshots at once.</p>
+
+<h3>Domain weighting</h3>
+<p>A pre-training corpus is a mixture of domains: web pages, code, maths, books, papers, other languages. The weights decide what the model is good at, and they interact with how much unique data each domain has. Upweighting a small domain means repeating it. Three ways to set them:</p>
+<ul>
+<li><strong>By hand, with ablations.</strong> Train small proxy models on a few candidate mixes and compare on held-out sets and benchmarks. Most published recipes still work this way.</li>
+<li><strong>Temperature sampling.</strong> Sample domain i with probability proportional to n<sub>i</sub><sup>1/T</sup>, where n<sub>i</sub> is its size. T = 1 is proportional to size. Larger T flattens the mix toward uniform. It's common for balancing languages in multilingual models.</li>
+<li><strong>Learned.</strong> DoReMi (Xie et al., 2023) trains a small proxy model with Group DRO, which upweights the domains where the proxy lags most behind a reference model. It then uses the resulting weights for the big model. A 280M proxy set weights for an 8B model. On The Pile, it raised average few-shot accuracy by 6.5 points over the default weights and reached the baseline's accuracy in 2.6× fewer steps.</li>
+</ul>
+<p>Quality filtering interacts with all of this. FineWeb-Edu, a 1.3T-token subset of FineWeb chosen by an educational-quality classifier, gave much better results on knowledge and reasoning benchmarks like MMLU and ARC. Often "which documents" matters as much as "which domain ratio".</p>
+
+<h3>Learning-rate schedules: cosine, warm restarts and WSD</h3>
+<p>Standard LLM pre-training uses a short linear warmup, then cosine decay to a fraction of the peak. Loshchilov &amp; Hutter (2016) introduced SGDR, cosine annealing with <em>warm restarts</em>. The rate decays along a cosine, jumps back to the peak, and repeats, often with each cycle longer than the last. They showed it on CIFAR image models. In LLM pre-training, restarts are less common than a single decay. Chinchilla noted that letting the cosine cycle run much longer than the actual training run gives a worse model. That's one reason Kaplan's allocation was off: a run cut short in the middle of a long schedule never gets its final decay.</p>
+<p>A popular alternative is <strong>warmup-stable-decay</strong> (WSD), described in the MiniCPM paper (Hu et al., 2024). Hold the rate constant, and decay sharply only at the end. You can branch a decay off any checkpoint, which makes it cheap to measure loss at several data sizes from one run.</p>
+<pre><code>def lr(step, peak=6e-4, warmup=500, total=20_000, floor=0.1):
+    if step &lt; warmup:
+        return peak * step / warmup
+    t = (step - warmup) / (total - warmup)
+    return peak * (floor + (1 - floor) * 0.5 * (1 + math.cos(math.pi * t)))
+
+def sgdr(step, peak=6e-4, t0=2_000, mult=2):
+    t, T = step, t0
+    while t &gt;= T:              # find the position inside the current cycle
+        t, T = t - T, T * mult
+    return peak * 0.5 * (1 + math.cos(math.pi * t / T))</code></pre>
+
+<h2 id="practice">3. The practice project</h2>
+<h3>(a) Colab version: a ~15M-parameter model, three mixes</h3>
+<ol>
+<li><strong>Data.</strong> Take three public sources from the Hugging Face Hub: a web sample (for example a FineWeb-Edu sample), a code set (for example a small slice of The Stack) and a maths set (for example OpenWebMath). Tokenize all of them with the same tokenizer (GPT-2's via <code>tiktoken</code> is fine). Loss per token isn't comparable across tokenizers.</li>
+<li><strong>Clean.</strong> Run exact-hash and MinHash deduplication within each source. Then MinHash your validation sets against the training sets and drop overlaps, so you aren't measuring memorisation.</li>
+<li><strong>Mixes.</strong> Build three training streams with the same total tokens, for example web/code/maths at 80/10/10, 40/40/20 and 40/20/40.</li>
+<li><strong>Train.</strong> Use a nanoGPT-style model of about 15M parameters for about 300M tokens each (20 tokens per parameter). That's C ≈ 6 × 1.5×10<sup>7</sup> × 3×10<sup>8</sup> ≈ 2.7×10<sup>16</sup> FLOPs per run, small enough for a Colab GPU in roughly an hour or a few per run, depending on how efficient your code is. Use the same seed, schedule and batch size for all three.</li>
+<li><strong>Measure.</strong> Every few hundred steps, log validation loss <em>separately</em> on held-out web, code and maths. Plot nine curves (3 mixes × 3 domains), and the difference between mixes per domain over time.</li>
+</ol>
+<p><strong>What to expect:</strong> each mix should usually do best on the domain it upweights. The interesting parts are how big the gaps are, when they open, and whether one domain helps another (does code help maths?). Run at least two seeds for one mix. If seed-to-seed differences are as big as mix-to-mix differences, you haven't measured anything yet.</p>
+<p>A MinHash sketch to start from, standard library only:</p>
+<pre><code>import hashlib
+
+def shingles(text, n=5):
+    w = text.lower().split()
+    return {" ".join(w[i:i + n]) for i in range(len(w) - n + 1)}
+
+def h(s, seed):
+    return int.from_bytes(hashlib.blake2b(f"{seed}:{s}".encode(), digest_size=8).digest(), "big")
+
+def minhash(sh, k=128):
+    return [min(h(s, i) for s in sh) for i in range(k)]
+
+def est_jaccard(a, b):
+    return sum(x == y for x, y in zip(a, b)) / len(a)
+
+def p_candidate(s, bands=16, rows=8):   # LSH: chance two docs share ≥ 1 band
+    return 1 - (1 - s ** rows) ** bands</code></pre>
+<p>For real volumes, use <code>datatrove</code>, the library behind FineWeb. It has MinHash dedup stages that run in parallel.</p>
+
+<h3>(b) The full version from the post: ~100M parameters</h3>
+<ul>
+<li><strong>Budget.</strong> At 20 tokens per parameter, 100M parameters means ~2B tokens per run and C ≈ 6 × 10<sup>8</sup> × 2×10<sup>9</sup> = 1.2×10<sup>18</sup> FLOPs.</li>
+<li><strong>Time.</strong> An A100's dense bf16 peak is 312 TFLOP/s. At a realistic 40% utilisation (~125 TFLOP/s), one run takes about 1.2×10<sup>18</sup> / 1.25×10<sup>14</sup> ≈ 9,600 s, under 3 hours. Three mixes plus a repeat seed or two is roughly 8–15 GPU-hours. At typical cloud rental prices that's tens of dollars, not thousands. Small models rarely reach 40% utilisation without care, so budget extra.</li>
+<li><strong>Code.</strong> Karpathy's <code>build-nanogpt</code> (GPT-2 124M) is almost exactly the right size and already has warmup plus cosine decay. Swap its data loader for a weighted sampler over your three domains.</li>
+<li><strong>Stretch.</strong> Fit your own mini scaling law: train 4–5 sizes at 3 budgets, find each IsoFLOP minimum, and fit N<sub>opt</sub> ∝ C<sup>a</sup>. Or run a DoReMi-style reweighting with a 15M proxy and test its weights at 100M.</li>
+</ul>
+
+<h3>(c) Pitfalls</h3>
+<ul>
+<li><strong>Comparing total loss across mixes.</strong> A code-heavy mix has lower average loss partly because code is more predictable. Always compare per-domain validation loss.</li>
+<li><strong>Repeating a small domain.</strong> If your maths set is small, a 40% maths mix repeats it many times. You're then testing repetition as much as the ratio.</li>
+<li><strong>Schedule mismatch.</strong> If runs have different lengths, each needs its own full schedule. Comparing checkpoints from the middle of a cosine schedule biases everything toward longer runs.</li>
+<li><strong>Leakage.</strong> Without deduplicating validation against training data, a mix with more duplicated pages looks better than it is.</li>
+</ul>
+
+<h2 id="reality">4. Reality check</h2>
+<p>The post's claim: in 2026, architecture is secondary, and the real advantage is the exact mathematical ratio of the training data.</p>
+<ul>
+<li><strong>True that data is a huge lever.</strong> FineWeb-Edu's quality filtering, deduplication's gains and DoReMi's 2.6× speedup on The Pile are all real, large effects from data alone, with the architecture held fixed.</li>
+<li><strong>Overstated that it's about an exact ratio.</strong> Mixture weights are found empirically on proxy models, and loss is often fairly flat around a good mix, much like the flat bottom of the IsoFLOP curve in the demo. Quality filtering, deduplication, and the amount of unique data per domain usually matter more than the second decimal of a ratio.</li>
+<li><strong>Overstated that architecture is secondary.</strong> Architecture still moves the scaling curve. Mixture-of-experts, attention variants and long-context designs change how much loss you get per FLOP. <a href="../05-trillion-scale-architecture.html">Module 05</a> covers one model credited with about 2.5× better scaling efficiency from architecture. Stage 03 goes further.</li>
+<li><strong>Also worth knowing:</strong> "compute-optimal" isn't "best". Production models are usually trained far beyond 20 tokens per parameter because inference cost dominates. So the Chinchilla ratio is a research tool, not a production recipe.</li>
+</ul>
+
+<h2 id="course">5. In this course</h2>
+<ul>
+<li><a href="../06-30u30/25-scaling-laws.html">30u30 Day 25 · Scaling Laws for Neural Language Models</a>: the Kaplan et al. power laws, with an interactive loss-versus-size demo. Read it before this page's Chinchilla section.</li>
+<li><a href="../04-distill-small-models.html#eval">Module 04 · Evaluation that doesn't fool you</a>: honest train/validation splits and leakage, the same discipline the per-domain validation sets need.</li>
+<li><a href="../05-trillion-scale-architecture.html#moe">Module 05 · Mixture of experts</a>: architecture changing the compute-to-loss trade-off, the counterpoint to "data is everything".</li>
+</ul>
+
+<h2 id="robotics">6. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Robot datasets are mixtures.</strong> Generalist policies are trained on pooled datasets such as Open X-Embodiment, which combines data from many robots, labs and tasks. Choosing per-dataset weights, so one large dataset of a single arm doesn't swamp the rest, is the domain-weighting problem again.</li>
+<li><strong>Co-training with web data.</strong> VLAs like RT-2 trained on robot data together with web vision-language data, so the model keeps its general knowledge. How much web data to keep in the mix is a data-mixing decision.</li>
+<li><strong>Sim plus real.</strong> Simulated demonstrations are cheap and plentiful. Real ones are scarce and valuable. The sim/real ratio and how often to repeat real data are the same questions as repeating a small domain.</li>
+<li><strong>Be careful with scaling laws for robots.</strong> Robot-learning scaling studies exist, but the curves are much less established than for text, because data is far scarcer and evaluation is noisier. Don't transfer the 20 tokens-per-parameter rule to robot data.</li>
+</ul>
+</div>
+
+<h2 id="check">7. Self-check</h2>
+<details><summary>Using C ≈ 6ND and D = 20N, what's the compute-optimal model size for C = 1.2 × 10<sup>18</sup> FLOPs?</summary><p>C = 120N², so N = √(C / 120) = √(10<sup>16</sup>) = 10<sup>8</sup>: a 100M-parameter model on 2B tokens.</p></details>
+<details><summary>Why did Kaplan et al. and Hoffmann et al. reach different allocations?</summary><p>A major reason: Kaplan's runs used a fixed learning-rate schedule length, so shorter runs were evaluated before their schedule finished decaying, which penalised training on more data. Chinchilla matched the cosine schedule to each run's length and found parameters and tokens should scale roughly equally.</p></details>
+<details><summary>Why is a MinHash collision probability equal to the Jaccard similarity?</summary><p>Under a random hash, each element of A ∪ B is equally likely to have the minimum value. The two sets share their minimum exactly when that element is in A ∩ B, which happens with probability |A ∩ B| / |A ∪ B|.</p></details>
+<details><summary>With 16 bands of 8 rows, roughly what share of pairs at Jaccard 0.5 become candidates? At 0.9?</summary><p>About 6% at 0.5, and essentially all at 0.9. The banding makes a sharp threshold around 0.7.</p></details>
+<details><summary>Your code-heavy mix has the lowest average validation loss. Is it the best mix?</summary><p>Not necessarily. Code tokens are easier to predict, so a code-heavy validation set lowers the average. Compare per-domain losses (and downstream evals) instead.</p></details>
+<details><summary>Why might a team train an 8B model on 15T tokens when Chinchilla says ~160B tokens?</summary><p>Chinchilla minimises training compute for a given loss. When a model will be served at huge volume, a smaller, over-trained model gives similar quality at much lower inference cost, which outweighs the extra training compute.</p></details>
+
+<h2 id="courses">8. Courses &amp; content</h2>
+<div class="table-wrap"><table>
+<tr><th>Resource</th><th>Type</th><th>Use it for</th></tr>
+<tr><td><a href="https://stanford-cs336.github.io/spring2025/">Stanford CS336 · Assignment 3 (Scaling) + Assignment 4 (Data)</a></td><td>University course (free materials)</td><td>Fit a scaling law; turn Common Crawl into training data with filtering and dedup</td></tr>
+<tr><td><a href="https://huggingface.co/spaces/HuggingFaceFW/blogpost-fineweb-v1">FineWeb: decanting the web for the finest text data</a></td><td>Long-form guide</td><td>Dedup (MinHash), quality filtering and the ablations behind each choice</td></tr>
+<tr><td><a href="https://github.com/huggingface/datatrove">datatrove</a></td><td>Library</td><td>The data-processing pipeline used for FineWeb</td></tr>
+<tr><td><a href="https://github.com/karpathy/build-nanogpt">Karpathy · build-nanogpt (reproduce GPT-2 124M)</a></td><td>Video + code (free)</td><td>A full small pre-training run with LR warmup and cosine decay</td></tr>
+<tr><td><a href="https://github.com/karpathy/nanochat">Karpathy · nanochat</a></td><td>Code (free)</td><td>End-to-end small ChatGPT: pre-train, mid-train, SFT, RL, on a small budget</td></tr>
+</table></div>
+<p>Start with the FineWeb write-up: it walks through deduplication, filtering and mixing with real ablation results, so you see which choices actually moved the numbers before you spend GPU time.</p>
+<p class="meta"><a href="index.html#courses">Full course map for all 12 stages →</a></p>
+
+<h2 id="papers">9. Papers &amp; docs</h2>
+<ul>
+<li>Kaplan et al., 2020. <a href="https://arxiv.org/abs/2001.08361">Scaling Laws for Neural Language Models</a></li>
+<li>Hoffmann et al., 2022. <a href="https://arxiv.org/abs/2203.15556">Training Compute-Optimal Large Language Models</a> (Chinchilla)</li>
+<li>Besiroglu, Erdil et al., 2024. <a href="https://arxiv.org/abs/2404.10102">Chinchilla Scaling: A replication attempt</a></li>
+<li>Lee, Ippolito, Nystrom et al., 2021. <a href="https://arxiv.org/abs/2107.06499">Deduplicating Training Data Makes Language Models Better</a></li>
+<li>Broder, 1997. On the resemblance and containment of documents (the original MinHash paper; not on arXiv)</li>
+<li>Xie, Pham, Dong et al., 2023. <a href="https://arxiv.org/abs/2305.10429">DoReMi: Optimizing Data Mixtures Speeds Up Language Model Pretraining</a></li>
+<li>Penedo, Kydlíček, Ben Allal et al., 2024. <a href="https://arxiv.org/abs/2406.17557">The FineWeb Datasets: Decanting the Web for the Finest Text Data at Scale</a></li>
+<li>Loshchilov &amp; Hutter, 2016. <a href="https://arxiv.org/abs/1608.03983">SGDR: Stochastic Gradient Descent with Warm Restarts</a></li>
+<li>Hu, Tu et al., 2024. <a href="https://arxiv.org/abs/2404.06395">MiniCPM: Unveiling the Potential of Small Language Models with Scalable Training Strategies</a> (the WSD schedule)</li>
+<li><a href="https://github.com/huggingface/datatrove">datatrove</a> documentation and examples</li>
+</ul>
+
+<nav class="pager">
+  <a href="01-tensor-math-autograd.html"><small>Previous</small>Stage 01 · Tensor maths &amp; custom autograd</a>
+  <a class="next" href="03-beyond-transformers.html"><small>Next</small>Stage 03 · Next-gen architectures</a>
+</nav>
+<footer>Module 08 · Stage 02 · written for this course from the source post and primary papers.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('cc'), ctx = cv.getContext('2d');
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+// Chinchilla approach-3 published fit (Hoffmann et al., 2022)
+const E = 1.69, A = 406.4, B = 410.7, a = 0.34, b = 0.28;
+const loss = (N, D) => E + A / N ** a + B / D ** b;
+// minimiser of loss under C = 6ND
+const fitOpt = C => { const G = (a * A / (b * B)) ** (1 / (a + b)), N = G * (C / 6) ** (b / (a + b)); return [N, C / 6 / N]; };
+const rule20 = C => { const N = Math.sqrt(C / 120); return [N, 20 * N]; };
+const fmt = x => {
+  const u = [[1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'k']].find(p => x >= p[0]);
+  return u ? (x / u[0]).toPrecision(3) + u[1] : x.toPrecision(3);
+};
+const sci = x => { const e = Math.floor(Math.log10(x)); return (x / 10 ** e).toFixed(1) + '×10^' + e; };
+
+function draw() {
+  const C = 10 ** +$('lc').value, N = 10 ** +$('ln').value, D = C / (6 * N);
+  const [No, Do] = fitOpt(C), [Nr, Dr] = rule20(C);
+  const W = cv.width, H = cv.height, L0 = 50, R0 = 15, T = 15, Bm = 32;
+  const x0 = 6, x1 = 12, lmin = loss(No, Do);
+  const ys = [];
+  for (let i = 0; i <= 240; i++) { const n = 10 ** (x0 + (x1 - x0) * i / 240); ys.push(loss(n, C / (6 * n))); }
+  const y0 = lmin - 0.05, y1 = Math.min(Math.max(...ys), lmin + 2.5);
+  const px = v => L0 + (Math.log10(v) - x0) / (x1 - x0) * (W - L0 - R0);
+  const py = v => T + (y1 - Math.min(v, y1)) / (y1 - y0) * (H - T - Bm);
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = css('--line'); ctx.lineWidth = 1; ctx.font = '12px sans-serif';
+  ctx.fillStyle = css('--muted'); ctx.textAlign = 'center';
+  for (let e = x0; e <= x1; e++) {
+    ctx.beginPath(); ctx.moveTo(px(10 ** e), T); ctx.lineTo(px(10 ** e), H - Bm); ctx.stroke();
+    ctx.fillText(fmt(10 ** e), px(10 ** e), H - 14);
+  }
+  ctx.fillText('model size N (log scale)', W / 2, H - 1);
+  ctx.textAlign = 'right';
+  [y0, (y0 + y1) / 2, y1].forEach(v => ctx.fillText(v.toFixed(2), L0 - 6, py(v) + 4));
+  ctx.strokeStyle = css('--accent'); ctx.lineWidth = 2.5; ctx.beginPath();
+  ys.forEach((v, i) => { const x = L0 + i / 240 * (W - L0 - R0); i ? ctx.lineTo(x, py(v)) : ctx.moveTo(x, py(v)); });
+  ctx.stroke();
+  ctx.strokeStyle = css('--pass'); ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(px(No), py(lmin), 8, 0, 7); ctx.stroke();
+  ctx.fillStyle = css('--warn'); ctx.fillRect(px(Nr) - 5, py(loss(Nr, Dr)) - 5, 10, 10);
+  ctx.fillStyle = css('--fail'); ctx.beginPath(); ctx.arc(px(N), py(loss(N, D)), 5, 0, 7); ctx.fill();
+
+  $('lcv').textContent = sci(C); $('lnv').textContent = fmt(N);
+  $('dd').textContent = fmt(D); $('tp').textContent = (D / N).toPrecision(3);
+  $('pl').textContent = loss(N, D).toFixed(3);
+  $('r20').textContent = fmt(Nr) + ', ' + fmt(Dr);
+  $('fo').textContent = fmt(No) + ', ' + fmt(Do);
+  $('gap').textContent = '+' + (loss(N, D) - lmin).toFixed(3);
+}
+$('lc').oninput = $('ln').oninput = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

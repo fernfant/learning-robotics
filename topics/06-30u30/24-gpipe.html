@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 24 · GPipe</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 24</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Unit 5 · Generative models &amp; scaling · Day 24</div>
+<h1>GPipe: Efficient Training of Giant Neural Networks using Pipeline Parallelism</h1>
+<p class="lede">Cut a model too big for one chip into stages on several chips, and split each batch into micro-batches so the stages work at the same time instead of waiting for each other.</p>
+
+<div class="facts">
+  <div><b>Authors</b>Yanping Huang, Youlong Cheng, Ankur Bapna, Orhan Firat, Mia Xu Chen, Dehao Chen, HyoukJoong Lee, Jiquan Ngiam, Quoc V. Le, Yonghui Wu, Zhifeng Chen (Google)</div>
+  <div><b>Year / venue</b>2019 · NeurIPS (arXiv Nov 2018)</div>
+  <div><b>Core idea</b>Micro-batch pipeline parallelism with synchronous updates</div>
+  <div><b>Study time</b>2–3 h</div>
+</div>
+<p class="meta">Original: <a href="https://arxiv.org/abs/1811.06965">arXiv:1811.06965</a> (later versions are titled "GPipe: Easy Scaling with Micro-Batch Pipeline Parallelism") · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/24_gpipe">30u30 Day 24</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">When a neural network is too big for one computer chip, you can split it across several chips and keep them all busy, like an assembly line.</p>
+
+<h3>Think of it like this</h3>
+<p>Think of a sandwich assembly line with four people: one adds bread, the next adds cheese, the next adds salad, the last wraps it. If you make one giant order all at once, three people stand around waiting while one works. But if you split the order into many small batches, everyone is busy at the same time. There's only a little waiting at the very start and end. GPipe does this with computer chips.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Cut the network into stages, one stage per chip.</li>
+<li>Split each big batch of training examples into small batches, called micro-batches.</li>
+<li>Send the micro-batches through the chips one after another, so all chips work at once.</li>
+<li>Each chip remembers only a little and redoes some work later. This saves memory.</li>
+<li>Add up what was learned from all the micro-batches and update the network once. The result is the same as using one giant chip.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>The big AI models that help robots understand instructions and pictures are far too large for one chip. Splitting them across many chips like this is part of how they get trained.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>With 3 friends, pass 8 paper cups down a line: each person draws one thing on a cup and passes it on. First pass all 8 cups as one stack, then one cup at a time. Which way finishes faster?</li>
+<li>In the demo further down, set <b>Accelerators K</b> (the number of chips) and <b>Micro-batches M</b>. Blank cells are chips sitting idle. Raise <b>Micro-batches M</b> and watch the idle part shrink.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Chip (accelerator)</dt><dd>A piece of computer hardware that runs the network fast.</dd>
+<dt>Stage</dt><dd>One part of the network, running on one chip.</dd>
+<dt>Micro-batch</dt><dd>A small group of training examples sent through the line together.</dd>
+<dt>Bubble</dt><dd>Time when a chip is idle, waiting for work.</dd>
+<dt>Pipeline</dt><dd>Work flowing through stages one after another, like an assembly line.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>If a network is a sequence of layers, you can put the first few layers on chip 1, the next few on chip 2, and so on. Done naively, only one chip works at a time, because each one waits for the previous chip's output. GPipe splits each mini-batch into <code>M</code> micro-batches and streams them through the <code>K</code> stages like an assembly line. Gradients from all micro-batches are added up and applied once, so the update is exactly the same as training on the full batch on one huge device. Add re-materialisation (recompute activations in the backward pass instead of storing them) and memory use drops too. With this, Google trained a 557M-parameter image model to 84.4% ImageNet top-1, and a 6B-parameter, 128-layer translation Transformer covering 103 languages.</p>
+</div>
+<ul>
+<li><strong>Interface:</strong> you give the layer list, the number of partitions <code>K</code> and the number of micro-batches <code>M</code>. GPipe balances the partitions by estimated cost.</li>
+<li><strong>Idle time:</strong> the pipeline "bubble" is <code>O((K−1)/(M+K−1))</code>. The authors found it negligible once <code>M ≥ 4K</code>.</li>
+<li><strong>Memory:</strong> on one accelerator, re-materialisation alone let them train a 318M-parameter AmoebaNet instead of 82M.</li>
+<li><strong>Scale:</strong> Transformers up to 83.9B parameters on 128 partitions, 298× what fits on one accelerator.</li>
+<li><strong>Cheap communication:</strong> only activations at stage boundaries move between chips, so it scaled well even on GPUs without fast interconnects.</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<p>Write the network as <code>L</code> layers and group consecutive layers into <code>K</code> cells, one per accelerator. Cell <code>k</code> computes <code>F_k</code> forward and <code>B_k</code> backward. Split a mini-batch of size <code>N</code> into <code>M</code> micro-batches:</p>
+<pre><code>forward:  micro-batch m runs F_1 → F_2 → … → F_K
+backward: micro-batch m runs B_K → … → B_1
+update:   g = Σ_{m=1..M} g_m   applied once, after all M are done
+
+bubble fraction ≈ (K − 1) / (M + K − 1)
+peak activation memory ≈ O(N + (L/K) · (N/M))   with re-materialisation
+                 vs      O(N · L)               without</code></pre>
+<ul>
+<li><code>K</code>: number of stages (accelerators). <code>M</code>: number of micro-batches per mini-batch.</li>
+<li><strong>Bubble:</strong> at the start, later stages wait for the first micro-batch to arrive. At the end, earlier stages wait for the last one to come back. That ramp costs <code>K−1</code> steps out of <code>M+K−1</code> in each direction.</li>
+<li><strong>Synchronous sum of gradients:</strong> every micro-batch uses the same weights, so the update is identical whatever <code>K</code> you choose. No stale weights.</li>
+<li><strong>Re-materialisation:</strong> each stage keeps only its input activations per micro-batch, and recomputes the inside of its cell during the backward pass. You pay about one extra forward pass for a large memory saving.</li>
+</ul>
+<div class="card demo">
+<h3>Interactive: the pipeline schedule</h3>
+<p class="legend">Rows are accelerators, columns are time steps. <b class="f">Forward</b> cells are solid, backward cells are lighter, and blank cells are the bubble. Raise M and watch the idle fraction shrink.</p>
+<canvas id="pipe" width="700" height="240" aria-label="GPipe schedule: forward and backward micro-batches per accelerator over time"></canvas>
+<label for="k">Accelerators K: <span id="kv" class="num"></span></label>
+<input id="k" type="range" min="1" max="8" step="1" value="4">
+<label for="m">Micro-batches M: <span id="mv" class="num"></span></label>
+<input id="m" type="range" min="1" max="32" step="1" value="4">
+<div class="stats">
+  <div class="stat"><div class="k">Idle fraction (counted)</div><div class="v" id="idle">–</div></div>
+  <div class="stat"><div class="k">(K−1)/(M+K−1)</div><div class="v" id="form">–</div></div>
+  <div class="stat"><div class="k">M / K</div><div class="v" id="ratio">–</div></div>
+</div>
+</div>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>Three ways to split training</h3>
+<ul>
+<li><strong>Data parallelism:</strong> every device holds the full model and gets a slice of the batch. Simple, and what <a href="22-deep-speech-2.html">Deep Speech 2</a> used. It fails when the model doesn't fit on one device.</li>
+<li><strong>Tensor (SPMD) splitting</strong>, as in Mesh-TensorFlow: split every matrix multiply across devices. It scales single layers, but needs many all-reduce-style exchanges and fast interconnects.</li>
+<li><strong>Pipeline parallelism</strong> (GPipe): split by layers. Little communication, but you must hide the bubble. Each layer must still fit on one device.</li>
+</ul>
+<p>Large modern training runs combine all three, plus expert parallelism for mixture-of-experts models. <a href="../05-trillion-scale-architecture.html#width">Module 05</a> shows routing among hundreds of experts spread across GPUs, the newest axis on this list.</p>
+
+<h3>Why synchronous matters</h3>
+<p>PipeDream, an earlier pipeline system, overlapped forward and backward passes of different batches. That kept chips busier but meant gradients were computed against slightly stale weights, and it had to store several weight versions. GPipe accepts some bubble in exchange for exact, synchronous updates. Training gives the same result whether you use 2 or 16 stages, which makes debugging and reproducing far easier.</p>
+
+<h3>What the numbers show</h3>
+<p>On TPUs with <code>M = 32</code>, going from 2 to 8 stages raised Transformer throughput from 1.8 to 6.3 (normalised), about 3.5× for 4× the chips. AmoebaNet scaled less well because its layers have uneven cost, so the stages couldn't be balanced. With <code>M = 1</code> there's no pipelining at all, and adding chips barely helped. On GPUs connected only through PCIe, 2 → 8 stages still gave 2.7× (AmoebaNet) and 3.3× (Transformer). The translation experiments also found that, at equal size, a deeper model beat a wider one by large margins on low-resource languages. That's a result GPipe made affordable to test, and it feeds into the scaling story of <a href="25-scaling-laws.html">Day 25</a>.</p>
+
+<h3>Gotchas</h3>
+<ul>
+<li><strong>Batch norm</strong> sees only a micro-batch at a time. GPipe computes training statistics per micro-batch and tracks the full-batch moving average for evaluation.</li>
+<li><strong>Balance</strong> matters: the slowest stage sets the pace for all of them.</li>
+<li><strong>A single layer must fit</strong> on one device. Bigger layers need tensor splitting.</li>
+</ul>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Robot foundation models are trained this way.</strong> Vision-language-action models sit on large Transformer backbones. Training them needs the same mix of data, pipeline and tensor parallelism that GPipe helped start. You'll meet these settings in any training framework you use.</li>
+<li><strong>Re-materialisation helps on one GPU too.</strong> Robot data is long: video clips, proprioception histories, action chunks. Recomputing activations (gradient checkpointing) lets you fit longer context or bigger batches on the hardware you have, at about one extra forward pass.</li>
+<li><strong>Synchronous updates make results reproducible.</strong> When a robot policy behaves oddly, you want to know the training run is deterministic. That's the same reasoning Deep Speech 2 gave for synchronous SGD.</li>
+<li><strong>It's a training tool, not an on-robot tool.</strong> Pipelining adds latency per sample, so on board you'd usually distil to a smaller model instead. See <a href="../04-distill-small-models.html">Module 04</a>.</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Read sections 2 and 3 of the paper (about 1 h). Redraw Figure 2(c) by hand for <code>K = 3</code>, <code>M = 4</code> and count the idle cells.</li>
+<li>In the 30u30 Day 24 folder, read <code>implementation.py</code>: find the micro-batch split, the schedule loop, gradient accumulation and checkpointing.</li>
+<li>Run <code>train_minimal.py</code> with different <code>--partitions</code> and <code>--micro-batches</code> values and compare against the bubble formula.</li>
+<li>Do the exercises: micro-batch splitting, the pipeline forward pass, gradient accumulation, re-materialisation, then the full wrapper.</li>
+<li>Stretch: check that the accumulated gradient over <code>M</code> micro-batches equals the full-batch gradient, to numerical precision, for a model without batch norm.</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>What is the pipeline bubble and how do you shrink it?</summary><p>Idle time while the pipeline fills and drains, about <code>(K−1)/(M+K−1)</code> of the total. More micro-batches per stage shrinks it. GPipe found <code>M ≥ 4K</code> enough to make it negligible.</p></details>
+<details><summary>Why are GPipe's gradients identical to single-device training?</summary><p>All micro-batches use the same weights, and their gradients are summed and applied once per mini-batch. Nothing is stale.</p></details>
+<details><summary>What does re-materialisation trade?</summary><p>Compute for memory. Each stage stores only boundary activations and recomputes the rest during the backward pass, costing roughly one extra forward pass.</p></details>
+<details><summary>Why did the Transformer scale more linearly than AmoebaNet?</summary><p>Transformer layers all cost about the same, so stages balance well. AmoebaNet's layers vary, so one stage is slower and holds the others back.</p></details>
+<details><summary>When is pipeline parallelism not enough?</summary><p>When a single layer doesn't fit on one device, or when there are too few micro-batches to hide the bubble.</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/1811.06965">The original paper</a></li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/24_gpipe">30u30 Day 24</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Next: <a href="25-scaling-laws.html">Day 25, Scaling Laws for Neural Language Models</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="23-variational-lossy-autoencoder.html"><small>Previous</small>Day 23 · Variational Lossy Autoencoder</a>
+  <a class="next" href="25-scaling-laws.html"><small>Next</small>Day 25 · Scaling Laws</a>
+</nav>
+<footer>Module 06 · Day 24 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('pipe'), ctx = cv.getContext('2d');
+const kIn = document.getElementById('k'), mIn = document.getElementById('m');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+// grid[k][slot] = {m, f} or null. Each F or B takes one slot per stage.
+function schedule(K, M) {
+  const S = 2 * (M + K - 1), grid = Array.from({length: K}, () => new Array(S).fill(null));
+  for (let k = 0; k < K; k++) for (let m = 0; m < M; m++) {
+    grid[k][m + k] = {m, f: true};                                   // forward wave
+    grid[k][(M + K - 1) + (M - 1 - m) + (K - 1 - k)] = {m, f: false}; // backward wave
+  }
+  return grid;
+}
+const idleFrac = g => g.flat().filter(c => !c).length / g.flat().length;
+
+function draw() {
+  const K = +kIn.value, M = +mIn.value, g = schedule(K, M), S = g[0].length;
+  document.getElementById('kv').textContent = K;
+  document.getElementById('mv').textContent = M;
+  const W = cv.width, H = cv.height, padL = 40, w = (W - padL - 6) / S, h = Math.min(40, (H - 10) / K);
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+  g.forEach((row, k) => {
+    ctx.fillStyle = css('--muted'); ctx.fillText(`GPU ${k + 1}`, padL / 2, 5 + k * h + h / 2 + 4);
+    row.forEach((c, s) => {
+      const x = padL + s * w, y = 5 + k * h;
+      ctx.strokeStyle = css('--line'); ctx.strokeRect(x, y, w, h - 2);
+      if (!c) return;
+      ctx.fillStyle = c.f ? css('--accent') : css('--pass'); ctx.fillRect(x + 1, y + 1, w - 2, h - 4);
+      if (w > 14) { ctx.fillStyle = css('--bg'); ctx.fillText(c.m + 1, x + w / 2, y + h / 2 + 3); }
+    });
+  });
+  document.getElementById('idle').textContent = (idleFrac(g) * 100).toFixed(1) + '%';
+  document.getElementById('form').textContent = ((K - 1) / (M + K - 1) * 100).toFixed(1) + '%';
+  document.getElementById('ratio').textContent = (M / K).toFixed(2);
+}
+kIn.oninput = mIn.oninput = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

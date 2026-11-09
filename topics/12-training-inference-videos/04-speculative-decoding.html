@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video 04 · Speculative decoding</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 12 · Training &amp; inference videos</a> › Video 04</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 12 · Video 04</div>
+<h1>Speculative decoding: draft, verify, and the EAGLE/Medusa/DFlash family</h1>
+<p class="lede">A big language model writes one token per forward pass, and each pass is slow mostly because it has to read every weight from memory. Speculative decoding lets something cheap guess several tokens ahead and has the big model check all the guesses in one pass. A careful accept-or-resample rule means the output distribution doesn't change at all. This guide walks through the video's chapters, from the basic trick to draft trees, Medusa, multi-token prediction, the EAGLE line and the parallel drafters DFlash and DFlash 2.</p>
+
+<div class="facts">
+  <div><b>Video length</b>24:34</div>
+  <div><b>Published</b>28 August 2026</div>
+  <div><b>Level</b>Intermediate: you should know what a forward pass, a softmax and a KV cache are</div>
+  <div><b>Builds on</b><a href="../09-inference-engineering/05-latency.html#p10">Module 09 · Speculative decoding problem</a>, <a href="../09-inference-engineering/02-kv-cache-attention.html">Module 09 · KV cache</a>, <a href="../05-trillion-scale-architecture.html#serving">Module 05 · Serving</a></div>
+</div>
+<p class="meta">Video by Jia-Bin Huang · <a href="https://www.youtube.com/watch?v=l8gWQlrVOKQ">Watch on YouTube</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">A big AI model writes one word at a time, and each word takes a long think. Speculative decoding lets a fast helper guess the next few words, and the big model checks all the guesses at once. Good guesses are kept, and the first bad one is replaced. The final text is exactly what the big model would have written on its own, just faster.</p>
+
+<h3>Think of it like this</h3>
+<p>Imagine a teacher marking a spelling test. A slow way: the student says one letter, the teacher nods, the student says the next letter, the teacher nods again. A faster way: a friend who is usually right writes down the next five letters, and the teacher looks at all five at once. The teacher keeps every letter up to the first mistake, fixes that one, and they move on. The teacher still decides every letter, so the answer is the teacher's answer. The friend only saves time.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>A small, fast "draft" model (or a few extra layers bolted onto the big model) guesses the next few words.</li>
+<li>The big "target" model reads all the guesses in a single pass, which costs about the same as checking one word.</li>
+<li>Going left to right, each guess is accepted with a chance that depends on how much the big model agrees with it.</li>
+<li>At the first rejected guess, the big model picks a replacement word in a special way, so the overall result is exactly what it would have chosen alone.</li>
+<li>Newer methods guess smarter: several possible branches at once (a tree), or a whole block of words in one go (DFlash).</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot that talks, plans or picks its next action with a language model has to answer quickly. If a reply takes three times longer than it needs to, the robot stands there frozen, or acts on old information. Speculative decoding makes the same model answer faster without making it any less accurate.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>With a friend: one of you thinks of a sentence. The other guesses the next three words at a time. Count how many guesses in a row are right before the first miss. Try an easy, predictable sentence ("Once upon a…") and a surprising one. Which goes faster?</li>
+<li>In the demo further down, slide <b>Draft error</b> from 0 upwards and watch the <b>Acceptance</b> number fall. Then press <b>Simulate 10,000 steps</b> and check that the dots (what actually came out) land on the outlined bars (what the big model wanted), however bad the draft is.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Token</dt><dd>A word or piece of a word, the unit a language model writes.</dd>
+<dt>Target model</dt><dd>The big, accurate model whose answers we want.</dd>
+<dt>Draft</dt><dd>The fast guesser, either a small separate model or extra heads on the big one.</dd>
+<dt>Acceptance rate</dt><dd>How often the big model keeps a guessed token.</dd>
+<dt>Lossless</dt><dd>The speed-up doesn't change what the big model would have written (or its odds of writing it).</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="watch">1. Watch</h2>
+<div class="card"><div style="position:relative;padding-top:56.25%"><iframe style="position:absolute;inset:0;width:100%;height:100%;border:0" src="https://www.youtube-nocookie.com/embed/l8gWQlrVOKQ" title="How LLMs Get Faster Without Changing Their Outputs · Speculative Decoding (Jia-Bin Huang)" loading="lazy" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div></div>
+
+<h3>Chapter guide</h3>
+<div class="table-wrap"><table>
+<tr><th>Time</th><th>Chapter</th><th>What to look for</th></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=l8gWQlrVOKQ&amp;t=0s">0:00</a></td><td>Autoregressive decoding</td><td>Why each token needs its own full forward pass, and why that pass is limited by memory bandwidth rather than arithmetic.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=l8gWQlrVOKQ&amp;t=51s">0:51</a></td><td>Speculative decoding: Draft and verify</td><td>The two roles, and why scoring k drafted tokens in one target pass costs about the same as generating one.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=l8gWQlrVOKQ&amp;t=128s">2:08</a></td><td>Rejection sampling</td><td>The accept probability min(1, p/q), the residual distribution used after a rejection, and the argument that the output follows p exactly. This is the heart of the video's title.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=l8gWQlrVOKQ&amp;t=428s">7:08</a></td><td>Draft trees</td><td>Proposing several branches instead of one chain, and how a tree attention mask lets the target verify all branches in one pass.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=l8gWQlrVOKQ&amp;t=583s">9:43</a></td><td>Medusa</td><td>Extra decoding heads on the target's last hidden state, each predicting a token further ahead, with no separate draft model.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=l8gWQlrVOKQ&amp;t=764s">12:44</a></td><td>MTP: Multi-token prediction</td><td>Training the model itself to predict several future tokens, and how those extra predictions can double as a built-in draft.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=l8gWQlrVOKQ&amp;t=881s">14:41</a></td><td>EAGLE: Feature-level drafting</td><td>Drafting in the target's feature space (the layer before the output head) rather than in token space, and feeding in the sampled token to remove ambiguity.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=l8gWQlrVOKQ&amp;t=985s">16:25</a></td><td>EAGLE-2: Dynamic draft trees</td><td>Growing the tree where the draft is confident, using its confidence as a stand-in for acceptance probability.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=l8gWQlrVOKQ&amp;t=1039s">17:19</a></td><td>EAGLE-3: Token prediction + layer fusion</td><td>Dropping the feature-prediction target, predicting tokens directly, and fusing features from several target layers.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=l8gWQlrVOKQ&amp;t=1067s">17:47</a></td><td>DFlash: Parallel drafting</td><td>A draft that produces a whole block of tokens in one forward pass instead of one token at a time.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=l8gWQlrVOKQ&amp;t=1183s">19:43</a></td><td>DFlash 2: Path selector and local mixing</td><td>The two fixes for independent parallel guesses: choosing a coherent path through each position's candidates, and letting neighbouring positions share information.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=l8gWQlrVOKQ&amp;t=1446s">24:06</a></td><td>Recap</td><td>How the family fits together: better drafts raise acceptance, cheaper drafts cut overhead, and the verification rule stays the same throughout.</td></tr>
+</table></div>
+<p class="meta">The video credits Inco AI's DFlash 2 blog post for its DFlash 2 material. Timestamps link to YouTube.</p>
+
+<h2 id="ideas">2. The ideas, explained</h2>
+
+<h3 id="ar">Why one token per pass is slow</h3>
+<p>At batch size 1, generating a token means streaming every weight from GPU memory into the compute units, then doing comparatively little arithmetic with them. The GPU spends most of the step waiting for memory. Scoring 5 tokens in one pass reads the same weights once and does 5 times the arithmetic, which the idle compute units absorb almost for free. Speculative decoding exploits this gap: if something cheap can propose tokens, the expensive model can check several per pass. The full latency story, including when the trick stops paying, is on <a href="../09-inference-engineering/05-latency.html#p10">Module 09's speculative decoding problem</a>; this page focuses on the drafting methods.</p>
+
+<h3 id="sec-rs">Draft, verify and rejection sampling</h3>
+<p>Speculative decoding was published independently by Leviathan, Kalman and Matias (2022, "speculative decoding") and by Chen, Borgeaud, Irving and colleagues at DeepMind (2023, "speculative sampling"). Both use the same acceptance rule. Let p be the target's next-token distribution and q the draft's, at the same position:</p>
+<pre><code>draft samples       x ~ q
+accept x with prob  min(1, p(x) / q(x))
+if rejected, sample from the residual
+                    r(x) = max(0, p(x) − q(x)) / Σ_y max(0, p(y) − q(y))
+
+P(output = x) = q(x)·min(1, p(x)/q(x))  +  (1 − β)·r(x)  =  p(x)
+acceptance prob     β = Σ_x min(p(x), q(x)) = 1 − TV(p, q)</code></pre>
+<p>Why the last line equals p(x): the first term is min(q(x), p(x)). The rejection mass is 1 − β, which equals Σ max(0, p − q), the normaliser of r. So the second term is max(0, p(x) − q(x)), and min(q, p) + max(0, p − q) = p. The draft affects only speed, never the distribution. The acceptance probability is the overlap between the two distributions, which is exactly what the demo below draws.</p>
+<p>With k drafted tokens, the target scores all k + 1 positions in one pass, accepts a prefix, and always contributes one token of its own: either the replacement at the first rejection or a bonus token after the last accepted one. With a constant per-token acceptance rate α, the expected tokens per pass is (1 − α<sup>k+1</sup>) / (1 − α). Greedy decoding is the special case where p and q are one-hot: accept if the draft's token matches the target's argmax.</p>
+
+<div class="card demo">
+<h3>Interactive: why rejection sampling is lossless</h3>
+<p class="legend">Eight candidate next tokens. Outlined bars: the target's distribution p. Filled bars: the draft's distribution q. The highlighted part of each bar is min(p, q); its total is the acceptance probability. After a simulation, the dots show how often each token was actually emitted using the accept-or-resample rule.</p>
+<canvas id="rs" width="700" height="260" aria-label="Target and draft distributions over eight tokens, their overlap, and simulated output frequencies"></canvas>
+<label for="er">Draft error: <span id="erv" class="num"></span></label>
+<input id="er" type="range" min="0" max="3" step="0.25" value="1">
+<label for="tp">Temperature: <span id="tpv" class="num"></span></label>
+<input id="tp" type="range" min="0.25" max="2" step="0.25" value="1">
+<p><button id="nd" type="button">New draft</button> <button id="go" type="button">Simulate 10,000 steps</button></p>
+<div class="stats">
+  <div class="stat"><div class="k">Acceptance β = Σ min(p, q)</div><div class="v" id="sa">–</div></div>
+  <div class="stat"><div class="k">Accepted in simulation</div><div class="v" id="ss">–</div></div>
+  <div class="stat"><div class="k">Largest gap, output vs p</div><div class="v" id="sg">–</div></div>
+  <div class="stat"><div class="k">Draft</div><div class="v" id="sd">–</div></div>
+</div>
+<p class="meta">Try this: the defaults (draft error 1, temperature 1, draft #1) give an acceptance of about 77.5%. Set draft error to 0 and the draft equals the target: 100%. At draft error 2 it falls to about 70.9%. Now simulate: the dots sit on the outlined bars to within roughly a percentage point or two (sampling noise at 10,000 draws), at any setting. A worse draft costs you accepted tokens, not correctness. The draft's logits are the target's plus scaled random noise; "New draft" redraws the noise.</p>
+</div>
+
+<h3 id="trees">Draft trees</h3>
+<p>A single chain dies at its first rejection. If the draft's second choice is often the right one, it's cheaper to propose several branches and let the target check them all. SpecInfer (Miao et al., 2023) organised the candidates as a token tree and verified it in one pass using a <em>tree attention mask</em>: the tree's tokens are flattened into one sequence, and each token may attend only to its own ancestors. The target then accepts the longest branch that survives verification. For sampled (non-greedy) decoding, multi-branch verification needs a generalised acceptance rule so the output still follows p; SpecInfer gives one. Trees raise the expected accepted length at the cost of verifying more tokens per pass, which is cheap only while the GPU has spare compute.</p>
+
+<h3 id="medusa">Medusa</h3>
+<p>Medusa (Cai, Li, Geng and colleagues, 2024) avoids a separate draft model. It adds K small heads on top of the target's final hidden state; head k predicts the token k + 1 positions ahead. The heads' top candidates are combined into a tree and verified with tree attention in the next forward pass. "Medusa-1" trains only the heads on a frozen model; "Medusa-2" fine-tunes heads and backbone together. For sampling, the paper proposes a "typical acceptance" scheme that accepts plausible candidates rather than applying exact rejection sampling, which trades strict losslessness for speed; check which acceptance rule a given Medusa deployment uses.</p>
+<pre><code>h_t = target's last hidden state at position t
+head_k(h_t) = softmax(W_k · (h_t + SiLU(W'_k · h_t)))   predicts token t + k + 1</code></pre>
+<p>The weakness: every head sees the same h_t and none of them knows which token the earlier heads picked, so far-ahead heads are much less accurate.</p>
+
+<h3 id="mtp">Multi-token prediction (MTP)</h3>
+<p>Gloeckle et al. (Meta, 2024) trained models to predict the next n tokens with n independent output heads on a shared trunk, as an auxiliary training loss. They report better sample efficiency, especially on code, and that 4-token models were up to 3× faster at inference when the extra heads are used for self-speculative decoding. DeepSeek-V3 (2024) used a sequential variant, where each extra MTP module also sees the embedding of the previous predicted token, and reused it for speculative decoding at serving time. The idea for this chapter: if a model is trained with MTP, it ships with its own draft. <a href="../08-ai-research-engineer/08-inference-aware-design.html#spec">Module 08 Stage 08</a> covers MTP as a design-time choice.</p>
+<pre><code>L_MTP = − Σ_t Σ_{i=1..n} log P_θ(x_{t+i} | x_{≤t})</code></pre>
+
+<h3 id="eagle">The EAGLE line</h3>
+<p><strong>EAGLE</strong> (Li, Wei, Zhang and Zhang, 2024) makes two observations. Predicting the next <em>feature</em> (the target's second-to-top layer, just before the output head) is easier than predicting the next token, because features vary smoothly. But features are uncertain: the next feature depends on which token was actually sampled. So EAGLE's one-layer draft takes both the current feature sequence and the token sequence shifted one step ahead, predicts the next feature, and runs it through the target's own frozen output head to get draft tokens. It keeps exact rejection-sampling verification, so it's lossless.</p>
+<pre><code>f̂_{t+1} = Draft(f_{≤t}, embed(x_{≤t+1}))
+q(· | ...) = softmax(LMHead_target(f̂_{t+1}))</code></pre>
+<p><strong>EAGLE-2</strong> (2024) noticed that acceptance depends on context, not only on a token's position in the tree, and that EAGLE's draft is well calibrated: its confidence approximates the acceptance rate. So it grows the draft tree dynamically, expanding the branches with the highest cumulative confidence and reranking before verification. The paper reports 3.05–4.26× speed-ups, 20–40% faster than EAGLE-1.</p>
+<p><strong>EAGLE-3</strong> (2025) found that EAGLE gained little from more training data, and traced it to the feature-prediction constraint. It drops feature prediction, predicts tokens directly, and fuses low-, middle- and high-level features from the target. Its training uses "training-time test": during training the draft is fed its own earlier predictions, as it will be at inference, so it learns to cope with its own errors over several steps. That last idea is closely related to the exposure-bias theme of <a href="05-on-policy-distillation.html">Video 05</a>.</p>
+
+<h3 id="dflash">DFlash: parallel drafting</h3>
+<p>Every method so far still drafts autoregressively: k draft tokens take k draft passes, so drafting cost grows with block length. DFlash (Chen, Liang and Liu, 2026) replaces the autoregressive draft with a lightweight <em>block diffusion</em> model that predicts every position of the draft block in a single forward pass, conditioned on context features extracted from the target model. Verification is unchanged, so it stays lossless. The paper's abstract reports over 6× lossless acceleration across models and tasks, and up to 2.5× higher speed-up than EAGLE-3. According to Inco AI's DFlash 2 post, the team released DFlash in January 2026 and it has since been integrated into SGLang, vLLM, TensorRT-LLM and llama.cpp.</p>
+
+<h3 id="dflash2">DFlash 2: path selection and local mixing</h3>
+<p>Everything in this section comes from Inco AI's blog post "DFlash 2: Keep Drafting Parallel" (August 2026), which the video credits. It's a company blog post, not a peer-reviewed paper, so treat the numbers as the authors' own measurements.</p>
+<p>Predicting every position independently has two weaknesses, the post argues. Positions don't coordinate, so neighbouring picks can clash (the post's example is two neighbours choosing the same word), and accuracy decays towards the end of the block ("suffix decay"). DFlash 2 adds two small pieces, both of which keep drafting in one parallel pass:</p>
+<ul>
+<li><strong>Path selector.</strong> The post observes that DFlash's top pick at the first position is right 85.4% of the time, but the right token is in its top 16 candidates 99.5% of the time. So DFlash 2 keeps 16 candidates per position and scores every adjacent pair in parallel with a low-rank bilinear term, then walks the best path from the last verified token. Rejection sampling at verification still restores the exact target distribution.</li>
+<li><strong>Local mixing.</strong> The post traces suffix decay to the drafter's attention spending less and less on the block itself in later layers. Its fix is a two-tap dynamic depthwise convolution before and after each attention and feed-forward sublayer, so each position mixes in its predecessor's representation (the first position reads the last verified token). It adds about 3% parameters and, by the post's measurement, gets a five-layer drafter close to a fifteen-layer one.</li>
+</ul>
+<pre><code>path score     S_t(a, b) = U_t(b) + ⟨ A(a) ⊙ H(h_t), B(b) ⟩
+               U_t(b): DFlash's own logit for candidate b at position t
+               A, B: compact token embeddings; H(h_t): a context gate
+
+local mixing   Conv_k(x)_t = k_{t,0} ⊙ x_t + k_{t,1} ⊙ x_{t−1}</code></pre>
+<p>Reported results: on Qwen3.5-4B across five benchmarks, mean acceptance length rose from 4.92 tokens (DFlash) to 5.97 (DFlash 2), about 21%, with the two additions together adding about 1.3% to draft–verify cycle latency. The post sums up its selector result as "Choosing is cheaper than predicting." For the newer model families and engines named in the post, see the post itself.</p>
+
+<h3 id="family">How the family fits together</h3>
+<div class="table-wrap"><table>
+<tr><th>Method</th><th>Where the draft comes from</th><th>Draft cost for k tokens</th><th>Lossless under sampling?</th></tr>
+<tr><td>Classic speculative decoding (2022–23)</td><td>Separate small model, same tokenizer</td><td>k small-model passes</td><td>Yes</td></tr>
+<tr><td>Draft trees (SpecInfer)</td><td>Small model(s), several branches</td><td>Grows with tree size</td><td>Yes, with tree verification</td></tr>
+<tr><td>Medusa</td><td>Extra heads on the target's last state</td><td>One pass of tiny heads</td><td>Only with exact verification; typical acceptance relaxes it</td></tr>
+<tr><td>MTP</td><td>Heads trained with the model</td><td>Built in</td><td>Yes, when verified</td></tr>
+<tr><td>EAGLE / -2 / -3</td><td>One-layer draft on target features</td><td>k light passes</td><td>Yes</td></tr>
+<tr><td>DFlash / DFlash 2</td><td>Light block-diffusion drafter on target features</td><td>One pass for the whole block</td><td>Yes</td></tr>
+</table></div>
+
+<h2 id="course">3. Where the course goes deeper</h2>
+<div class="table-wrap"><table>
+<tr><th>Topic</th><th>Course page</th></tr>
+<tr><td>Speedup maths, choosing k, when speculation hurts under load (with a speedup demo)</td><td><a href="../09-inference-engineering/05-latency.html#p10">Module 09 · Latency, problem 10</a></td></tr>
+<tr><td>Speculative decoding in a trillion-parameter serving stack, with a draft trained for acceptance</td><td><a href="../05-trillion-scale-architecture.html#serving">Module 05 · Serving</a></td></tr>
+<tr><td>Designing a model to be easy to speculate with (tokenizer, MTP, two KV caches)</td><td><a href="../08-ai-research-engineer/08-inference-aware-design.html#spec">Module 08 · Stage 08</a></td></tr>
+<tr><td>Why decode is memory-bound; the KV cache that verification reads</td><td><a href="../09-inference-engineering/02-kv-cache-attention.html">Module 09 · KV cache and attention</a></td></tr>
+<tr><td>Engines that ship these drafters (vLLM, SGLang)</td><td><a href="../09-inference-engineering/08-engines-observability.html">Module 09 · Engines</a>, <a href="09-llm-serving.html">Video 09 · LLM serving</a></td></tr>
+<tr><td>Distillation, which many drafters are trained with</td><td><a href="05-on-policy-distillation.html">Video 05 · On-policy distillation</a>, <a href="../04-distill-small-models.html">Module 04</a></td></tr>
+</table></div>
+
+<h2 id="robotics">Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Robots run at batch 1.</strong> One robot, one episode, one stream of tokens: exactly the memory-bound regime where speculative decoding helps most. A language planner on board can answer faster with the same weights and the same output distribution.</li>
+<li><strong>Autoregressive action tokens.</strong> VLAs that emit actions as discrete tokens (RT-2 and OpenVLA style) decode several tokens per control step, so a draft-and-verify scheme could cut that latency. Many newer VLAs instead decode action chunks in parallel or with flow matching, where token-level speculation doesn't apply directly. The link is real but depends on the action head.</li>
+<li><strong>Two models need memory.</strong> A separate draft needs its own weights and KV cache. On a memory-poor robot computer, built-in drafts (Medusa heads, MTP, a light EAGLE- or DFlash-style drafter) are easier to fit than a second full model.</li>
+<li><strong>Lossless matters for safety reviews.</strong> Because verification preserves the target's distribution, you don't need to re-validate the robot's behaviour after adding a lossless drafter. Relaxed schemes such as typical acceptance do change outputs and would need re-testing.</li>
+</ul>
+</div>
+
+<h2 id="check">Self-check</h2>
+<details><summary>Target p = (0.6, 0.3, 0.1) and draft q = (0.3, 0.3, 0.4) over three tokens. What is the acceptance probability, and what is the residual distribution after a rejection?</summary><p>β = min(0.6,0.3) + min(0.3,0.3) + min(0.1,0.4) = 0.3 + 0.3 + 0.1 = 0.7. The residual is max(0, p − q) = (0.3, 0, 0), normalised to (1, 0, 0): after a rejection you always emit the first token, which is the one the draft under-proposed.</p></details>
+<details><summary>Why can't the draft model change the output distribution, however bad it is?</summary><p>Accepted mass at token x is min(p(x), q(x)); the rejected mass is redistributed through the residual exactly in proportion to max(0, p(x) − q(x)). The two add to p(x) for every x. A bad draft lowers acceptance, so you get fewer tokens per target pass, but the distribution is still p.</p></details>
+<details><summary>What problem do draft trees solve, and what do they cost?</summary><p>A single chain stops at the first rejection, even when the draft's second guess was right. Trees propose several branches and verify them all in one pass with a tree attention mask. The cost is more tokens to verify per pass, which is cheap only while the GPU has spare compute (small batches).</p></details>
+<details><summary>How does EAGLE deal with the uncertainty of predicting the next feature?</summary><p>It feeds the draft the token sequence shifted one step ahead alongside the features, so the draft knows which token was actually sampled and predicts the feature that follows it. The target's frozen output head turns predicted features into draft tokens.</p></details>
+<details><summary>What does DFlash change about drafting, and what two problems does DFlash 2 address?</summary><p>DFlash drafts a whole block in one forward pass with a light block-diffusion model, instead of k sequential draft passes. Because positions are predicted independently, DFlash 2 adds a path selector (pick a coherent path through each position's top candidates) and local mixing (a short convolution so each position sees its predecessor), targeting incoherent blocks and suffix decay.</p></details>
+<details><summary>Medusa's typical acceptance can be faster than exact verification. What do you give up?</summary><p>Exact losslessness under sampling: outputs can differ from what the target alone would sample. Under greedy decoding the difference disappears, but for sampled outputs you'd need to re-evaluate quality.</p></details>
+
+<h2 id="refs">References</h2>
+<p>From the video's description:</p>
+<ul>
+<li><a href="https://inco.ai/blog/dflash2/">DFlash 2: Keep Drafting Parallel</a> (Inco AI blog, August 2026), credited in the video</li>
+<li><a href="https://www.manim.community/">Manim Community</a>, the animation library used to make the video</li>
+</ul>
+<p>Primary papers cited on this page:</p>
+<ul>
+<li><a href="https://arxiv.org/abs/2211.17192">Fast Inference from Transformers via Speculative Decoding</a> (Leviathan, Kalman, Matias, 2022)</li>
+<li><a href="https://arxiv.org/abs/2302.01318">Accelerating Large Language Model Decoding with Speculative Sampling</a> (Chen, Borgeaud, Irving et al., 2023)</li>
+<li><a href="https://arxiv.org/abs/2305.09781">SpecInfer: Accelerating Generative LLM Serving with Tree-based Speculative Inference and Verification</a> (Miao et al., 2023)</li>
+<li><a href="https://arxiv.org/abs/2401.10774">Medusa: Simple LLM Inference Acceleration Framework with Multiple Decoding Heads</a> (Cai et al., 2024)</li>
+<li><a href="https://arxiv.org/abs/2404.19737">Better &amp; Faster Large Language Models via Multi-token Prediction</a> (Gloeckle et al., 2024)</li>
+<li><a href="https://arxiv.org/abs/2412.19437">DeepSeek-V3 Technical Report</a> (DeepSeek-AI, 2024), sequential MTP</li>
+<li><a href="https://arxiv.org/abs/2401.15077">EAGLE: Speculative Sampling Requires Rethinking Feature Uncertainty</a> (Li, Wei, Zhang, Zhang, 2024)</li>
+<li><a href="https://arxiv.org/abs/2406.16858">EAGLE-2: Faster Inference of Language Models with Dynamic Draft Trees</a> (Li et al., 2024)</li>
+<li><a href="https://arxiv.org/abs/2503.01840">EAGLE-3: Scaling up Inference Acceleration of Large Language Models via Training-Time Test</a> (Li et al., 2025)</li>
+<li><a href="https://arxiv.org/abs/2602.06036">DFlash: Block Diffusion for Flash Speculative Decoding</a> (Chen, Liang, Liu, 2026)</li>
+</ul>
+
+<nav class="pager">
+  <a href="03-lora.html"><small>Previous</small>Video 03 · LoRA and its descendants</a>
+  <a class="next" href="05-on-policy-distillation.html"><small>Next</small>Video 05 · On-policy distillation</a>
+</nav>
+<footer>Module 12 · Video 04 · a watch guide written for this course from the video's chapter list, its references and the original papers. Video © Jia-Bin Huang.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('rs'), ctx = cv.getContext('2d');
+const el = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const pct = v => (100 * v).toFixed(1) + '%';
+
+// seeded RNG (mulberry32)
+const mul = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+const TOK = ['the', 'a', 'robot', 'arm', 'moves', 'picks', 'cup', '.'];
+const ZT = [2.0, 1.2, 0.8, 0.3, 0.0, -0.4, -1.0, -1.5];
+const noise = s => { const r = mul(s); return ZT.map(() => Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(2 * Math.PI * r())); };
+const soft = (z, T) => { const m = Math.max(...z), e = z.map(v => Math.exp((v - m) / T)), s = e.reduce((a, b) => a + b); return e.map(v => v / s); };
+const dists = (sig, T, seed) => { const n = noise(seed); return [soft(ZT, T), soft(ZT.map((v, i) => v + sig * n[i]), T)]; };
+const alpha = (p, q) => p.reduce((a, v, i) => a + Math.min(v, q[i]), 0);
+const pick = (w, u) => { let c = 0; for (let i = 0; i < w.length; i++) { c += w[i]; if (u < c) return i; } return w.length - 1; };
+
+// draft x ~ q, accept with min(1, p/q), else resample from max(0, p - q)
+function sim(p, q, N, seed) {
+  const r = mul(seed), cnt = p.map(() => 0); let acc = 0;
+  const res = p.map((v, i) => Math.max(0, v - q[i])), rs = res.reduce((a, b) => a + b, 0);
+  for (let n = 0; n < N; n++) {
+    const x = pick(q, r());
+    if (r() < Math.min(1, p[x] / q[x])) { cnt[x]++; acc++; }
+    else cnt[pick(res.map(v => v / rs), r())]++;
+  }
+  return [cnt.map(c => c / N), acc / N];
+}
+
+let seed = 1, runs = 0, emp = null;
+function draw() {
+  const sig = +el('er').value, T = +el('tp').value;
+  el('erv').textContent = sig.toFixed(2); el('tpv').textContent = T.toFixed(2);
+  const [p, q] = dists(sig, T, seed);
+  const W = cv.width, H = cv.height, l = 44, r = 12, t = 14, b = 30;
+  const top = Math.max(...p, ...q, ...(emp ? emp[0] : [0])) * 1.1;
+  const py = v => H - b - v / top * (H - t - b);
+  const bw = (W - l - r) / TOK.length;
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '12px sans-serif'; ctx.strokeStyle = css('--line'); ctx.fillStyle = css('--muted'); ctx.lineWidth = 1;
+  for (let g = 0; g <= top; g += 0.1) {
+    ctx.beginPath(); ctx.moveTo(l, py(g)); ctx.lineTo(W - r, py(g)); ctx.stroke();
+    ctx.textAlign = 'right'; ctx.fillText(g.toFixed(1), l - 6, py(g) + 4);
+  }
+  TOK.forEach((k, i) => {
+    const x = l + i * bw + bw * 0.18, w = bw * 0.64;
+    ctx.globalAlpha = 0.35; ctx.fillStyle = css('--muted'); ctx.fillRect(x, py(q[i]), w, py(0) - py(q[i]));
+    ctx.globalAlpha = 1; ctx.fillStyle = css('--accent'); const m = Math.min(p[i], q[i]); ctx.fillRect(x, py(m), w, py(0) - py(m));
+    ctx.strokeStyle = css('--fg'); ctx.lineWidth = 2; ctx.strokeRect(x, py(p[i]), w, py(0) - py(p[i]));
+    ctx.fillStyle = css('--muted'); ctx.textAlign = 'center'; ctx.fillText(k, x + w / 2, H - 10);
+    if (emp) { ctx.fillStyle = css('--pass'); ctx.beginPath(); ctx.arc(x + w / 2, py(emp[0][i]), 5, 0, 7); ctx.fill(); }
+  });
+  el('sa').textContent = pct(alpha(p, q));
+  el('ss').textContent = emp ? pct(emp[1]) : '–';
+  el('sg').textContent = emp ? (100 * Math.max(...emp[0].map((v, i) => Math.abs(v - p[i])))).toFixed(1) + ' pts' : '–';
+  el('sd').textContent = '#' + seed;
+}
+const reset = () => { emp = null; draw(); };
+el('er').oninput = reset; el('tp').oninput = reset;
+el('nd').onclick = () => { seed++; reset(); };
+el('go').onclick = () => { const [p, q] = dists(+el('er').value, +el('tp').value, seed); emp = sim(p, q, 10000, 1000 + ++runs); draw(); };
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

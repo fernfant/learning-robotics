@@ -1,0 +1,4 @@
+# Raw third-party copies stay local (not ours to republish). Every source is credited and linked in sources.html and README.md.
+sources/*
+!sources/20-*-readme.md
+.DS_Store

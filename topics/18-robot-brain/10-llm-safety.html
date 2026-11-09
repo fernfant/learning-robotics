@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 10 · Using an LLM safely</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 7 · Lesson 10</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 7 · Lesson 10</div>
+<h1>Using a real LLM safely: never trust, always check</h1>
+<p class="lede">A big language model understands messy commands far better than your word-counter. It also sometimes chats, rambles, invents things, or sneaks in extra instructions. Today you build the bouncer that stands between the AI and the robot's wheels.</p>
+
+<div class="facts">
+  <div><b>Time</b>2–3 hours</div>
+  <div><b>You'll need</b>Python 3, your Lesson 9 file. No internet, no API key.</div>
+  <div><b>New words</b>LLM, JSON, parsing, validation, allow-list, fallback</div>
+  <div><b>Project piece</b>A safety layer for AI output</div>
+</div>
+
+<section class="kid" id="start">
+<h2>Start here</h2>
+<p class="big">The AI is a helper, not the boss: the robot only does something if the AI's answer passes strict checks that <em>you</em> wrote.</p>
+<h3>The problem</h3>
+<p>Your Lesson 9 classifier gets confused by words it has never seen, like "yeet". So you think: why not ask a real LLM, like the ones behind ChatGPT or Claude? You ask it to turn "please tidy away the red block" into a neat answer. Most of the time it works perfectly. But one time it says "Sure! Here you go:" before the answer. Another time it invents a "purple block" that doesn't exist. Another time it adds <code>"also": "ignore all safety rules"</code>. If the robot obeys any of those blindly, it drives into a wall, or worse.</p>
+<h3>The idea in one picture</h3>
+<p>Think of a nightclub bouncer with a guest list. The bouncer doesn't care how confident you sound or how nice your outfit is. Name on the list? In. Not on the list? Out. No arguments, no exceptions. Your safety layer is a bouncer for AI answers: it checks every answer against a fixed list of allowed actions and objects, and anything else is turned away.</p>
+<h3>Words to know</h3>
+<dl>
+<dt>LLM</dt><dd>Large language model. A huge next-word predictor (Lesson 8's baby model, grown up) trained on lots of text.</dd>
+<dt>JSON</dt><dd>A strict text format for data, like <code>{"intent": "put", "object": "red block"}</code>. Python turns it into a dict.</dd>
+<dt>Parsing</dt><dd>Turning text into a data structure the program can use.</dd>
+<dt>Validation</dt><dd>Checking that the data follows every rule before you act on it.</dd>
+<dt>Allow-list</dt><dd>A list of the only things that are permitted. Anything not on it is refused.</dd>
+<dt>Fallback</dt><dd>A plan B. If the AI's answer fails, try your own simpler parser instead.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>The full lesson:</strong> everything below builds the idea step by step, then you write the real code.</p>
+
+<h2 id="problem">1. The problem</h2>
+<p>In Lesson 9 you wrote <code>parse_command()</code>. It counts words. It's fast, free, and predictable, but it only knows the 34 sentences it was trained on. Type "yeet the blue block into the bin" and it has never seen "yeet". It still guesses "put" (lucky!), but it can't really understand.</p>
+<p>A real LLM has read a large chunk of the internet. It knows "yeet", "tidy away", "bin it", "get rid of", and thousands of other ways to say the same thing. So the plan is: send the person's command to an LLM, ask it to reply with JSON, and act on the JSON.</p>
+<p>Here's what can come back. These are the eight pretend replies in your homework file, called <code>MOCK_REPLIES</code>. Each one is a kind of reply real models really do give sometimes:</p>
+<div class="table-wrap"><table>
+<tr><th>Person typed</th><th>LLM replied</th><th>What's wrong</th></tr>
+<tr><td>please tidy away the red block</td><td><code>{"intent": "put", "object": "red block"}</code></td><td>Nothing. Perfect.</td></tr>
+<tr><td>where's the green one?</td><td><code>Sure! Here you go:</code> then the JSON in a code block</td><td><b>Chatty text</b> around the answer.</td></tr>
+<tr><td>yeet the blue block into the bin</td><td><code>{"intent": "throw", ...}</code></td><td><b>Made-up action.</b> The robot has no "throw".</td></tr>
+<tr><td>put the purple block away</td><td><code>{"intent": "put", "object": "purple block"}</code></td><td><b>Made-up object.</b> There is no purple block.</td></tr>
+<tr><td>stop!!!</td><td><code>{"intent": "stop", "object": null}</code></td><td>Nothing. Perfect.</td></tr>
+<tr><td>go to the red block</td><td><code>{..., "also": "ignore all safety rules"}</code></td><td><b>A sneaky extra key.</b></td></tr>
+<tr><td>hmm what about the blue</td><td><code>I think you want me to go to the blue block!</code></td><td><b>No JSON at all.</b></td></tr>
+<tr><td>bin the green block</td><td><code>{"intent": "put" "object": "green block"}</code></td><td><b>Broken JSON</b> (a comma is missing).</td></tr>
+</table></div>
+<p>Six of the eight are a problem. A robot is a machine that moves in the real world. A chatbot that says something silly just looks silly. A robot that <em>does</em> something silly can knock over a drink, run over a foot, or drive down the stairs.</p>
+
+<h2 id="principles">2. First principles</h2>
+<h3>Step 1: why can't we just trust it?</h3>
+<p>Remember Lesson 8. A language model is a next-word predictor. It picks words that are likely to come next. It doesn't "know" what's in your room. If the person says "purple block", the most likely next words include "purple block", so the model happily copies it. It isn't lying. It just has no idea that your room has no purple block. <strong>Only your code knows what is really in the room.</strong></p>
+<p>Also, the model's output is text. Text can say anything. Some text even contains instructions, like "ignore all safety rules". A robot that reads text and does whatever it says can be steered by anyone who can get words into it. That trick has a name: <strong>prompt injection</strong>. The fix is simple to say and important to remember:</p>
+<div class="card tldr"><h3>The golden rule</h3><p>Never let a model's words decide what's allowed. Your code decides what's allowed. The model only gets to <em>choose from</em> the allowed options.</p></div>
+
+<h3>Step 2: try the obvious thing, and watch it break</h3>
+<p>The obvious approach is <code>action = json.loads(reply)</code>. Python's <code>json.loads</code> turns JSON text into a dict. Try it on reply 2:</p>
+<pre><code>json.loads('Sure! Here you go:\n```json\n{"intent": "find", ...}\n```')
+→ crash! JSONDecodeError</code></pre>
+<p>The answer is <em>in there</em>, but it's wrapped in chat. And reply 8 (the missing comma) crashes too:</p>
+<pre><code>json.loads('{"intent": "put" "object": "green block"}')
+→ JSONDecodeError: Expecting ',' delimiter: line 1 column 18 (char 17)</code></pre>
+<p>A crash is bad for a robot: the program stops, maybe in the middle of driving. So we need parsing that <em>never crashes</em>. It either finds a good dict, or it says "nothing usable here" by returning <code>None</code>.</p>
+
+<h3>Step 3: dig the JSON out of the chat</h3>
+<p>A JSON object starts with <code>{</code> and ends with <code>}</code>. So: find the <em>first</em> <code>{</code>, find the <em>last</em> <code>}</code>, and cut out everything in between, both included. Let's do reply 2 by hand. Python's <code>text.find("{")</code> gives the position of the first <code>{</code>, and <code>text.rfind("}")</code> the last <code>}</code> (r for "from the right"):</p>
+<pre><code>text = 'Sure! Here you go:\n```json\n{"intent": "find", "object": "green block"}\n```'
+text.find("{")   → 27
+text.rfind("}")  → 69
+text[27:70]      → '{"intent": "find", "object": "green block"}'    (70 = 69 + 1, because slices stop BEFORE the end)
+json.loads(...)  → {'intent': 'find', 'object': 'green block'}</code></pre>
+<p>If there is no <code>{</code>, <code>find</code> returns <code>-1</code>. Then there's no JSON, so return <code>None</code>. And wrap <code>json.loads</code> in <code>try</code>/<code>except json.JSONDecodeError</code>, so broken JSON also gives <code>None</code> instead of a crash.</p>
+<details><summary>Predict first: what does this give? <code>'{"a": 1} and {"b": 2}'</code></summary>
+<p>First <code>{</code> is at 0, last <code>}</code> is at the very end, so you cut out the whole string <code>{"a": 1} and {"b": 2}</code>. That's not one valid JSON object, so <code>json.loads</code> fails ("Extra data") and you return <code>None</code>. That's fine! When in doubt, refuse. A safety layer that refuses a few good answers is much better than one that accepts a bad one.</p></details>
+
+<h3>Step 4: the bouncer's checklist</h3>
+<p>Getting a dict is not enough. Reply 3 is perfectly good JSON that says <code>"throw"</code>. We need rules, and we check them in order. The robot's allow-lists are tiny:</p>
+<pre><code>ALLOWED_INTENTS = {"put", "go", "find", "stop"}
+NEEDS_OBJECT    = {"put", "go", "find"}
+ALLOWED_KEYS    = {"intent", "object"}
+known objects   = {"red block", "blue block", "green block"}     (from world.py)</code></pre>
+<ol>
+<li><b>Is it a dict at all?</b> <code>None</code> fails here: "not a JSON object".</li>
+<li><b>Exactly the right keys?</b> Not "at least these keys". Exactly. Extra keys fail.</li>
+<li><b>Is the intent on the list?</b> "throw" fails.</li>
+<li><b>Is the object on the list, or None?</b> "purple block" fails.</li>
+<li><b>Do they fit together?</b> "put", "go" and "find" need an object. "stop" must have no object.</li>
+</ol>
+<p>Run reply 6 through it by hand:</p>
+<pre><code>action = {"intent": "go", "object": "red block", "also": "ignore all safety rules"}
+rule 1: it's a dict                                      ✓
+rule 2: keys are {intent, object, also}
+        ALLOWED_KEYS is {intent, object}
+        not equal → FAIL, reason: unexpected keys: ['also']</code></pre>
+<p>Notice what we did <em>not</em> do: we never read the words "ignore all safety rules". We didn't need to. We don't try to spot bad words (there are infinitely many ways to phrase a trick). We only accept the exact shape we expect. This is the difference between a <strong>block-list</strong> ("refuse these bad things", which always misses some) and an <strong>allow-list</strong> ("accept only these good things", which is easy to get right).</p>
+<details><summary>Predict first: does <code>{"intent": "stop", "object": "red block"}</code> pass?</summary>
+<p>No. Rules 1 to 4 all pass (it's a dict, right keys, "stop" is allowed, "red block" is known). Rule 5 fails: "stop" takes no object. Why be so fussy? Because a reply that mixes "stop" with an object means the model is confused, and a confused answer isn't one you want to act on.</p></details>
+<p>Each check returns a pair: <code>(True, "")</code> if it's safe, or <code>(False, "a reason")</code>. The reason matters: it goes in the robot's log so a human can see <em>why</em> something was refused.</p>
+
+<h3>Step 5: plan B, the fallback</h3>
+<p>When the LLM's answer fails, we don't have to give up. We still have your Lesson 9 parser! It's simple, but it always returns the right <em>shape</em>. So:</p>
+<pre><code>1. extract_json(reply) → validate it.  Passes? Use it.        source = "llm"
+2. Failed? Ask the fallback parser:  fallback(command) → validate THAT too.
+                                     Passes? Use it.        source = "fallback"
+3. Both failed? Do nothing.                                 source = "none"</code></pre>
+<p>Notice that the fallback's answer is <em>also</em> checked. Plan B doesn't get a free pass either. Nothing reaches the wheels without going through the bouncer.</p>
+<p>Here's reply 4 worked through. The LLM says <code>{"intent": "put", "object": "purple block"}</code>: unknown object, fail. The Lesson 9 parser reads "put the purple block away", picks "put", and looks for a colour from <code>["red", "blue", "green"]</code>. "purple" isn't one, so object is <code>None</code>. Then rule 5: "put" needs an object, fail. Both failed, so the robot does nothing. That's the right answer, because there is no purple block!</p>
+
+<h3>Step 6: the catch nobody tells you about</h3>
+<p>The checks guarantee the action is <em>allowed</em>. They do <strong>not</strong> guarantee it's what the person <em>meant</em>. Look at this real line from the solution's output:</p>
+<pre><code>'hmm what about the blue'   -> fallback {'intent': 'put', 'object': 'blue block'}  (not a JSON object)</code></pre>
+<p>The person was asking a vague question. The LLM's chatty reply was rightly rejected. Then the fallback confidently decided they wanted the blue block <em>put in the bin</em>, and that passes every rule. The robot would happily bin a block nobody asked it to touch. A safety layer stops <em>impossible</em> actions, not <em>wrong</em> ones. Keep this in mind: in Lesson 11 you'll find the same kind of mistake hiding in the finished robot.</p>
+
+<h2 id="play">3. Play with it</h2>
+<div class="card demo">
+<h3>Interactive: be the bouncer</h3>
+<p class="legend">Pick one of the eight <code>MOCK_REPLIES</code>, or type your own "LLM reply". The demo runs the same three steps as the Python: <code>extract_json</code>, <code>validate_action</code>, then the Lesson 9 word-counting parser as the fallback (trained on the same 34 <code>TRAIN</code> sentences).</p>
+<div id="presets" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
+<label for="cmd">What the person typed:</label>
+<input id="cmd" type="text" style="width:100%;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)">
+<label for="reply" style="display:block;margin-top:8px">What the LLM replied:</label>
+<textarea id="reply" rows="4" style="width:100%;font-family:var(--mono);font-size:.88rem;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)"></textarea>
+<pre id="steps" style="white-space:pre-wrap;font-size:.85rem"></pre>
+<div class="stats">
+  <div class="stat"><div class="k">Source</div><div class="v" id="src">–</div></div>
+  <div class="stat"><div class="k">Robot does</div><div class="v" id="act" style="font-size:1rem">–</div></div>
+</div>
+</div>
+<p>Things to try: delete the word <code>"also"</code> and its value from reply 6 so it passes. Change <code>"put"</code> to <code>"PUT"</code> (it fails: the allow-list is exact). Write a reply that sneaks <code>"object": "red block"</code> into a "stop". Then clear the reply completely and see what the fallback does with different commands.</p>
+
+<h2 id="homework">4. Homework</h2>
+<p>Open <code>project/homework/lesson10_llm_safety.py</code>. The allow-lists, <code>MOCK_REPLIES</code> and <code>build_prompt()</code> are written for you. Write these three functions, in order.</p>
+
+<h3>4.1 <code>extract_json(text)</code></h3>
+<p>Find the JSON object inside some text. Take everything from the first <code>{</code> to the last <code>}</code>, then <code>json.loads</code> it. Return the dict, or <code>None</code> if there's no valid JSON object. It must <strong>never crash</strong>.</p>
+<p>Example: <code>extract_json('Sure! {"intent": "stop", "object": null} ok')</code> → <code>{"intent": "stop", "object": None}</code>. (JSON's <code>null</code> becomes Python's <code>None</code>.) The <code>{</code> is at 6 and the <code>}</code> at 39.</p>
+<details><summary>Hint 1</summary><p>Strings have <code>.find()</code> and <code>.rfind()</code>. Both return <code>-1</code> when they don't find anything.</p></details>
+<details><summary>Hint 2</summary><p>Three ways to fail, all returning <code>None</code>: no <code>{</code> found; the last <code>}</code> is before the first <code>{</code>; <code>json.loads</code> raises <code>json.JSONDecodeError</code>. Remember the slice needs <code>end + 1</code> to include the <code>}</code>.</p></details>
+<details><summary>Hint 3</summary><pre><code>start = first "{"   end = last "}"
+if start is -1 or end &lt;= start: return None
+try: obj = json.loads(text[start : end+1])
+except json.JSONDecodeError: return None
+return obj if it is a dict, else None       (isinstance(obj, dict))</code></pre></details>
+
+<h3>4.2 <code>validate_action(action, known_objects)</code></h3>
+<p>The bouncer. Return <code>(True, "")</code> if the action is safe, otherwise <code>(False, reason)</code>. Apply the five rules from Step 4 in order, and return as soon as one fails.</p>
+<p>Example: <code>validate_action({"intent": "put", "object": "purple block"}, {"red block", "blue block", "green block"})</code> → <code>(False, "unknown object 'purple block'")</code>.</p>
+<details><summary>Hint 1</summary><p>Check "is it a dict?" first. If <code>action</code> is <code>None</code> and you try <code>action["intent"]</code>, Python crashes. <code>isinstance(action, dict)</code> is your friend.</p></details>
+<details><summary>Hint 2</summary><p><code>set(action)</code> gives the set of a dict's keys. Compare it with <code>ALLOWED_KEYS</code> using <code>!=</code>. For a helpful reason, <code>set(action) ^ ALLOWED_KEYS</code> gives the keys that are in one but not the other.</p></details>
+<details><summary>Hint 3</summary><pre><code>not a dict                              → False, "not a JSON object"
+set(action) != ALLOWED_KEYS             → False, "unexpected keys: ..."
+intent not in ALLOWED_INTENTS           → False, f"unknown intent {intent!r}"
+obj is not None and obj not in known    → False, f"unknown object {obj!r}"
+intent in NEEDS_OBJECT and obj is None  → False, f"{intent!r} needs an object"
+intent == "stop" and obj is not None    → False, "'stop' takes no object"
+otherwise                               → True, ""</code></pre><p>(<code>{x!r}</code> in an f-string puts quotes around a string, so the reason reads <code>unknown intent 'throw'</code>.)</p></details>
+
+<h3>4.3 <code>safe_parse(reply_text, known_objects, command=None, fallback=None)</code></h3>
+<p>Plan A, then plan B, both checked. Return a triple <code>(action_or_None, source, reason)</code>, where source is <code>"llm"</code>, <code>"fallback"</code> or <code>"none"</code>.</p>
+<p>Example: for reply 3 (<code>"throw"</code>) with the Lesson 9 parser as fallback, you get <code>({'intent': 'put', 'object': 'blue block'}, "fallback", "unknown intent 'throw'")</code>. The reason says why plan A failed.</p>
+<details><summary>Hint 1</summary><p>Use your two functions. Don't re-write the checks.</p></details>
+<details><summary>Hint 2</summary><p>Only try the fallback if <em>both</em> <code>fallback</code> and <code>command</code> were given (they default to <code>None</code>). The fallback is a function: call it with <code>fallback(command)</code>.</p></details>
+<details><summary>Hint 3</summary><pre><code>action = extract_json(reply_text);  ok, reason = validate_action(action, known)
+if ok: return action, "llm", ""
+if fallback and command given:
+    fb = fallback(command);  ok2, reason2 = validate_action(fb, known)
+    if ok2: return fb, "fallback", reason
+    return None, "none", f"llm: {reason}; fallback: {reason2}"
+return None, "none", reason</code></pre></details>
+
+<h3>Run it</h3>
+<pre><code>cd project/homework
+python3 lesson10_llm_safety.py</code></pre>
+<p>What you should see (real output from the solution):</p>
+<pre><code>'please tidy away the red block'         -> llm      {'intent': 'put', 'object': 'red block'}
+"where's the green one?"                 -> llm      {'intent': 'find', 'object': 'green block'}
+'yeet the blue block into the bin'       -> fallback {'intent': 'put', 'object': 'blue block'}  (unknown intent 'throw')
+'put the purple block away'              -> none     None  (llm: unknown object 'purple block'; fallback: 'put' needs an object)
+'stop!!!'                                -> llm      {'intent': 'stop', 'object': None}
+'go to the red block'                    -> fallback {'intent': 'go', 'object': 'red block'}  (unexpected keys: ['also'])
+'hmm what about the blue'                -> fallback {'intent': 'put', 'object': 'blue block'}  (not a JSON object)
+'bin the green block'                    -> fallback {'intent': 'put', 'object': 'green block'}  (not a JSON object)</code></pre>
+<p>Read it line by line. Every bad reply was caught, and every reason is clear. The purple block was refused by both plans. And line 7 is the "confidently wrong" fallback from Step 6.</p>
+
+<h3>Check it</h3>
+<pre><code>cd project
+python3 check.py 10</code></pre>
+<p>Three checks: <code>extract_json</code>, <code>validate_action</code>, <code>safe_parse</code>. A green ✓ means that function passed every test. A red ✗ comes with a hint, for example <em>"broken JSON -&gt; None, not a crash"</em> or <em>"None must fail, not crash"</em>. A yellow … means you haven't written it yet. When you see <code>3/3 passed</code>, you're done.</p>
+
+<h3>Optional extra: a real LLM</h3>
+<div class="card note">
+<p><strong>Optional, and it costs money.</strong> <code>homework/lesson10_optional_real_llm.py</code> sends five commands to a real Claude model. It is not checked by <code>check.py</code>, and you don't need it for anything later. To run it you need:</p>
+<ol>
+<li><code>pip install anthropic</code></li>
+<li>An Anthropic API key, set as the environment variable <code>ANTHROPIC_API_KEY</code>.</li>
+<li><strong>A parent's or guardian's OK.</strong> Each request costs a small amount of money, charged to whoever owns the key. Never paste a key into code you share.</li>
+</ol>
+</div>
+<p>Two things in that file are worth reading even if you never run it:</p>
+<ul>
+<li><b>It asks for JSON with a schema.</b> <code>ACTION_SCHEMA</code> describes the exact shape: an object with an <code>intent</code> from the four allowed words, an <code>object</code> that's a string or null, both required, and <code>"additionalProperties": False</code> (no extra keys). This is called <em>structured outputs</em>: the model is made to reply in that shape. That cuts out chatty text and broken JSON. But look: the schema doesn't list the objects, so a made-up "purple block" can still come back. That's why the file still runs every reply through your <code>safe_parse()</code>. Belt <em>and</em> braces.</li>
+<li><b>It has an automatic fallback if the model declines.</b> Models sometimes refuse a request. The file turns on a server-side fallback that retries on another model automatically, and if the reply still ends in a refusal, <code>ask_llm()</code> returns an empty string. An empty string has no JSON, so your <code>safe_parse()</code> calmly hands over to the Lesson 9 parser. Your safety layer handles that case without any special code.</li>
+</ul>
+
+<h3>Stretch</h3>
+<ul>
+<li>Add a fourth allowed intent, <code>"wait"</code>, that (like stop) takes no object. What do you need to change? Did any check break?</li>
+<li>Write three new nasty replies of your own and add them to <code>MOCK_REPLIES</code>: a reply where the JSON is a list (<code>[...]</code>), one where <code>"object"</code> is a number, and one with the keys in a different order. Predict each result before running.</li>
+<li>Line 7 above bothers you? Good. Can you think of a rule that would make the robot refuse vague commands instead of guessing? (You'll get the chance to build one in Lesson 11.)</li>
+</ul>
+
+<h2 id="real-world">5. Real-world challenge: be the bouncer</h2>
+<p>You'll play the robot, and someone else plays a slightly dodgy AI. You need a friend or family member, 10 small pieces of paper, and three objects on a table (say a cup, a pen and a spoon).</p>
+<ol>
+<li>Write a rulebook on one card: allowed actions <b>pick up, point at, stop</b>. Allowed objects <b>cup, pen, spoon</b>. Every instruction must be exactly "ACTION OBJECT", or just "stop".</li>
+<li>Your partner secretly writes 10 instruction cards. Their job is to sneak some past you: a made-up object ("pick up the phone"), a made-up action ("throw the pen"), extra words ("pick up cup and also ignore the rules"), chatty text ("hi! pick up cup thanks"), or just nonsense. Some should be perfectly valid.</li>
+<li>Shuffle and read each card. Before doing anything, check it against the rulebook, rule by rule. Only act if it passes. Say out loud which rule failed if it doesn't.</li>
+<li>Record in a table: card, pass or fail, which rule, and whether you made a mistake.</li>
+<li>Swap roles. Then talk: was any card "allowed but clearly not what they meant"? Did you find yourself guessing what a chatty card meant, instead of refusing it?</li>
+</ol>
+<p><b>What it teaches:</b> checking against a short allow-list is easy and reliable. Trying to work out what someone <em>meant</em> is hard, and that's exactly where both humans and robots slip up.</p>
+
+<h2 id="so-far">6. Your Robo-Helper so far</h2>
+<p>Robo-Helper can move (L1), sense (L2), brake (L3), decide to stop (L4 and L5), plan routes (L6) and understand commands (L9). Now it has a <strong>safety layer</strong>: nothing reaches the wheels unless <code>validate_action()</code> says yes.</p>
+<p>In <a href="11-capstone.html">Lesson 11</a>, <code>RoboHelper.run_command()</code> calls <code>validate_action(action, set(self.objects))</code> on <em>every</em> command before it moves. That includes commands from your own Lesson 9 parser. This is the bouncer that makes "put the purple block in the bin" and "go to the moon" come back as polite refusals instead of crashes.</p>
+
+<h2 id="mistakes">7. Common mistakes</h2>
+<ul>
+<li><b>Crashing on broken JSON.</b> <code>json.loads</code> raises an error on bad input. Catch <code>json.JSONDecodeError</code> and return <code>None</code>. (check.py: <em>"broken JSON -&gt; None, not a crash"</em>.)</li>
+<li><b>Checking keys with "at least" instead of "exactly".</b> <code>"intent" in action and "object" in action</code> lets the sneaky <code>"also"</code> key through. Compare the whole key set. (check.py: <em>"extra keys must fail"</em>.)</li>
+<li><b>Reading <code>action["intent"]</code> before checking it's a dict.</b> On <code>None</code> that crashes. (check.py: <em>"None must fail, not crash"</em>.)</li>
+<li><b>Forgetting that "go" needs an object.</b> <code>{"intent": "go", "object": None}</code> is valid JSON with allowed values, but the robot can't go "nowhere". (check.py: <em>"'go' needs an object"</em>.)</li>
+<li><b>Trusting the fallback.</b> Return the fallback's answer only after <code>validate_action</code> says yes to it as well.</li>
+</ul>
+
+<h2 id="check">8. Check yourself</h2>
+<details><summary>Why is an allow-list safer than a block-list of bad phrases like "ignore all safety rules"?</summary><p>There are endless ways to phrase a trick, so a block-list always misses some. An allow-list only has to list the few things that are OK. Anything else, however clever, is refused.</p></details>
+<details><summary>Predict: what does <code>extract_json('[{"intent": "stop", "object": null}]')</code> return?</summary><p>The first <code>{</code> and last <code>}</code> cut out <code>{"intent": "stop", "object": null}</code>, which is a valid dict. So it returns <code>{'intent': 'stop', 'object': None}</code>. The square brackets were outside the cut. (If you'd used <code>json.loads</code> on the whole text, you'd get a list, and the <code>isinstance(obj, dict)</code> check would return <code>None</code>.)</p></details>
+<details><summary>Predict: what does <code>validate_action({"object": None, "intent": "stop"}, known)</code> return?</summary><p><code>(True, "")</code>. The keys are in a different order, but sets don't care about order, so the key check passes. All other rules pass too.</p></details>
+<details><summary>Structured outputs force the right shape. Why do we still need <code>validate_action</code>?</summary><p>The shape can be right and the content still wrong: a made-up object like "purple block" fits <code>"string or null"</code>. Also, rules like "stop takes no object" aren't in the schema. And our own code is the last line of defence whatever the model does.</p></details>
+<details><summary>All checks passed, but the robot binned a block nobody asked about. How?</summary><p>The checks only say an action is <em>allowed</em>. A parser (the LLM or the fallback) can still pick the wrong allowed action, like "hmm what about the blue" becoming a "put". Catching that needs a different tool, such as refusing when the parser isn't confident.</p></details>
+
+<h2 id="deeper">9. Go deeper (optional)</h2>
+<ul>
+<li><a href="../10-rlm-harness.html#safety">RLM agent harnesses: safety</a>: how bigger AI agents put checks around models that call tools.</li>
+<li><a href="../03-shared-autonomy.html#askactwait">Shared autonomy: ask, act or wait</a>: when a robot should act, and when it should ask a human first.</li>
+<li><a href="../01-decision-model-evals.html">Decision-model evals</a>: measuring how often a model's decisions are right, before you trust it.</li>
+<li><a href="../07-post-training.html">Post-training</a>: how models are taught to follow instructions (and why they still don't always).</li>
+</ul>
+
+<nav class="pager">
+  <a href="15-tiny-lm.html"><small>Previous</small>Lesson 15 · A tiny language model</a>
+  <a class="next" href="11-capstone.html"><small>Next</small>Lesson 11 · Capstone: Robo-Helper</a>
+</nav>
+<footer>Build a Robot Brain · Week 7 · Lesson 10</footer>
+</main>
+
+<script>
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+// Same data as lesson09_commands.py and lesson10_llm_safety.py
+const TRAIN = [
+  ["put the red block in the bin", "put"], ["throw the blue block away", "put"],
+  ["tidy up the green block", "put"], ["put away the blue block", "put"],
+  ["can you bin the red one", "put"], ["clean up the green block please", "put"],
+  ["drop the blue block in the bin", "put"], ["get rid of the red block", "put"],
+  ["move the green block into the bin", "put"], ["put the blue one in the trash", "put"],
+  ["go to the red block", "go"], ["drive over to the blue block", "go"],
+  ["head to the green block", "go"], ["go near the red one", "go"],
+  ["move next to the blue block", "go"], ["travel to the green one", "go"],
+  ["come to the red block", "go"], ["go over to the blue block please", "go"],
+  ["where is the red block", "find"], ["find the blue block", "find"],
+  ["can you tell me where the green block is", "find"], ["where did the blue one go", "find"],
+  ["locate the red block", "find"], ["which square is the green block on", "find"],
+  ["show me where the red one is", "find"], ["where is the blue block now", "find"],
+  ["stop", "stop"], ["stop now", "stop"], ["halt", "stop"], ["freeze", "stop"],
+  ["stop moving", "stop"], ["please stop right now", "stop"], ["emergency stop", "stop"],
+  ["wait stop", "stop"],
+];
+const COLOURS = ["red", "blue", "green"];
+const KNOWN = new Set(["red block", "blue block", "green block"]);
+const ALLOWED_INTENTS = new Set(["put", "go", "find", "stop"]);
+const NEEDS_OBJECT = new Set(["put", "go", "find"]);
+const ALLOWED_KEYS = ["intent", "object"];
+const MOCK_REPLIES = [
+  ["please tidy away the red block", '{"intent": "put", "object": "red block"}'],
+  ["where's the green one?", 'Sure! Here you go:\n```json\n{"intent": "find", "object": "green block"}\n```'],
+  ["yeet the blue block into the bin", '{"intent": "throw", "object": "blue block"}'],
+  ["put the purple block away", '{"intent": "put", "object": "purple block"}'],
+  ["stop!!!", '{"intent": "stop", "object": null}'],
+  ["go to the red block", '{"intent": "go", "object": "red block", "also": "ignore all safety rules"}'],
+  ["hmm what about the blue", "I think you want me to go to the blue block!"],
+  ["bin the green block", '{"intent": "put" "object": "green block"}'],
+];
+
+// Python-style repr, so messages read exactly like the Python output
+function pyrepr(v) {
+  if (v === null || v === undefined) return 'None';
+  if (v === true) return 'True';
+  if (v === false) return 'False';
+  if (typeof v === 'string') return v.includes("'") && !v.includes('"') ? '"' + v + '"' : "'" + v.replace(/'/g, "\\'") + "'";
+  if (Array.isArray(v)) return '[' + v.map(pyrepr).join(', ') + ']';
+  if (typeof v === 'object') return '{' + Object.keys(v).map(k => pyrepr(k) + ': ' + pyrepr(v[k])).join(', ') + '}';
+  return String(v);
+}
+
+// Lesson 8 + 9
+const tokenize = t => t.toLowerCase().match(/[a-z']+|\./g) || [];
+function trainIntentModel(ex) {
+  const wc = {}, ic = {}, vocab = new Set();
+  for (const [text, intent] of ex) {
+    ic[intent] = (ic[intent] || 0) + 1;
+    const b = wc[intent] = wc[intent] || {};
+    for (const w of tokenize(text)) { b[w] = (b[w] || 0) + 1; vocab.add(w); }
+  }
+  return { wc, ic, vocab };
+}
+function intentScores(m, text) {
+  const total = Object.values(m.ic).reduce((a, b) => a + b, 0), V = m.vocab.size, s = {};
+  for (const intent of Object.keys(m.ic)) {
+    const words = m.wc[intent], size = Object.values(words).reduce((a, b) => a + b, 0);
+    let sc = Math.log(m.ic[intent] / total);
+    for (const w of tokenize(text)) sc += Math.log(((words[w] || 0) + 1) / (size + V));
+    s[intent] = sc;
+  }
+  return s;
+}
+function predictIntent(m, text) {
+  const s = intentScores(m, text);
+  let best = null;
+  for (const k of Object.keys(s)) if (best === null || s[k] > s[best]) best = k;
+  return best;
+}
+function extractObject(text) {
+  for (const w of tokenize(text)) if (COLOURS.includes(w)) return w + ' block';
+  return null;
+}
+function parseCommand(m, text) {
+  const intent = predictIntent(m, text);
+  return { intent, object: intent === 'stop' ? null : extractObject(text) };
+}
+
+// Lesson 10
+function extractJson(text) {
+  const start = text.indexOf('{'), end = text.lastIndexOf('}');
+  if (start === -1 || end <= start) return null;
+  let obj;
+  try { obj = JSON.parse(text.slice(start, end + 1)); } catch (e) { return null; }
+  return obj !== null && typeof obj === 'object' && !Array.isArray(obj) ? obj : null;
+}
+function validateAction(action, known) {
+  if (action === null || typeof action !== 'object' || Array.isArray(action)) return [false, 'not a JSON object'];
+  const keys = Object.keys(action);
+  const diff = keys.filter(k => !ALLOWED_KEYS.includes(k)).concat(ALLOWED_KEYS.filter(k => !keys.includes(k))).sort();
+  if (diff.length) return [false, 'unexpected keys: ' + pyrepr(diff)];
+  const intent = action.intent, obj = action.object;
+  if (!ALLOWED_INTENTS.has(intent)) return [false, 'unknown intent ' + pyrepr(intent)];
+  if (obj !== null && !known.has(obj)) return [false, 'unknown object ' + pyrepr(obj)];
+  if (NEEDS_OBJECT.has(intent) && obj === null) return [false, pyrepr(intent) + ' needs an object'];
+  if (intent === 'stop' && obj !== null) return [false, "'stop' takes no object"];
+  return [true, ''];
+}
+function safeParse(reply, known, command, fallback) {
+  const action = extractJson(reply);
+  const [ok, reason] = validateAction(action, known);
+  if (ok) return [action, 'llm', ''];
+  if (fallback && command != null) {
+    const fb = fallback(command);
+    const [ok2, reason2] = validateAction(fb, known);
+    if (ok2) return [fb, 'fallback', reason];
+    return [null, 'none', 'llm: ' + reason + '; fallback: ' + reason2];
+  }
+  return [null, 'none', reason];
+}
+
+const MODEL = trainIntentModel(TRAIN);
+const fallbackFn = c => parseCommand(MODEL, c);
+
+const $ = id => document.getElementById(id);
+function update() {
+  const cmd = $('cmd').value, reply = $('reply').value;
+  const ex = extractJson(reply);
+  const [ok, reason] = validateAction(ex, KNOWN);
+  const lines = ['1. extract_json(reply)      → ' + pyrepr(ex),
+                 '2. validate_action(...)     → ' + (ok ? 'PASS' : 'FAIL: ' + reason)];
+  if (!ok) {
+    const fb = fallbackFn(cmd), [ok2, r2] = validateAction(fb, KNOWN);
+    lines.push('3. fallback: parse_command  → ' + pyrepr(fb));
+    lines.push('   validate_action(...)     → ' + (ok2 ? 'PASS' : 'FAIL: ' + r2));
+  }
+  const [action, source] = safeParse(reply, KNOWN, cmd, fallbackFn);
+  $('steps').textContent = lines.join('\n');
+  $('src').textContent = source;
+  $('src').style.color = source === 'llm' ? css('--pass') : source === 'fallback' ? css('--warn') : css('--fail');
+  $('act').textContent = action ? (action.intent + (action.object ? ' → ' + action.object : '')) : 'nothing (refused)';
+}
+MOCK_REPLIES.forEach(([c, r], i) => {
+  const b = document.createElement('button');
+  b.textContent = 'Reply ' + (i + 1);
+  b.title = c;
+  b.onclick = () => { $('cmd').value = c; $('reply').value = r; update(); };
+  $('presets').appendChild(b);
+});
+$('cmd').value = MOCK_REPLIES[5][0]; $('reply').value = MOCK_REPLIES[5][1];
+$('cmd').oninput = update; $('reply').oninput = update;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', update);
+update();
+</script>
+</body>
+</html>

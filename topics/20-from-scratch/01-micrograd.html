@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>micrograd · Module 20</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 20 · From-scratch repos</a> › micrograd</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 20 · From-scratch code · 1 of 6</div>
+<h1>micrograd: backpropagation in about 150 lines</h1>
+<p class="lede">A tiny engine that works out gradients for you. It does automatically what you did by hand in Lessons 4 and 15, and it is the same idea that sits inside PyTorch.</p>
+
+<div class="facts">
+  <div><b>Repo</b><a href="https://github.com/karpathy/micrograd">karpathy/micrograd</a></div>
+  <div><b>Licence</b>MIT</div>
+  <div><b>Stars</b>18,738 (7 Nov 2026, GitHub API)</div>
+  <div><b>Core code</b><code>engine.py</code> 94 lines, <code>nn.py</code> 60 lines (counted with <code>wc -l</code>)</div>
+  <div><b>Status</b>Small and finished. Not marked deprecated. Last commit 3 Aug 2026. The README now points to <em>microgpt</em> for a faster engine.</div>
+  <div><b>Needs</b>Plain Python for the engine. The demo uses numpy, scikit-learn and matplotlib. The tests need PyTorch.</div>
+</div>
+<p class="meta">Tested at commit <code>7bc720e</code> on 7–8 Nov 2026, on a MacBook with an Apple M4 (16 GB), Python 3.14.5. Short code excerpts are quoted with credit to Andrej Karpathy (MIT).</p>
+
+<div class="note card"><strong>Track: LLM + Robotics.</strong> Backpropagation trains every neural network, whether it writes text or steers a robot. On this page micrograd trains Robo-Helper's stop detector (robotics), and the same engine idea trains GPTs (LLMs).</div>
+
+<div class="toc">
+<strong>On this page</strong>
+<ol>
+<li><a href="#start">Start here (no maths needed)</a></li>
+<li><a href="#summary">Summary</a></li>
+<li><a href="#code">How the code works</a></li>
+<li><a href="#demo">Interactive: watch the gradients flow</a></li>
+<li><a href="#run">Run it, tested</a></li>
+<li><a href="#robohelper">Connect to Robo-Helper (Module 18)</a></li>
+<li><a href="#robotics">Why it matters for robotics</a></li>
+<li><a href="#reality">Reality check</a></li>
+<li><a href="#check">Self-check</a></li>
+<li><a href="#reading">Further reading</a></li>
+</ol>
+</div>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">micrograd is a little program that remembers every sum it does, so that afterwards it can tell you which number to nudge, and which way, to make the answer better.</p>
+
+<h3>Think of it like this</h3>
+<p>Imagine a row of dominoes that split and join. You push the first ones and the last one falls. Now you want to know: "if I had pushed domino 3 a bit harder, how much faster would the last one fall?" micrograd keeps a map of which domino knocked over which. Then it walks the map backwards, from the last domino to the first, and works out how much each one mattered. That backwards walk is called <em>backpropagation</em>.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Every number is wrapped in a little box called a <code>Value</code>.</li>
+<li>When you add or multiply two boxes, the new box remembers which boxes made it, and how.</li>
+<li>At the end you have one number, the "loss", that says how wrong the answer is.</li>
+<li>Call <code>backward()</code>. micrograd walks the map backwards and writes into every box how much it changed the loss. That's its gradient.</li>
+<li>Nudge every weight a little bit against its gradient. The loss goes down. Repeat.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>In Lesson 4 you worked out by hand how to change Robo-Helper's stop-detector weights. That works for one neuron. A brain with 100 or a million weights needs a machine to do it. micrograd is that machine, small enough to read in an afternoon.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>In the demo below, drag the distance slider and watch the gradient of each weight change sign.</li>
+<li>Write down <code>a = 2</code>, <code>b = 3</code>, <code>c = a × b</code>. If you add 1 to <code>a</code>, how much does <code>c</code> change? (It changes by 3, which is <code>b</code>. That's the gradient of <code>c</code> with respect to <code>a</code>.)</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Gradient</dt><dd>How much the loss changes if you nudge one number up a tiny bit.</dd>
+<dt>Backpropagation</dt><dd>Walking backwards through the sums to get every gradient in one go.</dd>
+<dt>Autograd</dt><dd>Software that does backpropagation for you, automatically.</dd>
+<dt>MLP</dt><dd>"Multi-layer perceptron": layers of neurons, each layer feeding the next.</dd>
+<dt>Loss</dt><dd>One number that says how wrong the model is. Smaller is better.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some code and maths. On a first read, skim the headings, look at the demo and the Robo-Helper results, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>micrograd is a scalar autograd engine (<code>engine.py</code>, 94 lines) plus a tiny neural-network library on top (<code>nn.py</code>, 60 lines). Each <code>Value</code> stores a number, its gradient, its parents, and a small function that knows the local derivative. <code>backward()</code> sorts the graph and applies the chain rule from the output back to the inputs. We ran the README example (24.7041, 138.8338, 645.5773, as promised) and trained the README's 2-layer MLP on two moons: 100% training accuracy in 100 steps, 74.5 s on a MacBook CPU.</p>
+</div>
+<ul>
+<li><strong>Everything is a scalar.</strong> A neuron is chopped into single adds and multiplies. That is slow, but every step is visible.</li>
+<li><strong>The API copies PyTorch.</strong> <code>loss.backward()</code>, <code>p.grad</code>, <code>zero_grad()</code> mean the same thing in both.</li>
+<li><strong>It checks out against PyTorch.</strong> The two unit tests compare micrograd's gradients with PyTorch's. Both passed on our Mac.</li>
+<li><strong>Robo-Helper result:</strong> on Lesson 4's own data a micrograd MLP is <em>no better</em> than the single neuron, because the true rule is a straight line. On braking data with a curved rule it misses 7 stops instead of 17, out of 500 test readings.</li>
+<li><strong>The README now points onward</strong> to <a href="https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95">microgpt</a>, a whole GPT in one dependency-free Python file built on a faster version of this engine.</li>
+</ul>
+
+<h2 id="code">2. How the code works</h2>
+<h3>The <code>Value</code> box</h3>
+<p>A <code>Value</code> holds <code>data</code> (the number), <code>grad</code> (starts at 0), <code>_prev</code> (the Values that made it) and <code>_backward</code> (a small function). Here is multiplication, quoted from <code>engine.py</code>:</p>
+<pre><code>def __mul__(self, other):
+    other = other if isinstance(other, Value) else Value(other)
+    out = Value(self.data * other.data, (self, other), '*')
+    def _backward():
+        self.grad += other.data * out.grad
+        other.grad += self.data * out.grad
+    out._backward = _backward
+    return out</code></pre>
+<p class="legend">From karpathy/micrograd, <code>micrograd/engine.py</code> (MIT).</p>
+<p>Read the two <code>grad</code> lines as: "if <code>out</code> moves by 1, <code>self</code> was pushing it with strength <code>other.data</code>". That is the derivative of <code>a × b</code> with respect to <code>a</code>, which is <code>b</code>. It's multiplied by <code>out.grad</code>, how much <code>out</code> matters to the final loss. That multiplication is the chain rule.</p>
+<p>Notice the <code>+=</code>. If one Value is used twice (like <code>b</code> in the README example), the gradient from each use is added up. Forgetting this is the most common bug in hand-written backprop.</p>
+
+<h3>The one idea that makes it click: walk the graph backwards, in order</h3>
+<p><code>backward()</code> first builds a <strong>topological order</strong>: a list where every Value comes after the Values that made it. Then it sets the output's gradient to 1 and calls each node's <code>_backward</code> in reverse order:</p>
+<pre><code>self.grad = 1
+for v in reversed(topo):
+    v._backward()</code></pre>
+<p class="legend">From karpathy/micrograd, <code>micrograd/engine.py</code> (MIT).</p>
+<p>Reverse order guarantees that by the time a node passes its gradient back to its parents, it has already collected the gradient from <em>everything</em> that used it. That's the whole algorithm. PyTorch does the same thing, but on big arrays (tensors) instead of single numbers, and with fast C++ and GPU code.</p>
+
+<h3>The neural-network layer</h3>
+<p><code>nn.py</code> builds on that: a <code>Neuron</code> is a list of weight Values and a bias, giving <code>relu(w·x + b)</code>. A <code>Layer</code> is a list of Neurons, and an <code>MLP</code> is a list of Layers. <code>parameters()</code> collects every weight so the training loop can do <code>p.data -= lr * p.grad</code>. The demo's <code>MLP(2, [16, 16, 1])</code> has 337 parameters.</p>
+
+<h2 id="demo">3. Interactive: watch the gradients flow</h2>
+<div class="card demo">
+<h3>Robo-Helper's stop neuron, as a micrograd graph</h3>
+<p class="legend">The Lesson 4 neuron: p = sigmoid(w1·distance + w2·speed + b), loss = cross-entropy. Each row is one Value, listed in topological order. Press <b>Backward</b> to run the reversed loop one node at a time. Gradients are computed by a 30-line JavaScript copy of micrograd's <code>Value</code>.</p>
+<label for="dx">distance x1 (m): <span id="dxv" class="num"></span></label>
+<input id="dx" type="range" min="0" max="8" step="0.1" value="1.5">
+<label for="dv">closing speed x2 (m/s): <span id="dvv" class="num"></span></label>
+<input id="dv" type="range" min="0" max="2" step="0.05" value="1">
+<p><label><input type="checkbox" id="lab" checked> label: should stop (1)</label></p>
+<p><button id="bstep">Backward one step</button> <button id="ball">Backward all</button> <button id="breset">Reset gradients</button></p>
+<div class="table-wrap"><table id="gtab"></table></div>
+<div class="stats">
+  <div class="stat"><div class="k">p(stop)</div><div class="v" id="gp">–</div></div>
+  <div class="stat"><div class="k">dLoss/dw1</div><div class="v" id="gw1">–</div></div>
+  <div class="stat"><div class="k">(p − y)·x1, by hand</div><div class="v" id="gh1">–</div></div>
+  <div class="stat"><div class="k">dLoss/dw2</div><div class="v" id="gw2">–</div></div>
+</div>
+<p class="legend">Weights are fixed at w1 = −0.9, w2 = 1.3, b = 2.1. At distance 1.5 and speed 1.0 the page gives p = 0.885948 and dLoss/dw1 = −0.171079, the same digits as our Python check in section 6.</p>
+</div>
+
+<h2 id="run">4. Run it, tested</h2>
+<p>Everything ran in a fresh venv in a scratch folder, with the repo cloned into its own empty folder. Our scripts live in a separate <code>scripts/</code> folder and run by path.</p>
+<pre><code># 8 Nov 2026 · MacBook (Apple M4), CPU · Python 3.14.5
+git clone --depth 1 https://github.com/karpathy/micrograd micrograd-src/micrograd
+python3 -m venv venv
+venv/bin/pip install numpy scikit-learn torch pytest     # numpy 2.5.4, scikit-learn 1.9.1, torch 2.15.0
+venv/bin/pip install -e micrograd-src/micrograd
+
+# 1) The README example, copied into scripts/readme_example.py
+$ venv/bin/python scripts/readme_example.py
+24.7041
+138.8338
+645.5773
+
+# 2) The unit tests (they compare against PyTorch)
+$ venv/bin/python -m pytest -q micrograd-src/micrograd/test
+..                                                    [100%]
+2 passed in 6.22s</code></pre>
+<p>All three README numbers match exactly. Python 3.14 caused no problems for micrograd.</p>
+
+<h3>Two moons, as a plain script</h3>
+<p><code>demo.ipynb</code> is a notebook. We copied its steps into <code>scripts/moons.py</code>: the same seeds (1337), <code>make_moons(n_samples=100, noise=0.1)</code>, <code>MLP(2, [16, 16, 1])</code>, the same hinge ("max-margin") loss with L2 1e-4, and 100 steps of SGD with the learning rate falling from 1.0 to 0.1. We added a timer and a check on 200 fresh moons points.</p>
+<pre><code># 7 Nov 2026 · MacBook (Apple M4), CPU
+$ venv/bin/python scripts/moons.py
+params 337
+step 0 loss 0.8958, accuracy 50%
+step 10 loss 0.2451, accuracy 91%
+step 20 loss 0.1898, accuracy 91%
+step 30 loss 0.1173, accuracy 95%
+step 40 loss 0.0602, accuracy 100%
+step 50 loss 0.0988, accuracy 96%
+step 60 loss 0.0326, accuracy 99%
+step 70 loss 0.0142, accuracy 100%
+step 80 loss 0.0123, accuracy 100%
+step 90 loss 0.0110, accuracy 100%
+step 99 loss 0.0110, accuracy 100%
+time 74.5s
+held-out accuracy 100.0%</code></pre>
+<p>The losses match the notebook's saved output line for line (it also ends at step 99, loss 0.01098, accuracy 100%). The cost is the point to notice: 74.5 seconds for 100 steps of a 337-weight network on 100 points. Every multiply is a Python object with a closure. PyTorch would do this in well under a second.</p>
+
+<h2 id="robohelper">5. Connect to Robo-Helper (Module 18)</h2>
+<p>Module 18 uses the standard library only, and every gradient is written by hand. micrograd is the next rung up. It's still pure Python, but the gradients are worked out <em>for</em> you.</p>
+
+<h3>a) Check our hand-derived gradients with a 27-line engine</h3>
+<p>In <a href="../18-robot-brain/04-neuron.html">Lesson 4</a> the update rule is <code>w −= lr × (p − label) × x</code>. In <a href="../18-robot-brain/15-tiny-lm.html#attention">Lesson 15's attention stretch</a>, <code>lesson15_attention.py</code> back-propagates through softmax with <code>d_s = a × (d_a − Σ a·d_a)</code>. We wrote a micrograd-style <code>V</code> class (27 lines with <code>+ × ** exp log</code>) and let it compute both gradients automatically:</p>
+<pre><code># 7 Nov 2026 · MacBook (Apple M4), CPU
+$ venv/bin/python scripts/tiny_value.py
+lesson04 neuron, p = 0.885948
+  autodiff dw: [-0.171079, -0.114052] db: -0.114052
+  by hand  dw: [-0.171079, -0.114052] db: -0.114052
+lesson15 softmax backward
+  autodiff d_s: [0.022903, -0.059523, 0.054539, -0.017918]
+  by hand  d_s: [0.022903, -0.059523, 0.054539, -0.017918]</code></pre>
+<p>They agree to six decimal places. Lesson 15 checked its attention backprop against a <em>numerical</em> gradient (nudge and measure). This is a second, independent check: an autograd engine never sees our formula, yet reaches the same numbers.</p>
+
+<h3>b) A better stop detector? Tested honestly</h3>
+<p>The robot's stop decision comes from <a href="../18-robot-brain/04-neuron.html">Lesson 4</a>'s single neuron, judged with <a href="../18-robot-brain/05-evaluation.html">Lesson 5</a>'s precision and recall. We trained a micrograd <code>MLP(2, [8, 8, 1])</code> (105 weights, hinge loss as in the demo, 300 SGD steps of 64 examples) and compared it with the neuron, using Lesson 5's own split and rules. "Safe cut" is Lesson 5's rule: the highest threshold whose <em>training</em> recall is at least 0.97.</p>
+<pre><code># 8 Nov 2026 · MacBook (Apple M4), CPU
+$ venv/bin/python scripts/micrograd_stop.py &lt;Module 18 solutions folder&gt;
+
+== Lesson 4/5 data (straight-line rule: stop if d - v &lt; 1): 450 train, 150 test ==
+single neuron (Lesson 4)
+   default cut  : accuracy 0.973  precision 0.946  recall 0.946  missed stops 2
+   safe cut +0.22: accuracy 0.947  precision 0.837  recall 0.973  missed stops 1
+micrograd MLP 2-8-8-1 (105 params)
+   default cut  : accuracy 0.980  precision 1.000  recall 0.919  missed stops 3
+   safe cut -1.10: accuracy 0.753  precision 0.500  recall 0.973  missed stops 1
+
+== Braking data (curved rule: stop if d &lt; 0.3 + v^2/1.6): 1500 train, 500 test ==
+single neuron (Lesson 4)
+   default cut  : accuracy 0.946  precision 0.937  recall 0.898  missed stops 17
+   safe cut +0.11: accuracy 0.912  precision 0.811  recall 0.958  missed stops 7
+micrograd MLP 2-8-8-1 (105 params)
+   default cut  : accuracy 0.966  precision 0.941  recall 0.958  missed stops 7
+   safe cut -0.02: accuracy 0.966  precision 0.941  recall 0.958  missed stops 7</code></pre>
+<div class="table-wrap"><table>
+<tr><th>Data</th><th>What happened</th></tr>
+<tr><td>Lesson 4/5 data</td><td><strong>No real gain.</strong> The true rule (<code>d − v &lt; 1</code>) is a straight line, which is exactly what one neuron draws. The MLP's extra accuracy is one reading out of 150, and it misses one <em>more</em> stop. At Lesson 5's safe setting it is much worse: precision 0.500 against 0.837. Two more training seeds gave the same picture (safe-cut precision 0.837 and 0.818).</td></tr>
+<tr><td>Braking data</td><td><strong>A real gain.</strong> Stopping distance grows with speed <em>squared</em>, so the true boundary is a curve. A straight line can't follow it. At the default cut the MLP misses 7 stops instead of 17. At the same safe recall (0.958) its precision is 0.941 against 0.811, so it gives far fewer false alarms. Seeds 1 and 2 reached 0.972 and 0.974 accuracy, against the neuron's 0.946.</td></tr>
+</table></div>
+<p>For this test we made the braking data ourselves. Speeds go up to 3.5 m/s, and the sensors are less noisy than Lesson 4's (0.1 m and 0.05 m/s). With Lesson 4's noisier sensors, the noise blurred the curve and the two models tied. Cost: in micrograd one MLP decision took about 0.2–0.5 ms, against 0.0005 ms for the neuron. In the simulator's bake-off the stop detector is trained on Lesson 4's straight-line data, so swapping in the MLP would not be expected to help there.</p>
+
+<h3>Your next step</h3>
+<ol>
+<li>Copy the 27-line <code>V</code> class from the code above (the <code>__init__</code>, <code>__add__</code>, <code>__mul__</code>, <code>__pow__</code>, <code>exp</code>, <code>log</code> and <code>backward</code> methods, written in your own words). Use it to recompute the gradient of <code>W2</code> in <code>lesson15_tiny_lm.py</code>'s <code>train_step</code> for one example, and check it matches <code>d_scores[k] × hidden[j]</code>.</li>
+<li>Then make your own curved stop rule (try <code>d &lt; 0.3 + v²/1.6</code>). Train Lesson 4's neuron and a 2-8-8-1 micrograd MLP on it. Compare missed stops on a test set you never trained on.</li>
+</ol>
+
+<h2 id="robotics">6. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Every learned robot controller is trained by backprop.</strong> Policies, perception networks and world models all use this same algorithm, run by PyTorch or JAX on tensors.</li>
+<li><strong>Physics is often curved.</strong> Braking distance grows with speed squared. Torque needed changes with arm angle. Our braking test shows that one neuron can't draw these boundaries and a small MLP can.</li>
+<li><strong>Gradients can run through a simulator.</strong> "Differentiable physics" research builds simulators out of operations like micrograd's, so a gradient can flow from "the robot missed the target" back to the control inputs. micrograd shows the mechanism, not a tool you'd use for that.</li>
+<li><strong>Gradient checking is a safety habit.</strong> Before trusting a hand-written gradient in robot code, compare it against autograd or a numerical estimate, as we did above.</li>
+</ul>
+</div>
+
+<h2 id="reality">7. Reality check</h2>
+<ul>
+<li><strong>Far too slow for real use.</strong> 74.5 s for 100 steps of a 337-weight net on 100 points. Real work uses tensors: PyTorch, JAX or <a href="05-tinygrad.html">tinygrad</a> (page 5).</li>
+<li><strong>Only a few operations.</strong> <code>+</code>, <code>×</code>, <code>**</code> with a number, and <code>relu</code>. No <code>exp</code> or <code>log</code>, so no sigmoid or cross-entropy. That's why the demo uses a hinge loss. Our 27-line class adds <code>exp</code> and <code>log</code>.</li>
+<li><strong>Deep recursion.</strong> <code>build_topo</code> is recursive. A very long chain of operations can hit Python's recursion limit.</li>
+<li><strong>Not deprecated, but not the newest.</strong> The README sends readers who want more to microgpt, which keeps local gradients at forward time instead of one closure per operation.</li>
+<li><strong>Pitfalls when copying it:</strong> forgetting <code>zero_grad()</code> between steps (gradients pile up because of <code>+=</code>), and using <code>=</code> instead of <code>+=</code> in a <code>_backward</code>.</li>
+</ul>
+
+<h2 id="check">8. Self-check</h2>
+<details><summary>Why does <code>_backward</code> use <code>+=</code> and not <code>=</code>?</summary><p>A Value can feed several later operations. Its total gradient is the sum of the gradients from every use, so each use adds its share.</p></details>
+<details><summary>Why must <code>backward()</code> visit nodes in reverse topological order?</summary><p>A node can only pass its gradient back once it has received gradient from every node that used it. Reverse topological order guarantees all of those come first.</p></details>
+<details><summary>In <code>c = a × b</code>, what is <code>a.grad</code> after <code>c.backward()</code>?</summary><p><code>b.data</code>. The output's gradient is 1, and the local derivative of <code>a × b</code> with respect to <code>a</code> is <code>b</code>.</p></details>
+<details><summary>Why didn't the MLP beat the single neuron on Lesson 4's data?</summary><p>The true stop rule there is a straight line, which one neuron can already draw. Extra layers only help when the boundary is curved, as in the braking test.</p></details>
+<details><summary>What is the difference between micrograd and PyTorch's autograd?</summary><p>The same algorithm. micrograd works on single numbers in pure Python. PyTorch works on whole tensors with fast compiled kernels on CPU or GPU.</p></details>
+
+<h2 id="reading">9. Further reading</h2>
+<ul>
+<li><a href="https://github.com/karpathy/micrograd">karpathy/micrograd</a>: the repo, with <code>demo.ipynb</code> and <code>trace_graph.ipynb</code></li>
+<li><a href="https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95">microgpt</a>, a whole GPT in pure Python, and its <a href="https://karpathy.github.io/2026/02/12/microgpt/">explainer post</a> (both linked from the README)</li>
+<li><a href="https://pytorch.org/">PyTorch</a>, which the tests use as the reference</li>
+<li>Back in this course: <a href="../18-robot-brain/04-neuron.html">Lesson 4, the neuron</a>, <a href="../18-robot-brain/05-evaluation.html">Lesson 5, precision and recall</a>, <a href="../18-robot-brain/15-tiny-lm.html#attention">Lesson 15, attention</a></li>
+<li>Next: <a href="02-mingpt.html">minGPT</a>, which uses PyTorch's autograd to train a whole Transformer</li>
+</ul>
+
+<nav class="pager">
+  <a href="index.html"><small>Back</small>Module 20 hub</a>
+  <a class="next" href="02-mingpt.html"><small>Next</small>2 · minGPT</a>
+</nav>
+<footer>Module 20 · micrograd · added 2026-11-07 · repo MIT-licensed, short excerpts quoted with credit</footer>
+</main>
+
+<script>
+class V {
+  constructor(d, kids = [], local = [], name = '', op = '') { this.d = d; this.g = 0; this.kids = kids; this.local = local; this.name = name; this.op = op; }
+  add(o, n) { o = o instanceof V ? o : new V(o); return new V(this.d + o.d, [this, o], [1, 1], n, '+'); }
+  mul(o, n) { o = o instanceof V ? o : new V(o); return new V(this.d * o.d, [this, o], [o.d, this.d], n, '×'); }
+  pow(k, n) { return new V(this.d ** k, [this], [k * this.d ** (k - 1)], n, '**' + k); }
+  exp(n) { const e = Math.exp(this.d); return new V(e, [this], [e], n, 'exp'); }
+  log(n) { return new V(Math.log(this.d), [this], [1 / this.d], n, 'log'); }
+}
+function topo(root) {
+  const order = [], seen = new Set();
+  (function visit(v) { if (seen.has(v)) return; seen.add(v); v.kids.forEach(visit); order.push(v); })(root);
+  return order;
+}
+const $ = id => document.getElementById(id);
+let order = [], back = [], pos = 0, W1, W2, P;
+
+function build() {
+  const x1 = +$('dx').value, x2 = +$('dv').value, y = $('lab').checked ? 1 : 0;
+  $('dxv').textContent = x1.toFixed(1); $('dvv').textContent = x2.toFixed(2);
+  W1 = new V(-0.9, [], [], 'w1'); W2 = new V(1.3, [], [], 'w2');
+  const b = new V(2.1, [], [], 'b'), X1 = new V(x1, [], [], 'x1 (distance)'), X2 = new V(x2, [], [], 'x2 (speed)');
+  const z = W1.mul(X1, 'w1·x1').add(W2.mul(X2, 'w2·x2'), 'sum').add(b, 'z');
+  P = z.mul(-1, '−z').exp('e^−z').add(1, '1 + e^−z').pow(-1, 'p = sigmoid(z)');
+  const q = y ? P : P.mul(-1, '−p').add(1, '1 − p');
+  const loss = q.log('log').mul(-1, 'loss');
+  order = topo(loss).filter(v => v.name);
+  back = topo(loss).reverse();
+  pos = 0;
+  render();
+}
+function step() {
+  if (pos === 0) back[0].g = 1;
+  const v = back[pos];
+  v.kids.forEach((k, i) => { k.g += v.local[i] * v.g; });
+  pos++;
+}
+function render() {
+  const cur = pos > 0 ? back[pos - 1] : null;
+  let h = '<tr><th>Value</th><th>op</th><th class="num">data</th><th class="num">grad</th></tr>';
+  order.forEach(v => {
+    const mark = v === cur ? ' style="background:var(--accent-soft)"' : '';
+    h += `<tr${mark}><td>${v.name}</td><td>${v.op || 'input'}</td><td class="num">${v.d.toFixed(6)}</td><td class="num">${pos ? v.g.toFixed(6) : '–'}</td></tr>`;
+  });
+  $('gtab').innerHTML = h;
+  const done = pos >= back.length, y = $('lab').checked ? 1 : 0;
+  $('gp').textContent = P.d.toFixed(6);
+  $('gw1').textContent = done ? W1.g.toFixed(6) : '–';
+  $('gw2').textContent = done ? W2.g.toFixed(6) : '–';
+  $('gh1').textContent = ((P.d - y) * +$('dx').value).toFixed(6);
+}
+$('bstep').onclick = () => { if (pos < back.length) step(); render(); };
+$('ball').onclick = () => { while (pos < back.length) step(); render(); };
+$('breset').onclick = build;
+['dx', 'dv', 'lab'].forEach(id => $(id).addEventListener('input', build));
+build();
+</script>
+</body>
+</html>

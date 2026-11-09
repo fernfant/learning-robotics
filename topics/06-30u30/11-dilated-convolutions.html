@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 11 · Dilated Convolutions</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 11</nav>
+
+<div class="eyebrow"><span class="track robo">Robotics</span>Unit 2 · Deep learning explosion · Day 11</div>
+<h1>Multi-Scale Context Aggregation by Dilated Convolutions</h1>
+<p class="lede">Space out a 3×3 filter's taps instead of shrinking the image. Each layer can see exponentially further while the output keeps full resolution, which is exactly what pixel-level prediction needs.</p>
+
+<div class="facts">
+  <div><b>Authors</b>Fisher Yu (Princeton), Vladlen Koltun (Intel Labs)</div>
+  <div><b>Year / venue</b>2016 · ICLR</div>
+  <div><b>Core idea</b>Dilated convs for dense prediction</div>
+  <div><b>Study time</b>2–4 h</div>
+</div>
+<p class="meta">Original: <a href="https://arxiv.org/abs/1511.07122">arXiv:1511.07122</a> · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/11_dilated_convolutions">30u30 Day 11</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">By spreading out the points a small filter looks at, a network can see a big area of the picture while still giving an answer for every single pixel.</p>
+
+<h3>Think of it like this</h3>
+<p>Imagine checking a big field for weeds through a cardboard tube. You only see a small circle. One way to see more is to stand further back, but then you miss small details. Another way is to look at nine points spread far apart, like a wider net. Do that in several rounds, each time with the points further apart, and soon you have covered the whole field without losing detail.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>A normal filter looks at a small 3-by-3 square of neighbouring pixels.</li>
+<li>A dilated filter looks at the same nine points, but with gaps between them.</li>
+<li>Layer after layer, the gaps double: 1, 2, 4, 8, 16.</li>
+<li>So the area each output pixel "sees" grows very fast, while the number of settings to learn grows slowly.</li>
+<li>The picture is never shrunk, so the network can label every pixel: road, person, car, and so on.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>To pick up an object, a robot needs to know exactly which pixels belong to it, not just that it is "somewhere in the picture". Labelling every pixel is called segmentation. Good segmentation means the gripper closes on the cup, not on the table next to it.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>On squared paper, colour one square. Then colour the squares one step away in each direction, then two steps away, then four. Watch how fast the coloured area grows.</li>
+<li>In the demo further down, click <b>Paper: 1,1,2,4,8,16,1</b>, then move the <b>Layers used</b> slider. Then click <b>Constant 2: 2,2,2,2</b> and look for the holes.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Pixel</dt><dd>One tiny dot of colour in a picture.</dd>
+<dt>Receptive field</dt><dd>The patch of the input picture that one output pixel can "see".</dd>
+<dt>Dilation</dt><dd>How far apart the filter's points are spread.</dd>
+<dt>Segmentation</dt><dd>Giving every pixel in a picture a label.</dd>
+<dt>Context</dt><dd>The surroundings that help you work out what something is.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Classification networks pool and stride until the whole image is one vector. Semantic segmentation needs a label for every pixel, so that lost resolution has to be recovered somehow. This paper avoids losing it. It uses <strong>dilated convolutions</strong>: the same 3×3 weights, applied to inputs spaced <code>l</code> pixels apart. Stack layers with dilation 1, 2, 4, 8, … and the receptive field grows exponentially while the parameter count grows only linearly, with no pooling at all. The authors build a plug-in <strong>context module</strong> from these layers. They also show that a VGG-16 with its last two pooling layers removed is simpler and more accurate for segmentation than the earlier adaptations.</p>
+</div>
+<ul>
+<li><strong>Dilated convolution</strong> is a change to how the operator reads its input, not a bigger filter with zeros in it.</li>
+<li><strong>Context module:</strong> seven 3×3 layers with dilations 1, 1, 2, 4, 8, 16, 1 and a final 1×1. Receptive field 67×67. The basic version has about 64C² parameters.</li>
+<li><strong>Identity initialisation was essential.</strong> With standard random init the module didn't help at all.</li>
+<li><strong>Simplified front end:</strong> 67.6% mean IoU on the Pascal VOC 2012 test set, against 62.2% for FCN-8s and 62.1% for DeepLab, with no CRF.</li>
+<li><strong>Adding the context module helped in every configuration tested.</strong> On the test set it went from 71.3% (front end) to 73.5%, and to 75.3% with a CRF-RNN on top.</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<p>An ordinary discrete convolution and its dilated version, for a 2-D feature map <code>F</code> and a filter <code>k</code>:</p>
+<pre><code>(F ∗ k)(p)   = Σ_{s + t = p}     F(s) · k(t)
+(F ∗_l k)(p) = Σ_{s + l·t = p}   F(s) · k(t)        # l = dilation factor
+
+stacking 3×3 filters with dilation 2^i:
+  F_{i+1} = F_i ∗_{2^i} k_i     →  receptive field of F_{i+1} = (2^{i+2} − 1)²</code></pre>
+<ul>
+<li><code>p</code> is an output position, <code>s</code> an input position and <code>t</code> an offset inside the filter (−1, 0 or +1 for a 3×3 filter).</li>
+<li>With <code>l = 1</code> this is normal convolution. With <code>l = 2</code> the taps land 2 pixels apart, so a 3×3 filter spans 5×5 using 9 weights.</li>
+<li>For a stack of layers with filter size <code>K</code> and stride 1, the receptive field grows by <code>(K − 1)·l</code> per layer: <code>RF = 1 + Σ (K − 1)·l_i</code>.</li>
+<li>Output resolution never drops, because there is no striding and no pooling.</li>
+</ul>
+<p>The paper notes that this operator appears in the wavelet "algorithme à trous", and explains why it prefers the name "dilated convolution": no dilated filter is ever stored.</p>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>Receptive fields, made concrete</h3>
+<div class="card demo">
+<h3>Interactive: receptive field of a stack of 3×3 layers</h3>
+<p class="legend">The grid shows which input pixels feed the centre output pixel after the first <em>n</em> layers. Darker means more paths through the network. Pick a dilation schedule and step through its layers.</p>
+<canvas id="rf" width="700" height="220" aria-label="Grid showing the receptive field footprint of stacked dilated convolutions"></canvas>
+<button id="p0">Paper: 1,1,2,4,8,16,1</button> <button id="p1">Plain: 1×7</button> <button id="p2">Constant 2: 2,2,2,2</button>
+<label for="n">Layers used: <span id="nv" class="num"></span></label>
+<input id="n" type="range" min="1" max="7" step="1" value="7">
+<div class="stats">
+  <div class="stat"><div class="k">Receptive field</div><div class="v" id="rfv">–</div></div>
+  <div class="stat"><div class="k">Pixels covered</div><div class="v" id="cov">–</div></div>
+  <div class="stat"><div class="k">Weights / channel pair</div><div class="v" id="wt">–</div></div>
+</div>
+</div>
+<p>With the paper's schedule the receptive field after each layer is 3, 5, 9, 17, 33, 65 and 67 pixels wide, matching Table 1. Every pixel inside it is covered. Seven plain 3×3 layers reach only 15 pixels with the same 63 weights per channel pair. Repeating dilation 2 samples only every second row and column, so about 72% of its 17×17 field never contributes. This is the <strong>gridding</strong> problem, and it is why schedules start at dilation 1 and grow.</p>
+
+<h3>Why not just pool and upsample?</h3>
+<p>Pooling throws away <em>where</em> things are, and segmentation needs exactly that. Earlier systems either pooled hard and then learned to upsample, or ran the network on several rescaled copies of the image. Dilation gives large context and full resolution at once. The front end applies the same idea to VGG-16. The last two pooling and striding layers are deleted, and the convolutions after each deleted pool get dilation 2 (then 4). That keeps the pretrained weights usable and gives 64×64 output maps. The paper also removed padding of intermediate feature maps, another leftover from classification.</p>
+
+<h3>Making the context module train</h3>
+<p>The module maps C feature maps to C feature maps, so it can drop into any dense-prediction network. Random initialisation didn't work. The fix was to initialise every layer to pass its input straight through: the filter's centre tap is 1 on the matching channel and every other weight is 0. Backprop then learns to add context on top. This is the same "start at the identity" idea as ResNet (<a href="09-resnet.html">Day 09</a>, <a href="10-resnet-identity-mappings.html">Day 10</a>), arrived at independently for a different reason.</p>
+
+<h3>Limitations, and what came after</h3>
+<ul>
+<li><strong>Memory.</strong> Keeping full resolution through deep layers is expensive in activations, which matters on small GPUs.</li>
+<li><strong>Gridding artefacts</strong> appear when large dilations follow each other. Follow-up work by the same group (Dilated Residual Networks, 2017) added layers to smooth them out.</li>
+<li><strong>The ideas spread fast.</strong> DeepLab's atrous spatial pyramid pooling runs several dilations in parallel. WaveNet and temporal convolutional networks use causal 1-D dilated convolutions to cover long time windows. Later, attention (<a href="13-attention.html">Day 13</a>) offered global context in one layer, at quadratic cost.</li>
+</ul>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Segmentation drives grasping and navigation.</strong> Pick points, suction targets and drivable-terrain masks are per-pixel outputs. A model that keeps resolution gives tighter object boundaries, and that decides whether a gripper closes on the object or on the table.</li>
+<li><strong>Context fixes local ambiguity.</strong> A grey patch could be road or wall. Only a wide receptive field can tell. Dilated stacks give that context without a huge model.</li>
+<li><strong>1-D dilated convs suit robot time series.</strong> Force/torque, IMU and joint histories need long windows at low latency. A causal dilated stack covers hundreds of timesteps with a few layers and runs in parallel, unlike an RNN.</li>
+<li><strong>Measure what matters.</strong> Evaluate with mean IoU and per-class IoU, not pixel accuracy. Practise both in <a href="../02-tensortonic.html#track">Module 02's TensorTonic track</a> (mIoU, Dice loss).</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Read the paper (8 pages, about 1 h). Sections 2 and 3 plus Table 1 are the core. Section 4 is the front-end cleanup.</li>
+<li>Use the demo above to predict each row of Table 1 before checking it.</li>
+<li>In the 30u30 Day 11 folder, read <code>implementation.py</code>: the dilated conv block, the context module, the receptive-field analyser and the ASPP head. Run <code>train_minimal.py</code>.</li>
+<li>Work through <code>notebook.ipynb</code>, then the exercises: receptive-field exploration, building the context module, ASPP, an ablation against pooling plus upsampling, and a WaveNet-style audio model.</li>
+<li>Stretch: train the context module with random init and with identity init, and compare. You should reproduce the paper's finding that random init struggles.</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>How many weights does a 3×3 filter with dilation 4 have, and what span does it cover?</summary><p>Still 9 weights per channel pair. It spans 9×9 pixels: 1 + 2·4.</p></details>
+<details><summary>What is the receptive field after 3×3 layers with dilations 1, 2, 4, 8?</summary><p>1 + 2·(1 + 2 + 4 + 8) = 31 pixels across.</p></details>
+<details><summary>Why is dilation better than pooling for segmentation?</summary><p>It grows context without lowering resolution, so you don't need to recover lost spatial detail with upsampling later.</p></details>
+<details><summary>What goes wrong with dilations 2, 2, 2, 2?</summary><p>Only every second pixel is ever sampled, so the receptive field has holes. This is gridding.</p></details>
+<details><summary>Why identity initialisation?</summary><p>Random init left the module unable to improve on its input. Starting from pass-through means the module begins harmless and learns to add context.</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/1511.07122">The original paper</a> (ICLR 2016)</li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/11_dilated_convolutions">30u30 Day 11</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Next: <a href="12-dropout.html">Day 12, Dropout</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="10-resnet-identity-mappings.html"><small>Previous</small>Day 10 · Identity Mappings</a>
+  <a class="next" href="12-dropout.html"><small>Next</small>Day 12 · Dropout</a>
+</nav>
+<footer>Module 06 · Day 11 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('rf'), ctx = cv.getContext('2d'), nIn = document.getElementById('n');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const PRESETS = [[1, 1, 2, 4, 8, 16, 1], [1, 1, 1, 1, 1, 1, 1], [2, 2, 2, 2]];
+let sched = PRESETS[0];
+
+// 1-D path counts from centre output back to input offsets; 2-D footprint is the outer product
+function footprint(dils) {
+  let c = new Map([[0, 1]]);
+  for (const d of dils) {
+    const nx = new Map();
+    for (const [o, v] of c) for (const t of [-d, 0, d]) nx.set(o + t, (nx.get(o + t) || 0) + v);
+    c = nx;
+  }
+  const ks = [...c.keys()], lo = Math.min(...ks), hi = Math.max(...ks);
+  const row = Array.from({ length: hi - lo + 1 }, (_, i) => c.get(lo + i) || 0);
+  return { size: hi - lo + 1, row, hit: row.filter(v => v > 0).length };
+}
+
+function draw() {
+  nIn.max = sched.length;
+  if (+nIn.value > sched.length) nIn.value = sched.length;
+  const n = +nIn.value, f = footprint(sched.slice(0, n));
+  document.getElementById('nv').textContent = n + ' (' + sched.slice(0, n).join(', ') + ')';
+  const W = cv.width, H = cv.height, G = 80, cell = (H - 20) / G, ox = (W - G * cell) / 2, oy = 10;
+  const off = Math.floor((G - f.size) / 2), mx = Math.max(...f.row) ** 2;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = css('--line'); ctx.fillRect(ox, oy, G * cell, G * cell);
+  ctx.fillStyle = css('--accent');
+  for (let i = 0; i < f.size; i++) for (let j = 0; j < f.size; j++) {
+    const v = f.row[i] * f.row[j];
+    if (!v) continue;
+    ctx.globalAlpha = 0.25 + 0.75 * v / mx;
+    ctx.fillRect(ox + (off + j) * cell, oy + (off + i) * cell, cell, cell);
+  }
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = css('--fail'); const c0 = off + (f.size - 1) / 2; ctx.fillRect(ox + c0 * cell, oy + c0 * cell, cell, cell);
+  document.getElementById('rfv').textContent = f.size + '×' + f.size;
+  document.getElementById('cov').textContent = (f.hit * f.hit / (f.size * f.size) * 100).toFixed(0) + '%';
+  document.getElementById('wt').textContent = 9 * n;
+}
+PRESETS.forEach((p, i) => document.getElementById('p' + i).onclick = () => { sched = p; nIn.value = p.length; draw(); });
+nIn.oninput = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

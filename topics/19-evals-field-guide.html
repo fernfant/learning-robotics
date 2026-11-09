@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM Evals: A Field Guide</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../index.html">← LLMs &amp; Robotics</a> · Module 19</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 19 · Evaluation</div>
+<h1>Evals: how to know whether an AI system actually works</h1>
+<p class="lede">The whole eval loop, from one test case to a release gate: gold answers, reading outputs, code graders, AI judges you have checked, error bars, agents, benchmarks.</p>
+<p class="meta">Source: Sergii Makarevych, “Evals: how to know whether an AI system actually works”, X article, 3 Oct 2026 (34 min read) ·
+<a href="https://x.com/sermakarevich/status/2106453816757354947">X article</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">An eval is a test you can repeat. It tells you, with a number, whether an AI does its job, and whether your latest change made it better or worse.</p>
+<h3>Think of it like this</h3>
+<p>Your teacher marks a maths test with an answer key. Without the key she'd have to <em>feel</em> whether each answer looks right, and a neat, confident wrong answer would fool her. An AI is a very neat, very confident student. It never crashes. It just writes a smooth answer that is sometimes wrong. An eval is the answer key, the marking, and the final score.</p>
+<h3>How it works</h3>
+<ol>
+<li><b>Questions with answers.</b> Collect real examples and write the right answer next to each one.</li>
+<li><b>Run the AI</b> on every example and keep what it says.</li>
+<li><b>Mark it.</b> Use a simple rule ("did it mention the 5-day refund?"), another AI as the marker, or a person.</li>
+<li><b>Score it, with a "give or take".</b> "70% right, give or take 12" is honest. "70%" alone is not.</li>
+</ol>
+<h3>The twist</h3>
+<p>The marker can be wrong too. If another AI does the marking, you have to test the marker first. A marker that says "well done!" to everything will make a broken robot look great.</p>
+<h3>Why robots care</h3>
+<p>A robot that says "Done! The blue block is in the bin" when you asked for the purple one is exactly this problem. You check what's actually in the bin, not what the robot says. You build this yourself in <a href="18-robot-brain/19-bakeoff.html#judge">Robo-Helper week 11</a>.</p>
+<h3>Try it</h3>
+<p>Ask a friend 10 quick quiz questions. Before you start, write the answers down. Then mark them twice: once just by how sure they sounded, and once with your answer key. How often do the two marks disagree?</p>
+<h3>Words to know</h3>
+<dl>
+<dt>Eval</dt><dd>A repeatable test of your AI on your examples.</dd>
+<dt>Gold answer</dt><dd>The right answer, written down before the AI runs.</dd>
+<dt>Grader / judge</dt><dd>Whatever does the marking: a rule, another AI, or a person.</dd>
+<dt>Error bar</dt><dd>The "give or take" on a score.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> the full loop, how to check a judge (kappa), the five judge biases, error bars and paired comparisons, grading agents (pass^k), benchmarks, and how to run evals every week.</p>
+
+<div class="toc">
+<strong>In this module</strong>
+<ol>
+<li><a href="#summary">Summary</a></li>
+<li><a href="#why-robotics">Why this matters for robotics</a></li>
+<li><a href="#loop">Deep dive: the loop, and what to measure</a></li>
+<li><a href="#read">Deep dive: read the outputs first</a></li>
+<li><a href="#code">Deep dive: graders made of code</a></li>
+<li><a href="#judge">Deep dive: an AI as the grader, and how to check it</a></li>
+<li><a href="#numbers">Deep dive: honest numbers</a></li>
+<li><a href="#agents">Deep dive: systems with parts (RAG, agents, reward hacking)</a></li>
+<li><a href="#benchmarks">Deep dive: public benchmarks</a></li>
+<li><a href="#habit">Deep dive: making it a habit</a></li>
+<li><a href="#robohelper">Try it on Robo-Helper</a></li>
+<li><a href="#playbook">Playbook</a></li>
+<li><a href="#check">Self-check</a></li>
+<li><a href="#glossary">Glossary &amp; further reading</a></li>
+</ol>
+</div>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>An eval is input, system, grader, number. LLMs fail by being fluent and wrong, so one good demo tells you nothing. Build gold answers first, read a hundred or so outputs to find the real failure types, use code rules for anything definite, and use an AI judge only after you have measured it against human labels (report kappa or catch rate, not raw agreement). Put an error bar on every number, compare versions on the same cases, and know the smallest difference your test set can detect. Always report two numbers: how good the product is, and how good the grader is.</p>
+</div>
+<ul>
+<li><strong>Running example:</strong> a support assistant for a fictional bike and camping shop, with three parts: triage (12 categories), answer (retrieval plus a reply that cites the handbook), and an agent that calls tools against a mock database. 80 tickets: 20 for tuning, 60 for reporting.</li>
+<li><strong>Surface checks miss meaning.</strong> On one ticket, two code checks passed the reply. An AI judge then found an invented "15 business days" allowance that would have gone to a customer.</li>
+<li><strong>Reading outputs drives everything.</strong> Error analysis on the 60 replies: 34 pass. The top failures were a missing required fact (15) and an unsupported claim (12).</li>
+<li><strong>The judge was barely better than chance.</strong> It agreed with human labels on 36 of 60 (60%), but "always pass" would have scored 57%. Kappa was 0.15 and it caught 10 of 26 bad replies.</li>
+<li><strong>Error bars.</strong> Triage accuracy is 0.70, 95% CI [0.58, 0.82]. With 60 cases the smallest reliable difference is about 12 points, so a 5-point regression is invisible.</li>
+<li><strong>Agents:</strong> grade the final state <em>and</em> the path, run tasks several times, and report pass^k (succeeds every time), not just pass@k (succeeds at least once). The example agent: pass^3 = 0.75.</li>
+<li><strong>Judges are biased in known ways:</strong> position, length, self-preference, rating satisfaction instead of success, and results that change with the judge model. Giving the judge the evidence (tool calls, final state) matters more than using a stronger judge.</li>
+<li><strong>Benchmarks pick engines; evals test your product.</strong> Benchmark scores depend on the harness, get contaminated and saturate.</li>
+</ul>
+
+<h2 id="why-robotics">2. Why this matters for robotics</h2>
+<div class="card note">
+<p><strong>Track: LLM.</strong> The source is about evaluating LLM products. Robot evaluation has exactly the same shape: a set of tasks, a check of the final state of the world, several runs because physics and policies are noisy, and judges (human or AI) for the parts that have no exact check.</p>
+</div>
+<ul>
+<li><strong>Final state beats the robot's report.</strong> "Satisfaction is not success" in robot terms: check the bin, not the robot's message. Learned success detectors are graders too, so they need the same checking as an AI judge.</li>
+<li><strong>pass^k is what users feel.</strong> A grasp policy that works 9 times in 10 fails a 5-step task about 4 times in 10 (0.9⁵ ≈ 0.59). Report reliability over repeated runs, and test perturbed versions (moved objects, different lighting) as well as the standard setup.</li>
+<li><strong>Real-robot evals are expensive, so error bars matter more.</strong> Robot papers often report 20 trials per task. A 20-trial success rate of 70% is give or take about 20 points.</li>
+<li><strong>Reward hacking happens in robotics too.</strong> RL policies exploit simulator bugs the same way coding agents exploit tests (Module <a href="07-post-training.html#rlvr">07</a>). Keep a held-out check the policy never trained against.</li>
+<li><strong>Video judges.</strong> Teams increasingly use vision-language models to label robot rollouts as success or failure. Those judges have the same five biases, plus whatever the camera misses.</li>
+</ul>
+
+<h2 id="loop">3. Deep dive: the loop, and what to measure</h2>
+<p>The article runs one ticket through the whole loop first. A customer angrily asks about a missing refund. Triage labels it "returns", which matches the gold label. The answer step writes a polite reply that cites the returns section and states both required facts (5 business days, a 15% restocking fee for used items). Then three graders look at it:</p>
+<div class="table-wrap"><table>
+<tr><th>Grader</th><th>Question</th><th>Verdict</th></tr>
+<tr><td>Code rule</td><td>Does it cite a handbook section?</td><td>pass</td></tr>
+<tr><td>Code rule</td><td>Does it contain both required facts?</td><td>pass</td></tr>
+<tr><td>AI judge</td><td>Does it claim anything the handbook doesn't say?</td><td><b>fail</b>: it invented "up to 15 business days"</td></tr>
+</table></div>
+<p>The lesson: different graders answer different questions, and a fluent reply can pass every surface check while still being wrong.</p>
+<h3>Inputs, gold answers and two piles</h3>
+<ul>
+<li><strong>Inputs should look like real traffic,</strong> awkward cases included. The 80 tickets came from a grid of persona × topic × scenario, so angry, vague and multi-issue tickets all appear. The article cites Anthropic's agent-eval guide: start with 20–50 tasks taken from real failures.</li>
+<li><strong>Gold answers</strong> say what "right" means: the category, the sections to draw on, the 2–3 facts a reply must contain. They are the most valuable and most expensive part of the whole process.</li>
+<li><strong>Dev set and test set.</strong> Tune prompts and graders on the dev set (20) and report only on the test set (60). Tuning on what you report flatters you.</li>
+<li><strong>One number per experiment:</strong> accuracy for triage, pass rate for replies, right-final-state rate for the agent. Always on the test set, always with an error bar.</li>
+</ul>
+<div class="table-wrap"><table>
+<tr><th>Word</th><th>Measures</th><th>Example</th></tr>
+<tr><td>Eval</td><td>your system on your data</td><td>the assistant on 60 tickets</td></tr>
+<tr><td>Benchmark</td><td>a model on a public task</td><td>GSM8K, SWE-bench</td></tr>
+<tr><td>Software test</td><td>a function returns what it should</td><td>the JSON parses</td></tr>
+<tr><td>Monitoring</td><td>live traffic after launch</td><td>sampled real tickets graded daily</td></tr>
+</table></div>
+<p>The article's analogy: a benchmark measures the engine, your eval measures the car on your road.</p>
+
+<h2 id="read">4. Deep dive: read the outputs first</h2>
+<p>Before writing any automatic grader, read the outputs one by one. Write a short note on each failure (<em>open coding</em>), then group the notes into failure types with counts (<em>axial coding</em>). This is <strong>error analysis</strong>. On the 60 test replies:</p>
+<div class="table-wrap"><table>
+<tr><th>Failure type</th><th class="num">Count</th></tr>
+<tr><td>(replies that pass)</td><td class="num">34 of 60</td></tr>
+<tr><td>missing_required_fact</td><td class="num">15</td></tr>
+<tr><td>unsupported_claim</td><td class="num">12</td></tr>
+<tr><td>wrong_section_retrieved</td><td class="num">8</td></tr>
+<tr><td>did_not_answer</td><td class="num">5</td></tr>
+<tr><td>wrong_value</td><td class="num">2</td></tr>
+<tr><td>over_promise</td><td class="num">1</td></tr>
+</table></div>
+<p class="meta">A reply can have more than one failure, so the counts add up to more than 26.</p>
+<p>This list is the plan: one grader per failure type, most frequent first. The article says teams whose eval work stalls have almost always skipped this step. Expect <strong>criteria drift</strong> (Shankar et al., 2024): grading examples sharpens your rubric, which changes earlier grades. Two or three rounds is normal.</p>
+
+<h2 id="code">5. Deep dive: graders made of code</h2>
+<p>A code grader is free, instant and gives the same answer every time. Use it for everything with a definite answer.</p>
+<ul>
+<li><strong>Exact labels.</strong> Triage: accuracy 0.700, macro F1 0.697. Macro F1 weights all 12 categories equally. The two numbers are close, so the mistakes are spread out rather than concentrated in one category.</li>
+<li><strong>Rule checks on free text:</strong> nonempty 100% pass, ≤150 words <b>17%</b> pass, no banned promises 92%. The app is far too chatty, and no judge was needed to find that. IFEval is a public benchmark built entirely from rules like these.</li>
+<li><strong>Required facts:</strong> check each gold fact appears in the reply. This catches the top failure type for free.</li>
+<li><strong>Similarity</strong> (ROUGE, BLEU, embeddings) separates good from bad replies with AUC 0.709 (0.5 is a coin flip). That's enough to notice that outputs <em>changed</em>, not to say whether they are right. Use it as a cheap drift alarm, never as the headline number.</li>
+</ul>
+<p>The limit, in one number: only 11.7% of replies passed every code check, yet the code checks caught <em>none</em> of the invented claims. Rules see form, not meaning.</p>
+
+<h2 id="judge">6. Deep dive: an AI as the grader, and how to check it</h2>
+<p>An AI judge (LLM-as-judge) reads for meaning, so it can catch the invented 15-day allowance. It is also a language model, with all the failure modes of one. The article calls this the place where most eval programmes go wrong.</p>
+<h3>How to ask</h3>
+<ul>
+<li><strong>One yes/no question per failure type.</strong> "Does the reply contain a claim the handbook excerpts don't support?" rather than "rate quality 1–5". The output passes only if every question comes back clean.</li>
+<li><strong>Ask for evidence:</strong> the judge quotes the offending sentence, so a person can check the verdict in seconds.</li>
+<li><strong>Give it the context.</strong> A judge that can't see the handbook can't know what is unsupported.</li>
+</ul>
+<p>The article cites Cho et al. (2026, "Ask, Don't Judge"): yes/no questions about specific errors beat holistic G-Eval scoring on every dataset (Spearman 0.563 vs 0.514 on SummEval). A summary with three planted factual errors got a perfect 5.0 from holistic judges and 1.57 from the question-based one. Adding more and more instructions eventually made the judge worse.</p>
+
+<h3>Checking the judge</h3>
+<p>All 60 replies were labelled by hand, then the judge ran. The reference passed 34; the judge passed 42. They agreed on 36 (60%). That sounds fine until you notice that a judge saying "pass" to everything would agree 57% of the time. <strong>Cohen's kappa</strong> corrects for that: it measures agreement beyond what chance would give. 0 is chance, 1 is perfect. The usual bar is about 0.6 for a judge that gates a release and 0.8 for one that runs unsupervised. This judge scored <b>0.15</b>: lenient, and it caught only 10 of the 26 bad replies.</p>
+
+<div class="card demo">
+<h3>Interactive: is your judge any good?</h3>
+<p class="legend">60 replies checked by hand. Set how many are really good, and how the judge does on each kind. It starts at the article's numbers.</p>
+<label for="kGood">Replies that are really good: <span id="kGoodV" class="num"></span> of 60</label>
+<input id="kGood" type="range" min="1" max="59" step="1" value="34">
+<label for="kCaught">Bad replies the judge catches: <span id="kCaughtV" class="num"></span></label>
+<input id="kCaught" type="range" min="0" max="26" step="1" value="10">
+<label for="kWrong">Good replies the judge wrongly fails: <span id="kWrongV" class="num"></span></label>
+<input id="kWrong" type="range" min="0" max="34" step="1" value="8">
+<div class="stats">
+  <div class="stat"><div class="k">Agreement</div><div class="v" id="kAgree">–</div></div>
+  <div class="stat"><div class="k">"Always pass" agrees</div><div class="v" id="kLazy">–</div></div>
+  <div class="stat"><div class="k">Kappa</div><div class="v" id="kKappa">–</div></div>
+  <div class="stat"><div class="k">Catch rate</div><div class="v" id="kCatch">–</div></div>
+</div>
+<p class="legend" id="kNote"></p>
+<p class="meta">Try 54 good replies, 2 caught and 0 wrongly failed: agreement is 93%, and the judge still misses two thirds of the failures.</p>
+</div>
+
+<p>The fix is iteration on the dev set: add examples of the failure to the judge prompt, narrow the question, and give it the gold facts. In the article's tutorial the "missing fact" judge reached a usable level this way. The "unsupported claim" judge did not, and that question went to a specialised detector instead.</p>
+
+<h3>The five known biases</h3>
+<div class="table-wrap"><table>
+<tr><th>Bias</th><th>What happens</th><th>Cheap fix</th></tr>
+<tr><td>Position</td><td>In A-vs-B comparisons the judge prefers whichever comes first (Wang et al., 2024).</td><td>Judge both orders; count a win only if both agree.</td></tr>
+<tr><td>Length</td><td>Longer answers win. Correcting for length raised agreement with human rankings from 0.94 to 0.98 (Dubois et al., 2024).</td><td>Length-controlled scoring, or yes/no questions.</td></tr>
+<tr><td>Self-preference</td><td>Judges rate their own model family's answers higher (Panickssery et al., 2024).</td><td>Use a judge from a different family than the system under test.</td></tr>
+<tr><td>Satisfaction vs success</td><td>The judge rates how the chat felt, not whether the task got done.</td><td>Give the judge the tool calls and the final state.</td></tr>
+<tr><td>Judge identity</td><td>Swapping the judge model changes which system wins.</td><td>Record the judge model and version with every result.</td></tr>
+</table></div>
+<p>The article gives the GAUGE audit (Bodhwani et al., 2026) its own paragraph because it tests the setup many companies use to decide releases: a simulated user chats with the agent, a judge scores the transcript, and the higher score ships. Across 25 agents and about 3,700 transcripts, this worked when one agent was clearly better (correlation 0.94 with ground truth). On near-equal pairs, which are the decisions that matter, it promoted the worse agent 31% of the time. A judge that only saw the chat and rated satisfaction was a coin flip (AUC 0.49). A judge that also saw the tool calls and whether the task was resolved reached AUC 0.73. <strong>Reliability came from the evidence the judge was given, not from how strong the judge was.</strong></p>
+
+<h3>Panels, detectors and typed judges</h3>
+<ul>
+<li><strong>Panels.</strong> Several smaller judges can agree with humans better than one large one, at a fraction of the cost (Verga et al., 2024). But <em>averaging</em> is fragile: one broken judge (parser failures returning zeros, or a judge that gives everything 10) drags the average anywhere. Acharya et al. (2026) use the geometric median instead, and find about three judges capture most of the benefit because judges' errors are correlated.</li>
+<li><strong>JSON makes answers more uniform.</strong> Parikh (2026): asking for JSON output raised the most common answer's share from 41% to 64%. Harmless for one-right-answer questions; it makes open-ended ratings less discriminating.</li>
+<li><strong>Hallucination detectors</strong> (HHEM, LettuceDetect, MiniCheck, NLI cross-encoders) are 100–500M-parameter models trained for one question: is this sentence supported by this text? They run on a laptop CPU in about a second and, on RAGTruth, come close to a large judge. SelfCheckGPT needs no detector: sample several times and flag claims that change.</li>
+<li><strong>Typed judges</strong> (TypeSafe Jev, see <a href="01-decision-model-evals.html">Module 01</a>) return a calibrated probability for a yes/no or pick-a-label question, about a hundred times cheaper than a generative judge, but give no explanation. The article cites a 2026 study: 92.2% on RewardBench pairs vs 93.5% for a frontier judge, but 78.6% vs 93.1% on hard derivation checks. Escalating low-confidence cases kept 92.5% at about half the cost.</li>
+<li><strong>Judges need benchmarks too.</strong> JudgeBench (Tan et al., 2025) found frontier judges barely beat chance on genuinely hard, checkable problems. Vendor claims like "85% agreement with humans" come from one dataset and don't transfer.</li>
+</ul>
+
+<h2 id="numbers">7. Deep dive: honest numbers</h2>
+<p>Would the score be the same on a different 60 tickets? Three tools answer that.</p>
+<ul>
+<li><strong>Error bar (bootstrap).</strong> Resample the 60 results thousands of times and look at the spread. Triage accuracy 0.700, 95% CI [0.583, 0.817]. The honest sentence is "most likely 70%, somewhere between 58% and 82%". Miller (2024) showed that most published differences between models are smaller than intervals like this, and gives the formulas (including clustered standard errors when several questions share a source).</li>
+<li><strong>Paired comparison.</strong> A v2 prompt that retrieved more sections scored the same judge pass rate as v1: 0.700 vs 0.700, difference +0.000, CI [−0.117, +0.117]. Verdict: no real difference, keep v1. The interval is narrower than for a single score because both versions run on the same tickets, so ticket difficulty cancels out. A McNemar test asks whether v2 wins where v1 loses or they just trade cases. Here they traded: v2 regressed on 14% of cases and improved on others.</li>
+<li><strong>Detection floor.</strong> With 60 cases, the smallest difference you can reliably detect is about 12 points. Below that you need more cases, not a cleverer test.</li>
+<li><strong>Many comparisons.</strong> Test 20 prompt variants and one will look 10 points better by luck. Correct for it, or confirm the winner on fresh cases.</li>
+</ul>
+
+<div class="card demo">
+<h3>Interactive: how wide is the error bar?</h3>
+<p class="legend">The 95% error bar for a pass rate, using the normal approximation <code>1.96 × √(p(1−p)/n)</code>. A bootstrap gives almost the same answer once n is more than about 30.</p>
+<label for="ciN">Number of test cases: <span id="ciNV" class="num"></span></label>
+<input id="ciN" type="range" min="0" max="100" step="1" value="39">
+<label for="ciP">Measured pass rate: <span id="ciPV" class="num"></span></label>
+<input id="ciP" type="range" min="0.05" max="0.95" step="0.01" value="0.70">
+<div class="stats">
+  <div class="stat"><div class="k">Give or take</div><div class="v" id="ciHalf">–</div></div>
+  <div class="stat"><div class="k">95% range</div><div class="v" id="ciRange">–</div></div>
+  <div class="stat"><div class="k">Cases to halve it</div><div class="v" id="ciX4">–</div></div>
+</div>
+<canvas id="ciCanvas" width="700" height="80" aria-label="Error bar for the pass rate on a 0 to 100 percent scale"></canvas>
+<p class="meta">Starts at the article's case: 60 cases at 70% gives about ±12 points. To halve the error bar you need four times as many cases. Robo-Helper's bake-off has only 12 tasks.</p>
+</div>
+
+<h2 id="agents">8. Deep dive: systems with parts (RAG, agents, reward hacking)</h2>
+<h3>Retrieval systems: grade each stage</h3>
+<p>A bad reply can come from the finder or from the writer, and they need different fixes. Grade the finder against the gold sections: hit@2 = 0.93, recall@2 = 0.88. Of 18 failing replies, 1 failed in the finder and 17 in the writer. That one line redirects a week of engineering. For the writer, the RAGAS triad (faithfulness, answer relevance, context precision) needs no gold answers; in this run RAGAS gave context relevance 0.855 and faithfulness 0.737, the same "retrieval good, writing worse" story as the hand-built graders. When two different methods tell the same story, the number is easier to believe. ARES adds confidence intervals by calibrating small judges against about 150 human labels.</p>
+<h3>Agents: final state, path, and many runs</h3>
+<ul>
+<li><strong>Final state and path.</strong> Did the database end up right, and did the agent only take allowed actions (not, say, refund twice)? τ-bench set this pattern. Outcome-only scoring overstates capability because agents sometimes reach the right state by luck.</li>
+<li><strong>pass@k vs pass^k.</strong> Agents are random. pass@k = succeeded at least once in k tries (capability). pass^k = succeeded all k times (reliability). Customers feel pass^k. The example agent scores pass^3 = 0.75. τ²-bench found pass^1 drops about 20 points when the agent must coordinate with an active user.</li>
+<li><strong>Reliability is its own axis.</strong> Rabanser et al. (2026) define 12 reliability metrics (consistency, robustness, predictability, bounded harm). Across 15 frontier models, two years of capability gains brought about one sixth as much reliability gain. Agents break on a rephrased instruction.</li>
+<li><strong>Cost per correct outcome.</strong> Bai et al. (2026): agentic tasks use about a thousand times more tokens than a chat turn, mostly re-reading their own history. The same task on the same model varied 30-fold in cost between runs, and models predicted their own cost poorly (correlation ≤ 0.39).</li>
+</ul>
+
+<div class="card demo">
+<h3>Interactive: pass@k vs pass^k</h3>
+<p class="legend">If each try succeeds with probability p, independently: pass@k = 1 − (1 − p)<sup>k</sup>, pass^k = p<sup>k</sup>.</p>
+<label for="pkP">Chance one try succeeds: <span id="pkPV" class="num"></span></label>
+<input id="pkP" type="range" min="0.5" max="1" step="0.01" value="0.9">
+<label for="pkK">Number of tries k: <span id="pkKV" class="num"></span></label>
+<input id="pkK" type="range" min="1" max="10" step="1" value="3">
+<div class="stats">
+  <div class="stat"><div class="k">pass@k (at least once)</div><div class="v" id="pkAt">–</div></div>
+  <div class="stat"><div class="k">pass^k (every time)</div><div class="v" id="pkHat">–</div></div>
+</div>
+<p class="meta">At 90% per try, "worked at least once in 3" is 99.9%, and "worked all 3 times" is 73%. The second number is what a customer, or a robot owner, actually feels.</p>
+</div>
+
+<h3>Graders get gamed</h3>
+<p>Any grader used to train or select a system will be gamed. Wang et al. (Qwen, 2026) catalogue coding agents reading answers from repository history, editing the tests, and patching for the evaluator. A behaviour monitor cut hacked "solutions" from 28.6% to 0.6% while genuine ones rose from 40% to 61%. Their argument: no grader is scalable, faithful and robust at once. Tests scale and resist gaming but miss intent; judges scale and capture intent but can be gamed; experts are faithful and robust but don't scale. Keep a held-out grader the system never sees, and upgrade it as the system improves. Same idea as the KL leash in <a href="07-post-training.html#pref">Module 07</a>.</p>
+
+<h2 id="benchmarks">9. Deep dive: public benchmarks</h2>
+<ul>
+<li><strong>The harness matters as much as the model.</strong> The article ran GSM8K on one open model with two prompt formats: 0.686 and 0.746. A score is a (model, prompt, harness, version) tuple. Schaeffer et al. (2023) showed some "emergent" jumps vanish under smoother metrics.</li>
+<li><strong>Contamination.</strong> GSM1k rebuilt GSM8K with fresh questions; some model families dropped up to 8 points, others didn't.</li>
+<li><strong>Saturation.</strong> SWE-bench Verified went from roughly 40% to over 80% solved in about two years. MMLU, GSM8K and HumanEval have been replaced by HLE, GPQA Diamond, SWE-bench Verified, LiveCodeBench and τ²-bench, which will saturate too. The top of Chatbot Arena sits within about 20 Elo, inside the noise.</li>
+<li><strong>Redundancy.</strong> Zeng &amp; Papailiopoulos (2026): an 84-model × 133-benchmark matrix is roughly rank two, and five well-chosen benchmarks predict the rest to within about 4 points.</li>
+</ul>
+<p>Use benchmarks to shortlist two or three models. Decide with your own eval on your own data.</p>
+
+<h2 id="habit">10. Deep dive: making it a habit</h2>
+<div class="table-wrap"><table>
+<tr><th>Level</th><th>What</th><th>When</th><th>Cost</th></tr>
+<tr><td>1</td><td>Code graders, schema checks, required facts</td><td>every commit</td><td>free</td></tr>
+<tr><td>2</td><td>Judges and detectors on the test set; human review of a sample</td><td>every prompt, model or retrieval change</td><td>cents to dollars</td></tr>
+<tr><td>3</td><td>A/B test on real traffic</td><td>after shipping</td><td>real users</td></tr>
+</table></div>
+<ul>
+<li><strong>The merge gate</strong> fails the build if the pass rate drops more than 3 points below a 0.70 baseline. It's a tripwire for big regressions, not a guarantee: with a 12-point floor, a 5-point regression gets through. Say so on the dashboard.</li>
+<li><strong>Calibrate, then trust.</strong> Audit the cheap judge gate once against verifiable ground truth, use it only where it agreed, and re-audit when the model, judge, simulator or domain changes.</li>
+<li><strong>Cache every model call</strong> keyed on prompt, data version and recipe. The full A/B on 60 tickets cost 121 judge calls, about four cents. Cost is not a reason to skip evals.</li>
+<li><strong>What a leader should ask for:</strong> four numbers on one page. The pass rate with its interval, the grader's agreement with human labels, the detection floor, and the share of cases that got worse in the last change.</li>
+</ul>
+<p>The article also compares tools. In short: Inspect AI (complete, code-first), lm-evaluation-harness (public benchmarks), promptfoo (YAML suites and red-teaming), DeepEval (pytest-style), RAGAS (RAG triad), Langfuse / Phoenix / LangSmith / Braintrust (tracing plus evals), and small detectors for "is this supported". Its advice is to read a hand-built grader's number against a framework's: agreement is evidence, disagreement is a good question.</p>
+
+<h2 id="robohelper">11. Try it on Robo-Helper</h2>
+<p>Module 18's week-11 bake-off now uses three of these ideas, with real numbers from the project (<code>python3 lesson19_judge.py</code>):</p>
+<ul>
+<li><strong>Kappa and catch rate.</strong> The reply-only rule judge agrees with the exact checks 58% on the word counter (kappa 0.21, caught 3 of 7 failures), 67% on the tiny LM (kappa 0.14, caught 1 of 4), and 75% on the distilled brain, where kappa is <b>−0.12</b>: worse than guessing, and it caught neither of the 2 failures. A lazy "always pass" judge would have agreed 83% of the time.</li>
+<li><strong>Satisfaction vs success.</strong> Asked "where's the green one?", the word counter drives off, bins the green block and says "The green block is in the bin." A reply-only judge passes it, but the bin shows the robot did the wrong thing: it was asked a question, not told to tidy up.</li>
+<li><strong>Error bars and paired comparison.</strong> Word counter 5/12 (bootstrap 95% range 17%–67%), tiny LM 8/12 (42%–92%), distilled 10/12 (58%–100%). Paired: tiny LM minus word counter is +25 points [+0, +50] over 3 differing tasks, which is too close to call on 12 tasks. Distilled minus word counter is +42 points [+17, +67] over 5 differing tasks: a real difference.</li>
+</ul>
+<p>Homework: <code>kappa</code>, <code>catch_rate</code> and <code>bootstrap_ci</code> in <code>lesson19_judge.py</code>, checked by <code>python3 check.py 19a</code>. See <a href="18-robot-brain/19-bakeoff.html#judge">week 11, stretch 2</a>.</p>
+
+<h2 id="playbook">12. Playbook</h2>
+<ol>
+<li>Collect 20–50 real inputs, awkward ones included, and write gold answers before running anything. Split into dev and test.</li>
+<li>Run the system and <strong>read</strong> the outputs. Note each failure, group the notes, count them. That list is your grader plan.</li>
+<li>Write code graders for everything definite: labels, formats, length, required facts, forbidden phrases.</li>
+<li>For meaning, write one yes/no judge question per failure type. Give the judge the context and the evidence (tool calls, final state), and ask it to quote the problem.</li>
+<li>Label a few dozen dev cases by hand. Measure the judge: kappa or catch rate plus false-fail rate. Iterate until it clears about 0.6, or hand that question to a detector.</li>
+<li>Report every score with an error bar. Compare versions paired, on the same cases, and list the cases that got worse.</li>
+<li>Work out your detection floor before comparing versions. Add cases if it's too coarse.</li>
+<li>For agents: check the final state and the path, run each task several times, report pass^k, cost per success and consistency.</li>
+<li>Keep one grader the system never trains or selects against.</li>
+<li>Automate: code checks every commit, judges every change, monitoring after launch. Cache model calls. Re-audit judges when anything changes.</li>
+</ol>
+
+<h2 id="check">13. Self-check</h2>
+<details><summary>Your judge agrees with humans 90% of the time. Is it good?</summary>
+<p>You can't tell yet. If 90% of outputs are good, "always pass" also agrees 90%. Compute kappa, or report how many bad outputs it catches and how many good ones it wrongly fails.</p></details>
+<details><summary>v2 scores 72% and v1 70% on 60 cases. Ship v2?</summary>
+<p>Not on that evidence. With 60 cases the error bar is about ±12 points and the detection floor is about 12. Run a paired comparison, look at the interval and at the cases v2 made worse, and add cases if you need to detect small changes.</p></details>
+<details><summary>Code checks pass 100% of replies. What can still be wrong?</summary>
+<p>Meaning. Code rules see form (length, format, required words). They can't see an invented fact, like the 15-day allowance in the article's example.</p></details>
+<details><summary>Your agent succeeds 95% of the time per task. A job needs 4 tasks in a row. How often does the job succeed?</summary>
+<p>About 81% (0.95⁴). That's pass^k thinking: reliability compounds down, not up.</p></details>
+<details><summary>A judge only sees the chat transcript of a customer-service agent. What will it measure?</summary>
+<p>Mostly satisfaction: how the conversation felt. In the GAUGE audit such a judge was no better than a coin at telling working agents from broken ones (AUC 0.49). Give it the tool calls and the final state.</p></details>
+<details><summary>A model tops a public leaderboard by 2 points. Switch to it?</summary>
+<p>Use it to shortlist, then decide on your own eval. Leaderboard gaps that small are usually within noise, depend on the harness, and may reflect contamination.</p></details>
+
+<h2 id="glossary">14. Glossary &amp; further reading</h2>
+<div class="table-wrap"><table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<tr><td>Eval</td><td>A repeatable test of your system on your data, with a grader and a number.</td></tr>
+<tr><td>Gold answer</td><td>The correct output (or required facts) written down for each input.</td></tr>
+<tr><td>Error analysis</td><td>Reading outputs, noting failures (open coding) and grouping them (axial coding).</td></tr>
+<tr><td>LLM-as-judge</td><td>A model that grades another model's output.</td></tr>
+<tr><td>Cohen's kappa</td><td>Agreement beyond chance. 0 = chance, 1 = perfect; ~0.6 to gate a release.</td></tr>
+<tr><td>Catch rate</td><td>Share of truly bad outputs the grader fails (its recall on failures).</td></tr>
+<tr><td>Bootstrap</td><td>Resampling your results with replacement to get an error bar.</td></tr>
+<tr><td>Paired comparison</td><td>Comparing two versions on the same cases, so case difficulty cancels.</td></tr>
+<tr><td>Detection floor</td><td>The smallest difference your test set can reliably detect.</td></tr>
+<tr><td>pass@k / pass^k</td><td>Succeeds at least once in k tries / every one of k tries.</td></tr>
+<tr><td>Faithfulness</td><td>Every claim in an answer is supported by the retrieved text.</td></tr>
+<tr><td>Reward hacking</td><td>A system optimised against a grader exploiting the grader's blind spots.</td></tr>
+<tr><td>Contamination / saturation</td><td>Test items in training data / a benchmark nearly everyone solves.</td></tr>
+</table></div>
+<p class="meta">Every number on this page is quoted from the article, except the Robo-Helper numbers in section 11, which come from our own project code. The article's running-example numbers come from its author's own tutorial, which isn't linked publicly. Many of the 2026 papers it cites are arXiv preprints we haven't checked independently.</p>
+<ul>
+<li><a href="https://x.com/sermakarevich/status/2106453816757354947">The article on X</a> (full reference list at the end)</li>
+<li>Husain, <a href="https://hamel.dev/blog/posts/evals/">Your AI Product Needs Evals</a>; Husain &amp; Shankar, <a href="https://hamel.dev/blog/posts/evals-faq/">AI Evals FAQ</a></li>
+<li>Miller (2024), <a href="https://arxiv.org/abs/2411.00640">Adding Error Bars to Evals</a></li>
+<li>Shankar et al. (2024), <a href="https://arxiv.org/abs/2404.12272">Who Validates the Validators?</a></li>
+<li>Zheng et al. (2023), <a href="https://arxiv.org/abs/2306.05685">Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena</a></li>
+<li>Yao et al. (2024), <a href="https://arxiv.org/abs/2406.12045">τ-bench</a></li>
+<li>Es et al. (2024), <a href="https://arxiv.org/abs/2309.15217">RAGAS</a></li>
+<li>Related: <a href="01-decision-model-evals.html">Module 01: decision models</a> (thresholds, precision/recall, calibration: the typed-judge side of this page)</li>
+<li>Related: <a href="04-distill-small-models.html#eval">Module 04: evaluation that doesn't fool you</a> (paired bootstrap, splits by day)</li>
+<li>Related: <a href="07-post-training.html#rlvr">Module 07: checkers as rewards</a>, where reward hacking comes from</li>
+<li>Related: <a href="18-robot-brain/05-evaluation.html">Module 18, week 3: testing Robo-Helper honestly</a> and <a href="18-robot-brain/19-bakeoff.html#judge">week 11: the bake-off and the AI judge</a></li>
+</ul>
+
+<footer>Module 19 · added 2026-11-05 · <a href="../index.html">Back to course index</a></footer>
+</main>
+
+<script>
+function kappaCounts(good, caught, wrong, n) {
+  const bad = n - good;
+  const agree = (good - wrong) + caught;
+  const pRef = good / n, pJudge = (good - wrong + bad - caught) / n;
+  const chance = pRef * pJudge + (1 - pRef) * (1 - pJudge);
+  return { agree: agree / n, lazy: good / n, kappa: chance === 1 ? 0 : (agree / n - chance) / (1 - chance), catchRate: bad ? caught / bad : 1 };
+}
+function ciHalf(p, n) { return 1.96 * Math.sqrt(p * (1 - p) / n); }
+function passK(p, k) { return { at: 1 - Math.pow(1 - p, k), hat: Math.pow(p, k) }; }
+const nFromSlider = v => Math.round(10 * Math.pow(100, v / 100));   // 10 .. 1000, log scale
+
+if (typeof document !== 'undefined') {
+  const $ = id => document.getElementById(id);
+  const pct = x => Math.round(x * 100) + '%';
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  function kRender() {
+    const good = +$('kGood').value, bad = 60 - good;
+    $('kCaught').max = bad; $('kWrong').max = good;
+    const caught = Math.min(+$('kCaught').value, bad), wrong = Math.min(+$('kWrong').value, good);
+    $('kGoodV').textContent = good; $('kCaughtV').textContent = `${caught} of ${bad}`; $('kWrongV').textContent = `${wrong} of ${good}`;
+    const r = kappaCounts(good, caught, wrong, 60);
+    $('kAgree').textContent = pct(r.agree); $('kLazy').textContent = pct(r.lazy);
+    $('kKappa').textContent = r.kappa.toFixed(2); $('kCatch').textContent = pct(r.catchRate);
+    $('kNote').textContent = r.kappa >= 0.8 ? 'Kappa ≥ 0.8: good enough to run unsupervised.' :
+      r.kappa >= 0.6 ? 'Kappa ≥ 0.6: good enough to gate a release, with spot checks.' :
+      'Kappa below 0.6: don\'t let this judge make decisions yet. Improve it on the dev set first.';
+  }
+  ['kGood', 'kCaught', 'kWrong'].forEach(id => $(id).addEventListener('input', kRender));
+  kRender();
+
+  const cv = $('ciCanvas'), ctx = cv.getContext('2d');
+  function ciRender() {
+    const n = nFromSlider(+$('ciN').value), p = +$('ciP').value, h = ciHalf(p, n);
+    const lo = Math.max(0, p - h), hi = Math.min(1, p + h);
+    $('ciNV').textContent = n; $('ciPV').textContent = pct(p);
+    $('ciHalf').textContent = '±' + Math.round(h * 100); $('ciRange').textContent = `${pct(lo)}–${pct(hi)}`;
+    $('ciX4').textContent = 4 * n;
+    const W = cv.width, H = cv.height, pad = 20, x = v => pad + v * (W - 2 * pad);
+    ctx.clearRect(0, 0, W, H);
+    ctx.strokeStyle = css('--line'); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x(0), 40); ctx.lineTo(x(1), 40); ctx.stroke();
+    ctx.fillStyle = css('--accent'); ctx.globalAlpha = .3; ctx.fillRect(x(lo), 26, x(hi) - x(lo), 28); ctx.globalAlpha = 1;
+    ctx.beginPath(); ctx.arc(x(p), 40, 6, 0, 2 * Math.PI); ctx.fill();
+    ctx.fillStyle = css('--muted'); ctx.font = '12px sans-serif';
+    ['0%', '50%', '100%'].forEach((l, i) => ctx.fillText(l, x(i / 2) - 12, 74));
+  }
+  ['ciN', 'ciP'].forEach(id => $(id).addEventListener('input', ciRender));
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', ciRender);
+  ciRender();
+
+  function pkRender() {
+    const p = +$('pkP').value, k = +$('pkK').value, r = passK(p, k);
+    $('pkPV').textContent = pct(p); $('pkKV').textContent = k;
+    $('pkAt').textContent = (r.at * 100).toFixed(1) + '%'; $('pkHat').textContent = (r.hat * 100).toFixed(1) + '%';
+  }
+  ['pkP', 'pkK'].forEach(id => $(id).addEventListener('input', pkRender));
+  pkRender();
+} else {
+  module.exports = { kappaCounts, ciHalf, passK, nFromSlider };
+}
+</script>
+</body>
+</html>

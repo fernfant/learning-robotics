@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 08 · AlexNet</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 08</nav>
+
+<div class="eyebrow"><span class="track robo">Robotics</span>Unit 2 · Deep learning explosion · Day 08</div>
+<h1>ImageNet Classification with Deep Convolutional Neural Networks (AlexNet)</h1>
+<p class="lede">A big convolutional network, a big labelled dataset and two gaming GPUs beat years of hand-engineered vision features by a wide margin. Deep learning took over computer vision from here.</p>
+
+<div class="facts">
+  <div><b>Authors</b>Alex Krizhevsky, Ilya Sutskever, Geoffrey E. Hinton</div>
+  <div><b>Year / venue</b>2012 · NIPS (now NeurIPS)</div>
+  <div><b>Core idea</b>Deep CNN + GPUs + lots of data</div>
+  <div><b>Study time</b>3–5 h</div>
+</div>
+<p class="meta">Original: <a href="https://papers.nips.cc/paper/2012/hash/c399862d3b9d6b76c8436e924a68c45b-Abstract.html">NeurIPS proceedings</a> · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/08_alexnet">30u30 Day 8</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">In 2012, a big computer program that learned from over a million labelled photos beat every hand-built method at naming what was in a picture, and it beat them by a lot.</p>
+
+<h3>Think of it like this</h3>
+<p>Think about how you learned to tell dogs from cats. Nobody gave you a rule book about ear shapes. You just saw lots and lots of dogs and cats. AlexNet learns the same way. It looks at over a million photos, each with a label like "dog" or "car", until it can name things in photos it has never seen.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>The program looks at a photo through many small "windows", each one checking a small patch for simple things like edges and colours.</li>
+<li>The next layers combine those simple things into bigger ones: textures, then shapes, then parts like eyes or wheels.</li>
+<li>The last layers put it all together and give a score for each of 1,000 possible labels.</li>
+<li>If the top answer is wrong, the program nudges its settings a tiny bit so it does better next time.</li>
+<li>Two graphics cards (the chips used for video games) did this millions of times over about a week.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Before a robot can pick up a cup, it has to find the cup in its camera picture. Programs like AlexNet made robots much better at recognising objects. Robots today still use the same trick: start with a program trained on millions of everyday photos, then teach it a little more with pictures of the robot's own objects.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Ask someone to show you photos of objects zoomed in so far that you only see a small patch. How many patches do you need before you can name the object? That is roughly how the layers build up an answer.</li>
+<li>In the demo further down, click <b>Parameters</b>, then <b>Multiply-adds</b>. The first shows where the program stores what it learned. The second shows where it does most of its work. They are in different places!</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Neural network</dt><dd>A computer program that learns from examples instead of being given rules.</dd>
+<dt>Convolution</dt><dd>Sliding a small window over a picture and checking each spot for a pattern.</dd>
+<dt>GPU</dt><dd>A graphics chip that can do lots of simple maths at the same time.</dd>
+<dt>Parameters</dt><dd>The numbers inside the program that change as it learns.</dd>
+<dt>Overfitting</dt><dd>Memorising the training photos instead of learning ideas that work on new photos.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>The authors trained a CNN with five convolutional and three fully-connected layers on the 1.2 million labelled images of the ImageNet challenge. It had 60 million parameters and took five to six days on two GTX 580 GPUs. In the ILSVRC-2012 competition it scored a 15.3% top-5 error. The second-best entry, built on hand-designed features, scored 26.2%. Almost none of the parts were new. What was new was putting them together at this scale, plus a few practical tricks that made training fast enough and stopped the network from overfitting.</p>
+</div>
+<ul>
+<li><strong>ReLU instead of tanh.</strong> On CIFAR-10, a four-layer ReLU network reached 25% training error six times faster than the same network with tanh.</li>
+<li><strong>Two GPUs.</strong> Each 3 GB card held half the kernels. The halves talked to each other only at certain layers.</li>
+<li><strong>Fighting overfitting:</strong> random crops and flips, colour jitter along the RGB principal components, and dropout (Day 12) in the first two fully-connected layers.</li>
+<li><strong>Depth mattered.</strong> Removing any one convolutional layer made results worse.</li>
+<li><strong>Results on ILSVRC-2010 test:</strong> 37.5% top-1 and 17.0% top-5 error. The best earlier published results were 45.7% and 25.7%.</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<p>A convolutional layer slides a small set of learned filters over the image. Each filter is reused at every position, so the layer has far fewer weights than a fully-connected one:</p>
+<pre><code>out[k, y, x] = ReLU( b_k + Σ_c Σ_i Σ_j  W[k, c, i, j] · in[c, y·s + i, x·s + j] )
+ReLU(z)      = max(0, z)</code></pre>
+<ul>
+<li><code>k</code> indexes output channels (filters), <code>c</code> input channels, and <code>i, j</code> positions inside the filter.</li>
+<li><code>s</code> is the stride. AlexNet's first layer uses 96 filters of 11×11×3 with stride 4.</li>
+<li><code>W</code> and <code>b</code> are learned. The same <code>W[k]</code> is applied everywhere in the image (<strong>weight sharing</strong>).</li>
+</ul>
+<p>The full network stacks these: conv1 → pool → conv2 → pool → conv3 → conv4 → conv5 → pool → fc6 (4096) → fc7 (4096) → fc8 (1000-way softmax). Training uses SGD with batch size 128, momentum 0.9 and weight decay 0.0005. The learning rate starts at 0.01 and is divided by 10 whenever validation error stops improving. That happened three times over about 90 epochs.</p>
+<p>The paper also uses <strong>local response normalisation</strong> (each activation is divided by a term that grows with the activity of neighbouring channels at the same position) and <strong>overlapping max pooling</strong> (3×3 windows with stride 2). Each gave a small gain: LRN cut top-1/top-5 error by 1.4%/1.2%, overlapping pooling by 0.4%/0.3%. Later networks dropped LRN in favour of batch normalisation.</p>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>Why it worked in 2012 and not in 2005</h3>
+<p>CNNs were not new. LeCun's networks read handwritten digits in the 1990s. Three things changed at once:</p>
+<ul>
+<li><strong>Data.</strong> ImageNet gave roughly 1,000 labelled images for each of 1,000 classes. Earlier datasets had tens of thousands of images in total.</li>
+<li><strong>Compute.</strong> Krizhevsky's hand-written CUDA convolution code (cuda-convnet) made training feasible on consumer GPUs.</li>
+<li><strong>Trainability.</strong> ReLUs don't saturate, so gradients stay large for active units and training is much faster.</li>
+</ul>
+<p>The authors expected this trend to continue, saying "our results can be improved simply by waiting for faster GPUs and bigger datasets". That bet is the seed of the scaling story in <a href="25-scaling-laws.html">Day 25</a>. Splitting the model across two GPUs is an early ancestor of the model parallelism in <a href="24-gpipe.html">Day 24</a>.</p>
+
+<h3>Overfitting control at 60 million parameters</h3>
+<p>Each label carries only about 10 bits of information. With 1.2 million images that's not enough to pin down 60 million weights, so the paper fights overfitting on two fronts:</p>
+<ul>
+<li><strong>Cheap augmentation.</strong> Training uses random 224×224 crops of 256×256 images, plus horizontal flips. That's 2048 variants per image, generated on the CPU while the GPU trains. At test time the network averages its predictions over ten crops.</li>
+<li><strong>Colour jitter.</strong> PCA of all RGB pixel values gives three colour directions. Each image gets a random shift along them, so the network learns that object identity doesn't depend on lighting colour. This alone lowered top-1 error by over 1%.</li>
+<li><strong>Dropout</strong> with probability 0.5 in fc6 and fc7. Without it the network overfit badly. With it, training needed about twice as many iterations. See <a href="12-dropout.html">Day 12</a>.</li>
+</ul>
+
+<h3>Where the parameters and the compute live</h3>
+<div class="card demo">
+<h3>Interactive: AlexNet layer budget</h3>
+<p class="legend">Per-layer parameters versus multiply-adds for one image. Sizes follow standard reimplementations: 55×55 after conv1 (the arithmetic needs a 227-pixel input, though the paper says 224), with conv2, conv4 and conv5 seeing only their own GPU's half of the channels.</p>
+<canvas id="budget" width="700" height="220" aria-label="Bar chart of AlexNet parameters or compute per layer"></canvas>
+<button id="bp">Parameters</button> <button id="bm">Multiply-adds</button>
+<div class="stats">
+  <div class="stat"><div class="k">Total</div><div class="v" id="tot">–</div></div>
+  <div class="stat"><div class="k">Share in conv</div><div class="v" id="sc">–</div></div>
+  <div class="stat"><div class="k">Share in FC</div><div class="v" id="sf">–</div></div>
+</div>
+</div>
+<p>The pattern is lopsided. About 96% of the weights sit in the three fully-connected layers, fc6 alone holding about 38 million. About 92% of the arithmetic happens in the convolutions. Later architectures (GoogLeNet, ResNet on <a href="09-resnet.html">Day 09</a>) replaced the big FC layers with global average pooling and cut parameters sharply. For a robot, compute is usually the tighter limit, and that sits in the conv layers. <a href="28-cs231n.html">Day 28</a> walks through the same bookkeeping for VGG.</p>
+
+<h3>Limitations, and what came after</h3>
+<ul>
+<li><strong>Odd design choices.</strong> The two-GPU split and LRN were workarounds for the hardware and the tools of 2012. Neither survived.</li>
+<li><strong>Large early filters.</strong> 11×11 filters at stride 4 discard detail. ZFNet used smaller first-layer filters and strides, and VGG used only 3×3.</li>
+<li><strong>Depth stopped at 8.</strong> Making plain networks much deeper caused <em>higher</em> training error. ResNet (<a href="09-resnet.html">Day 09</a>) fixed this and went to 152 layers.</li>
+<li><strong>The features transfer.</strong> The paper's own best entry pre-trained on all 15 million ImageNet Fall 2011 images, then fine-tuned. Pre-train on lots of data, then fine-tune is now the default recipe everywhere, robot foundation models included.</li>
+</ul>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>It made learned perception the default.</strong> Object detection, segmentation for grasping and visual servoing all moved from hand-made features (SIFT, HOG) to CNN features after this paper.</li>
+<li><strong>Pre-train, then fine-tune.</strong> Robots rarely have millions of labelled images. Starting from ImageNet weights and fine-tuning on a few thousand robot images is the practical recipe that began here. Vision encoders in today's VLAs follow the same idea at much larger scale.</li>
+<li><strong>Feature-space similarity.</strong> The paper showed that images close together in the 4096-d fc7 space look alike. Place recognition and visual loop closure for robot localisation reuse this idea with newer backbones.</li>
+<li><strong>Augmentation ≈ domain randomisation.</strong> Random crops and colour jitter teach invariance to framing and lighting. Sim-to-real transfer randomises textures, lights and camera poses for the same reason.</li>
+<li><strong>Compute is the budget.</strong> Most of AlexNet's arithmetic is in the conv layers. On an embedded GPU that is where latency goes. See <a href="../04-distill-small-models.html#latency">Module 04 on latency</a>.</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Read the paper (9 pages, about 1.5 h). Focus on Sections 3 and 4. Sections 3.1–3.4 are ordered by how much each trick mattered.</li>
+<li>In the 30u30 Day 8 folder, read <code>implementation.py</code> and match each layer to Figure 2 of the paper. Then run <code>train_minimal.py</code> on the small dataset it uses.</li>
+<li>Work through <code>notebook.ipynb</code>, then the exercises: building the network, an ablation study, feature visualisation, transfer learning and modern replacements such as batch norm.</li>
+<li>Do the ablation honestly: swap ReLU for tanh, remove dropout, remove augmentation. Plot training curves and compare with the paper's claims.</li>
+<li>Stretch: for each conv layer, compute output size, parameters and multiply-adds by hand, then check against the demo above. The <a href="../02-tensortonic.html#track">TensorTonic conv problems</a> from Module 02 are good practice.</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>Why do ReLUs train faster than tanh units?</summary><p>tanh saturates. For large positive or negative inputs its gradient is close to zero, so learning slows down. ReLU has gradient 1 for every positive input. The paper measured about six times faster training on CIFAR-10.</p></details>
+<details><summary>Most parameters are in the FC layers. Why does most compute happen in the conv layers?</summary><p>A conv filter is small but runs at every spatial position. conv1 has only about 35k weights, yet it applies them at 55×55 positions. An FC weight is used once per image.</p></details>
+<details><summary>Name the two main ways AlexNet fought overfitting.</summary><p>Data augmentation (random crops, flips and PCA colour shifts) and dropout in the first two fully-connected layers.</p></details>
+<details><summary>What does test-time averaging over ten crops buy you, and what does it cost?</summary><p>A small accuracy gain: 37.5% versus 39.0% top-1 on ILSVRC-2010. The cost is ten forward passes per image, which a real-time robot usually can't afford.</p></details>
+<details><summary>What is top-5 error?</summary><p>The fraction of test images whose correct label is not among the model's five most probable guesses.</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://papers.nips.cc/paper/2012/hash/c399862d3b9d6b76c8436e924a68c45b-Abstract.html">The original paper</a> (NeurIPS 2012)</li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/08_alexnet">30u30 Day 8</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Next: <a href="09-resnet.html">Day 09, Deep Residual Learning (ResNet)</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="07-coffee-automaton.html"><small>Previous</small>Day 07 · The Coffee Automaton</a>
+  <a class="next" href="09-resnet.html"><small>Next</small>Day 09 · ResNet</a>
+</nav>
+<footer>Module 06 · Day 08 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('budget'), ctx = cv.getContext('2d');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+// name, kind, output H×W, filter size, input channels seen, output channels
+const L = [
+  ['conv1', 'c', 55, 11, 3, 96], ['conv2', 'c', 27, 5, 48, 256], ['conv3', 'c', 13, 3, 256, 384],
+  ['conv4', 'c', 13, 3, 192, 384], ['conv5', 'c', 13, 3, 192, 256],
+  ['fc6', 'f', 1, 1, 9216, 4096], ['fc7', 'f', 1, 1, 4096, 4096], ['fc8', 'f', 1, 1, 4096, 1000]
+].map(([n, t, hw, k, ci, co]) => ({ n, t, p: k * k * ci * co + co, m: hw * hw * k * k * ci * co }));
+let mode = 'p';
+const fmt = v => v >= 1e9 ? (v / 1e9).toFixed(2) + ' G' : v >= 1e6 ? (v / 1e6).toFixed(1) + ' M' : (v / 1e3).toFixed(0) + ' k';
+
+function draw() {
+  const v = L.map(l => l[mode]), tot = v.reduce((a, b) => a + b), max = Math.max(...v);
+  const conv = L.filter(l => l.t === 'c').reduce((a, l) => a + l[mode], 0);
+  const W = cv.width, H = cv.height, pad = 24, bw = (W - 2 * pad) / L.length;
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
+  L.forEach((l, i) => {
+    const h = l[mode] / max * (H - 2 * pad - 16);
+    ctx.fillStyle = l.t === 'c' ? css('--accent') : css('--warn');
+    ctx.fillRect(pad + i * bw + 8, H - pad - h, bw - 16, h);
+    ctx.fillStyle = css('--fg'); ctx.fillText(l.n, pad + i * bw + bw / 2, H - 6);
+    ctx.fillStyle = css('--muted'); ctx.fillText(fmt(l[mode]), pad + i * bw + bw / 2, H - pad - h - 6);
+  });
+  document.getElementById('tot').textContent = fmt(tot);
+  document.getElementById('sc').textContent = (conv / tot * 100).toFixed(0) + '%';
+  document.getElementById('sf').textContent = ((tot - conv) / tot * 100).toFixed(0) + '%';
+}
+document.getElementById('bp').onclick = () => { mode = 'p'; draw(); };
+document.getElementById('bm').onclick = () => { mode = 'm'; draw(); };
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

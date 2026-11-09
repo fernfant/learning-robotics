@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 10 · Identity Mappings</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 10</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Unit 2 · Deep learning explosion · Day 10</div>
+<h1>Identity Mappings in Deep Residual Networks</h1>
+<p class="lede">Keep the shortcut path completely clean, with nothing on it but addition, and signals travel between any two layers in both directions. That lets a 1001-layer ResNet train easily.</p>
+
+<div class="facts">
+  <div><b>Authors</b>Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun (Microsoft Research)</div>
+  <div><b>Year / venue</b>2016 · ECCV</div>
+  <div><b>Core idea</b>Pre-activation residual units</div>
+  <div><b>Study time</b>2–4 h</div>
+</div>
+<p class="meta">Original: <a href="https://arxiv.org/abs/1603.05027">arXiv:1603.05027</a> · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/10_resnet_v2">30u30 Day 10</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">ResNet works even better when nothing at all gets in the way of its shortcuts, and this lets networks with 1,000 layers learn.</p>
+
+<h3>Think of it like this</h3>
+<p>Think of a water slide with a straight express lane next to the twisty part. If the express lane is completely clear, you zoom from the top to the bottom. Put a gate or a speed bump on it, even a small one, and over a very long slide those slow-downs add up until hardly anyone gets through.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Each block has two paths: a shortcut, and a path with the layers that do the work.</li>
+<li>The authors tried putting things on the shortcut: shrinking the signal, gates, extra layers, randomly switching it off. Every one made learning worse.</li>
+<li>They also moved the "clean-up" steps from after the two paths join to inside the work path.</li>
+<li>Now the shortcut is a clear express lane from the top of the network to the bottom.</li>
+<li>Learning signals travel easily through all the layers, so even 1,000-layer networks train well.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Engineers often add new sensors to a robot that already works, such as a touch sensor on its gripper. A safe way is to add the new part like a residual block that starts out adding nothing. On day one the robot behaves exactly as before. Then it slowly learns to use the new sensor.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Multiply 0.9 by itself again and again on a calculator (0.9 × 0.9 × 0.9 …). How many times until you get below 0.01? Now try 1 × 1 × 1 … That is the difference between a slightly blocked shortcut and a clean one.</li>
+<li>In the demo further down, move the <b>Shortcut scale λ</b> slider. At exactly 1 the line stays flat. Just below 1 it sinks, and just above 1 it shoots up.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Shortcut</dt><dd>The path in a ResNet block that skips the layers.</dd>
+<dt>Gradient</dt><dd>The learning signal that tells each layer how to change.</dd>
+<dt>Activation</dt><dd>A simple step after a layer that decides which signals pass on.</dd>
+<dt>Pre-activation</dt><dd>Doing that clean-up step before a layer instead of after it.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>The follow-up to ResNet asks why residual nets train so well, and answers with a few lines of algebra. If the shortcut is a pure identity <em>and</em> nothing is applied after the addition, any deep layer's features equal any shallow layer's features plus a sum of residuals. The gradient then has a term that skips every weight layer. The paper tests this by spoiling the shortcut with scaling, gating, 1×1 convs and dropout. Every variant trains worse. It then moves BN and ReLU <em>before</em> the weight layers ("pre-activation"), so the path after the addition is clean too. A 1001-layer pre-activation ResNet gets 4.92% error on CIFAR-10, against 7.61% for the original design at the same depth.</p>
+</div>
+<ul>
+<li><strong>Clean path, two conditions:</strong> the shortcut is identity, h(x) = x, and the after-addition function is identity, f(y) = y.</li>
+<li><strong>Anything multiplicative on the shortcut hurts</strong> in ResNet-110 on CIFAR-10. Error goes from 6.61% (identity) to 12.35% (constant scaling of 0.5 on both paths) and 12.22% (1×1 conv shortcut). Dropout on the shortcut fails to converge.</li>
+<li><strong>Extra power isn't the issue.</strong> Gated and 1×1 shortcuts can represent the identity, yet they reach <em>higher training error</em>. That points to optimisation, not capacity.</li>
+<li><strong>Full pre-activation</strong> (BN → ReLU → conv → BN → ReLU → conv, then add) was best among the five orderings tested.</li>
+<li><strong>On ImageNet,</strong> the original ResNet-200 overfit (21.8% top-1, worse than ResNet-152). The pre-activation ResNet-200 reached 20.7%.</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<p>Write a residual unit in general form, with a shortcut function <code>h</code> and an after-addition function <code>f</code>:</p>
+<pre><code>y_l     = h(x_l) + F(x_l, W_l)
+x_{l+1} = f(y_l)
+
+# if h and f are both identity:
+x_L = x_l + Σ_{i=l}^{L-1} F(x_i, W_i)                          (forward)
+∂E/∂x_l = ∂E/∂x_L · ( 1 + ∂/∂x_l Σ_{i=l}^{L-1} F(x_i, W_i) )   (backward)</code></pre>
+<ul>
+<li><code>x_l</code> is the input to unit <code>l</code>, and <code>F</code> its residual branch (BN, ReLU and convs).</li>
+<li><strong>Forward:</strong> the deep feature <code>x_L</code> is the shallow feature plus a <em>sum</em> of residuals. In a plain net it would be a <em>product</em> of weight matrices.</li>
+<li><strong>Backward:</strong> the "1" carries the loss gradient straight from <code>x_L</code> to <code>x_l</code> without touching any weights. The other term is unlikely to be exactly −1 for every sample in a mini-batch, so the gradient doesn't cancel out even when weights are tiny.</li>
+</ul>
+<p>Now break the shortcut with a scale, <code>h(x) = λ·x</code>. The "1" becomes a product:</p>
+<pre><code>∂E/∂x_l = ∂E/∂x_L · ( Π_{i=l}^{L-1} λ_i  +  ∂/∂x_l Σ F̂(x_i, W_i) )</code></pre>
+<p>Over many units, λ &gt; 1 makes that product explode and λ &lt; 1 makes it vanish. Either way the direct path is lost, and the signal has to squeeze through the weight layers.</p>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>Watching the direct path die</h3>
+<div class="card demo">
+<h3>Interactive: the shortcut term Πλ across units</h3>
+<p class="legend">ResNet-110 has 54 residual units. The plot shows log₁₀ of the direct gradient factor that reaches unit l from the top of the network when every shortcut is scaled by λ. λ = 1 is the identity.</p>
+<canvas id="prod" width="700" height="220" aria-label="Log-scale plot of the shortcut gradient factor across residual units"></canvas>
+<label for="lam">Shortcut scale λ: <span id="lv" class="num"></span></label>
+<input id="lam" type="range" min="0.5" max="1.2" step="0.01" value="0.9">
+<div class="stats">
+  <div class="stat"><div class="k">Factor at unit 1</div><div class="v" id="f1">–</div></div>
+  <div class="stat"><div class="k">Units until &lt; 1%</div><div class="v" id="u1">–</div></div>
+</div>
+</div>
+<p>At λ = 0.5, as in the paper's constant-scaling test, the direct term is about 10⁻¹⁶ by the bottom of the net. Even λ = 0.9 shrinks it to below 1%. Only λ = 1 keeps it exactly 1 at every depth. Dropout on the shortcut acts like a random λ with mean 0.5, which explains why it failed too.</p>
+
+<h3>Moving the activation: post versus pre</h3>
+<p>The original unit ends with ReLU after the addition, so <code>f</code> is not the identity. Negative values get clipped on the shortcut path, again and again. The paper tested five orderings of the same parts:</p>
+<ul>
+<li><strong>BN after addition:</strong> worse (8.17% on ResNet-110). BN now rescales the shortcut signal.</li>
+<li><strong>ReLU before addition:</strong> worse (7.84%). The residual can only be non-negative, so features can only grow.</li>
+<li><strong>ReLU-only pre-activation:</strong> about the same as the original (6.71%).</li>
+<li><strong>Full pre-activation:</strong> best (6.37% on ResNet-110, 5.46% on ResNet-164).</li>
+</ul>
+<p>The trick is to see the after-addition activation as the <em>pre</em>-activation of the next unit's branch. Apply it only to the branch, and the shortcut stays untouched from start to end. The paper credits two effects: easier optimisation (very clear at 1001 layers) and better regularisation, because every weight layer now receives normalised input.</p>
+
+<h3>Limitations, and what came after</h3>
+<ul>
+<li><strong>Gains are modest at normal depth.</strong> On ResNet-152 the top-1 improvement was only 21.3% → 21.1%. The design pays off at extreme depth or where the original overfits.</li>
+<li><strong>Cost grows linearly with depth.</strong> ResNet-1001 took about 27 hours on 2 GPUs for CIFAR. ResNet-200 took about 3 weeks on 8 GPUs for ImageNet.</li>
+<li><strong>The design won anyway.</strong> Pre-LayerNorm Transformers use the same pattern: normalise inside the branch and leave the residual stream as a pure sum. That is a main reason deep Transformers (<a href="13-attention.html">Day 13</a>) train stably. <a href="../05-trillion-scale-architecture.html#depth">Module 05</a> shows Kimi K3 revisiting the running sum with attention over earlier layers.</li>
+</ul>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Your VLA's language and vision backbones are pre-norm residual stacks.</strong> Knowing why the residual stream must stay clean helps when you fine-tune, add adapters, or insert new layers into a pretrained policy.</li>
+<li><strong>Add new modules as zero-initialised residuals.</strong> When bolting a new input (force, tactile, proprioception) onto a pretrained network, add it as <code>x + F(new)</code> with F starting at zero. The pretrained behaviour is preserved on day one. This is the same argument as the paper's identity path.</li>
+<li><strong>Don't gate or scale the main path.</strong> The paper's ablations are a warning for custom fusion blocks. Multiplicative gates on the trunk make deep models harder to train.</li>
+<li><strong>Debug with gradient norms per layer.</strong> The analysis tells you what healthy looks like. If early layers of a deep policy get almost no gradient, check what sits on the skip path.</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Read Section 2 carefully and derive Eqns 4 and 5 yourself (about 30 min). Then read Table 1 (shortcut variants) and Table 2 (activation orderings).</li>
+<li>In the 30u30 Day 10 folder, read <code>implementation.py</code> and compare its pre-activation block with the post-activation block from Day 9. Note the special handling of the first and last units.</li>
+<li>Run <code>train_minimal.py</code>, then work through <code>notebook.ipynb</code>.</li>
+<li>Exercises: pre versus post activation, ablating where BN and ReLU go, ultra-deep networks, a 1001-layer ResNet and transfer learning. Log per-layer gradient norms in each.</li>
+<li>Stretch: put a 0.5 scale on the shortcut of a 50-unit toy ResNet and confirm the training slowdown.</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>What two conditions give a clean information path?</summary><p>The shortcut h must be the identity, and the function after the addition f must be the identity. Then x_L = x_l + ΣF.</p></details>
+<details><summary>Why does the "1" in the backward equation matter?</summary><p>It sends the gradient from any deep unit straight to any shallow one without passing through weight layers, so it can't vanish however small the weights are.</p></details>
+<details><summary>A 1×1 conv shortcut can learn the identity. Why did it train worse?</summary><p>Being able to represent the identity doesn't mean the optimiser will find it. Over 54 units, products of shortcut Jacobians still hamper propagation, and training error rose. It's an optimisation problem, not a capacity one.</p></details>
+<details><summary>What is "full pre-activation"?</summary><p>Each branch runs BN → ReLU → conv → BN → ReLU → conv, then adds to the untouched shortcut. Nothing is applied after the addition.</p></details>
+<details><summary>Why does ReLU before the addition hurt?</summary><p>The residual becomes non-negative, so each unit can only increase the features. A residual should be able to push either way.</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/1603.05027">The original paper</a> (ECCV 2016) and the authors' <a href="https://github.com/KaimingHe/resnet-1k-layers">1001-layer code</a></li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/10_resnet_v2">30u30 Day 10</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Next: <a href="11-dilated-convolutions.html">Day 11, Multi-Scale Context Aggregation by Dilated Convolutions</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="09-resnet.html"><small>Previous</small>Day 09 · ResNet</a>
+  <a class="next" href="11-dilated-convolutions.html"><small>Next</small>Day 11 · Dilated Convolutions</a>
+</nav>
+<footer>Module 06 · Day 10 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('prod'), ctx = cv.getContext('2d'), lIn = document.getElementById('lam');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const U = 54, LO = -17, HI = 5;
+
+// log10 of the direct factor reaching unit l (1 = bottom) from the top unit U
+const factors = lam => Array.from({ length: U }, (_, i) => (U - 1 - i) * Math.log10(lam));
+
+function draw() {
+  const lam = +lIn.value, f = factors(lam);
+  document.getElementById('lv').textContent = lam.toFixed(2);
+  const W = cv.width, H = cv.height, pad = 34;
+  const X = i => pad + i / (U - 1) * (W - 2 * pad), Y = v => H - pad - (Math.max(LO, Math.min(HI, v)) - LO) / (HI - LO) * (H - 2 * pad);
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '12px sans-serif'; ctx.lineWidth = 1;
+  [-15, -10, -5, 0, 5].forEach(v => {
+    ctx.strokeStyle = v === 0 ? css('--muted') : css('--line');
+    ctx.beginPath(); ctx.moveTo(pad, Y(v)); ctx.lineTo(W - pad, Y(v)); ctx.stroke();
+    ctx.fillStyle = css('--muted'); ctx.textAlign = 'right'; ctx.fillText('1e' + v, pad - 4, Y(v) + 4);
+  });
+  ctx.textAlign = 'center'; ctx.fillText('residual unit (1 = bottom, 54 = top)', W / 2, H - 8);
+  ctx.strokeStyle = Math.abs(lam - 1) < 1e-9 ? css('--pass') : lam < 1 ? css('--fail') : css('--warn');
+  ctx.lineWidth = 2; ctx.beginPath();
+  f.forEach((v, i) => i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v)));
+  ctx.stroke();
+  document.getElementById('f1').textContent = Math.pow(10, f[0]).toExponential(1);
+  const k = f.slice().reverse().findIndex(v => v < -2);
+  document.getElementById('u1').textContent = k < 0 ? 'never' : k;
+}
+lIn.oninput = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>nanoGPT · Module 20</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 20 · From-scratch repos</a> › nanoGPT</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 20 · From-scratch code · 3 of 6</div>
+<h1>nanoGPT: a real GPT in two 300-line files</h1>
+<p class="lede">The simplest code that can train a proper GPT, from a baby Shakespeare model on a laptop up to GPT-2 on a GPU node. Now retired in favour of nanochat, which covers the whole path to a chatbot.</p>
+
+<div class="facts">
+  <div><b>Repo</b><a href="https://github.com/karpathy/nanoGPT">karpathy/nanoGPT</a></div>
+  <div><b>Licence</b>MIT</div>
+  <div><b>Stars</b>64,528 (7 Nov 2026, GitHub API). Successor nanochat: 60,358.</div>
+  <div><b>Core code</b><code>model.py</code> 330 lines, <code>train.py</code> 336, <code>sample.py</code> 89 (counted with <code>wc -l</code>)</div>
+  <div><b>Status</b>Deprecated. The README's Nov 2025 update says it is "very old and deprecated" and points to nanochat. Last commit 12 Nov 2025.</div>
+  <div><b>Needs</b>Python, PyTorch, numpy, tiktoken. A GPU for the big runs; a MacBook (CPU or MPS) is enough for Shakespeare.</div>
+</div>
+<p class="meta">Tested at commit <code>3adf61e</code> on 7 Nov 2026, on a MacBook with an Apple M4 (16 GB), Python 3.14.5, PyTorch 2.15.0. Short code excerpts are quoted with credit to Andrej Karpathy (MIT).</p>
+
+<div class="toc">
+<strong>On this page</strong>
+<ol>
+<li><a href="#start">Start here (no maths needed)</a></li>
+<li><a href="#summary">Summary</a></li>
+<li><a href="#code">How the code works</a></li>
+<li><a href="#run">Run it, tested</a></li>
+<li><a href="#nanochat">The successor: nanochat</a></li>
+<li><a href="#robohelper">Connect to Robo-Helper (Module 18)</a></li>
+<li><a href="#robotics">Why it matters for robotics</a></li>
+<li><a href="#reality">Reality check</a></li>
+<li><a href="#check">Self-check</a></li>
+<li><a href="#reading">Further reading</a></li>
+</ol>
+</div>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">nanoGPT is the same kind of brain as ChatGPT, shrunk down so small that you can train it on a laptop in under a minute and watch it learn to write like Shakespeare.</p>
+
+<h3>Think of it like this</h3>
+<p>Imagine a class reading a play aloud, one letter at a time. Before each new letter, every student looks back at the letters already read and decides which ones matter right now. One student watches for spelling. Another watches for whose turn it is to speak. Another watches for the end of a line. Then they pool what they noticed and guess the next letter. nanoGPT works like that class. Each "student" is called a <b>head</b>, and there are several rows of students, one row on top of another, called <b>layers</b>.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Turn every letter into a list of numbers (an embedding), and add a second list that says <em>where</em> the letter is in the line.</li>
+<li>Each layer lets every letter look back at the letters before it (never ahead: that would be cheating) and pick out what's useful.</li>
+<li>After a few layers, the model gives a score to every possible next letter.</li>
+<li>Training compares that guess to the real next letter and nudges every number a little. PyTorch works out the nudges automatically.</li>
+<li>To write, it picks a letter, adds it to the end, and repeats.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>The robot brains in the news (models that read a camera picture and a command, then output moves) are built from this same block: attention plus layers. If you can read nanoGPT's <code>model.py</code>, you can read the core of most of them.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Read the sample text in <a href="#run">Run it, tested</a>. It took 38 seconds of training. Which things did it already get right (names in capitals, a colon after the speaker)? Which words are made up?</li>
+<li>Write a line, then try to guess the next letter of a friend's line from just the last 3 letters. Then from the last 30. More looking back means better guesses. That's why nanoGPT's "context" matters.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>GPT</dt><dd>A kind of language model built from stacked Transformer blocks that guesses the next token.</dd>
+<dt>Token</dt><dd>One piece of text the model reads. In the Shakespeare demo, one token is one character.</dd>
+<dt>Attention head</dt><dd>One "student" deciding which earlier tokens to look at.</dd>
+<dt>Causal</dt><dd>Only allowed to look backwards, at tokens already written.</dd>
+<dt>Loss</dt><dd>A score for how wrong the guesses are. Lower is better.</dd>
+<dt>Validation (val) loss</dt><dd>The loss on text the model never trained on. It tells you if it learned or just memorised.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version. On a first read, look at the real output in <a href="#run">Run it, tested</a> and the Robo-Helper link, then come back.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>nanoGPT is a rewrite of minGPT that, in the README's words, "prioritizes teeth over education": it is meant to train real models fast. <code>model.py</code> defines GPT-2 (and can load OpenAI's GPT-2 weights). <code>train.py</code> is one training loop that runs on a laptop or, with the README's settings, reproduces GPT-2 (124M) on OpenWebText in about 4 days on an 8×A100 40GB node. On this M4 MacBook, the README's laptop-sized Shakespeare model trained in 38 seconds on MPS to a val loss of 1.8857.</p>
+</div>
+<ul>
+<li><strong>Two files do the work.</strong> The model (embeddings, Transformer blocks, output head) and the training loop (batches, AdamW, learning-rate schedule, checkpoints).</li>
+<li><strong>Autograd does the calculus.</strong> Unlike our Module 18 lessons, there is no hand-written backward pass. One call, <code>loss.backward()</code>, computes every gradient.</li>
+<li><strong>Configs are just Python files</strong> plus <code>--key=value</code> flags that override them. No framework.</li>
+<li><strong>It scales by changing numbers, not code.</strong> The same files train a 0.8M-parameter toy and the 124M-parameter GPT-2.</li>
+<li><strong>As a Robo-Helper brain</strong> (61K parameters, the same training data as Lesson 15), it scored 9/12 in the bake-off against tinylm's 8/12. It kept the colour in 100% of commands with 14 filler words, against 52%, and decided in under 2 ms on the CPU. <a href="#robohelper">Details</a>.</li>
+<li><strong>It's deprecated.</strong> The Nov 2025 note says you probably want <a href="#nanochat">nanochat</a>, which covers tokenizer, pretraining, finetuning, evaluation and chat.</li>
+</ul>
+
+<h2 id="code">2. How the code works</h2>
+<h3><code>model.py</code>: the GPT</h3>
+<p>The model is four small classes and one big one:</p>
+<ul>
+<li><code>CausalSelfAttention</code>: one linear layer makes a query, key and value for every token, for every head at once. The tokens are split into <code>n_head</code> groups, each head does attention on its own slice, and the results are glued back together.</li>
+<li><code>MLP</code>: two linear layers with a GELU between them. The middle is 4× wider than the embedding.</li>
+<li><code>Block</code>: layer norm → attention → add back; layer norm → MLP → add back.</li>
+<li><code>GPT</code>: token embeddings (<code>wte</code>) plus position embeddings (<code>wpe</code>), a stack of <code>n_layer</code> Blocks, a final layer norm, and <code>lm_head</code>, which turns each position into a score for every token in the vocabulary.</li>
+</ul>
+<p>The whole Transformer block fits in two lines. This is the one idea that makes it click:</p>
+<pre><code># model.py (MIT, Andrej Karpathy): class Block
+def forward(self, x):
+    x = x + self.attn(self.ln_1(x))
+    x = x + self.mlp(self.ln_2(x))
+    return x</code></pre>
+<p>Each sub-layer only adds a <em>correction</em> to <code>x</code>; it never replaces it. That "add back" is the <strong>residual connection</strong>. Gradients can flow straight down the <code>x = x + …</code> path, which is why you can stack many blocks and still train them. Layer norm (<code>ln_1</code>, <code>ln_2</code>) rescales the numbers going into each sub-layer so they stay in a sensible range.</p>
+<p>Inside attention, the line that makes it "causal" asks PyTorch's fused attention to mask out the future:</p>
+<pre><code># model.py: CausalSelfAttention.forward (trimmed)
+q, k, v = self.c_attn(x).split(self.n_embd, dim=2)
+y = torch.nn.functional.scaled_dot_product_attention(q, k, v, attn_mask=None,
+        dropout_p=self.dropout if self.training else 0, is_causal=True)</code></pre>
+<p>The file also keeps a slow, written-out version (used only on old PyTorch): <code>q @ k.transpose</code>, times <code>1/√(head size)</code>, fill the future with −∞, softmax, then <code>@ v</code>. That's exactly the recipe from our Lesson 15 stretch, done for every position and every head in one matrix multiply.</p>
+<p>Two more details worth spotting: the output head shares its weights with the token embedding (<code>wte.weight = lm_head.weight</code>, "weight tying"), and <code>generate()</code> is a plain loop: crop to <code>block_size</code>, run the model, take the last position's scores, divide by temperature, optionally keep the top k, softmax, sample, append.</p>
+
+<h3><code>train.py</code>: the loop</h3>
+<ol>
+<li><strong>Config.</strong> Defaults at the top of the file, then a config file, then command-line flags (via the tiny <code>configurator.py</code>), each overriding the last.</li>
+<li><strong>Data.</strong> <code>get_batch</code> memory-maps <code>train.bin</code> (a long list of token ids as 16-bit integers), picks <code>batch_size</code> random start points, and takes <code>block_size</code> tokens from each. The targets are the same slices shifted by one.</li>
+<li><strong>Learning rate.</strong> <code>get_lr</code> warms up linearly for <code>warmup_iters</code>, then follows a cosine curve down to <code>min_lr</code> at <code>lr_decay_iters</code>.</li>
+<li><strong>Step.</strong> Forward, <code>loss.backward()</code>, clip the gradient norm to 1.0, AdamW step, zero the gradients. Gradient accumulation lets a small GPU fake a big batch.</li>
+<li><strong>Evaluate.</strong> Every <code>eval_interval</code> steps, average the loss over <code>eval_iters</code> batches of train and val data, and save a checkpoint if val improved.</li>
+<li><strong>Scale up.</strong> The same file runs on 8 GPUs with PyTorch DDP via <code>torchrun</code>, and can use <code>torch.compile</code> and bfloat16 on GPUs.</li>
+</ol>
+
+<h2 id="run">3. Run it, tested</h2>
+<p>All commands were run on 7 Nov 2026 on a MacBook (Apple M4, 16 GB), Python 3.14.5, in a private venv in a scratch folder. PyTorch reported <code>torch.backends.mps.is_available() == True</code>. <code>train.py</code> uses relative paths, so it is run from inside the cloned folder, as the README does.</p>
+
+<h3>Install and prepare the data</h3>
+<pre><code>git clone --depth 1 https://github.com/karpathy/nanoGPT.git
+python3 -m venv venv
+./venv/bin/pip install torch numpy tiktoken requests
+cd nanoGPT
+../venv/bin/python data/shakespeare_char/prepare.py
+
+length of dataset in characters: 1,115,394
+vocab size: 65
+train has 1,003,854 tokens
+val has 111,540 tokens</code></pre>
+<p>Everything installed on Python 3.14 with no fixes. (The README's install line also lists <code>transformers datasets wandb tqdm</code>; they're only needed for loading OpenAI's weights, OpenWebText and logging.)</p>
+
+<h3>Run 1: the README's MacBook command, with <code>--device=mps</code></h3>
+<p>This is the README's CPU command with the device switched to the Mac GPU, as the README suggests for Apple Silicon. It already finishes in well under 10 minutes, so <code>max_iters</code> stays at 2000.</p>
+<pre><code>$ ../venv/bin/python train.py config/train_shakespeare_char.py --device=mps --compile=False \
+    --eval_iters=20 --log_interval=1 --block_size=64 --batch_size=12 --n_layer=4 --n_head=4 \
+    --n_embd=128 --max_iters=2000 --lr_decay_iters=2000 --dropout=0.0
+# 7 Nov 2026 · MacBook (Apple M4) · MPS
+number of parameters: 0.80M
+step 0: train loss 4.1676, val loss 4.1649
+step 500: train loss 2.2732, val loss 2.3141
+step 1000: train loss 1.9714, val loss 2.0528
+step 1500: train loss 1.8557, val loss 1.9225
+step 2000: train loss 1.7648, val loss 1.8857
+iter 1999: loss 1.9002, time 12.38ms, mfu 0.11%
+total wall time 38.3 s · median 11.9 ms per iteration</code></pre>
+<p>The README reports a loss of "only 1.88" for this command on CPU in about 3 minutes. We got val 1.8857 in 38 seconds. The run also prints two harmless warnings about <code>torch.cuda.amp.GradScaler</code> being deprecated and disabled (there's no CUDA).</p>
+<p>The same command with <code>--device=cpu</code> took 33.5 s (median 13.6 ms per iteration) and ended at the same losses to 4 decimal places. This model is so small that the Mac GPU doesn't help; the CPU is just as fast.</p>
+<pre><code>$ ../venv/bin/python sample.py --out_dir=out-shakespeare-char --device=mps --num_samples=1 --max_new_tokens=300
+
+That not and of this neht a lord shall stell the maid
+not for sembly in blow the she were no the broth
+sace crear in what hus from hourt canter here!
+Thy post a coursel my happhing fond esend
+Of the me blod I have at affor's o' for werer.
+
+YELEO:
+Went nacte king it you hath Cliffsly all tiser mut
+To</code></pre>
+<p>It has learned the <em>shape</em> of a play: a speaker name in capitals with a colon, short lines, real small words ("a lord shall", "I have"). Most long words are invented.</p>
+
+<h3>Run 2: the full "baby GPT" config on MPS, shortened</h3>
+<p>The config file's own model (6 layers, 6 heads, 384 channels, 256-character context, batch 64, dropout 0.2) is meant for a GPU: the README says 5000 iterations take about 3 minutes on one A100 and reach val loss 1.4697. A 30-iteration probe on MPS took about 0.85 s per iteration, so 5000 iterations would take over an hour. We cut it to 500.</p>
+<pre><code>$ /usr/bin/time -p ../venv/bin/python train.py config/train_shakespeare_char.py --device=mps --compile=False \
+    --max_iters=500 --lr_decay_iters=500 --eval_iters=20 --out_dir=out-big
+# 7 Nov 2026 · MacBook (Apple M4) · MPS
+number of parameters: 10.65M
+step 0: train loss 4.2885, val loss 4.2831
+step 250: train loss 1.9712, val loss 2.0761
+step 500: train loss 1.6049, val loss 1.7723
+iter 400: loss 1.7681, time 1269.03ms, mfu 0.29%
+real 664.08          (median 1.21 s per iteration)
+
+$ ../venv/bin/python sample.py --out_dir=out-big --device=mps --num_samples=1 --max_new_tokens=300
+
+That not and bect of me
+That the shall stell the maid not for seess and blood.
+
+AUTOLYCUS:
+I cark that say they
+Heir what nuke to the good on me such brone,
+He should like happ it then less in him to thy
+Which which daught omon for werer a grace of then comple,
+And have their somell all of rangue</code></pre>
+<p>After only 500 of its 5000 steps, the 10.65M model already beats the small model's final score (val 1.7723 vs 1.8857). It also uses a real Shakespeare name, AUTOLYCUS. The run took 11 minutes, a little over our 10-minute target. Steps slowed from about 0.85 s at the start to a median of 1.21 s, and each evaluation took 15–19 s. For the last minute, the Robo-Helper experiment below was also running on the CPU, which may have slowed it a little.</p>
+
+<h3>What failed</h3>
+<p>Nothing failed outright. <code>--compile=False</code> is still needed on the Mac (as the README says), and <code>torch.compile</code> was not tried.</p>
+
+<h2 id="nanochat">4. The successor: nanochat</h2>
+<div class="note">
+<p>The nanoGPT README now opens with this: nanoGPT has "a new and improved cousin called nanochat", and "it is very likely you meant to use/find nanochat instead". nanoGPT only covered pretraining. nanochat (<a href="https://github.com/karpathy/nanochat">karpathy/nanochat</a>, MIT, Oct 2025) covers the whole pipeline in one small codebase:</p>
+<ul>
+<li><strong>Stages:</strong> tokenizer training (a GPT-4-style BPE), pretraining, supervised finetuning (SFT), reinforcement learning, evaluation (CORE score, ARC, GSM8K, MMLU, HumanEval) and inference with a KV cache, plus a chat CLI.</li>
+<li><strong>One dial:</strong> <code>--depth</code>, the number of layers. Width, heads, learning rates, training length and weight decay are all calculated from it. GPT-2 capability is around depth 24–26.</li>
+<li><strong>Cost:</strong> the README says you can train a GPT-2-capability model "for only $48 (~2 hours of 8XH100 GPU node)" and then talk to it. At about $3 per GPU per hour, an 8×H100 node is about $24 an hour. On a spot instance it can be closer to $15. GPT-2 cost about $43,000 to train in 2019.</li>
+<li><strong>The "time to GPT-2" leaderboard:</strong> the main metric is the wall-clock time to beat GPT-2's CORE score (0.256525) on one 8×H100 node. The original OpenAI GPT-2 sits at 168 hours. The first nanochat entry (29 Jan 2026) took 3.04 hours. The newest entry in the saved README is 1.65 hours (14 Mar 2026, "autoresearch round 2"), after changes such as fp8, a 1M-token batch and a new dataset (NVIDIA ClimbMix).</li>
+<li><strong>On a Mac:</strong> <code>runs/runcpu.sh</code> trains a heavily shrunk model on CPU or MPS in a few tens of minutes. The README warns "You will not get strong results in this way." We did not run nanochat for this page.</li>
+</ul>
+</div>
+
+<h2 id="robohelper">5. Connect to Robo-Helper (Module 18): a nanoGPT brain, measured</h2>
+<p class="meta">Measured on 8 Nov 2026, with the first version of Robo-Helper's training data: 350 examples, which by accident included 3 of the 12 bake-off commands. On 9 Nov those were removed (343 examples). The small Module 18 brains' bake-off scores didn't change, and the tiny LM's held-out score went from 86% to 92%. Every brain here was compared on the same data, but if you re-run, expect the exact numbers to move by a few points.</p>
+<p>Our <a href="../18-robot-brain/15-tiny-lm.html">Lesson 15, a tiny language model</a>, is the hand-built version of what nanoGPT does. It writes a plan one word at a time, like <code>put red blue &lt;end&gt;</code>. Its <a href="../18-robot-brain/15-tiny-lm.html#attention">Stretch 2: attention</a> is the exact bridge.</p>
+<div class="table-wrap"><table>
+<tr><th></th><th>Our TinyLM / attention stretch (Lesson 15)</th><th>nanoGPT</th></tr>
+<tr><td>Reading the input</td><td>Average of the command's word embeddings, or one head of attention (stretch)</td><td>Multi-head <em>causal self-attention</em>: every position looks at all earlier ones, in every layer</td></tr>
+<tr><td>Memory of its own words</td><td>The last 2 words it wrote</td><td>Everything in the window (up to <code>block_size</code>)</td></tr>
+<tr><td>Word order</td><td>Ignored: shuffling the words gives the same weights</td><td>Position embeddings (<code>wpe</code>) added to every token</td></tr>
+<tr><td>Depth</td><td>1 hidden layer</td><td>A stack of Blocks, each with <strong>layer norm</strong> and a <strong>residual</strong> "add back" path</td></tr>
+<tr><td>Gradients</td><td>Backprop written by hand, checked against a numerical gradient</td><td>PyTorch autograd: <code>loss.backward()</code></td></tr>
+<tr><td>Libraries</td><td>Python standard library only</td><td>PyTorch, numpy</td></tr>
+</table></div>
+
+<h3>The experiment: swap Robo-Helper's brain for a nanoGPT</h3>
+<p>We used nanoGPT's <code>model.py</code> unchanged, at a small size: 2 layers, 4 heads, 48 channels, a 24-word window, <strong>61,488 parameters</strong>. Each word is one token. A training example looks like <code>command words &lt;sep&gt; plan words &lt;end&gt;</code>, and the loss only counts the plan words. It trains on exactly the same data as the Lesson 15 model, <code>lesson15_tiny_lm.training_data()</code> (350 examples), and runs inside the same <code>TinyLMBrain</code> wrapper. That means the same typo fixer and the same Lesson 10 safety check on every action. We added one trick: in training, each example is shifted right by a random number of padding tokens, so every position learns to hold real words. Training 1,500 steps of batch 32 on the CPU took about 14 s per model. We trained 3 seeds.</p>
+<pre><code>$ ./nanogpt/venv/bin/python nanogpt_brain.py        # 8 Nov 2026 · MacBook (Apple M4)
+BAKE-OFF (12 tasks)            words  tinylm  attention  distilled  nanogpt(s0,s1,s2)  nanogpt+teacher(s0,s1,s2)
+ 1. put the red block in the bin     Y     Y      Y          Y         Y Y Y              Y Y Y
+ 2. where's the green one?           .     .      .          Y         . . .              Y Y Y
+ 3. make me a sandwich               Y     Y      Y          Y         Y Y Y              Y Y Y
+ 4. put the red and blue blocks away .     Y      Y          Y         Y Y Y              Y Y Y
+ 5. tidy up the room                 .     .      .          .         . . .              . . .
+ 6. bin everything except the green  .     Y      Y          Y         Y Y Y              Y Y Y
+ 7. put away the block closest to... .     .      .          .         . . .              . . .
+ 8. put the block away               .     Y      Y          Y         Y Y Y              Y Y Y
+ 9. go to the blue block             Y     Y      Y          Y         Y Y Y              Y Y Y
+10. stop                             Y     Y      Y          Y         Y Y Y              Y Y Y
+11. hmm what about the blue          .     .      .          Y         Y Y Y              Y Y Y
+12. put the purple block in the bin  Y     Y      Y          Y         Y Y Y              Y Y Y
+PASSED                              5/12  8/12   8/12      10/12      9/12 (all 3 seeds)  10/12 (all 3 seeds)
+
+HELD-OUT test_data() exact-plan accuracy (50 examples)
+   tinylm 86.0%   attention 94.0%   distilled 94.0%   nanogpt 94.0% / 94.0% / 88.0%
+
+COLOUR BURIED IN FILLER (padded_commands, 9 commands, mean of 3 seeds)
+   filler   tinylm  attention  nanogpt
+        0     100%       100%     100%
+        6      89%        85%     100%
+       10      78%        85%     100%
+       14      52%        52%     100%
+
+TIME PER DECISION: model.generate("put the red block in the bin"), 200 runs
+   tinylm (pure Python)   p50   0.172 ms  p95   0.193 ms   travels 0.19 mm at 1 m/s
+   nanogpt CPU            p50   0.910 ms  p95   1.626 ms   travels 1.63 mm
+   nanogpt MPS            p50   5.281 ms  p95   6.451 ms   travels 6.45 mm</code></pre>
+<p>(The table is lined up by hand from the script's output. "nanogpt+teacher" adds the Lesson 17 teacher's labels, <code>distill_examples(UNLABELLED, best_teacher())</code>, to the training data, just as the "distilled" brain does.)</p>
+<h3>What got better, and what didn't</h3>
+<ul>
+<li><strong>Bake-off: 9/12 against 8/12</strong> for tinylm and attention trained on the same data. With the teacher's labels it reaches <strong>10/12, the same as the distilled brain</strong>, not better.</li>
+<li><strong>The extra pass is task 11, and it's luck.</strong> On "hmm what about the blue" the model wrote <code>go blue green</code>, which isn't a valid plan, so the robot stayed put and the task (bin nothing) passed. That's a safe failure, not understanding.</li>
+<li><strong>Buried colours: the clearest win.</strong> With 14 filler words, nanoGPT still found the colour 100% of the time, against 52% for both Lesson 15 models. Attention over every position, plus position embeddings, keeps the colour from being averaged away. The random padding in training helps too: without it, positions 15–18 would never have seen a real word.</li>
+<li><strong>Held-out test:</strong> 94% for two seeds and 88% for the third. That's level with the attention model, not ahead of it.</li>
+<li><strong>Still failing:</strong> "tidy up the room" (it asks "which block?") and "the block that's closest to the bin" (it says it can't). Neither is in the training templates, and no model this size can work out "closest" without seeing the room.</li>
+<li><strong>Speed:</strong> nanoGPT is about 5–8× slower than our pure-Python tinylm, because PyTorch has a fixed cost per call. On the Mac GPU (MPS) it is slower again, about 5 ms, because launching GPU work costs more than the sums themselves. Even so, the slowest case, 6.45 ms (8.6 ms for a 3-word plan), is far inside the 0.2 s "stop!" budget from <a href="../18-robot-brain/16-speed.html">Lesson 16</a>. The robot rolls less than 1 cm while it thinks.</li>
+</ul>
+<p>So nanoGPT is the next rung up. It isn't magic on 350 examples. What it adds is <strong>robustness to long, messy commands</strong> and a way to <strong>scale</strong>: the same file trains a 61K model in seconds or a 124M GPT-2 on a GPU node, just by changing numbers. Our hand-built model would need new hand-written backprop for every change.</p>
+<p><strong>Next-step exercise.</strong> Open <code>nanogpt_brain.py</code> and make the model bigger (<code>n_layer=4, n_embd=96</code>). Then remove the random padding by setting <code>k = 0</code> in <code>_example</code>. Re-run it and record three numbers each time: bake-off score, filler accuracy at 14 words, and CPU p95. Which change matters more for the buried colours: the size or the padding?</p>
+
+<h2 id="robotics">6. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Same block, different tokens.</strong> Many robot foundation models (vision-language-action models) use a GPT-style Transformer backbone and predict actions as tokens. nanoGPT's <code>Block</code> is that backbone in its plainest form.</li>
+<li><strong>Causal masking matches time.</strong> A robot controller can only use the past. The causal mask that stops a GPT peeking at the next character is the same rule for a policy that reads a history of observations.</li>
+<li><strong>Small models on small machines.</strong> The Shakespeare runs show what a laptop-class chip can train in seconds or minutes. Onboard robot computers are in the same class, so knowing how loss, size and speed trade off is practical.</li>
+<li><strong>What it doesn't do:</strong> nanoGPT has no images, no actions and no robot data. Turning it into a robot policy means new tokenisers and new data, which is the hard part.</li>
+</ul>
+</div>
+
+<h2 id="reality">7. Reality check</h2>
+<ul>
+<li><strong>Deprecated.</strong> The README itself sends you to nanochat. Expect no fixes. We saw deprecation warnings (<code>torch.cuda.amp.GradScaler</code>) on PyTorch 2.15.0, though everything still ran.</li>
+<li><strong>The GPU numbers are for GPUs.</strong> "3 minutes, val loss 1.4697" is on an A100. The same config on the M4's MPS ran at a median of 1.21 s per iteration, so the full 5000 iterations would take well over an hour.</li>
+<li><strong>MPS isn't always faster.</strong> For the tiny 0.8M model, CPU and MPS took about the same time per step. The GPU only pays off once the model and batch are big enough to keep it busy.</li>
+<li><strong>Character-level is a toy.</strong> Real models use tokens (GPT-2's BPE has 50,257). The <code>shakespeare</code> (not <code>_char</code>) data folder and the finetuning config show that path.</li>
+<li><strong>The GPT-2 reproduction</strong> needs OpenWebText and about 4 days on 8×A100 40GB. nanochat now gets past GPT-2's CORE score in under 2 hours on 8×H100, thanks to better data, optimisers and precision.</li>
+<li><strong>Overfitting.</strong> The small Shakespeare set is about 1 MB. The config's comment says "we expect to overfit", which is why it only saves when val loss improves.</li>
+</ul>
+
+<h2 id="check">8. Self-check</h2>
+<details><summary>What two lines make up a Transformer Block's forward pass, and why the "x +"?</summary><p><code>x = x + attn(ln_1(x))</code> and <code>x = x + mlp(ln_2(x))</code>. The "x +" is the residual connection: each sub-layer adds a correction instead of replacing x, so gradients flow straight through and deep stacks still train.</p></details>
+<details><summary>What does "causal" mean in causal self-attention, and how is it enforced?</summary><p>A position may only attend to itself and earlier positions. The scores for future positions are set to −∞ before the softmax (or <code>is_causal=True</code> in PyTorch's fused version), so they get weight 0.</p></details>
+<details><summary>Our Lesson 15 attention can't tell word order. What in nanoGPT fixes that?</summary><p>The position embedding table <code>wpe</code>: a learned vector for each position, added to each token's embedding before the first block.</p></details>
+<details><summary>Why did MPS not beat the CPU on the 0.8M-parameter run?</summary><p>The model and batch (12 × 64 characters) are tiny, so there isn't enough work to keep the GPU busy, and moving data and launching kernels costs time. On the bigger config, the GPU matters much more.</p></details>
+<details><summary>What does nanochat cover that nanoGPT doesn't?</summary><p>Everything after pretraining and around it: training its own tokenizer, finetuning (SFT), reinforcement learning, evaluations and a chat interface with a KV-cached inference engine. nanoGPT only pretrains (and can finetune on text).</p></details>
+
+<h2 id="reading">9. Further reading</h2>
+<ul>
+<li><a href="https://github.com/karpathy/nanoGPT">karpathy/nanoGPT</a> on GitHub, and its predecessor <a href="02-mingpt.html">minGPT (page 2)</a></li>
+<li><a href="https://github.com/karpathy/nanochat">karpathy/nanochat</a>, its <a href="https://github.com/karpathy/nanochat/discussions/1">original post (13 Oct 2025)</a> and <a href="https://github.com/karpathy/nanochat/discussions/481">"Beating GPT-2 for &lt;&lt;$100: the nanochat journey" (1 Feb 2026)</a></li>
+<li><a href="https://karpathy.ai/zero-to-hero.html">Neural Networks: Zero to Hero</a>, especially the <a href="https://www.youtube.com/watch?v=kCc8FmEb1nY">GPT video</a> that builds this model step by step</li>
+<li><a href="https://github.com/openai/gpt-2">OpenAI GPT-2</a>, the model nanoGPT reproduces, and <a href="https://huggingface.co/datasets/openwebtext">OpenWebText</a>, the open copy of its training data</li>
+<li><a href="https://github.com/KellerJordan/modded-nanogpt">modded-nanogpt</a>, the speedrun fork that inspired nanochat's leaderboard</li>
+<li>Back in this course: <a href="../18-robot-brain/15-tiny-lm.html#attention">Lesson 15, Stretch 2: attention</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="02-mingpt.html"><small>Back</small>2 · minGPT</a>
+  <a class="next" href="04-llm-c.html"><small>Next</small>4 · llm.c</a>
+</nav>
+<footer>Module 20 · nanoGPT · added 2026-11-07 · repo MIT-licensed, short excerpts quoted with credit</footer>
+</main>
+</body>
+</html>

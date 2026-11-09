@@ -1,0 +1,22 @@
+n|slug|title|homework_file|track|project_piece|week
+00|00-setup|Lesson 0 · Setup, and your first algorithm|lesson00_hello.py|both|Run your first robot script|1
+01|01-coordinates|Lesson 1 · Where am I? Coordinates and moving on a grid|lesson01_moving.py|robo|The robot can move|1
+02|02-sensors|Lesson 2 · Noisy senses: measuring, noise and averaging|lesson02_sensors.py|robo|A distance sensor|2
+03|03-learning-from-data|Lesson 3 · Learning from data: fit a line by shrinking the error|lesson03_learning.py|both|Learns its own braking distance|2
+04|04-neuron|Lesson 4 · The artificial neuron: should the robot stop?|lesson04_neuron.py|both|An obstacle detector|3
+05|05-evaluation|Lesson 5 · Is it any good? Honest testing, precision and recall|lesson05_evaluate.py|both|Safe, tested stop decisions|3
+06|06-pathfinding|Lesson 6 · Finding the way: BFS and A*|lesson06_paths.py|robo|Route planning|4
+07|07-trial-and-error|Lesson 7 · Learning by trial and error: Q-learning|lesson07_trial_error.py|robo|Learns a maze by itself|bonus
+08|08-words-as-numbers|Lesson 8 · Words as numbers: a tiny next-word model|lesson08_words.py|llm|Fixes typos in commands (6/9 -> 9/9 handled right)|5
+09|09-understanding-commands|Lesson 9 · Understanding commands: a word-counting classifier|lesson09_commands.py|llm|Understands one action per command (bake-off 5/12)|5
+15|15-tiny-lm|Lesson 15 · A tiny language model, built from zero|lesson15_tiny_lm.py|llm|Writes whole plans and asks when unsure (bake-off 5 -> 8/12)|6
+10|10-llm-safety|Lesson 10 · Using a real LLM safely: never trust, always check|lesson10_llm_safety.py|llm|A safety layer for AI output|7
+11|11-capstone|Lesson 11 · Capstone: Robo-Helper|lesson11_robohelper.py|both|The full robot, tested|7
+16|16-speed|Lesson 16 · How fast is a brain? Latency, tokens and cost|lesson16_speed.py|llm|A time budget: how far it rolls while it thinks|8
+17|17-faster|Lesson 17 · Faster and cheaper: caching, quantising and distilling|lesson17_faster.py|llm|Learns new phrasings from a teacher, then shrinks 8x (10/12 in 1.4 KB)|9
+13|13-lora|Lesson 13 · Teaching an old model a new trick: fine-tuning and LoRA|lesson13_lora.py|both|Adapts a factory model to YOUR robot cheaply|9
+18|18-world-class|Lesson 18 · A world-class brain over the internet: planners and agents|lesson18_world_class.py|both|Claude as the robot's brain, with you in charge|10
+20|20-mcp|Lesson 20 · Give any AI app your robot: MCP|lesson20_mcp_server.py|both|An MCP server any AI app can drive, with rules it can't break|bonus
+19|19-bakeoff|Lesson 19 · The bake-off: every brain, the same 12 tasks|lesson19_bakeoff.py|both|A scorecard: 5 -> 8 -> 10/12 across the brains you built|11
+12|12-preferences|Lesson 12 · Learning what people prefer: reinforcement learning from human feedback, by hand|lesson12_preferences.py|both|Picks the route people like best|12
+14|14-go-real|Lesson 14 · Going real: hardware, showing your work, what's next|(none)|both|Share it, or put it on a real robot|12

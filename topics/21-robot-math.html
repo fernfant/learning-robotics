@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Robot Maths, Played With</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../index.html">← LLMs &amp; Robotics</a> · Module 21</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 21 · The maths behind robots</div>
+<h1>The maths behind robots, learned by playing: ten interactive explainers, each one used to make Robo-Helper better</h1>
+<p class="lede">Linear algebra, Bayes, Markov chains, Kalman filters, A*, Fourier, momentum, reinforcement learning, Transformers and diffusion. Play with each idea in your browser, then use it on your own robot and measure the difference.</p>
+<p class="meta">Source: Martin (@0x_meden), “Learn the math behind robots by playing with it”, 8 Nov 2026 ·
+<a href="https://x.com/0x_meden/status/2119507343348212198">X post</a> · quoting his guide <a href="https://x.com/0x_meden/status/2118366063196774479">“How π0, GR00T and Optimus actually think”</a> (5 Nov 2026). All ten links checked and working on 9 Nov 2026.</p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Robots run on maths, but you don't have to learn it from a textbook. These ten websites let you <em>play</em> with the maths: drag things, press buttons, watch what happens.</p>
+<h3>Think of it like this</h3>
+<p>You learned to ride a bike by riding, not by reading about balance. These websites are like training wheels for maths: you wobble the numbers around and feel how they work before anyone writes an equation.</p>
+<h3>How to use this page</h3>
+<ol>
+<li>Pick one of the ten ideas below. Each has a "Play" link.</li>
+<li>Play for 10–15 minutes. Each section says what to try.</li>
+<li>Read the short "idea in plain words".</li>
+<li>Then use it on Robo-Helper: run <code>python3 bonus_robot_math.py</code> and see the robot get better, with numbers.</li>
+</ol>
+<h3>Why robots care</h3>
+<p>Every robot has to answer the same questions: Where am I? What did my sensors really see? Which way should I go? What should I do next? Each of these ten ideas answers one of them.</p>
+<h3>Try it</h3>
+<p>Open the <a href="https://www.redblobgames.com/pathfinding/a-star/introduction.html">A* page</a>, drag the walls around, and watch the search change. You already built A* in Robo-Helper week 4, so you'll recognise it.</p>
+<h3>Words to know</h3>
+<dl>
+<dt>Explainer</dt><dd>A web page that teaches an idea with pictures you can move.</dd>
+<dt>Noise</dt><dd>Random wobble in a sensor reading.</dd>
+<dt>Belief</dt><dd>What the robot thinks is true, with how sure it is.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> each section links an explainer to the exact Robo-Helper lesson that uses the idea, with a tested experiment and a challenge. At the end there's a summary of the quoted guide on how π0 and GR00T are built.</p>
+
+<div class="toc">
+<strong>In this module</strong>
+<ol>
+<li><a href="#summary">Summary</a></li>
+<li><a href="#why-robotics">How to use it with Robo-Helper</a></li>
+<li><a href="#linalg">Linear algebra</a></li>
+<li><a href="#bayes">Probability and Bayes</a></li>
+<li><a href="#markov">Markov chains</a></li>
+<li><a href="#kalman">Kalman filters</a> (with an interactive demo)</li>
+<li><a href="#astar">Path planning: A*</a></li>
+<li><a href="#fourier">Signals: Fourier</a></li>
+<li><a href="#momentum">Optimisation: momentum</a></li>
+<li><a href="#rl">Reinforcement learning</a></li>
+<li><a href="#transformers">Transformers</a></li>
+<li><a href="#diffusion">Diffusion, and how π0 and GR00T move</a></li>
+<li><a href="#playbook">Playbook</a></li>
+<li><a href="#check">Self-check</a></li>
+<li><a href="#glossary">Glossary &amp; further reading</a></li>
+</ol>
+</div>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>The post lists ten free interactive pages that cover the maths a robot brain uses, from rotating a vector to turning noise into arm motion. The last two (Transformers and diffusion) are, in the author's words, the maths inside π0 and GR00T: a Transformer that understands the scene and a diffusion-style head that produces motion. Here, every explainer is paired with the Robo-Helper lesson that uses it, and one tested experiment (<code>bonus_robot_math.py</code>, standard library only) that makes the robot measurably better.</p>
+</div>
+<div class="table-wrap"><table>
+<tr><th>Idea</th><th>Robo-Helper lesson</th><th>Experiment: before → after (real output)</th></tr>
+<tr><td>Linear algebra</td><td><a href="18-robot-brain/01-coordinates.html">Week 1</a></td><td>Turns "2 squares ahead, facing down" into room square (4, 5)</td></tr>
+<tr><td>Bayes</td><td><a href="18-robot-brain/02-sensors.html">Week 2</a>, <a href="18-robot-brain/09-understanding-commands.html">week 5</a></td><td>Finding the cat: 50% right after 1 reading → 92% after 4 → 100% after 16</td></tr>
+<tr><td>Markov chains</td><td><a href="18-robot-brain/08-words-as-numbers.html">Week 5</a></td><td>Run-ins with a wandering cat: 0.83 per trip → 0.06, for 2 extra steps</td></tr>
+<tr><td>Kalman filter</td><td><a href="18-robot-brain/02-sensors.html">Week 2</a></td><td>Distance error while driving: 0.56 m raw, 0.54 m averaged → 0.22 m</td></tr>
+<tr><td>A*</td><td><a href="18-robot-brain/06-pathfinding.html">Week 4</a></td><td>Squares searched: 40 (no guess) → 35 (A*) → 13 (weighted A*), same 11-step path</td></tr>
+<tr><td>Fourier</td><td><a href="18-robot-brain/02-sensors.html">Week 2</a></td><td>Wheel wobble removed: error 0.44 m → 0.11 m</td></tr>
+<tr><td>Momentum</td><td><a href="18-robot-brain/03-learning-from-data.html">Week 2</a></td><td>Braking fit: 73 steps → 35 with momentum 0.5 (but 0.9 overshoots)</td></tr>
+<tr><td>Reinforcement learning</td><td><a href="18-robot-brain/07-trial-and-error.html">Bonus</a></td><td>A surprise: in this tiny maze, exploring more only slows learning down</td></tr>
+<tr><td>Transformers</td><td><a href="18-robot-brain/15-tiny-lm.html#attention">Week 6 stretch</a></td><td>Attention: new commands 89% → 92% (average of 3 seeds)</td></tr>
+<tr><td>Diffusion</td><td><a href="18-robot-brain/15-tiny-lm.html">Week 6</a> (action chunks)</td><td>No experiment: explained, with what it would take</td></tr>
+</table></div>
+
+<h2 id="why-robotics">2. How to use it with Robo-Helper</h2>
+<div class="card note">
+<p><strong>Track: LLM + Robotics.</strong> Eight of the ten ideas are classic robotics (estimation, planning, control). The last two are the machine-learning half that modern robot brains add on top. Robo-Helper's week-by-week lessons already use most of them; this module gives you the interactive version of each idea and one more way to apply it.</p>
+</div>
+<ul>
+<li><strong>Run the experiments:</strong> <code>cd topics/18-robot-brain/project/solutions</code> then <code>python3 bonus_robot_math.py</code>. It runs in well under a second and needs nothing installed. Your homework folder has the same file once your earlier lessons are done.</li>
+<li><strong>Each experiment changes one thing and measures it.</strong> Three of them are honest surprises, which is the point: momentum can overshoot, more exploring isn't always better, and a moving average lags behind a moving robot.</li>
+<li><strong>Do them in Robo-Helper order:</strong> linear algebra and Kalman/Fourier/Bayes after week 2, A* after week 4, Markov after week 5, Transformers after week 6. Diffusion is for after the course.</li>
+</ul>
+
+<h2 id="linalg">3. Linear algebra</h2>
+<p><b>Play:</b> <a href="https://immersivemath.com/ila">Immersive Math: “Immersive Linear Algebra”</a>, a whole book with interactive figures. Try the vectors chapter and the matrices chapter: drag a vector and watch a matrix move it.</p>
+<p><b>The idea:</b> a robot sees the world from its own point of view ("2 squares ahead of me"). To use that on a map, it rotates the reading by the way it's facing, then adds where it is. Rotation is a 2×2 matrix of cosines and sines. Arms are the same idea stacked joint by joint (forward kinematics, <a href="02-tensortonic.html">Module 02</a>).</p>
+<p><b>In Robo-Helper:</b> <a href="18-robot-brain/01-coordinates.html">week 1</a> moves on a grid with fixed directions, so it never needed rotation. A real robot can face any way.</p>
+<pre><code>1) LINEAR ALGEBRA: the robot at (4, 3) facing 90 degrees (down the screen) sees something 2 squares ahead.
+   rotate((2, 0), 90) = (0.0, 2.0)  -&gt;  it is at room square (4, 5)</code></pre>
+<p><b>Challenge:</b> the robot faces 180° and reads 3. Where is the thing? Predict, then check with <code>sensor_to_room((4, 3), 180, 3)</code>. (Remember y grows downwards in our room.)</p>
+
+<h2 id="bayes">4. Probability and Bayes</h2>
+<p><b>Play:</b> <a href="https://seeing-theory.brown.edu">Seeing Theory (Brown University)</a>. Do "Basic Probability" then "Bayesian Inference": flip coins, and watch a belief update as evidence arrives.</p>
+<p><b>The idea:</b> start with a belief (every square equally likely). Each sensor reading makes some squares more likely and some less: multiply by how well each square explains the reading, then rescale so it adds up to 1. That's Bayes' rule, and it's how real robots work out where they are (localisation).</p>
+<p><b>In Robo-Helper:</b> <a href="18-robot-brain/02-sensors.html">week 2</a> averages noisy readings; <a href="18-robot-brain/09-understanding-commands.html">week 5</a>'s word counter is Bayes too (the "prior" is how common each intent is).</p>
+<pre><code>2) BAYES: where is the cat? The robot at (1, 1) takes noisy 'distance east' readings (noise 1.0).
+    1 readings: most likely square is the right one 50% of the time
+    4 readings: most likely square is the right one 92% of the time
+   16 readings: most likely square is the right one 100% of the time</code></pre>
+<p class="meta">500 trials each. Our sensor's noise is flat (anywhere within ±1), but the belief update assumes a bell curve. It still works, which is common: the model doesn't have to be exactly right to be useful.</p>
+<p><b>Challenge:</b> double the noise to 2.0. How many readings do you need now to be right 90% of the time?</p>
+
+<h2 id="markov">5. Markov chains</h2>
+<p><b>Play:</b> <a href="https://setosa.io/ev/markov-chains">Setosa: Markov chains, explained visually</a>. Change the arrows' probabilities and watch where the dot spends its time.</p>
+<p><b>The idea:</b> a Markov chain is "what happens next depends only on where you are now", with a probability for each next step. Run it for a long time and you get where it spends its time (the stationary distribution). Your <a href="18-robot-brain/08-words-as-numbers.html">week 5 next-word model</a> is a Markov chain over words.</p>
+<p><b>In Robo-Helper:</b> the cat. Give it a favourite bed at (4, 1) and let it wander. Then let A* charge extra for squares the cat likes.</p>
+<pre><code>3) MARKOV CHAIN: a wandering cat with a favourite bed at (4, 1). Route to the blue block avoiding where it usually is.
+   cat's favourite squares (long-run share): (4, 1) 32.9%, (5, 1) 23.1%, (3, 1) 19.8%
+   shortest  route:  7 steps, expected run-ins with the cat per trip 0.828
+   cat-aware route:  9 steps, expected run-ins with the cat per trip 0.060</code></pre>
+<p>Two extra steps cut run-ins by more than 90%. An honest note: our first try had a cat that wandered with no favourite spot. It spent its time almost evenly everywhere, so the "cat-aware" route was identical and no better. The model only helps if the cat has habits.</p>
+<p><b>Challenge:</b> try <code>pull=0.3</code> (a lazier preference for the bed) and a cost of <code>1 + 5 * pi[s]</code>. When does avoiding the cat stop being worth the extra steps?</p>
+
+<h2 id="kalman">6. Kalman filters</h2>
+<p><b>Play:</b> <a href="https://www.bzarg.com/p/how-a-kalman-filter-works-in-pictures">Tim Babb: How a Kalman filter works, in pictures</a>. The best-known plain explanation, built from blobs of uncertainty.</p>
+<p><b>The idea:</b> two sources of information, both imperfect: what you <em>expect</em> (I'm driving at 0.5 m/s, so the wall should be 5 cm closer) and what you <em>measure</em> (the noisy sensor). The Kalman filter blends them, trusting each in proportion to how sure it is. Every self-driving car and drone runs one (or a cousin of it).</p>
+<p><b>In Robo-Helper:</b> <a href="18-robot-brain/02-sensors.html">week 2</a> averaged 16 readings while standing still. That fails when the robot moves, because the old readings are out of date.</p>
+<pre><code>4) KALMAN FILTER: driving towards a wall at 0.5 m/s, sensor noise 1.0 m, 10 readings a second.
+   raw readings         typical error 0.56 m
+   average of last 16   typical error 0.54 m
+   Kalman filter        typical error 0.22 m</code></pre>
+
+<div class="card demo">
+<h3>Interactive: raw, averaged, Kalman</h3>
+<p class="legend">The robot drives towards a wall. <b class="f">■ noisy readings</b> &nbsp; <b class="p">■ Kalman estimate</b> &nbsp; grey: average of the last 16 &nbsp; dark: the truth. This demo uses its own random numbers, so its errors differ a little from the Python output above.</p>
+<canvas id="kf" width="700" height="220" aria-label="True distance, noisy readings, moving average and Kalman estimate over time"></canvas>
+<label for="kfNoise">Sensor noise: <span id="kfNoiseV" class="num"></span> m</label>
+<input id="kfNoise" type="range" min="0.1" max="2" step="0.1" value="1">
+<label for="kfSpeed">Robot speed: <span id="kfSpeedV" class="num"></span> m/s</label>
+<input id="kfSpeed" type="range" min="0" max="1" step="0.05" value="0.5">
+<div class="stats">
+  <div class="stat"><div class="k">Raw error</div><div class="v" id="kfRaw">–</div></div>
+  <div class="stat"><div class="k">Average of 16</div><div class="v" id="kfAvg">–</div></div>
+  <div class="stat"><div class="k">Kalman</div><div class="v" id="kfKal">–</div></div>
+</div>
+<p class="meta">Set the speed to 0: now the robot stands still and the average works well. Speed it up and watch the grey line lag behind.</p>
+</div>
+<p><b>Challenge:</b> the filter has one knob, <code>q</code> (how much the robot doubts its own speed). Try 0.0001 and 1.0. Which way does it go wrong?</p>
+
+<h2 id="astar">7. Path planning: A*</h2>
+<p><b>Play:</b> <a href="https://www.redblobgames.com/pathfinding/a-star/introduction.html">Red Blob Games: Introduction to A*</a>. Drag walls and goals and compare breadth-first search, Dijkstra and A*.</p>
+<p><b>The idea:</b> search outwards from the start, but always look next at the square that seems closest to the goal ("steps so far + a guess of steps left"). A good guess means far fewer squares looked at. Trust the guess more (weighted A*) and it searches even less, but may no longer find the shortest path.</p>
+<p><b>In Robo-Helper:</b> <a href="18-robot-brain/06-pathfinding.html">week 4</a>.</p>
+<pre><code>5) A*: the room, start to bin. Plain search vs A* vs weighted A* (trusting the guess more).
+   no heuristic (Dijkstra)  path 11 steps, squares looked at 40
+   A* weight 1              path 11 steps, squares looked at 35
+   A* weight 2              path 11 steps, squares looked at 13
+   A* weight 5              path 11 steps, squares looked at 13</code></pre>
+<p>In our small room, weighted A* still finds the shortest path. That isn't guaranteed: weighted A* only promises a path at most w times the shortest. On a big map, that trade (a slightly longer path, found much faster) is what a robot with a deadline wants.</p>
+<p><b>Challenge:</b> add walls to <code>ROOM</code> in a copy until weighted A* with w = 5 returns a longer path than plain A*.</p>
+
+<h2 id="fourier">8. Signals: Fourier</h2>
+<p><b>Play:</b> <a href="https://www.jezzamon.com/fourier">Jez Swanson: An Interactive Introduction to Fourier Transforms</a>. Draw a shape and watch circles spinning at different speeds trace it out.</p>
+<p><b>The idea:</b> any wiggly signal is a sum of simple waves at different speeds (frequencies). The Fourier transform tells you how much of each. If a wobble comes from the wheels at a steady rhythm, it shows up as one spike, and you can remove just that spike.</p>
+<p><b>In Robo-Helper:</b> <a href="18-robot-brain/02-sensors.html">week 2</a>'s sensor. Averaging can't remove a steady rhythm well; Fourier can.</p>
+<pre><code>6) FOURIER: a 64-reading sensor log with a wheel wobble (8 cycles) and noise.
+   strongest rhythm found at 8 cycles per log (we put it at 8)
+   typical error vs the true distance: 0.44 m before, 0.11 m after removing it</code></pre>
+<p class="meta">This works on a log you've already recorded. A robot cleaning its readings live would use a filter that only looks backwards; the idea is the same.</p>
+<p><b>Challenge:</b> make the wobble 2 cycles instead of 8. Does the method still find it? (The slow downward drift of the true distance also lives at low frequencies.)</p>
+
+<h2 id="momentum">9. Optimisation: gradient descent with momentum</h2>
+<p><b>Play:</b> <a href="https://distill.pub/2017/momentum">Gabriel Goh: Why Momentum Really Works (Distill)</a>. Slide the step size and momentum and watch the path to the bottom of the valley.</p>
+<p><b>The idea:</b> plain gradient descent takes a step downhill each time. Momentum remembers the last steps and keeps rolling, like a heavy ball, so it speeds up along long gentle slopes. Too much momentum and it overshoots and swings.</p>
+<p><b>In Robo-Helper:</b> <a href="18-robot-brain/03-learning-from-data.html">week 2</a> fits the braking distance with plain gradient descent.</p>
+<pre><code>7) MOMENTUM: Lesson 3's braking-distance fit. Steps until the error is below 0.001.
+   learning rate 0.1, momentum 0.0: 73 steps
+   learning rate 0.1, momentum 0.5: 35 steps
+   learning rate 0.1, momentum 0.9: 37 steps
+   learning rate 0.3, momentum 0.0: 24 steps</code></pre>
+<p>Momentum halves the steps at the same learning rate, but 0.9 swings and does no better than 0.5. On this easy problem, a bigger learning rate on its own does best. Momentum matters most on long, narrow valleys, which is exactly what the Distill page shows. Big networks have lots of those.</p>
+<p><b>Challenge:</b> try learning rate 0.6 without momentum. What happens, and why does the Distill page say so?</p>
+
+<h2 id="rl">10. Reinforcement learning</h2>
+<p><b>Play:</b> <a href="https://cs.stanford.edu/people/karpathy/reinforcejs">Andrej Karpathy: REINFORCEjs</a>. Run the GridWorld demos and watch values spread from the goal; try the "Waterworld" deep Q-learning agent.</p>
+<p><b>The idea:</b> no teacher, only rewards. The robot tries things, remembers how good each move was in each square (its Q table), and slowly prefers the moves that led to reward. It has to <em>explore</em> (try new moves) and <em>exploit</em> (use what it knows).</p>
+<p><b>In Robo-Helper:</b> the <a href="18-robot-brain/07-trial-and-error.html">Q-learning bonus</a>, and DQN against A* in <a href="20-from-scratch/06-minimalrl.html">Module 20</a>.</p>
+<pre><code>8) REINFORCEMENT LEARNING: Lesson 7's maze. How much exploring is best? (5 seeds each)
+   epsilon  0.0: learned route found by 5/5 seeds (length 7), first 9-step-or-better episode: [7, 7, 7, 7, 7]
+   epsilon 0.05: learned route found by 5/5 seeds (length 7), first 9-step-or-better episode: [11, 3, 9, 7, 5]
+   epsilon  0.2: learned route found by 5/5 seeds (length 7), first 9-step-or-better episode: [9, 8, 7, 9, 7]
+   epsilon  0.5: learned route found by 5/5 seeds (length 7), first 9-step-or-better episode: [18, 14, 23, 21, 7]</code></pre>
+<p>A surprise: with no random exploring at all (epsilon 0) it learns fastest. Why? Every step costs −1, and untried moves start at 0, so an untried move always looks better than one that's already cost something. The robot explores <em>on its own</em> ("optimism"). In a big world with distant rewards that trick isn't enough, and exploring matters.</p>
+<p><b>Challenge:</b> change the step reward from −1 to 0 in a copy of <code>q_learn</code>. Does epsilon 0 still work?</p>
+
+<h2 id="transformers">11. Transformers</h2>
+<p><b>Play:</b> <a href="https://poloclub.github.io/transformer-explainer">Polo Club (Georgia Tech): Transformer Explainer</a>. A real GPT-2 running in your browser. Type a sentence, then click into the attention heads and move the temperature slider.</p>
+<p><b>The idea:</b> every word asks every other word "how relevant are you to me?" (queries times keys), turns the scores into weights with softmax, and takes a weighted mix of their information (values). Stack that many times and you have the "understanding" half of π0 and GR00T.</p>
+<p><b>In Robo-Helper:</b> you built single-head attention, with backprop by hand, in the <a href="18-robot-brain/15-tiny-lm.html#attention">week 6 stretch</a>. Its measured gain: new commands 89% → 92% on average over 3 seeds, the same 8/12 on the bake-off. A real nanoGPT on the same robot data is in <a href="20-from-scratch/03-nanogpt.html">Module 20</a>.</p>
+<p><b>Challenge:</b> in the explainer, set the temperature to 0.2 and then 2.0 on the same prompt. Then find where Robo-Helper's tiny LM uses softmax, and say what a temperature would do to its plans.</p>
+
+<h2 id="diffusion">12. Diffusion, and how π0 and GR00T move</h2>
+<p><b>Play:</b> <a href="https://poloclub.github.io/diffusion-explainer">Polo Club: Diffusion Explainer</a>. Watch Stable Diffusion turn pure noise into a picture, step by step, and change the prompt and the guidance.</p>
+<p><b>The idea:</b> train a network to remove a little noise at a time. Then start from pure noise and run it again and again until a clean picture appears. Robots use the same trick for motion: start from a random wobble of joint positions and refine it into a smooth arm movement.</p>
+<h3>What the quoted guide says about π0 and GR00T (summary)</h3>
+<ul>
+<li><strong>The same two-part design.</strong> A vision-language model on top that understands the scene and the instruction, and a smaller "action head" below that produces motion. Per the guide, π0 starts from PaliGemma (3B) with a 300M-parameter action expert, and GR00T N1.7 uses Cosmos-Reason2-2B with a 16-layer diffusion-transformer action head that runs at about 28 Hz on a Jetson AGX Thor.</li>
+<li><strong>Flow matching, a cousin of diffusion.</strong> Both action heads start from noise and refine it into a trajectory, the way an image model refines noise into a picture.</li>
+<li><strong>Action chunks.</strong> π0 outputs a chunk of 50 future actions at once. Copying human demos one step at a time drifts: a small mistake leads somewhere the demos never went. Predicting a chunk is one of the main fixes.</li>
+<li><strong>The real difference is the data.</strong> π0: over 10,000 hours of humans driving real robots. GR00T: 20K hours of first-person video of human hands, plus robot demos. Optimus: human video and simulation (its walking: PPO on about a billion simulated steps, per a Stanford lecture by Ashish Kumar). Tesla publishes no architecture or weights.</li>
+<li><strong>Open models.</strong> openpi (π0, π0-FAST, π0.5; Apache 2.0; inference needs a GPU with more than 8 GB) and Isaac-GR00T (code Apache 2.0, weights under NVIDIA's Open Model License; inference 16 GB). LeRobot records your own demos and fine-tunes either.</li>
+</ul>
+<p class="meta">These figures are as reported in the guide, which cites the π0 paper, NVIDIA's repo and the talks it links. We haven't run either model.</p>
+<p><b>In Robo-Helper:</b> no diffusion, and we're honest about why: the robot moves on a grid with A*, so there's no smooth arm motion to generate. But one idea is already there. Since the week-6 rebuild, the tiny LM writes a <em>whole plan</em> at once ("put red blue") instead of one action, which is an action chunk in words. It's what took the bake-off from 5/12 to 8/12.</p>
+<p><b>Challenge (after the course):</b> pick one lecture from the guide's watching order (start with Stanford AA203 lecture 15 on flow matching and action chunks), then read the openpi README and write down what you'd need to run π0 in the LIBERO simulator.</p>
+
+<h2 id="playbook">13. Playbook</h2>
+<ol>
+<li>Play first, for 10–15 minutes, before reading anything. Make a prediction, then test it on the page.</li>
+<li>Find the matching Robo-Helper lesson and reread the part that uses the idea.</li>
+<li>Run <code>bonus_robot_math.py</code>. Read the before and after numbers, and say in one sentence why they changed.</li>
+<li>Do the challenge: change one number, predict what will happen, then run it.</li>
+<li>Keep the honest surprises. When an idea didn't help (momentum 0.9, epsilon 0.5, a cat with no habits), write down why. That's real understanding.</li>
+</ol>
+
+<h2 id="check">14. Self-check</h2>
+<details><summary>Why did averaging 16 readings work in week 2 but barely help while driving?</summary>
+<p>Standing still, every reading measures the same distance, so averaging cancels the noise. Driving, the old readings measure distances the robot has already passed, so the average lags behind. The Kalman filter fixes that by moving its estimate forward with the robot's known speed before blending in each new reading.</p></details>
+<details><summary>A* with weight 5 found the same 11-step path as plain A*. Is weighted A* always as good?</summary>
+<p>No. It only promises a path at most w times the shortest. It happened to be optimal in our small room. The trade is fewer squares searched for a possibly longer path.</p></details>
+<details><summary>The cat-aware route is 2 steps longer. When is that worth it?</summary>
+<p>When a run-in costs more than two steps, for example if the robot has to stop and replan, or might hurt the cat. With our cat, run-ins dropped from 0.83 to 0.06 per trip. With a cat that has no habits, avoiding it gains nothing.</p></details>
+<details><summary>Why did exploring less make Q-learning faster in Lesson 7's maze?</summary>
+<p>Optimistic starting values: untried moves are worth 0 while tried ones have cost −1 per step, so the greedy robot keeps trying new moves anyway. Random exploring on top only wastes steps in such a small maze.</p></details>
+<details><summary>What do π0 and GR00T have in common, and where do they differ most?</summary>
+<p>Both put a vision-language model on top and a flow-matching action head below that turns noise into a chunk of motion. They differ most in data: humans driving robots for π0, video of human hands for GR00T.</p></details>
+
+<h2 id="glossary">15. Glossary &amp; further reading</h2>
+<div class="table-wrap"><table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<tr><td>Rotation matrix</td><td>A 2×2 (or 3×3) table of cosines and sines that turns a vector by an angle.</td></tr>
+<tr><td>Prior / posterior</td><td>What you believe before / after seeing the evidence.</td></tr>
+<tr><td>Stationary distribution</td><td>Where a Markov chain spends its time in the long run.</td></tr>
+<tr><td>Kalman gain</td><td>How much the filter trusts the new reading versus its prediction.</td></tr>
+<tr><td>Heuristic</td><td>A guess of the remaining cost, used by A* to search less.</td></tr>
+<tr><td>Frequency</td><td>How many times per log (or per second) a wave repeats.</td></tr>
+<tr><td>Momentum</td><td>Keeping part of the last step's direction, like a rolling ball.</td></tr>
+<tr><td>Epsilon (ε)</td><td>How often a learning robot picks a random move to explore.</td></tr>
+<tr><td>Attention</td><td>Weighted mixing of information, with weights from query-key scores.</td></tr>
+<tr><td>Flow matching / diffusion</td><td>Turning noise into data (a picture, a motion) step by step.</td></tr>
+<tr><td>Action chunk</td><td>Several future actions predicted at once.</td></tr>
+</table></div>
+<ul>
+<li>The ten explainers: <a href="https://immersivemath.com/ila">Immersive Linear Algebra</a> · <a href="https://seeing-theory.brown.edu">Seeing Theory</a> · <a href="https://setosa.io/ev/markov-chains">Markov chains</a> · <a href="https://www.bzarg.com/p/how-a-kalman-filter-works-in-pictures">Kalman filter in pictures</a> · <a href="https://www.redblobgames.com/pathfinding/a-star/introduction.html">A*</a> · <a href="https://www.jezzamon.com/fourier">Fourier</a> · <a href="https://distill.pub/2017/momentum">Momentum</a> · <a href="https://cs.stanford.edu/people/karpathy/reinforcejs">REINFORCEjs</a> · <a href="https://poloclub.github.io/transformer-explainer">Transformer Explainer</a> · <a href="https://poloclub.github.io/diffusion-explainer">Diffusion Explainer</a></li>
+<li>From the guide: <a href="https://github.com/Physical-Intelligence/openpi">openpi</a> · <a href="https://github.com/NVIDIA/Isaac-GR00T">Isaac-GR00T</a> · <a href="https://github.com/huggingface/lerobot">LeRobot</a> · <a href="https://www.youtube.com/watch?v=udHX5Auj7ik">Stanford AA203 lecture 15</a> (flow matching, action chunks) · <a href="https://www.youtube.com/watch?v=yatA09E0J00">Berkeley CS 285 lecture 2</a> (why copied behaviour drifts)</li>
+<li>Related: <a href="02-tensortonic.html">Module 02</a> (drill the maths), <a href="03-shared-autonomy.html">Module 03</a> (Bayes for intent), <a href="06-30u30/index.html">Module 06</a> (attention, PPO papers), <a href="07-post-training.html">Module 07</a> (behaviour cloning, RL), <a href="18-robot-brain/index.html">Module 18</a> (Robo-Helper), <a href="20-from-scratch/index.html">Module 20</a> (minimalRL, nanoGPT)</li>
+</ul>
+
+<footer>Module 21 · added 2026-11-09 · <a href="../index.html">Back to course index</a></footer>
+</main>
+
+<script>
+function makeRng(seed) { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
+function simulate(noise, speed, seed) {
+  const rnd = makeRng(seed), dt = 0.1, steps = 100, q = 0.01;
+  const truth = [], raw = [], avg = [], kal = [];
+  let x = null, P = noise * noise;
+  for (let k = 0; k < steps; k++) {
+    const t = Math.max(7 - speed * dt * k, 0);
+    const r = Math.max(0, t + (rnd() * 2 - 1) * noise);
+    truth.push(t); raw.push(r);
+    const win = raw.slice(Math.max(0, k - 15));
+    avg.push(win.reduce((a, b) => a + b, 0) / win.length);
+    if (x === null) x = r;
+    x -= speed * dt; P += q;
+    const K = P / (P + noise * noise);
+    x += K * (r - x); P *= 1 - K;
+    kal.push(x);
+  }
+  return { truth, raw, avg, kal };
+}
+function rmsErr(est, truth) { return Math.sqrt(est.reduce((s, e, i) => s + (e - truth[i]) ** 2, 0) / truth.length); }
+
+if (typeof document !== 'undefined') {
+  const $ = id => document.getElementById(id);
+  const cv = $('kf'), ctx = cv.getContext('2d');
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  function draw() {
+    const noise = +$('kfNoise').value, speed = +$('kfSpeed').value, d = simulate(noise, speed, 7);
+    $('kfNoiseV').textContent = noise.toFixed(1); $('kfSpeedV').textContent = speed.toFixed(2);
+    $('kfRaw').textContent = rmsErr(d.raw, d.truth).toFixed(2) + ' m';
+    $('kfAvg').textContent = rmsErr(d.avg, d.truth).toFixed(2) + ' m';
+    $('kfKal').textContent = rmsErr(d.kal, d.truth).toFixed(2) + ' m';
+    const W = cv.width, H = cv.height, pad = 20, top = 10;
+    const X = i => pad + i * (W - 2 * pad) / 99, Y = v => H - pad - v / 10 * (H - pad - top);
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = css('--fail');
+    d.raw.forEach((v, i) => ctx.fillRect(X(i) - 1.5, Y(v) - 1.5, 3, 3));
+    const line = (arr, color, width) => {
+      ctx.strokeStyle = color; ctx.lineWidth = width; ctx.beginPath();
+      arr.forEach((v, i) => i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v))); ctx.stroke();
+    };
+    line(d.avg, css('--muted'), 2); line(d.kal, css('--pass'), 2.5); line(d.truth, css('--fg'), 1.5);
+    ctx.fillStyle = css('--muted'); ctx.font = '12px sans-serif';
+    ctx.fillText('0 m', 2, Y(0) + 4); ctx.fillText('10 s →', W - 52, H - 4);
+  }
+  ['kfNoise', 'kfSpeed'].forEach(id => $(id).addEventListener('input', draw));
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+  draw();
+} else {
+  module.exports = { simulate, rmsErr };
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stage 12 · Open-source portfolio</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 08 · Research-engineer roadmap</a> › Stage 12</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 08 · Stage 12</div>
+<h1>Open-source portfolio &amp; teardowns</h1>
+<p class="lede">Publish what you built so others can check it: the model, the data pipeline, the training logs, and an honest account of where your numbers and the paper's numbers differ, and why.</p>
+
+<div class="facts">
+  <div><b>Prerequisites</b>Stage 11 (a reproduction to write up); Stages 04 and 10 help (data pipeline, evals)</div>
+  <div><b>Time</b>2–4 days to publish one small fine-tune properly; a teardown takes as long as the attribution experiments it needs</div>
+  <div><b>Hardware</b>Colab GPU for a small LoRA fine-tune; publishing itself needs only a laptop and a free Hugging Face account</div>
+  <div><b>Key papers</b>Mitchell et al. 2018 (model cards) · Gebru et al. 2018 (datasheets) · Dodge et al. 2019 · Pineau et al. 2020 · Biderman et al. 2023 (Pythia)</div>
+</div>
+<p class="meta">Source: <a href="https://x.com/suraj_sharma14/status/2112876560629825734">Suraj Sharma's roadmap post on X</a>, stage 12</p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">When you build an AI model, you share it with everyone, explain exactly how you made it, and say honestly what it can't do.</p>
+
+<h3>Think of it like this</h3>
+<p>Think of a science fair. A poster that just says "my plant grew the tallest" isn't very convincing. A great poster shows what seeds you used, how much water and light each plant got, a chart of every day's height, and the plants that died too. It also says what you'd change next time. Judges trust it because they could repeat your experiment at home. A model card and a teardown are that poster, for an AI model.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Train a model and keep a record of everything: data, settings, and the training charts.</li>
+<li>Upload the model and the data to a public website (the Hugging Face Hub) so anyone can use them.</li>
+<li>Write a "model card": what it's for, how well it does, and where it fails.</li>
+<li>If you copied someone else's experiment and got a different answer, write a "teardown": what you did differently, and which differences explain the gap.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Robot teams share recordings of robots doing tasks, so other teams can train on them. A recording is only useful if it says which robot, which camera, and how "success" was decided. A robot model that says "works great" without saying where it was tested could fail badly in a new kitchen.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Pick a gadget or app you use. Write its "card" in five lines: what it's for, what it's good at, one thing it's bad at, who shouldn't use it, and how you know.</li>
+<li>In the demo further down, set <b>Runs the authors tried</b> to 1, then slide it up to 20. Watch how much better the "best" run looks, even though nothing about the method changed.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Open source</dt><dd>Sharing your work so anyone can see, use and check it.</dd>
+<dt>Hugging Face Hub</dt><dd>A website where people share AI models and datasets.</dd>
+<dt>Model card</dt><dd>A short document that comes with a model and explains it honestly.</dd>
+<dt>Training log</dt><dd>A record of how the model improved while it was learning.</dd>
+<dt>Teardown</dt><dd>A careful write-up of why your result differs from someone else's.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version. On a first read, skim the headings, try the demo and read the "Why it matters for robotics" box.</p>
+
+<h2 id="covers">1. What this stage covers</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>The post asks you to learn the Hugging Face ecosystem, write rigorous model cards, publish training logs and benchmark in public. Then publish a fine-tune, the exact synthetic-data pipeline behind it, and a teardown of why a paper's claimed results differed from your reproduction. The skill underneath is <strong>trustworthy reporting</strong>: enough detail that someone else could rerun your work, and honest enough that they'd get your numbers. A teardown is a controlled experiment, not an opinion piece.</p>
+</div>
+<ul>
+<li><strong>Learn:</strong> the Hub (models, datasets, cards, versioning); model cards; public training logs; public benchmarking with stated methods.</li>
+<li><strong>Practice:</strong> publish a novel fine-tune, the exact data pipeline used to make its training set, and a teardown of a reproduction gap.</li>
+<li><strong>Why (the post's claim):</strong> top labs hire research engineers on their public Hugging Face repos and training methods, not their degrees. Section 4 says what's true in that and what's overstated.</li>
+</ul>
+
+<h2 id="concepts">2. Concepts, explained</h2>
+
+<h3>The Hugging Face ecosystem</h3>
+<p>The <a href="https://huggingface.co/docs/hub/index">Hub</a> hosts models, datasets and demos (Spaces) as git repositories, so every file has a version history. Each repo's <code>README.md</code> is its card: a YAML metadata block at the top, then free text. Metadata fields such as <code>license</code>, <code>datasets</code> and <code>base_model</code> make a model searchable and link it to its training data and parent model. The <code>huggingface_hub</code> library uploads files; <code>transformers</code>, <code>datasets</code>, <code>peft</code> (LoRA) and <code>trl</code> (SFT and preference training) cover the usual fine-tuning path. Pin a commit hash when you cite a model or dataset; the default branch can change under you.</p>
+
+<h3>Rigorous model cards</h3>
+<p>Mitchell et al. (2018), <a href="https://arxiv.org/abs/1810.03993"><em>Model Cards for Model Reporting</em></a>, proposed short documents shipped with every model. They state intended use, evaluation procedure, and results broken down across relevant conditions and groups. Gebru et al. (2018), <a href="https://arxiv.org/abs/1803.09010"><em>Datasheets for Datasets</em></a>, did the same for data: motivation, composition, collection process and recommended uses. "Rigorous" means a reader can check the claims:</p>
+<pre><code>Model card, minimum
+- What it is: base model + commit, method (LoRA r=16, SFT), parameter count
+- Intended use / out of scope: who should and shouldn't use it
+- Training data: dataset repo + commit, how it was made (link the pipeline)
+- Training: hyperparameters, hardware, wall-clock, link to the logs
+- Evaluation: benchmark + harness version + prompt format,
+              mean over seeds with 95% intervals, slices where it's weak
+- Limitations: known failures, contamination check, what was not tested
+- License: of the weights, and the terms of the base model and data</code></pre>
+
+<h3>Publishing training logs</h3>
+<p>A final number hides the run. Loss curves, learning-rate schedule, gradient norm, evaluation over time and the exact config let readers see instability, overfitting or a lucky checkpoint. Publish them as a <a href="https://docs.wandb.ai/guides/reports/">Weights &amp; Biases report</a>, TensorBoard files in the model repo, or a CSV plus the config. Biderman et al. (2023), <a href="https://arxiv.org/abs/2304.01373"><em>Pythia</em></a>, set a high bar at scale: 16 models from 70M to 12B parameters, all trained on public data in the same order, with 154 checkpoints each and tools to rebuild the exact dataloaders. Groeneveld et al. (2024), <a href="https://arxiv.org/abs/2402.00838"><em>OLMo</em></a>, released training data and training and evaluation code alongside the weights. You don't need that scale; you need the same instinct.</p>
+
+<h3>Public benchmarking</h3>
+<p>A public benchmark number is only comparable if the method is public too: harness and version, prompt template, few-shot examples, decoding settings, and how many seeds. Dodge et al. (2019), <a href="https://arxiv.org/abs/1909.03004"><em>Show Your Work</em></a>, showed that test scores alone mislead. They found several published comparisons where the winner would flip with more or less hyperparameter-search compute, and proposed reporting expected validation performance as a function of search budget. Pineau et al. (2020), <a href="https://arxiv.org/abs/2003.12206"><em>Improving Reproducibility in ML Research</em></a>, describe the NeurIPS 2019 reproducibility program and its ML Reproducibility Checklist, a good template for what to state.</p>
+
+<h3>Teardowns: explaining a reproduction gap</h3>
+<p>A teardown answers: "the paper reports X, I got Y; which differences explain the gap?" Structure it like an experiment:</p>
+<ol>
+<li><strong>State both numbers on the same footing.</strong> Same benchmark version, same metric, same harness if possible. Many "gaps" are evaluation differences: prompt format, answer extraction, few-shot count.</li>
+<li><strong>List every difference</strong>: data, tokenizer, model size, steps, batch, learning rate, precision, seeds, and how the paper chose its reported run.</li>
+<li><strong>Test the suspects one at a time</strong>, each with several seeds, and report how much of the gap each closes.</li>
+<li><strong>Account for selection.</strong> If the paper reports the best of several runs and you report a mean, part of the gap is expected even if nothing else differs. The demo below shows how much.</li>
+<li><strong>Say what it does not show.</strong> Module 04's <a href="../04-distill-small-models.html#summary">own-voice-stt write-up</a> is a model: it lists the limits of its own test set (one headset, the same room and weeks as training, English only).</li>
+</ol>
+
+<div class="card demo">
+<h3>Interactive: how much of a gap does "best of N runs" explain?</h3>
+<p class="legend">Every run of the same method scores the true mean plus seed noise (standard deviation σ). The paper reports its best of N runs; you report the mean of k runs. Grey: one run. Accent: the paper's best-of-N. Green dashed: your k-run mean. Vertical lines: the true mean (solid) and the expected best-of-N (dashed). Scores are in benchmark points relative to the true mean.</p>
+<canvas id="gc" width="700" height="230" aria-label="Distributions of a single run, the best of N runs, and the mean of k runs, showing selection bias"></canvas>
+<label for="nr">Runs the authors tried (N): <span id="nrv" class="num"></span></label>
+<input id="nr" type="range" min="1" max="50" step="1" value="10">
+<label for="sg">Seed noise σ (points): <span id="sgv" class="num"></span></label>
+<input id="sg" type="range" min="0.1" max="2" step="0.1" value="0.5">
+<label for="kr">Your runs (k): <span id="krv" class="num"></span></label>
+<input id="kr" type="range" min="1" max="10" step="1" value="3">
+<label for="gp">Gap you observed, paper − you (points): <span id="gpv" class="num"></span></label>
+<input id="gp" type="range" min="0" max="3" step="0.1" value="1">
+<div class="stats">
+  <div class="stat"><div class="k">Expected best-of-N inflation</div><div class="v" id="inf">–</div></div>
+  <div class="stat"><div class="k">Your mean, 95% range</div><div class="v" id="yr">–</div></div>
+  <div class="stat"><div class="k">Chance of a gap this big from selection + noise alone</div><div class="v" id="pg">–</div></div>
+</div>
+<p class="meta">Try this: at the defaults (N = 10, σ = 0.5, k = 3, gap 1.0), the expected best-of-10 sits about 0.77 points above the true mean, and selection plus noise alone produce a gap of 1 point or more about 28% of the time. Set N to 1 and that chance falls to about 4%. The lesson for teardowns: find out how the paper picked its reported run before blaming anything else. If it doesn't say, say that in your teardown.</p>
+</div>
+
+<h2 id="project">3. The practice project</h2>
+<h3>(a) Laptop / Colab version: one small, fully documented release</h3>
+<ol>
+<li><strong>Pick a narrow task</strong> with an automatic check: maths word problems with numeric answers, JSON extraction, a classification label. A checkable task makes evaluation honest and cheap.</li>
+<li><strong>Build the data pipeline</strong> as a script, not a notebook you ran once (this is <a href="04-synthetic-data.html">Stage 04</a>): generation prompts, filters, dedup, a contamination check against your test set, and a fixed seed. Publish the resulting dataset on the Hub with a dataset card in the spirit of datasheets.</li>
+<li><strong>Fine-tune a small open model</strong> (a few hundred million parameters) with LoRA via <code>peft</code> and <code>trl</code> on one Colab GPU. Log to W&amp;B or TensorBoard.</li>
+<li><strong>Evaluate</strong> the base model and your fine-tune on the same held-out set, with three seeds for the fine-tune and a paired bootstrap interval for the difference (the code is on the <a href="11-paper-to-production.html#concepts">Stage 11 page</a>).</li>
+<li><strong>Publish</strong> the model with a card that follows the minimum above, linking the dataset commit, the pipeline repo and the logs.</li>
+<li><strong>Write a teardown</strong> of your Stage 11 reproduction, or of one claim from a paper or model card you can test at small scale.</li>
+</ol>
+<pre><code>from huggingface_hub import HfApi, ModelCard
+
+card = ModelCard(open("README.md").read())     # YAML header + text
+card.validate()                                 # checks the metadata block
+api = HfApi()
+api.create_repo("you/task-lora-small", exist_ok=True)
+api.upload_folder(folder_path="out/", repo_id="you/task-lora-small",
+                  commit_message="v0.1: LoRA r=16, 3 seeds, eval in card")</code></pre>
+<p><strong>What to expect:</strong> the fine-tune may well beat the base model on your narrow task; whether it does is the experiment. Report it either way. A careful card on a modest model shows more skill than a big claim with no method.</p>
+
+<h3>(b) The full version from the post</h3>
+<p>A "novel fine-tune" at a size people would use (often 7B-class), the exact synthetic data pipeline, and a teardown of a published result. Costs: LoRA or QLoRA fine-tuning of a 7B-class model fits on one rented high-memory GPU; full fine-tuning needs several. Generating a large synthetic set with a frontier model's API costs real money, so estimate tokens before you start. Check licences and terms: the base model's licence, the dataset's terms, and the API provider's terms on using outputs for training all constrain what you can publish.</p>
+
+<h3>(c) Pitfalls</h3>
+<ul>
+<li><strong>Cards written after the fact.</strong> Fill in the card as you go; reconstructing hyperparameters from memory is how cards end up wrong.</li>
+<li><strong>Unpinned versions.</strong> Cite model and dataset commits, library versions and the harness version, or nobody can rerun it.</li>
+<li><strong>Test-set contamination</strong> from the synthetic pipeline, which often paraphrases public benchmarks. Check n-gram overlap before training (see <a href="10-evals-red-teaming.html">Stage 10</a>).</li>
+<li><strong>Best checkpoint chosen on test.</strong> Choose on dev; report test once.</li>
+<li><strong>Teardowns that accuse.</strong> Write about the gap, not the authors. Contact them first; many gaps are an undocumented detail they'll happily share.</li>
+<li><strong>Leaking secrets or private data</strong> in logs, configs or datasets. Scrub API keys, paths and personal data before you push.</li>
+</ul>
+
+<h2 id="reality">4. Reality check</h2>
+<p>The post claims top labs hire research engineers on their public Hugging Face repos and training methods, not their degrees.</p>
+<ul>
+<li><strong>True:</strong> public, checkable work is strong evidence, and it's one of the few routes for people without a PhD or a big-lab job. A good model card, published logs and a fair teardown show exactly the habits labs want: careful measurement and honest reporting.</li>
+<li><strong>Overstated:</strong> hiring still runs on interviews, coding and research discussions, referrals, papers and prior experience, and degrees still feature. A Hub profile gets attention; it doesn't replace the rest. We don't have data on how much weight labs give it, so treat the claim as opinion.</li>
+<li><strong>Quality over volume:</strong> one well-documented release and one careful teardown beat a page of thinly described fine-tunes. "Novel" matters less than "trustworthy".</li>
+</ul>
+
+<h2 id="course">5. In this course</h2>
+<ul>
+<li><a href="../04-distill-small-models.html#summary">Module 04 · Distilling small models</a>: the own-voice-stt repo as a model honest write-up, with a "what the numbers don't show" list, plus its <a href="../04-distill-small-models.html#eval">evaluation checklist</a> and <a href="../04-distill-small-models.html#pitfalls">pitfalls table</a>.</li>
+<li><a href="11-paper-to-production.html">Stage 11 · Paper-to-production</a>: the reproduction this stage writes up, and the paired bootstrap.</li>
+<li><a href="../06-30u30/index.html">Module 06 · 30u30</a>: thirty reproductions, each a candidate for a short public write-up.</li>
+<li><a href="../01-decision-model-evals.html#calibration">Module 01 · Calibration</a>: what to report beyond accuracy.</li>
+<li><a href="../07-post-training.html">Module 07 · After pre-training</a>: the SFT and preference methods your fine-tune will use.</li>
+</ul>
+
+<h2 id="robotics">6. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Robot datasets and policies are shared on the Hub.</strong> LeRobot publishes datasets and trained policies there, so the same cards, versioning and logs apply. A robot dataset card should state the robot, cameras and rates, the action space, how episodes were collected, and how success was judged.</li>
+<li><strong>Robot results need more context than benchmark scores.</strong> Number of trials, start-state distribution, objects, lighting and hardware revision all change success rates. Report trials and intervals, and publish failure videos alongside successes.</li>
+<li><strong>Reproduction gaps are bigger on hardware.</strong> Different arms, grippers and cameras mean a policy may not transfer at all. A teardown that separates "the method" from "my robot is different" is valuable and rare.</li>
+<li><strong>Selection bias is common.</strong> "Best of several evaluation sessions" or a hand-picked demo video is the robot version of best-of-N runs. Say how you chose what you show.</li>
+</ul>
+</div>
+
+<h2 id="check">7. Self-check</h2>
+<details><summary>What must a model card contain for a reader to check its evaluation claims?</summary><p>The benchmark and harness version, prompt format and decoding settings, the number of seeds, means with intervals, the exact model and data commits, and how the checkpoint was chosen.</p></details>
+<details><summary>A paper reports the best of 10 seeds; you report the mean of 3. Seed noise is σ = 0.5 points. Roughly how big a gap should you expect with no real difference?</summary><p>The expected maximum of 10 standard normal draws is about 1.54, so the best-of-10 sits about 0.77 points above the true mean on average. Your mean has its own noise (95% range about ±0.57). A gap under about a point is plausibly selection plus noise.</p></details>
+<details><summary>What did Dodge et al. (2019) propose instead of a single test score?</summary><p>Reporting expected validation performance of the best model as a function of the hyperparameter-search budget, since conclusions can flip with more or less search compute.</p></details>
+<details><summary>Why publish the synthetic data pipeline and not just the dataset?</summary><p>The pipeline shows the filters, dedup and contamination checks that shaped the data, lets others regenerate or vary it, and makes errors findable. A frozen dataset alone hides those decisions.</p></details>
+<details><summary>What makes Pythia useful for research beyond its weights?</summary><p>All 16 models were trained on public data in the same order, with 154 checkpoints each and tools to rebuild the exact dataloaders, so you can study training dynamics and memorisation in a controlled way.</p></details>
+
+<h2 id="courses">8. Courses &amp; content</h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Resource</th><th>Type</th><th>Use it for</th></tr></thead>
+<tbody>
+<tr><td><a href="https://huggingface.co/docs/hub/model-cards">Hugging Face Hub · Model cards</a></td><td>Official docs</td><td>What a rigorous model card contains</td></tr>
+<tr><td><a href="https://huggingface.co/learn/llm-course">Hugging Face LLM Course</a></td><td>Course (free)</td><td>Fine-tune, then share models and datasets on the Hub</td></tr>
+<tr><td><a href="https://docs.wandb.ai/guides/reports/">Weights &amp; Biases · Reports</a></td><td>Official docs</td><td>Publishing training logs and comparisons</td></tr>
+<tr><td><a href="https://course.fast.ai/">fast.ai · Practical Deep Learning</a></td><td>Course (free)</td><td>Strong emphasis on shipping and writing about your work</td></tr>
+</tbody>
+</table>
+</div>
+<p>Start with the model cards docs: it's short, it's the format you'll publish in, and writing your card first tells you what to log during training.</p>
+<p class="meta"><a href="index.html#courses">Full course map for all 12 stages →</a></p>
+
+<h2 id="papers">9. Papers &amp; docs</h2>
+<ul>
+<li>Mitchell, Wu, Zaldivar, Barnes, Vasserman, Hutchinson, Spitzer, Raji, Gebru (2018). <a href="https://arxiv.org/abs/1810.03993">Model Cards for Model Reporting</a></li>
+<li>Gebru, Morgenstern, Vecchione, Vaughan, Wallach, Daumé III, Crawford (2018). <a href="https://arxiv.org/abs/1803.09010">Datasheets for Datasets</a></li>
+<li>Dodge, Gururangan, Card, Schwartz, Smith (2019). <a href="https://arxiv.org/abs/1909.03004">Show Your Work: Improved Reporting of Experimental Results</a></li>
+<li>Pineau, Vincent-Lamarre, Sinha, Larivière, Beygelzimer, d'Alché-Buc, Fox, Larochelle (2020). <a href="https://arxiv.org/abs/2003.12206">Improving Reproducibility in Machine Learning Research</a></li>
+<li>Biderman, Schoelkopf, Anthony, Bradley et al. (2023). <a href="https://arxiv.org/abs/2304.01373">Pythia: A Suite for Analyzing Large Language Models Across Training and Scaling</a></li>
+<li>Groeneveld, Beltagy, Walsh, Bhagia et al. (2024). <a href="https://arxiv.org/abs/2402.00838">OLMo: Accelerating the Science of Language Models</a></li>
+<li>Docs: <a href="https://huggingface.co/docs/hub/model-cards">Hub model cards</a> · <a href="https://huggingface.co/docs/hub/datasets-cards">Hub dataset cards</a> · <a href="https://docs.wandb.ai/guides/reports/">W&amp;B Reports</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="11-paper-to-production.html"><small>Previous</small>Stage 11 · Paper to production</a>
+  <a class="next" href="index.html"><small>Next</small>Module 08 hub</a>
+</nav>
+<footer>Module 08 · Stage 12 · written for this course from the source post and primary papers.</footer>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const cv = $('gc'), ctx = cv.getContext('2d');
+const nIn = $('nr'), sIn = $('sg'), kIn = $('kr'), gIn = $('gp');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+// Abramowitz & Stegun 7.1.26, abs error < 1.5e-7
+function erf(x) {
+  const s = Math.sign(x); x = Math.abs(x);
+  const t = 1 / (1 + 0.3275911 * x);
+  return s * (1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x));
+}
+const Phi = z => 0.5 * (1 + erf(z / Math.SQRT2));
+const phi = z => Math.exp(-z * z / 2) / Math.sqrt(2 * Math.PI);
+const fmax = (z, N) => N * phi(z) * Phi(z) ** (N - 1);   // density of the max of N standard normals
+
+function emax(N) {
+  let s = 0; const h = 0.002;
+  for (let z = -8; z <= 8; z += h) s += z * fmax(z, N) * h;
+  return s;
+}
+
+// P(best-of-N minus your k-run mean >= g), true means equal
+function pgap(N, sig, k, g) {
+  let s = 0; const h = 0.002, se = sig / Math.sqrt(k);
+  for (let z = -8; z <= 8; z += h) s += fmax(z, N) * Phi((z * sig - g) / se) * h;
+  return s;
+}
+
+function draw() {
+  const N = +nIn.value, sig = +sIn.value, k = +kIn.value, g = +gIn.value;
+  $('nrv').textContent = N; $('sgv').textContent = sig.toFixed(1);
+  $('krv').textContent = k; $('gpv').textContent = g.toFixed(1);
+  const em = emax(N) * sig, half = 1.96 * sig / Math.sqrt(k), p = pgap(N, sig, k, g);
+  $('inf').textContent = '+' + em.toFixed(2) + ' pts';
+  $('yr').textContent = '±' + half.toFixed(2) + ' pts';
+  $('pg').textContent = (100 * p).toFixed(0) + '%';
+
+  const W = cv.width, H = cv.height, L = 20, R = 20, T = 14, B = 26;
+  const lo = -4 * sig, hi = 5 * sig, px = v => L + (v - lo) / (hi - lo) * (W - L - R);
+  const dens = [
+    [x => phi(x / sig) / sig, css('--muted'), []],
+    [x => fmax(x / sig, N) / sig, css('--accent'), []],
+    [x => phi(x / (sig / Math.sqrt(k))) / (sig / Math.sqrt(k)), css('--pass'), [6, 4]]
+  ];
+  let top = 0;
+  for (const [f] of dens) for (let i = 0; i <= 200; i++) top = Math.max(top, f(lo + (hi - lo) * i / 200));
+  const py = v => H - B - v / top * (H - T - B);
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = css('--line'); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(L, H - B); ctx.lineTo(W - R, H - B); ctx.stroke();
+  for (const [f, col, dash] of dens) {
+    ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.setLineDash(dash); ctx.beginPath();
+    for (let i = 0; i <= 200; i++) { const x = lo + (hi - lo) * i / 200; i ? ctx.lineTo(px(x), py(f(x))) : ctx.moveTo(px(x), py(f(x))); }
+    ctx.stroke();
+  }
+  ctx.setLineDash([]); ctx.strokeStyle = css('--fg'); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(px(0), T); ctx.lineTo(px(0), H - B); ctx.stroke();
+  ctx.setLineDash([5, 4]); ctx.strokeStyle = css('--accent');
+  ctx.beginPath(); ctx.moveTo(px(em), T); ctx.lineTo(px(em), H - B); ctx.stroke(); ctx.setLineDash([]);
+  ctx.font = '12px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = css('--muted');
+  [-4, -2, 0, 2, 4].forEach(m => ctx.fillText((m > 0 ? '+' : m < 0 ? '−' : '') + Math.abs(m * sig).toFixed(1), px(m * sig), H - 8));
+  ctx.textAlign = 'left'; ctx.fillText('score − true mean (points)', L, T + 2);
+}
+
+nIn.oninput = sIn.oninput = kIn.oninput = gIn.oninput = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

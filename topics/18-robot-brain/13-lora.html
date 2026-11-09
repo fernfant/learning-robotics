@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 13 · LoRA</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 9 · Lesson 13</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 9 · Lesson 13</div>
+<h1>Teaching an old model a new trick: fine-tuning and LoRA</h1>
+<p class="lede">A factory trained a model for robots like yours. But your robot is a little bit different, and the model gets things wrong. You could retrain every number in it. Or you could notice that the fix is simple, and train a tiny add-on instead.</p>
+
+<div class="facts">
+  <div><b>Time</b>2–3 hours</div>
+  <div><b>You'll need</b>Python 3 (no earlier lesson files needed this time), paper and a pencil, a recipe or a kitchen scale</div>
+  <div><b>New words</b>matrix, matrix × vector, fine-tuning, parameters, LoRA, adapter, rank, frozen</div>
+  <div><b>Project piece</b>Adapts a factory model to YOUR robot cheaply</div>
+</div>
+
+<section class="kid" id="start">
+<h2>Start here</h2>
+<p class="big">When a big model needs a small, simple change, don't rewrite the whole model: freeze it and train a thin add-on that holds only the change.</p>
+
+<h3>The problem</h3>
+<p>Robo-Helper has six distance sensors, one for each direction it cares about. The factory shipped a model that turns those six readings into six "danger levels", and it works perfectly on the factory's robots. But on your robot, sensor 2 got bolted on at a slight angle. Now it picks up things that are really in front of the <em>other</em> sensors, and its readings leak into all the danger levels. The factory model is confused. Measured on 200 tests, its error is 0.0673. For a robot about to bump into things, that's too much.</p>
+
+<h3>The idea in one picture</h3>
+<p>Imagine you buy glasses off the shelf, and they're nearly right, but your left eye is a bit weaker. You don't grind a whole new pair of lenses from scratch. You add a thin clip-on lens to fix just the difference. The original glasses stay exactly as they were, and you can unclip the add-on and use a different one for reading or for sunshine. LoRA is a clip-on lens for a model.</p>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Matrix</dt><dd>A table of numbers in rows and columns. A model's "knowledge" is stored in matrices. Ours, W, is 6 × 6: 36 numbers.</dd>
+<dt>Matrix × vector</dt><dd>How a matrix turns inputs into outputs: each output is one row of the table multiplied number-by-number with the inputs, then added up.</dd>
+<dt>Parameters</dt><dd>The numbers a model learns. "Trained 12 numbers" means 12 parameters.</dd>
+<dt>Fine-tuning</dt><dd>Taking a model that's already trained and nudging its numbers a bit more on new data, so it fits a new situation.</dd>
+<dt>Frozen</dt><dd>Not allowed to change during training. In LoRA the original W is frozen.</dd>
+<dt>LoRA</dt><dd>Low-Rank Adaptation. Keep W frozen and learn a small correction written as a thin column of numbers times a thin row: A @ B.</dd>
+<dt>Adapter</dt><dd>The small A and B you trained. You can save it, swap it, or have one per robot.</dd>
+<dt>Rank</dt><dd>How many independent changes the add-on can express. Rank 1 = one pattern of change. Rank 2 = two.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full lesson: the idea built from nothing, a demo with live heatmaps, your homework, and a challenge away from the screen.</p>
+
+<h2 id="problem">1. The problem</h2>
+<p>The factory model W gets six sensor readings <code>x</code> (each from 0 to 1) and gives six danger levels. On a perfect robot, sensor 0 should drive danger 0, sensor 1 drive danger 1, and so on. So W looks almost like this, with 1s down the diagonal and tiny "cross-talk" numbers everywhere else:</p>
+<pre><code>W (rounded)    s0     s1     s2     s3     s4     s5
+danger 0     1.07   0.05  -0.02  -0.05   0.00  -0.02
+danger 1     0.06   0.96  -0.01   0.02   0.08   0.00
+danger 2    -0.04   0.05   1.02  -0.05   0.08   0.10
+danger 3     0.06   0.08  -0.04   1.05   0.08   0.04
+danger 4    -0.01  -0.08  -0.01   0.02   1.08   0.09
+danger 5    -0.01   0.07  -0.05   0.06   0.01   0.90</code></pre>
+<p>Your robot's angled sensor 2 leaks: what it reads should push danger 0 up by 0.5, danger 1 down by 0.3, danger 2 up by 0.8, and so on. The factory model doesn't know that. You can measure 12 examples on your robot: six readings, and the danger levels that turned out to be right.</p>
+<p><strong>Obvious idea 1: train a new model from scratch on your 12 examples.</strong> You'd throw away everything the factory learned from thousands of robots. And 12 examples aren't nearly enough to learn a big model from nothing.</p>
+<p><strong>Obvious idea 2: fine-tune, i.e. keep training all 36 numbers of W on your 12 examples.</strong> This actually works here. But imagine W was a real AI model with billions of numbers. Training all of them needs huge computers, and every robot would need its own giant copy of the whole model. A factory with 1,000 slightly different robots would store 1,000 giant models. There must be a cheaper way.</p>
+
+<h2 id="principles">2. First principles</h2>
+
+<h3>Step 1: a model is a table of numbers</h3>
+<p>Let's shrink it to 2 sensors and 2 danger levels. The model is a 2 × 2 table:</p>
+<pre><code>W = [[1, 2],
+     [3, 4]]          x = [1, 1]</code></pre>
+<p>To get the outputs, take each <strong>row</strong>, multiply it number-by-number with x, and add up. That's called <strong>matrix × vector</strong> (or "matvec").</p>
+<pre><code>output 0 = row 0 · x = 1×1 + 2×1 = 3
+output 1 = row 1 · x = 3×1 + 4×1 = 7
+W x = [3, 7]</code></pre>
+<p>That's all a layer of a neural network does (plus a squash like sigmoid, sometimes). It's Lesson 4's neuron, done for several neurons at once: each row is one neuron's weights.</p>
+<details><summary>Predict first: W = [[2, 0], [1, 3]] and x = [1, 2]. What is W x?</summary>
+<p><code>[2, 7]</code>. Row 0: 2×1 + 0×2 = 2. Row 1: 1×1 + 3×2 = 7. Notice the 0 in row 0: input 1 has no effect at all on output 0. Zeros in the table mean "no connection".</p>
+</details>
+
+<h3>Step 2: fine-tuning means nudging the numbers</h3>
+<p>Fine-tuning uses the same idea as Lesson 3: look at the error, nudge each number to shrink it. For a table, the rule is:</p>
+<pre><code>err = W x − y                      (prediction minus the right answer)
+W[i][j] −= lr × err[i] × x[j]       (for every row i and column j)</code></pre>
+<p>Example. A tiny robot with <code>W = [[1, 0], [0, 1]]</code>. It reads <code>x = [1, 0.5]</code>, and the right danger levels are <code>y = [1, 1]</code>. Use <code>lr = 0.5</code>:</p>
+<pre><code>W x       = [1, 0.5]
+err       = [1 − 1, 0.5 − 1] = [0, −0.5]
+row 0:      err is 0, so nothing changes
+W[1][0]   = 0 − 0.5 × (−0.5) × 1   = 0.25
+W[1][1]   = 1 − 0.5 × (−0.5) × 0.5 = 1.125
+new W     = [[1, 0], [0.25, 1.125]]
+new W x   = [1, 0.25 + 0.5625] = [1, 0.8125]      closer to [1, 1]</code></pre>
+<p>Do that many times, over many examples, and W fits your robot. Every number in the table can move. That's <strong>full fine-tuning</strong>. On a 6 × 6 table, that's 36 numbers.</p>
+
+<h3>Step 3: big models make this expensive</h3>
+<p>Real models are made of many layers, and one layer of a big language model is a table of about <strong>4096 × 4096 = 16,777,216</strong> numbers. A model has hundreds of tables like that. To fine-tune all of it you need memory not just for the numbers but for their training bookkeeping too, which needs big, expensive computers. And afterwards, you have a whole new copy of the model. Ten robots, ten copies.</p>
+
+<h3>Step 4: the change is often simple</h3>
+<p>Here's the key insight. Look at what your robot actually needs: <code>W_new = W + change</code>. What does the <em>change</em> look like? Sensor 2 leaks into every danger level, with amounts <code>u = [0.5, −0.3, 0.8, 0, −0.4, 0.2]</code>. So the change table is all zeros except column 2:</p>
+<pre><code>change      s0   s1    s2    s3   s4   s5
+danger 0     0    0   0.5    0    0    0
+danger 1     0    0  -0.3    0    0    0
+danger 2     0    0   0.8    0    0    0
+danger 3     0    0   0      0    0    0
+danger 4     0    0  -0.4    0    0    0
+danger 5     0    0   0.2    0    0    0</code></pre>
+<p>That's 36 numbers, but there's really only one idea in it: "sensor 2 leaks, by these amounts". You can write the whole table as a <strong>thin column times a thin row</strong>:</p>
+<pre><code>A (6 × 1) = a column  [0.5, −0.3, 0.8, 0, −0.4, 0.2]     "how much each danger level is affected"
+B (1 × 6) = a row     [0, 0, 1, 0, 0, 0]                 "which sensor is causing it"
+change = A @ B        entry [i][j] = A[i] × B[j]</code></pre>
+<p>Try the small version from <code>check.py</code> by hand. A column times a row makes a whole table:</p>
+<pre><code>[[1],      @   [[3, 4]]   =   [[1×3, 1×4],    =   [[3, 4],
+ [2]]                          [2×3, 2×4]]         [6, 8]]</code></pre>
+<p>Here 2 + 2 = 4 numbers build a table of 4, so no saving yet (the table is tiny). For 6 × 6: A has 6 numbers, B has 6, so 12 numbers build a table of 36. That's <strong>LoRA</strong>: freeze W, and only learn A and B.</p>
+
+<details><summary>Predict first: a 4096 × 4096 layer, and a LoRA where A is 4096 × 8 and B is 8 × 4096. How many numbers does LoRA train, and what fraction is that?</summary>
+<p>4096 × 8 + 8 × 4096 = 32,768 + 32,768 = <strong>65,536</strong>. Out of 16,777,216, that's about <strong>0.4%</strong>. You train 256 times fewer numbers, and the adapter file is tiny. That "8" is the rank, and it's coming up next.</p>
+</details>
+
+<h3>Step 5: rank = how many independent changes</h3>
+<p>Rank 1 means A is one column and B is one row: the add-on can express <strong>one pattern</strong> of change ("this sensor leaks, by these amounts"). What if <em>two</em> sensors leak, in different ways? Then the change is two separate patterns added together. One column and one row can't hold both. You need <strong>rank 2</strong>: A becomes 6 × 2 (two columns) and B becomes 2 × 6 (two rows), 24 numbers.</p>
+<p>A good way to feel it: rank is the number of <em>root causes</em>. "My sensor is bolted on crooked" is one cause, even though it changes all six danger levels. "Two sensors are bolted on crooked" is two causes. Real LLM adapters use rank 8 or 16 or 64, because "talk like a pirate" or "answer in robot-command JSON" needs a few more independent changes, but still far fewer than the full table.</p>
+
+<h3>Step 6: using the add-on (and why B starts at zero)</h3>
+<p>With LoRA the model's output is</p>
+<pre><code>output = W x + A (B x)</code></pre>
+<p>Notice we never build the 6 × 6 table A @ B. We squeeze x through the thin middle first: <code>B x</code> is just 1 number (for rank 1), then <code>A</code> spreads it back out to 6. For a 4096-wide layer that's far less work. Here's the <code>check.py</code> example by hand, with <code>W = [[1, 2], [3, 4]]</code>, <code>A = [[1], [0]]</code>, <code>B = [[0, 1]]</code>, <code>x = [1, 1]</code>:</p>
+<pre><code>W x       = [3, 7]
+B x       = [0×1 + 1×1] = [1]
+A (B x)   = [1×1, 0×1]  = [1, 0]
+output    = [3 + 1, 7 + 0] = [4, 7]</code></pre>
+<p>Training starts with A as small random numbers and <strong>B as all zeros</strong>. Then <code>A @ B</code> is all zeros, and the model starts out as <em>exactly</em> the factory model. Training can only move away from "already pretty good", never start from a random mess.</p>
+<details><summary>Predict first: what goes wrong if A and B <em>both</em> start at zero?</summary>
+<p>Nothing ever learns. A's update is multiplied by <code>B x</code>, which is 0. B's update is multiplied by A, which is 0. Both nudges are zero, every step, forever. One of the two must start non-zero to get things moving. (That's also why, in the demo, the first few steps barely change the error: A is small, so B grows slowly at first, then it speeds up.)</p>
+</details>
+
+<h3>Step 7: what happened on our robot</h3>
+<p>Both methods train on the same 12 examples, for 400 passes, and are tested on 200 new ones:</p>
+<pre><code>factory model on OUR robot:          test error 0.0673
+LoRA rank 1 (12 numbers trained):    test error 0.0000
+full fine-tune (36 numbers trained): test error 0.0000</code></pre>
+<p>And when you look inside the trained adapter, LoRA <em>found the leak</em>: A came out as about <code>[0.48, −0.29, 0.77, 0, −0.38, 0.19]</code> and B as about <code>[0.01, 0, 1.05, 0, 0, 0]</code>. B points at sensor 2, and A × 1.05 gives back <code>[0.5, −0.3, 0.8, 0, −0.4, 0.2]</code>. Nobody told it which sensor was bent.</p>
+<p>The harder robot, with two leaky sensors:</p>
+<pre><code>two leaky sensors, LoRA rank 1: test error 0.0154
+two leaky sensors, LoRA rank 2: test error 0.0000</code></pre>
+<p>Rank 1 fixes the bigger of the two leaks and gets stuck. It simply doesn't have room for a second pattern. Rank 2 fixes both.</p>
+
+<div class="note"><strong>Be honest about what LoRA wins.</strong> In this small experiment, LoRA is <em>not</em> more accurate than full fine-tuning. Both hit 0.0000 with 12 examples. With only 2 to 6 examples, they land at about the same error as each other too (for example 0.0030 vs 0.0030 with 2 examples). LoRA's real wins are: (1) <strong>far fewer numbers to train and store</strong> (12 instead of 36 here, 0.4% of the table at real scale); (2) <strong>the original model stays untouched</strong>, so you can't wreck what the factory taught it, and you can always switch the adapter off; (3) <strong>small adapters you can swap</strong>, one per robot or per task, all sharing one big model.</div>
+
+<h3>Step 8: why robotics people love this</h3>
+<p>Modern robots are starting to use one big <strong>robot foundation model</strong>: a model trained on data from many robots that takes camera images and an instruction and outputs actions. OpenVLA is a well-known open one, and it's commonly fine-tuned with LoRA for a new robot or a new task. The picture is exactly our lesson, scaled up: one shared frozen model, plus a small adapter for "the arm in the kitchen", another for "the arm in the warehouse with a crooked camera". Servers can even keep one big model in memory and switch between many LoRA adapters request by request (called <strong>multi-LoRA serving</strong>), which is how one computer can run many robot "personalities" cheaply.</p>
+
+<h2 id="play">3. Play with it</h2>
+<div class="card demo">
+<h3>Interactive: watch the adapter learn the leak</h3>
+<p class="legend">The same factory model, examples and starting A as <code>lesson13_lora.py</code> (from <code>random.Random(0)</code>), and the same training rule (lr 0.05). One "step" is one pass over the 12 examples, like one of the Python's 400 steps. Blue squares are positive numbers, red are negative; the stronger the colour, the bigger the number. Compare the add-on <b>A @ B</b> with <b>the change your robot really needs</b>. Train to 400 and the numbers match the Python: 0.0000 for one leak; 0.0154 (rank 1) and 0.0000 (rank 2) for two leaks.</p>
+<canvas id="loracv" width="700" height="390" style="height:auto" aria-label="Heatmaps of the frozen model W, the add-on A @ B, the adapted model, the needed change, and the thin A and B themselves"></canvas>
+<p>
+<label for="lrobot">Robot:</label>
+<select id="lrobot"><option value="1">one leaky sensor</option><option value="2">two leaky sensors</option></select>
+<label for="lrank">LoRA rank:</label>
+<select id="lrank"><option value="1">1</option><option value="2">2</option></select>
+</p>
+<p>
+<button id="lStep">Train one step</button>
+<button id="l10">+10 steps</button>
+<button id="lAll">Train to 400</button>
+<button id="lReset">Reset</button>
+</p>
+<div class="stats">
+  <div class="stat"><div class="k">Steps</div><div class="v" id="lsSteps">0</div></div>
+  <div class="stat"><div class="k">Test error (200 tests)</div><div class="v" id="lsErr">–</div></div>
+  <div class="stat"><div class="k">Factory model error</div><div class="v" id="lsFac">–</div></div>
+  <div class="stat"><div class="k">Numbers trained</div><div class="v" id="lsN">–</div></div>
+</div>
+<p class="legend">Things to try: press "Train one step" five times. The error barely moves (A is small, B starts at 0). Then +10 a few times and watch it drop fast. Now pick "two leaky sensors" with rank 1 and train to 400: A @ B copies one column of the needed change and can't do the other. Switch to rank 2, Reset, and train again.</p>
+</div>
+
+<h2 id="homework">4. Homework</h2>
+<p>Open <code>homework/lesson13_lora.py</code>. This file stands on its own: no earlier lessons needed. Matrices are plain Python lists of lists, like <code>[[1, 2], [3, 4]]</code>. Already written for you: the factory model, our robot's true behaviour, <code>make_examples</code> and <code>train_full</code> (full fine-tuning, for comparison). Write these seven functions, in order.</p>
+
+<h3>4.1 <code>matvec(M, x)</code></h3>
+<p>Matrix × vector (Step 1). Example: <code>matvec([[1, 2], [3, 4]], [1, 1])</code> → <code>[3, 7]</code>.</p>
+<details><summary>Hint 1</summary><p>One output number per row of M.</p></details>
+<details><summary>Hint 2</summary><p>For one row, pair it up with x using <code>zip(row, x)</code>, multiply each pair, add them up.</p></details>
+<details><summary>Hint 3</summary><p>Return a list: for each <code>row</code> in M, the <code>sum</code> of <code>m * xi</code> for <code>m, xi</code> in <code>zip(row, x)</code>.</p></details>
+
+<h3>4.2 <code>matmul(A, B)</code></h3>
+<p>Matrix × matrix: <code>result[i][j]</code> = sum over k of <code>A[i][k] * B[k][j]</code>. Example: <code>matmul([[1], [2]], [[3, 4]])</code> → <code>[[3, 4], [6, 8]]</code> (a column times a row, Step 4).</p>
+<details><summary>Hint 1</summary><p>The result has as many rows as A and as many columns as B.</p></details>
+<details><summary>Hint 2</summary><p>Three loops: i over the rows of A, j over the columns of B (<code>len(B[0])</code>), and k over the shared middle (<code>len(B)</code>).</p></details>
+<details><summary>Hint 3</summary><p>Build each row i as a list over j of <code>sum(A[i][k] * B[k][j] for k in range(len(B)))</code>. Test it with the identity: <code>matmul(W, [[1, 0], [0, 1]])</code> must give back W.</p></details>
+
+<h3>4.3 <code>add(M, N)</code> and 4.4 <code>count_params(*matrices)</code></h3>
+<p><code>add</code> adds two same-shaped tables number by number: <code>add([[1, 2], [3, 4]], [[1, 2], [3, 4]])</code> → <code>[[2, 4], [6, 8]]</code>. <code>count_params</code> counts all the numbers in any number of tables: <code>count_params([[1, 2], [3, 4]], [[1, 2, 3]])</code> → 4 + 3 = <code>7</code>.</p>
+<details><summary>Hint 1</summary><p>add: zip the rows together, then zip the numbers inside each pair of rows. count_params: rows × columns for each table.</p></details>
+<details><summary>Hint 2</summary><p><code>*matrices</code> means the function receives a tuple of however many tables you passed. Loop over it.</p></details>
+<details><summary>Hint 3</summary><p><code>add</code>: <code>[[a + b for a, b in zip(r1, r2)] for r1, r2 in zip(M, N)]</code> is the shape. <code>count_params</code>: the sum of <code>len(M) * len(M[0])</code> over the matrices.</p></details>
+
+<h3>4.5 <code>lora_forward(W, A, B, x)</code></h3>
+<p>Output = <code>W x + A (B x)</code>, without ever building A @ B (Step 6). Example: <code>lora_forward([[1, 2], [3, 4]], [[1], [0]], [[0, 1]], [1, 1])</code> → <code>[4, 7]</code>.</p>
+<details><summary>Hint 1</summary><p>It's three matvecs and one add-up. Which one has to happen first?</p></details>
+<details><summary>Hint 2</summary><p>First <code>bx = matvec(B, x)</code> (a short list, one number per rank). Then <code>matvec(A, bx)</code> gives 6 numbers. Add those to <code>matvec(W, x)</code>.</p></details>
+<details><summary>Hint 3</summary><p>Return the list of <code>w + a</code> for <code>w, a</code> in <code>zip(matvec(W, x), matvec(A, bx))</code>.</p></details>
+
+<h3>4.6 <code>mse(predict, examples)</code></h3>
+<p>Mean squared error (Lesson 3) over <em>every</em> output number of every example. <code>predict</code> is a function you call with x. Example: <code>mse(lambda x: [0, 0], [([1], [1, 3])])</code> → errors 1 and 3 → (1 + 9) / 2 = <code>5.0</code>.</p>
+<details><summary>Hint 1</summary><p>Keep a running total of squared errors and a count of how many numbers you added.</p></details>
+<details><summary>Hint 2</summary><p>For each <code>x, y</code> in examples, call <code>predict(x)</code> once, then zip its outputs with y.</p></details>
+<details><summary>Hint 3</summary><p>For each pair <code>p, t</code>: <code>total += (p - t) ** 2</code> and <code>count += 1</code>. Return <code>total / count</code>.</p></details>
+
+<h3>4.7 <code>train_lora(W, examples, rank=1, lr=0.05, steps=400, rng=None)</code></h3>
+<p>The main event. Keep W frozen. Make A (6 × rank) of small random numbers and B (rank × 6) of zeros. Then, for each step, for each example, nudge A and B. Return <code>(A, B)</code>. The docstring gives the exact rule.</p>
+<details><summary>Hint 1</summary><p>Look at <code>train_full</code> just below: same loops, same <code>err</code>. The difference is <em>which</em> numbers you change, and that there are two tables.</p></details>
+<details><summary>Hint 2</summary><p>Set up: <code>rng = rng or random.Random(0)</code>, then A with <code>rng.uniform(-0.1, 0.1)</code> for each of D rows × rank columns (row by row, so you match the Python output), and B as <code>rank</code> rows of <code>[0.0] * D</code>. Inside the loop, compute <code>bx</code>, <code>err</code>, and also, <em>before</em> touching A, the "back" signal for each r: <code>sum(A[i][r] * err[i] for i in range(D))</code>.</p></details>
+<details><summary>Hint 3</summary><p>Per example: <code>bx = matvec(B, x)</code>; <code>err</code> = <code>lora_forward(W, A, B, x)</code> minus y, number by number; <code>back</code> as in Hint 2. Then for every i and r: <code>A[i][r] -= lr * err[i] * bx[r]</code>. Then for every r and j: <code>B[r][j] -= lr * back[r] * x[j]</code>. Using <code>back</code> (computed from the old A) is what "use A from BEFORE this update" means.</p></details>
+
+<h3>Run it</h3>
+<pre><code>cd homework
+python3 lesson13_lora.py</code></pre>
+<p>What you should see (this is the real output of the reference solution):</p>
+<pre><code>factory model on OUR robot:   test error 0.0673
+LoRA rank 1 (12 numbers trained): test error 0.0000
+full fine-tune (36 numbers trained): test error 0.0000
+two leaky sensors, LoRA rank 1: test error 0.0154
+two leaky sensors, LoRA rank 2: test error 0.0000
+a 6x6 layer: full = 36 numbers, LoRA rank 1 = 12 (33.3%)
+a 4096x4096 layer: full = 16,777,216 numbers, LoRA rank 8 = 65,536 (0.4%)</code></pre>
+
+<h3>Check it</h3>
+<pre><code>cd ..
+python3 check.py 13</code></pre>
+<p>A green ✓ means that part passed. A red ✗ comes with a hint, for example:</p>
+<ul>
+<li><code>✗ matmul: a 2x1 times a 1x2 makes a 2x2 table</code>: your loops probably use the wrong lengths. The middle loop runs over <code>len(B)</code>, the columns over <code>len(B[0])</code>.</li>
+<li><code>✗ LoRA fixes our robot: after training, LoRA's test error should be under a tenth of the factory model's</code>: check the signs (<code>-=</code>, and err = prediction − truth), that B starts at zeros, and that you use the old A for B's update.</li>
+</ul>
+<p>All green shows <code>6/6 passed</code>.</p>
+
+<h3>Stretch</h3>
+<ul>
+<li>Start B at small random numbers too, instead of zeros. Print the test error at step 0. Is it still 0.0673? (It shouldn't be: the model no longer starts as the factory model.)</li>
+<li>Start both A and B at zero. Confirm nothing ever learns, then explain why in one sentence.</li>
+<li>Try rank 3 on the two-leak robot. Does the extra rank help, or is it just wasted numbers?</li>
+<li>Train on only the first 3 examples with both <code>train_lora</code> and <code>train_full</code>. Which has the lower test error? Be honest about what you find.</li>
+</ul>
+
+<h2 id="challenge">5. Real-world challenge: adapt, don't rebuild</h2>
+<p>You'll feel why "the change is usually simple" is true in everyday life.</p>
+<p><strong>Version A: a recipe or workout plan.</strong></p>
+<ol>
+<li>Find a recipe (or a workout plan) someone else wrote for "standard" people. Count how many separate numbers and lines it has (quantities, times, reps). That's your "full model".</li>
+<li>Adapt it for yourself or your family: maybe you're cooking for 2 instead of 4, or you want it less sweet, or you can only do half the reps. Make the <strong>fewest edits</strong> that do the job. Write each edit on its own line.</li>
+<li>Count your edits, and compare them with the number of lines you'd write if you rewrote the whole thing from scratch.</li>
+<li>Now group your edits by <em>why</em> you made them. "Cooking for 2" probably caused lots of edits (every quantity halved) from one root cause. "Less sweet" is a second root cause.</li>
+</ol>
+<p><strong>Version B: a kitchen scale or measuring jug.</strong></p>
+<ol>
+<li>Find 4–5 things whose true weight you know: a sealed 500 g packet of pasta, a 1 kg bag of sugar, 1 litre of water (1000 g, minus the jug).</li>
+<li>Weigh each and write down "true" and "reading" in a table.</li>
+<li>Is the scale off by the same amount every time (an offset, like always +20 g), or by the same percentage (like always 5% heavy)? Work out the one correction.</li>
+<li>Write that one correction on a sticky note on the scale, instead of re-marking every line.</li>
+</ol>
+<p><strong>What to notice:</strong> the number of <em>root causes</em> is the rank. One root cause can change many numbers, and still be described by one small rule. Most real adjustments are low rank, which is exactly why LoRA works so well on huge models.</p>
+
+<h2 id="project">6. Your Robo-Helper so far</h2>
+<p>Robo-Helper can now be <strong>adapted cheaply</strong>. Your file has <code>lora_forward</code> (run the factory model plus your adapter) and <code>train_lora</code> (learn the adapter from a handful of measurements on your robot). The factory model W stays frozen and shared; your robot's personality fits in 12 numbers. Together with <a href="12-preferences.html">Lesson 12</a> (learning what people prefer), that's the big idea of the later weeks: you rarely build a robot brain from nothing, you <em>teach</em> one that already exists.</p>
+<p>In <a href="14-go-real.html">Lesson 14</a> you'll go real. Real sensors never match the factory spec exactly, so "measure a few examples on your actual robot and fit a small correction" is the first thing you'd do with real hardware, whether it's a 12-number adapter like <code>train_lora</code> makes, or a LoRA on a robot foundation model.</p>
+
+<h2 id="mistakes">7. Common mistakes</h2>
+<ul>
+<li><strong>matmul with the wrong loop lengths</strong>, which works for square tables and crashes or gives wrong shapes for a column times a row. Checker hint: <em>"a 2x1 times a 1x2 makes a 2x2 table"</em>.</li>
+<li><strong>Building A @ B inside <code>lora_forward</code>.</strong> It gives the right answer but defeats the point (it's slow for big layers). Go through <code>B x</code> first.</li>
+<li><strong>Starting B at random numbers</strong> (or forgetting B entirely), so the model doesn't start as the factory model.</li>
+<li><strong>Updating A, then using the new A for B's update.</strong> Compute <code>back</code> from the old A first. Otherwise your numbers won't match the expected output.</li>
+<li><strong>Changing W.</strong> W is frozen. If your LoRA code edits W, you're secretly doing full fine-tuning. Checker hint: <em>"rank-1 LoRA on a 6x6 model trains 12 numbers"</em>.</li>
+</ul>
+
+<h2 id="check">8. Check yourself</h2>
+<details><summary>Predict: <code>matvec([[0, 1], [1, 0]], [5, 9])</code>. What comes out, and what does this table do?</summary><p><code>[9, 5]</code>. Row 0 picks input 1, row 1 picks input 0. This table swaps the two inputs.</p></details>
+<details><summary>How many numbers does a rank-2 LoRA on a 6 × 6 table train?</summary><p>A is 6 × 2 = 12, B is 2 × 6 = 12, so 24. Still fewer than the 36 in W.</p></details>
+<details><summary>Why does B start at zero?</summary><p>So A @ B is all zeros at the start, and the adapted model begins as exactly the factory model. Training then only moves it away from "already pretty good".</p></details>
+<details><summary>Two sensors leak. Rank 1 gets 0.0154, rank 2 gets 0.0000. Explain in terms of root causes.</summary><p>Each leaky sensor is one independent pattern of change (one column of the change table). Rank 1 can hold one pattern, so it fixes one leak (the bigger one) and is stuck with the other. Rank 2 holds two.</p></details>
+<details><summary>Is LoRA more accurate than full fine-tuning? What are its real advantages?</summary><p>Not in our experiment: both reach about the same error. The wins are far fewer numbers to train and store, the original model left untouched, and tiny adapters you can swap per robot or task while sharing one big model.</p></details>
+
+<h2 id="deeper">9. Go deeper (optional)</h2>
+<ul>
+<li><a href="../12-training-inference-videos/03-lora.html">LoRA, explained with videos</a>: the real thing, including <a href="../12-training-inference-videos/03-lora.html#init">why B starts at zero</a>, QLoRA and newer variants, and OpenVLA.</li>
+<li><a href="../08-ai-research-engineer/05-alignment-preference.html">Alignment and preference training</a>: how LoRA adapters are used to cheaply train models on people's preferences, which joins this lesson to <a href="12-preferences.html">Lesson 12</a>.</li>
+<li><a href="../16-hands-on-llm-serving.html#why-robotics">Hands-on LLM serving: why it matters for robotics</a>: multi-LoRA serving, one base model with many small adapters, mapped to one robot model with per-robot adapters.</li>
+<li><a href="../07-post-training.html#sft">Post-training: supervised fine-tuning</a>: what fine-tuning big language models looks like in practice.</li>
+</ul>
+
+<nav class="pager">
+  <a href="17-faster.html"><small>Previous</small>Lesson 17 · Faster and cheaper</a>
+  <a class="next" href="18-world-class.html"><small>Next</small>Lesson 18 · A world-class brain</a>
+</nav>
+<footer>Build a Robot Brain · Week 9 · Lesson 13</footer>
+</main>
+
+<script>
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+// Python's random.Random(seed): Mersenne Twister, so the demo matches the .py exactly
+function PyRandom(seed) {
+  const mt = new Uint32Array(624); let mti;
+  const mul = (a, b) => Math.imul(a, b) >>> 0;
+  mt[0] = 19650218;
+  for (mti = 1; mti < 624; mti++) mt[mti] = (mul(1812433253, mt[mti - 1] ^ (mt[mti - 1] >>> 30)) + mti) >>> 0;
+  let i = 1;
+  for (let k = 624; k; k--) {
+    mt[i] = ((mt[i] ^ mul(mt[i - 1] ^ (mt[i - 1] >>> 30), 1664525)) + (seed >>> 0)) >>> 0;
+    if (++i >= 624) { mt[0] = mt[623]; i = 1; }
+  }
+  for (let k = 623; k; k--) {
+    mt[i] = ((mt[i] ^ mul(mt[i - 1] ^ (mt[i - 1] >>> 30), 1566083941)) - i) >>> 0;
+    if (++i >= 624) { mt[0] = mt[623]; i = 1; }
+  }
+  mt[0] = 0x80000000;
+  function u32() {
+    if (mti >= 624) {
+      for (let k = 0; k < 624; k++) {
+        const y = (mt[k] & 0x80000000) | (mt[(k + 1) % 624] & 0x7fffffff);
+        mt[k] = mt[(k + 397) % 624] ^ (y >>> 1) ^ (y & 1 ? 0x9908b0df : 0);
+      }
+      mti = 0;
+    }
+    let y = mt[mti++];
+    y ^= y >>> 11; y ^= (y << 7) & 0x9d2c5680; y ^= (y << 15) & 0xefc60000; y ^= y >>> 18;
+    return y >>> 0;
+  }
+  const random = () => ((u32() >>> 5) * 67108864 + (u32() >>> 6)) / 9007199254740992;
+  return { random, uniform: (a, b) => a + (b - a) * random() };
+}
+
+const D = 6;
+const matvec = (M, x) => M.map(row => row.reduce((s, m, j) => s + m * x[j], 0));
+const matmul = (A, B) => A.map(r => B[0].map((_, j) => r.reduce((s, a, k) => s + a * B[k][j], 0)));
+const add = (M, N) => M.map((r, i) => r.map((v, j) => v + N[i][j]));
+const outer = (u, v) => u.map(a => v.map(b => a * b));
+const range = n => [...Array(n).keys()];
+
+const factoryModel = rng => range(D).map(i => range(D).map(j => (i === j ? 1 : 0) + rng.uniform(-0.1, 0.1)));
+const ourRobotTruth = W => add(W, outer([0.5, -0.3, 0.8, 0.0, -0.4, 0.2], [0, 0, 1, 0, 0, 0]));
+const ourRobotTwoLeaks = W => add(ourRobotTruth(W), outer([0.0, 0.6, 0.0, -0.5, 0.3, 0.0], [0, 0, 0, 0, 1, 0]));
+const makeExamples = (Wt, n, rng) => range(n).map(() => { const x = range(D).map(() => rng.uniform(0, 1)); return [x, matvec(Wt, x)]; });
+function loraForward(W, A, B, x) { const bx = matvec(B, x), ab = matvec(A, bx); return matvec(W, x).map((w, i) => w + ab[i]); }
+function mse(predict, examples) {
+  let total = 0, count = 0;
+  for (const [x, y] of examples) predict(x).forEach((p, i) => { total += (p - y[i]) ** 2; count++; });
+  return total / count;
+}
+function newLora(rank) {
+  const rng = PyRandom(0);
+  return { A: range(D).map(() => range(rank).map(() => rng.uniform(-0.1, 0.1))), B: range(rank).map(() => Array(D).fill(0)), rank, steps: 0 };
+}
+function loraStep(W, L, examples, lr = 0.05) {
+  const { A, B, rank } = L;
+  for (const [x, y] of examples) {
+    const bx = matvec(B, x);
+    const err = loraForward(W, A, B, x).map((p, i) => p - y[i]);
+    const back = range(rank).map(r => range(D).reduce((s, i) => s + A[i][r] * err[i], 0));
+    for (let i = 0; i < D; i++) for (let r = 0; r < rank; r++) A[i][r] -= lr * err[i] * bx[r];
+    for (let r = 0; r < rank; r++) for (let j = 0; j < D; j++) B[r][j] -= lr * back[r] * x[j];
+  }
+  L.steps++;
+}
+
+// the same sequence of random numbers as the Python __main__
+const rng0 = PyRandom(0);
+const W = factoryModel(rng0);
+const TRUTH1 = ourRobotTruth(W);
+const TRAIN1 = makeExamples(TRUTH1, 12, rng0), TEST1 = makeExamples(TRUTH1, 200, rng0);
+const TRUTH2 = ourRobotTwoLeaks(W);
+const TRAIN2 = makeExamples(TRUTH2, 12, rng0), TEST2 = makeExamples(TRUTH2, 200, rng0);
+const ROBOTS = { 1: { truth: TRUTH1, train: TRAIN1, test: TEST1 }, 2: { truth: TRUTH2, train: TRAIN2, test: TEST2 } };
+
+if (typeof document !== 'undefined') {
+  const cv = document.getElementById('loracv'), ctx = cv.getContext('2d');
+  const robotSel = document.getElementById('lrobot'), rankSel = document.getElementById('lrank');
+  const C = 26, PX = [0, 178, 356, 534], OY = 26;
+  let L;
+  const robot = () => ROBOTS[robotSel.value];
+
+  function cell(x, y, v, size, label) {
+    ctx.fillStyle = css('--card'); ctx.fillRect(x, y, size, size);
+    ctx.globalAlpha = Math.min(1, Math.abs(v));
+    ctx.fillStyle = v >= 0 ? css('--accent') : css('--fail'); ctx.fillRect(x, y, size, size);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = css('--line'); ctx.lineWidth = 1; ctx.strokeRect(x, y, size, size);
+    if (label && Math.abs(v) >= 0.05) {
+      ctx.fillStyle = Math.abs(v) > 0.6 ? css('--bg') : css('--fg');
+      ctx.font = '9px sans-serif'; ctx.fillText(v.toFixed(2).replace('0.', '.'), x + size / 2, y + size / 2);
+    }
+  }
+  function heat(ox, oy, M, title) {
+    ctx.fillStyle = css('--fg'); ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(title, ox, oy - 12);
+    ctx.textAlign = 'center';
+    M.forEach((row, i) => row.forEach((v, j) => cell(ox + j * C, oy + i * C, v, C, true)));
+  }
+  function draw() {
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    const AB = matmul(L.A, L.B), R = robot();
+    heat(PX[0], OY, W, 'W (frozen)');
+    heat(PX[1], OY, AB, 'A @ B (the add-on)');
+    heat(PX[2], OY, add(W, AB), 'W + A @ B (adapted)');
+    heat(PX[3], OY, add(R.truth, W.map(r => r.map(v => -v))), 'Change really needed');
+    const oy2 = OY + D * C + 40;
+    heat(PX[1], oy2, L.A, `A (6 × ${L.rank})`);
+    heat(PX[1] + L.rank * C + 24, oy2, L.B, `B (${L.rank} × 6)`);
+    ctx.fillStyle = css('--muted'); ctx.font = '12px sans-serif'; ctx.textAlign = 'left';
+    const tx = PX[1] + L.rank * C + 24, ty = oy2 + L.rank * C + 22;
+    ['A @ B: column i of A times row j of B.', 'B starts at 0, so A @ B starts at 0', 'and the model starts as the factory one.'].forEach((t, k) => ctx.fillText(t, tx, ty + k * 16));
+    document.getElementById('lsSteps').textContent = L.steps;
+    document.getElementById('lsErr').textContent = mse(x => loraForward(W, L.A, L.B, x), R.test).toFixed(4);
+    document.getElementById('lsFac').textContent = mse(x => matvec(W, x), R.test).toFixed(4);
+    document.getElementById('lsN').textContent = `${2 * D * L.rank} of ${D * D}`;
+  }
+  function reset() { L = newLora(+rankSel.value); draw(); }
+  const train = n => { for (let k = 0; k < n && L.steps < 400; k++) loraStep(W, L, robot().train); draw(); };
+  document.getElementById('lStep').onclick = () => train(1);
+  document.getElementById('l10').onclick = () => train(10);
+  document.getElementById('lAll').onclick = () => train(400);
+  document.getElementById('lReset').onclick = reset;
+  robotSel.onchange = reset; rankSel.onchange = reset;
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+  reset();
+} else {
+  module.exports = { W, ROBOTS, newLora, loraStep, loraForward, mse, matvec, matmul };
+}
+</script>
+</body>
+</html>

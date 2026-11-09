@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 14 · Going real</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 12 · Lesson 14</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 12 · Lesson 14</div>
+<h1>Going real: hardware, showing your work, what's next</h1>
+<p class="lede">Your robot brain works, on your laptop, in a perfect pretend room. This last lesson is about the two steps that turn a school project into something real: showing it to other people honestly, and (if you want) putting it on wheels.</p>
+
+<div class="facts">
+  <div><b>Time</b>2–4 hours (a hardware build: a few weekends)</div>
+  <div><b>You'll need</b>Your finished project, a way to record your screen. Optional: a small robot kit.</div>
+  <div><b>New words</b>README, demo, portfolio, ultrasonic sensor, motor, drift, kill switch</div>
+  <div><b>Project piece</b>Share it, or put it on a real robot</div>
+</div>
+
+<section class="kid" id="start">
+<h2>Start here</h2>
+<p class="big">A project nobody can understand might as well not exist, and a simulation is only a rehearsal for the real, messy world.</p>
+<h3>The problem</h3>
+<p>You've built something genuinely impressive: a robot that understands commands, plans routes, brakes safely, dodges a cat and grades itself. Right now it lives in a folder only you know about. If you showed it to a teacher, a friend or a future employer, could they run it in five minutes? Would they know what it gets wrong? And the room it drives around is made of text characters. A real floor has slippery tiles, socks and an actual cat.</p>
+<h3>The idea in one picture</h3>
+<p>Think of a science fair. The best stands aren't the ones that claim "it works perfectly". They're the ones with a clear poster, a working demo, a graph of results, and a corner that says "what went wrong and what we learned". The judges trust those stands, because they're honest. A README is your science-fair poster. A real robot is taking your experiment out of the lab.</p>
+<h3>Words to know</h3>
+<dl>
+<dt>README</dt><dd>The front-page text file of a project. It says what it is, how to run it, and how well it works.</dd>
+<dt>Demo</dt><dd>A short recording or live show of the project doing its thing, failures included.</dd>
+<dt>Portfolio</dt><dd>A collection of your projects that shows what you can do.</dd>
+<dt>Ultrasonic sensor</dt><dd>A sensor that measures distance by sending a sound too high to hear and timing the echo, like a bat.</dd>
+<dt>Drift</dt><dd>When a real robot slowly ends up somewhere other than where it thinks it is, because wheels slip.</dd>
+<dt>Kill switch</dt><dd>A physical switch that cuts the power instantly, whatever the code is doing.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>The full lesson:</strong> four parts: showing your work, going physical (optional), safety and ethics, and where to go next. There's no Python file this time: your homework is the README and a demo.</p>
+
+<h2 id="problem">1. The problem</h2>
+<p>Two problems, actually.</p>
+<p><b>Nobody can see your work.</b> Your code is spread over 20 files. Someone new doesn't know to start at <code>lesson11_robohelper.py</code>, doesn't know about <code>check.py</code>, and doesn't know that 83% is the honest score, not a bug. Without a guide, most people give up after a minute.</p>
+<p><b>The pretend world is too kind.</b> In <code>world.py</code>, a step east moves the robot exactly one square. The sensor in Lesson 2 has neat, made-up noise. The cat sits still on one square. Real motors don't turn exactly the same amount each time, real sensors get confused by soft cushions, and real cats move. Every robot that works in real life first worked in a simulation, and then had to be fixed for the real world.</p>
+
+<h2 id="principles">2. First principles</h2>
+
+<h3 id="show">Part A: showing your work</h3>
+<p>Start from the reader. Someone opens your project. In order, they want to know:</p>
+<ol>
+<li><b>What is it?</b> One sentence, plus a picture or short recording.</li>
+<li><b>Can I run it?</b> The exact commands, copy-pasteable.</li>
+<li><b>How does it work?</b> The pipeline, in a small diagram. Which part does what.</li>
+<li><b>How well does it work?</b> Real numbers from a real test, and what the test was.</li>
+<li><b>What fails, and why?</b> The honest list.</li>
+<li><b>What would you do next?</b></li>
+</ol>
+<p>That list <em>is</em> your README's outline. You have every piece already. For the results, use your own <code>evaluate()</code> output: <code>Test set: 83% passed</code>, with <code>FAILED: ('find the green block', 'The green block is in the bin.')</code> and <code>FAILED: ('make me a sandwich', 'Stopping.')</code>. Add your Lesson 19 bake-off table: which brain passed what, how long it thought, and what it cost. If you did the Lesson 11 stretch, show the before and after.</p>
+<details><summary>Predict first: two READMEs. A says "My robot understands commands perfectly!". B says "83% on a 12-command test set. It thinks 'make me a sandwich' means stop, because the classifier can't say 'I don't know'." Which one would an engineer trust more?</summary>
+<p>B, by a mile. "Perfectly" makes an engineer suspicious straight away, because nothing is perfect, so either you didn't test it or you're hiding something. B shows that you <em>tested</em>, you <em>measured</em>, you <em>understood</em> the failure, and you can explain it. That's exactly what people who hire engineers look for. Honest failures are a strength, not a weakness.</p></details>
+<p>See how grown-up AI work reports results: the <a href="../04-distill-small-models.html#results">"reading the results honestly"</a> section of the distillation module is a good model, with numbers next to what they do and don't prove. And <a href="../08-ai-research-engineer/12-open-source-portfolio.html">the open-source portfolio stage</a> shows how professionals use public projects like yours to get noticed.</p>
+<p><b>The demo recording.</b> 30 to 60 seconds is plenty. Most computers have a built-in screen recorder. Show: one command working, the cat replan (the log line), the test-set score, and <em>one failure on purpose</em>. Talk over it, or add captions. Then put the recording file (or a GIF) next to your README and link to it.</p>
+
+<h3 id="physical">Part B: going physical (optional)</h3>
+<p>You don't need hardware to finish this course. But if you want to see your ideas move, a cheap wheeled robot kit is the next step. Look for one with <b>two motors</b> and an <b>ultrasonic distance sensor</b>. Kits built around a <b>micro:bit</b> (which can run MicroPython, a small version of Python) or an <b>Arduino</b> (usually programmed in C++, which looks different but uses the same ideas) are common, well documented, and used in lots of schools.</p>
+<p><b>How an ultrasonic sensor works, from first principles.</b> It sends a short click of sound, too high-pitched to hear, and times how long the echo takes to come back. Sound travels at about 343 metres per second in air. The sound goes <em>there and back</em>, so you halve it:</p>
+<pre><code>echo time   = 2.9 milliseconds = 0.0029 s
+distance    = 343 × 0.0029 ÷ 2
+            = 0.497 m   ≈ half a metre      (one Robo-Helper square!)</code></pre>
+<p>Now map each lesson onto the real robot:</p>
+<div class="table-wrap"><table>
+<tr><th>Lesson</th><th>In the simulation</th><th>On a real robot</th></tr>
+<tr><td>L2 Sensors</td><td><code>noisy_reading</code>, <code>average</code></td><td>Take 5 to 10 ultrasonic readings in a row and average them. Real readings jump around, especially off soft or angled things. Lesson 2's maths is exactly why averaging helps.</td></tr>
+<tr><td>L3 Braking</td><td><code>STOP_DATA</code>, <code>fit_line</code>, <code>max_safe_speed</code></td><td>Drive at a few motor power levels, cut the power, and measure with a tape how far it rolls. That's your own <code>STOP_DATA</code>. Fit the line on a laptop, then put the two numbers (w and b) into the robot's code.</td></tr>
+<tr><td>L4–L5 Stop decision</td><td><code>should_stop</code>, <code>safest_threshold</code></td><td>Inputs: smoothed distance and current speed. Start with a simple safe rule, then collect real examples ("should it have stopped?") and train the neuron. Choose a threshold that favours recall: braking for nothing is fine, hitting the wall is not.</td></tr>
+<tr><td>L6 Pathfinding</td><td><code>astar_path</code>, <code>path_to_commands</code></td><td>Use floor tiles (or tape squares on the floor) as your grid. Draw the map, plan with A*, and turn the path into moves: "forward one tile, turn left, forward two tiles".</td></tr>
+</table></div>
+<p><b>The big surprise: drift.</b> Tell a real robot "forward one tile" ten times and it won't land exactly ten tiles away, slightly to the left. Wheels slip and motors differ. This is why real robots keep <em>sensing</em> while they move, and correct themselves, instead of trusting the plan blindly. It's the same lesson as Lesson 10, in motors instead of words: <strong>never trust, always check</strong>.</p>
+<details><summary>Predict first: your robot plans a 6-tile route along a corridor using only "forward one tile" commands. What's the most likely thing to go wrong?</summary>
+<p>It drifts sideways and bumps a wall, or stops a bit short. Each move is slightly off, and the errors add up over 6 moves. The fix is feedback: use the distance sensor to check the gap to the wall ahead, and stop based on what it <em>measures</em>, not on how many moves you planned.</p></details>
+<p><b>Later: a robot arm.</b> When you're ready for a bigger project, look at <a href="https://github.com/huggingface/lerobot">LeRobot</a>, Hugging Face's open-source robotics library. It supports low-cost robot arms that people build themselves, and lets you teach an arm by showing it what to do, then training a neural network on your demonstrations. Their free <a href="https://huggingface.co/learn/robotics-course">robotics course</a> is a good next step after this one. This is a project for later, with an adult: it needs more money, tools and patience.</p>
+
+<h3 id="safety">Part C: safety and ethics</h3>
+<div class="card note">
+<p><strong>Moving robots can hurt people and pets.</strong> Even a small one can pinch fingers in its wheels, trip someone, scare a pet, or drive off a table or down the stairs. Follow these rules every time:</p>
+<ul>
+<li><b>Always have a physical off switch</b> you can reach instantly. Not a button in your code: a real switch that cuts the power, because when the code is the problem, the code can't save you.</li>
+<li><b>Test with the wheels off the ground first</b> (prop it on a book), then on the floor at the slowest speed, away from stairs, table edges, pets and little brothers or sisters.</li>
+<li><b>Adult supervision</b> for anything with tools (soldering irons, hot glue guns, craft knives) and for batteries. Rechargeable lithium batteries can get very hot or catch fire if they're squashed, short-circuited or charged the wrong way. Use only the batteries and charger the kit says, and never leave them charging unattended.</li>
+</ul>
+</div>
+<p><b>Ethics, in plain words.</b> Lesson 10's rule still applies: never let AI output control something that moves without checks you wrote. If your robot ever has a camera or microphone, ask people before recording them. And be honest in what you claim, in your README and in conversation. "It works 83% of the time on my test set" is a true sentence. "It understands language" is not.</p>
+
+<h3 id="next">Part D: where to go next</h3>
+<ul>
+<li><a href="../17-free-ai-curriculum.html#robotics">Free robotics courses</a>: a checked list of free courses to go deeper into robotics.</li>
+<li><a href="../11-three-book-path.html">Three books and a gym</a>: a longer path through language models, reinforcement learning and building things.</li>
+<li><a href="../06-30u30/index.html">Ilya's 30 papers</a>: the famous reading list. Start with day 1, which is about next-word prediction, the same idea as your Lesson 8.</li>
+</ul>
+
+<h2 id="play">3. Play with it</h2>
+<div class="card demo">
+<h3>Interactive: README builder</h3>
+<p class="legend">Fill in your own numbers. The README updates as you type and is saved in this browser. Tick each section only when it's true for your project. The honesty check is strict on purpose.</p>
+<label for="nm">Project name</label>
+<input id="nm" type="text" value="Robo-Helper" style="width:100%;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)">
+<label for="score" style="display:block;margin-top:8px">Test-set score (from <code>evaluate()</code>)</label>
+<input id="score" type="text" value="83% (10 of 12 commands)" style="width:100%;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)">
+<label for="fail" style="display:block;margin-top:8px">Biggest failure, and why</label>
+<input id="fail" type="text" value="'make me a sandwich' is read as stop: the classifier always picks a top intent and can't say 'I don't know'." style="width:100%;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)">
+<div id="secs" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:4px;margin-top:10px"></div>
+<div class="stats">
+  <div class="stat"><div class="k">Sections ready</div><div class="v" id="ready">–</div></div>
+  <div class="stat"><div class="k">Honesty check</div><div class="v" id="honest" style="font-size:1rem">–</div></div>
+</div>
+<pre id="md" style="white-space:pre-wrap;font-size:.82rem;max-height:420px;overflow:auto"></pre>
+<button id="copy">Copy README</button>
+</div>
+
+<h2 id="homework">4. Homework</h2>
+<p>No Python file this time. You'll make three things, in your <code>project</code> folder.</p>
+<h3>4.1 Make sure everything passes</h3>
+<p>From the <code>project</code> folder, run <code>python3 check.py all</code>. When every lesson is done, the last line reads <code>Total: 84/84 checks passed</code> (that's the real total for the reference solutions). If anything is red or yellow, fix it first: a README for a broken project is a sad README.</p>
+<h3>4.2 Write <code>README.md</code></h3>
+<p>Use the six questions from Part A as your headings. The builder above gives you a starting draft, but rewrite it in your own words. Keep it short: one screen per section at most.</p>
+<details><summary>Hint 1: the "how to run" section</summary><p>Pretend the reader has never used a terminal. Give the exact commands, in order, in code blocks: <code>cd project/solutions</code> (or <code>homework</code>), then <code>python3 lesson11_robohelper.py</code>, then <code>python3 ../check.py 11</code> from the right folder. Test them yourself in a fresh terminal window.</p></details>
+<details><summary>Hint 2: the results section</summary><p>Say what was tested (12 commands, a fresh robot each time, a surprise at (4, 1)), then the number, then what it does and doesn't prove. "83% on 12 commands" is not "83% in real life". If you did the stretch, show before and after in a small table.</p></details>
+<details><summary>Hint 3: the "what fails" section</summary><p>For each failure: the command, what the robot did, why (in one sentence), and an idea for fixing it. Include at least the sandwich. Good extras: Lesson 10's "hmm what about the blue" becoming a "put", and (if you found it) "find the green block" being classified as "put", which bins the block.</p></details>
+<h3>4.3 Record a demo</h3>
+<p>30–60 seconds of screen recording: one command working, the cat replan, the test score, and one failure on purpose. Save it next to the README and link to it.</p>
+<h3>How to check</h3>
+<p>Give your project folder to someone who hasn't seen it (a parent, a friend, a teacher). Don't help them. Can they run it from the README alone in under five minutes? Can they tell you, afterwards, what the robot is bad at? If yes to both, you're done.</p>
+<h3>Stretch</h3>
+<ul>
+<li>With a parent's or guardian's OK, put the project on a public code site such as GitHub. Check there are no secrets in it first (like an API key from Lesson 10's optional file).</li>
+<li>If you have a robot kit: get just the sensor working first. Take 20 readings of a wall at 50 cm, then work out the average and how far the readings spread, exactly like Lesson 2's <code>average_error</code>. Add the numbers to your README.</li>
+</ul>
+
+<h2 id="real-world">5. Real-world challenge: present it</h2>
+<p>Real engineers explain their work out loud, to people who weren't there. That's a skill, and it gets better with practice.</p>
+<ol>
+<li>Find someone willing to listen for 10 minutes: a parent, grandparent, friend, or teacher. Non-technical people are best.</li>
+<li>Present for 5 minutes: what the robot does, the demo (live or recorded), the honest score, and one failure, explained simply.</li>
+<li>Then stop and ask: "What questions do you have?" Write down <em>every</em> question, word for word, even the ones that seem silly.</li>
+<li>Afterwards, sort the questions: ones you answered well, ones you answered badly, and ones you couldn't answer.</li>
+<li>Add a short FAQ to your README with the best questions and answers. Put the ones you couldn't answer into "What I'd do next".</li>
+</ol>
+<p><b>What it teaches:</b> other people's questions show you what's unclear, and often what's genuinely missing. Questions like "what happens if the cat moves?" or "can it learn new words?" are real research questions.</p>
+
+<h2 id="so-far">6. Your Robo-Helper so far</h2>
+<p>Robo-Helper is finished: it understands commands (L8–L9), refuses unsafe ones (L10), plans (L6), senses and brakes (L2–L5), replans around surprises, and grades itself (L11). Lessons 12 and 13 showed how bigger models learn what people prefer and adapt cheaply. Now it also has the two things every real project needs: <strong>a README that tells the truth</strong> and <strong>a demo</strong>.</p>
+<p>Nothing later in this course uses it, because this is the end of the course. But it lives on as the first piece in your portfolio, and, if you build the kit, as the brain of a robot you can actually watch drive across your floor.</p>
+
+<h2 id="mistakes">7. Common mistakes</h2>
+<ul>
+<li><b>Hiding the failures.</b> A README that only shows the good bits reads like an advert. Show the 83% and the 17%.</li>
+<li><b>"How to run" that doesn't run.</b> Test the commands from a fresh terminal, in a fresh copy of the folder.</li>
+<li><b>A ten-minute demo.</b> Nobody watches it. Under a minute, and the best part first.</li>
+<li><b>Testing a real robot on a table.</b> It <em>will</em> drive off the edge one day. Floor only, slow first, off switch in reach.</li>
+<li><b>Trusting the plan on real wheels.</b> Drift adds up. Keep sensing while moving.</li>
+</ul>
+
+<h2 id="check">8. Check yourself</h2>
+<details><summary>Name the six questions a README should answer.</summary><p>What is it? Can I run it? How does it work? How well does it work? What fails and why? What would you do next?</p></details>
+<details><summary>An ultrasonic echo comes back after 5.8 ms. How far away is the object?</summary><p>343 × 0.0058 ÷ 2 ≈ 0.99 m. Twice the time, twice the distance: about one metre.</p></details>
+<details><summary>Predict: your real robot plans "forward 4 tiles" and you measure where it stops, five times. Will all five be the same?</summary><p>No. They'll spread out a bit, and probably all lean slightly one way. That's drift plus noise, the real-world version of Lesson 2. Averaging the five shows the typical error, and checking with the sensor while driving fixes it.</p></details>
+<details><summary>Why must the off switch be physical, not a button in your code?</summary><p>If the code has a bug or freezes, a software button may not work. A physical switch cuts the power whatever the code is doing.</p></details>
+<details><summary>Which lesson's idea is "keep sensing while you move, don't trust the plan blindly" most like?</summary><p>Lesson 10: never trust, always check. There it was AI output, here it's your own motion plan. Lesson 11's replanning around the cat is the same idea too.</p></details>
+
+<h2 id="deeper">9. Go deeper (optional)</h2>
+<ul>
+<li><a href="../17-free-ai-curriculum.html#robotics">Free robotics courses</a></li>
+<li><a href="../11-three-book-path.html">Three books and a gym</a></li>
+<li><a href="../06-30u30/index.html">Ilya's 30 papers</a></li>
+<li><a href="../08-ai-research-engineer/12-open-source-portfolio.html">Open-source portfolio</a> and <a href="../04-distill-small-models.html#results">reading results honestly</a></li>
+<li><a href="https://huggingface.co/learn/robotics-course">Hugging Face robotics course</a> and <a href="https://github.com/huggingface/lerobot">LeRobot</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="12-preferences.html"><small>Previous</small>Lesson 12 · Learning preferences</a>
+  <a class="next" href="index.html"><small>Next</small>Course hub</a>
+</nav>
+<footer>Build a Robot Brain · Week 12 · Lesson 14</footer>
+</main>
+
+<script>
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const KEY = 'lr-robot-brain-readme';
+const SECTIONS = [
+  ['what', 'What it is (one sentence + demo link)'],
+  ['run', 'How to run it (tested commands)'],
+  ['how', 'How it works (the pipeline)'],
+  ['results', 'Results on a test set'],
+  ['fails', 'What fails, and why'],
+  ['next', "What I'd do next"],
+  ['safety', 'Safety notes (if there is hardware)'],
+];
+const $ = id => document.getElementById(id);
+let state = {};
+try { state = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) {}
+
+function buildReadme(s) {
+  const name = s.nm || 'My robot', on = k => !!(s.ticks || {})[k];
+  const L = ['# ' + name, ''];
+  if (on('what')) L.push('A simulated robot that understands commands like "put the red block in the bin", plans a route, stops for surprises and reports how well it works.', '', 'Demo: [demo recording](demo.mp4)', '');
+  if (on('run')) L.push('## How to run it', '', '```', 'cd project/homework', 'python3 lesson11_robohelper.py', 'cd ..', 'python3 check.py all', '```', '');
+  if (on('how')) L.push('## How it works', '', '```', 'command --(word-counting classifier + safety checks)--> action', 'action  --(A* route planner)--> route', 'route   --(distance sensor, braking line, stop-neuron)--> driving', '```', '');
+  if (on('results')) L.push('## Results', '', 'Test set: 12 commands, a fresh robot each time, an unexpected obstacle at (4, 1).', '', 'Score: ' + (s.score || '?'), '');
+  if (on('fails')) L.push('## What fails, and why', '', '- ' + (s.fail || '?'), '');
+  if (on('next')) L.push("## What I'd do next", '', '- Let the robot say "I don\'t know" when it isn\'t sure.', '');
+  if (on('safety')) L.push('## Safety', '', '- Physical off switch, slow speed first, floor only, adult supervision for tools and batteries.', '');
+  return L.join('\n');
+}
+function honesty(s) {
+  if (/100\s*%/.test(s.score || '')) return ['100%? Check your test set', '--warn'];
+  if (!(s.ticks || {}).fails || !(s.fail || '').trim()) return ['Add a failure', '--fail'];
+  if (!(s.ticks || {}).results) return ['Add results', '--fail'];
+  return ['Honest', '--pass'];
+}
+function update() {
+  state.nm = $('nm').value; state.score = $('score').value; state.fail = $('fail').value;
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  $('md').textContent = buildReadme(state);
+  const n = SECTIONS.filter(([k]) => (state.ticks || {})[k]).length;
+  $('ready').textContent = n + ' / ' + SECTIONS.length;
+  const [msg, col] = honesty(state);
+  $('honest').textContent = msg;
+  $('honest').style.color = css(col);
+}
+state.ticks = state.ticks || {};
+for (const id of ['nm', 'score', 'fail']) { if (state[id] != null) $(id).value = state[id]; $(id).oninput = update; }
+SECTIONS.forEach(([k, label]) => {
+  const lab = document.createElement('label');
+  const box = document.createElement('input');
+  box.type = 'checkbox'; box.checked = !!state.ticks[k];
+  box.onchange = () => { state.ticks[k] = box.checked; update(); };
+  lab.appendChild(box);
+  lab.appendChild(document.createTextNode(' ' + label));
+  $('secs').appendChild(lab);
+});
+$('copy').onclick = () => {
+  try { navigator.clipboard.writeText(buildReadme(state)).then(() => { $('copy').textContent = 'Copied'; }, () => {}); } catch (e) {}
+};
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', update);
+update();
+</script>
+</body>
+</html>

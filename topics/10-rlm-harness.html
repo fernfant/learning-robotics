@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RLM Agent Harnesses</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../index.html">← LLMs &amp; Robotics</a> · Module 10</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 10 · Agents &amp; harnesses</div>
+<h1>Self-improving agent harnesses: Recursive Language Models, Continual Harness and Prime Agent</h1>
+<p class="lede">Instead of stuffing everything into the model's context, let the model hold its context in variables, write code over it, call copies of itself, and edit its own notes, skills and helpers as it learns.</p>
+<p class="meta">Source: Yacine Mahdid, <a href="https://x.com/yacinelearning/status/2113688068352004435">X post</a> (23 Oct 2026), announcing a 2h36m walkthrough with Seth Karten (Prime Intellect): <a href="https://www.youtube.com/watch?v=znotMe8NaHc">“Prime Agent: Self-Improving RLM Harness”</a>. I couldn't watch the video, so this module is built from the primary written sources: the Prime Agent paper, repo and launch post, the RLM paper and posts, and the Continual Harness paper. All are saved in <code>sources/10-*</code>.</p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">A "harness" is everything wrapped around an AI model so it can do long jobs. The new idea: let the model organise its own notes and helpers, and improve them as it goes.</p>
+
+<h3>Think of it like this</h3>
+<p>Imagine doing a huge school project. You can't hold every page of every book in your head at once. So you keep a <b>binder</b> with labelled tabs, you <b>ask friends</b> to read some chapters and report back, and you keep a <b>"tips that worked"</b> sheet that you update after every mistake. Smart students don't just read harder. They get better at organising.</p>
+<ul>
+<li><b>The binder</b> is the RLM idea: keep the material in labelled places and look up only what you need.</li>
+<li><b>The friends</b> are sub-agents: copies of the AI that each handle a piece and report back.</li>
+<li><b>The tips sheet</b> is the Continual Harness: the AI writes down what worked and fixes its own instructions.</li>
+</ul>
+
+<h3>How it works</h3>
+<ol>
+<li>The AI gets a notebook it can run code in. Big inputs (whole books, codebases, logs) sit in the notebook as named variables, not in its "head".</li>
+<li>It writes small programs to search, cut up and filter that material.</li>
+<li>For big jobs, it sends pieces to helper copies of itself, which work in parallel and message back.</li>
+<li>After a while, it looks back at what happened and makes a small, careful change to its notes, skills or helpers, and can undo it if it was a bad idea.</li>
+<li>It keeps going (bounded by limits on time, tokens and turns) until a check says the job is done.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>The "tips sheet that improves itself" idea was first built for an AI playing Pokémon. That's a game where you can't restart, can only see part of the world, and must plan for a very long time, just like a real robot. Robots can't press "reset" in your kitchen, so learning while doing, without restarts, matters a lot.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Next time you study for a test, keep a "what tripped me up" list. After each practice session, add or change one line. Notice how small, regular fixes add up.</li>
+<li>In the demo below, drag <b>Context size</b> up to a million tokens or more, then change <b>Sub-call window</b>. See how many helper calls and how many levels of helpers it takes, while the main AI still only reads a small amount.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Harness</dt><dd>The software around an AI model: tools, memory, instructions and helpers.</dd>
+<dt>Context window</dt><dd>How much text the model can "see" at once.</dd>
+<dt>REPL</dt><dd>A notebook where you type code, run it, and see results straight away.</dd>
+<dt>Sub-agent</dt><dd>A helper copy of the AI given part of the job.</dd>
+<dt>Context rot</dt><dd>Models getting worse as their context fills up with lots of text.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version. On a first read, look at the three-ideas table, the demo and the robotics section.</p>
+
+<div class="card note"><p><strong>Track: LLM + Robotics.</strong> RLMs and Prime Agent are LLM agent technology. Continual Harness, one of Prime Agent's two pillars, was designed for <em>embodied</em> agents with long horizons and partial observability, so it connects directly to robot autonomy.</p></div>
+
+<div class="toc">
+<strong>In this module</strong>
+<ol>
+<li><a href="#summary">Summary</a></li>
+<li><a href="#why-robotics">Why this matters for robotics</a></li>
+<li><a href="#rlm">Deep dive: Recursive Language Models (interactive)</a></li>
+<li><a href="#continual">Deep dive: Continual Harness, an agent that edits its own harness</a></li>
+<li><a href="#prime">Deep dive: Prime Agent, putting it together</a></li>
+<li><a href="#results">Deep dive: results, and how to read them</a></li>
+<li><a href="#safety">Deep dive: safety and bounds</a></li>
+<li><a href="#playbook">Playbook</a></li>
+<li><a href="#check">Self-check</a></li>
+<li><a href="#glossary">Glossary &amp; further reading</a></li>
+</ol>
+</div>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Prime Agent (Prime Intellect with collaborators, Aug 2026) is an open-source (MIT) coding and research agent built on two ideas:</p>
+<ul>
+<li><strong>Recursive Language Models (RLMs):</strong> the model's only tool is a persistent Python REPL. Long context lives there as variables ("prompt-as-a-variable"), and sub-agents are async function calls.</li>
+<li><strong>Continual Harness:</strong> the harness's own prompts, skills, memories and sub-agent specs are durable state the agent can create, read, update and delete. A <code>/refine</code> step makes small, evidence-backed edits from the agent's own trajectory, never touching the base system prompt, with rollback.</li>
+</ul>
+<p>The design philosophy: the harness standardises execution, recovery, verification and accounting, but leaves strategy to the model, so harness failures don't masquerade as model failures.</p>
+</div>
+<div class="table-wrap"><table>
+<tr><th>Idea</th><th>Problem it attacks</th><th>Core mechanism</th><th>Source</th></tr>
+<tr><td><strong>RLM</strong></td><td>Context rot and context-window limits</td><td>Context stored in a REPL variable; the model programmatically examines and decomposes it and recursively calls itself on snippets</td><td>Zhang, Kraska &amp; Khattab, arXiv 2512.24601 (blog Oct 2025; paper Dec 2025, revised May 2026)</td></tr>
+<tr><td><strong>Continual Harness</strong></td><td>Hand-engineered prompts, skills and memory that never adapt; prompt optimisation that needs episode resets</td><td>Harness state H = (ρ, G, K, M), meaning prompt, sub-agents, skills and memory, refined online within a single run</td><td>Karten et al., arXiv 2605.09998 (May 2026)</td></tr>
+<tr><td><strong>Prime Agent</strong></td><td>Harnesses built around older models' limits (fixed tool schemas, compaction)</td><td>RLM REPL + Continual Harness + persistent sub-agents + agent-to-agent messaging + a background daemon</td><td>Karten, Zhang et al., arXiv 2608.23552 (Aug 2026); <a href="https://github.com/PrimeIntellect-ai/prime-agent">repo</a></td></tr>
+</table></div>
+
+<h2 id="why-robotics">2. Why this matters for robotics</h2>
+<ul>
+<li><strong>Continual Harness was born embodied.</strong> It came from the Gemini Plays Pokémon experiments, where human-in-the-loop harness refinement helped the agent become, per the paper, the first AI system to complete Pokémon Blue, Yellow Legacy on hard mode, and Crystal without a lost battle. Continual Harness then removed the human from that loop. Long horizons plus partial observability is the robot setting.</li>
+<li><strong>Reset-free learning is the real-world constraint.</strong> Prompt-optimisation methods need episode resets. Continual Harness adapts within a single run. A home robot can't reset the kitchen between attempts.</li>
+<li><strong>Skills libraries and sub-agents mirror robot stacks.</strong> Many robot systems already use an LLM planner that calls skills (grasp, navigate, open-door) and delegates to specialised policies. A harness that can <em>add and refine</em> its own skill descriptions and helper specs is a software version of that stack learning on the job.</li>
+<li><strong>Programmatic context fits sensor data.</strong> An hour of robot logs (joint states, detections, events) is far too big for a context window. Holding it as a variable and querying it with code ("when did the gripper last slip?") is the RLM pattern.</li>
+<li><strong>Bounded autonomy is a safety envelope.</strong> Prime Agent's autonomous mode runs within turn, token and time budgets with quality gates. Robots need the same idea with physical limits. See <a href="03-shared-autonomy.html#autonomy">Module 03, levels of automation</a>.</li>
+</ul>
+
+<h2 id="rlm">3. Deep dive: Recursive Language Models</h2>
+<p><strong>The problem.</strong> Per-token cost rises with context length, and quality tends to fall as contexts grow. This is called <em>context rot</em>. Common fixes: summarise or compact the history (lossy), or pass state between agents through files.</p>
+<p><strong>The RLM move.</strong> Don't give the model the context at all. Give it the <em>query</em>, plus a REPL in which the context is pre-loaded as a variable. The model (the "root" LM, depth 0) writes code to peek at, search, slice and transform that variable. It can also call sub-LMs, fresh copies of itself, on pieces of it, and combine their answers. From the outside it's a drop-in replacement for a normal completion call.</p>
+<pre><code># the shape of an RLM call (illustrative, not the library's exact API)
+answer = rlm.completion(query, context=huge_text)   # same interface as an LM call
+
+# inside, the root model might write:
+chunks  = split(context, 100_000)
+notes   = llm_batch([f"Find mentions of X in:\n{c}" for c in chunks])   # parallel sub-LMs
+answer  = llm(f"Combine these findings to answer: {query}\n{notes}")</code></pre>
+<ul>
+<li><strong>No summarisation, so no forced loss.</strong> The full context stays available in memory. The model chooses what to read.</li>
+<li><strong>Test-time compute becomes programmable:</strong> loops, filters, parallel fan-out.</li>
+<li><strong>Prime Intellect's variant</strong> (in their <code>verifiers</code> library): only sub-LLMs get tools beyond the REPL, so tool output tokens don't flood the root. Answers are returned via a variable. An <code>llm_batch</code> function runs sub-calls in parallel.</li>
+</ul>
+<p><strong>Reported results</strong> (RLM paper abstract):</p>
+<ul>
+<li>Handles inputs up to two orders of magnitude beyond the model's context window.</li>
+<li>With GPT-5, it beats common scaffolds at comparable cost. The median improvements across four long-context tasks were 26% over compaction, 130% over CodeAct with sub-calls, and 13% over Claude Code.</li>
+<li>A small post-trained model, RLM-Qwen3-8B, beat its base Qwen3-8B by 28.3% on average.</li>
+</ul>
+
+<div class="card demo">
+<h3>Interactive: what a recursive call tree costs</h3>
+<p class="legend">Exact arithmetic for a simple split-and-delegate strategy. Each level splits its input into pieces that fit the sub-call window, and each parent reads only short notes from its children. No accuracy is modelled here; this shows structure and token cost only.</p>
+<canvas id="tree" width="700" height="240" aria-label="Recursion tree showing levels and number of calls"></canvas>
+<label for="ctx">Context size: <span id="ctxv" class="num"></span></label>
+<input id="ctx" type="range" min="4" max="8" step="0.05" value="6.3">
+<label for="win">Sub-call window: <span id="winv" class="num"></span></label>
+<input id="win" type="range" min="16000" max="256000" step="8000" value="128000">
+<label for="note">Note size per child (tokens): <span id="notev" class="num"></span></label>
+<input id="note" type="range" min="100" max="4000" step="100" value="500">
+<div class="stats">
+  <div class="stat"><div class="k">Levels of helpers</div><div class="v" id="lv">–</div></div>
+  <div class="stat"><div class="k">Sub-calls</div><div class="v" id="calls">–</div></div>
+  <div class="stat"><div class="k">Tokens the root reads</div><div class="v" id="root">–</div></div>
+  <div class="stat"><div class="k">Total tokens read</div><div class="v" id="tot">–</div></div>
+</div>
+<p class="meta">Notice that the root's reading stays small however big the context gets, while the total work grows only slightly faster than the context itself (leaves read everything once; parents read notes). Real RLMs are smarter: they filter with code first and skip irrelevant chunks entirely.</p>
+</div>
+
+<h2 id="continual">4. Deep dive: Continual Harness, an agent that edits its own harness</h2>
+<p><strong>The observation.</strong> In the Gemini Plays Pokémon runs, people kept improving the harness. In the hardest stages, the agent itself began iterating on its strategy through long-context memory. Continual Harness formalises and automates that loop.</p>
+<p><strong>The formalism.</strong> The harness state is</p>
+<pre><code>H = (ρ, G, K, M)   # prompt, sub-agents, skills, memory</code></pre>
+<p>Starting from only a minimal environment interface, the agent alternates between <em>acting</em> and <em>refining</em> H, drawing on any past trajectory data, all <strong>without resetting the environment</strong>.</p>
+<ul>
+<li><strong>Result</strong> (paper abstract): on Pokémon Red and Emerald across frontier models, starting from scratch, it substantially cut button-press cost compared with a minimal baseline. It also recovered most of the gap to a hand-engineered expert harness. Gains depended on model capability.</li>
+<li><strong>Closing the loop with the model:</strong> an online process-reward co-learning loop. An open-source agent's rollouts through the refining harness are relabelled by a frontier teacher and used to update the model, again without environment resets. It's the distillation pattern of <a href="04-distill-small-models.html#distill">Module 04</a>, run continuously.</li>
+</ul>
+<p><strong>In Prime Agent</strong>, the harness state lives in the REPL as <code>rlm.harness</code>, with one create/read/update/delete surface for all four kinds (prompt notes, memories, skills, sub-agent specs), persisted to disk.</p>
+<p><code>/refine</code> reads the trajectory and applies the <em>smallest</em> relevant edit, recording its trigger and outcome. The planning runs in the background, and the apply step blocks only briefly at a turn boundary. The base system prompt is immutable, and refinements can be rolled back by ID.</p>
+<p class="robot"><strong>Why "small, evidence-backed, reversible" matters:</strong> self-modifying systems can drift, the same failure as reward hacking in <a href="07-post-training.html#pref">Module 07</a>. Small diffs, recorded evidence, a fixed core and rollback are the harness-level equivalent of a KL leash.</p>
+
+<h2 id="prime">5. Deep dive: Prime Agent, putting it together</h2>
+<div class="table-wrap"><table>
+<tr><th>Component</th><th>What it does</th></tr>
+<tr><td>Persistent IPython kernel</td><td>The model's <em>only</em> tool. Files, shell, tools, skills and sub-agents are all called as functions from code.</td></tr>
+<tr><td><code>rlm(...)</code> sub-agents</td><td>Async: spawning returns a handle immediately. Each child is a full Prime Agent session (own model, kernel, history). Results arrive as messages, and children can be steered mid-flight or kept as persistent sub-agents.</td></tr>
+<tr><td>Agent-to-agent messaging</td><td>Through a background daemon. Limited to the "nuclear family" (parent, sibling, child) to avoid unwanted cross-talk between independent sessions.</td></tr>
+<tr><td>Daemon + Agents View</td><td>Sessions keep running when the terminal detaches. Crashed workers recover from the session's append-only JSONL plus a kernel snapshot. Idle sub-agents unload after 30 minutes and reload on demand.</td></tr>
+<tr><td>Session &amp; context</td><td>The full history is append-only JSONL. Compaction cleans the active context, but the full history stays reachable from the kernel. A spawned agent "garbage-collects" REPL memory.</td></tr>
+<tr><td>Skills</td><td>Importable Python packages. A built-in skill creator turns recurring workflows into skills.</td></tr>
+<tr><td>Autonomous mode</td><td>Goal + heartbeats + continuation, bounded by max turns, tokens and time, with a quality-gate command that must pass before finishing.</td></tr>
+</table></div>
+<p>Compare the two ways of beating long context in this course. <a href="05-trillion-scale-architecture.html#length">Module 05</a> changes the <em>architecture</em> (Kimi K3's fixed-size linear-attention memory). RLMs change the <em>scaffolding</em>, so the model manages context with code. They're complementary. External, addressable memory also echoes the <a href="06-30u30/17-neural-turing-machines.html">Neural Turing Machine (Module 06, Day 17)</a>, now with Python as the memory controller.</p>
+
+<h2 id="results">6. Deep dive: results, and how to read them</h2>
+<ul>
+<li><strong>ARC-AGI-3:</strong> the paper reports raising RHAE Best@1 from 30% to 95.5%. The launch post attributes the best result to Opus 5 inside Prime Agent, notes the ARC-reported human-expert baseline of 95.4%, and gives three runs of 95.0, 95.2 and 95.5, with Best@3 99.97% and all 183 levels completed. The only ARC-specific change was the task prompt.</li>
+<li><strong>Token efficiency:</strong> the post reports higher maximum scores than the models' native harnesses at lower token use. Its explanation is that running functions over data costs fewer tokens than reading the data through tools.</li>
+<li><strong>Long-context suite:</strong> using the open-weights GLM-5.2 in Prime Agent against closed models in their own harnesses, the post shows Prime Agent competitive or ahead on several tasks. One example: OOLONG (128k), 0.700 for Prime Agent with GLM-5.2 vs 0.420 for Pi-mono with sub-agents.</li>
+<li><strong>Also reported:</strong> results on GPU-kernel generation, emulator construction, autonomous nanoGPT speedruns and Factorio. In Factorio, refinement enabled continuous technology progression and dedicated sub-agents parallelised work.</li>
+</ul>
+<div class="card note"><p><strong>Reading these critically</strong> (<a href="01-decision-model-evals.html">Module 01</a> and <a href="08-ai-research-engineer/10-evals-red-teaming.html">Module 08 Stage 10</a> habits):</p>
+<ul>
+<li>These are the authors' own results. The post notes that no model has been trained around Prime Agent yet.</li>
+<li>For Claude Code and Codex, the authors used the official reported numbers because their own runs scored lower. That's fair, but it means the comparison mixes evaluation setups.</li>
+<li>Harness comparisons depend heavily on prompts, budgets and gates. Look for matched token and time budgets before concluding one harness is "better".</li>
+<li>The paper's thesis cuts both ways: if harness failures can look like model failures, then benchmark scores measure the <em>model + harness</em> pair, never the model alone.</li>
+</ul></div>
+
+<h2 id="safety">7. Deep dive: safety and bounds</h2>
+<ul>
+<li><strong>Not a sandbox:</strong> the README warns that Prime Agent executes model-generated Python and project commands with your user permissions. Its process isolation is for recovery, not security. Use disposable clones or worktrees, trusted repos and skills only, and an external sandbox for untrusted code.</li>
+<li><strong>Bounded autonomy:</strong> autonomous mode stops at configured turn, token and time limits. The README notes that passing a gate checks only what that gate verifies, and that hitting a limit doesn't mean success.</li>
+<li><strong>Self-editing risk:</strong> refinement edits only the supplemental layer, keeps the base prompt immutable, records history and supports rollback. Review refinements as you would code changes.</li>
+<li><strong>Communication scope:</strong> agent-to-agent messaging is restricted to parent, sibling and child sessions.</li>
+</ul>
+
+<h2 id="playbook">8. Playbook</h2>
+<ol>
+<li><strong>Try the minimal RLM first:</strong> <a href="https://github.com/alexzhang13/rlm-minimal">rlm-minimal</a>. Put a long document in a REPL variable and let a model answer questions by writing code over it.</li>
+<li>Compare against "paste it all in" and "summarise then answer" on the same questions. Measure accuracy and total tokens.</li>
+<li>Run Prime Agent in a <strong>disposable worktree</strong>. Give it a goal, a quality gate (tests) and tight turn, token and time budgets.</li>
+<li>Watch <code>/refine</code>: read each proposed edit, keep the good ones, and roll back the rest. Treat harness state like code under review.</li>
+<li>Robotics exercise: log a simulated robot run (states, events, failures) to a file, load it as a variable, and have an RLM-style agent answer "why did grasp attempt 7 fail?" by querying the log with code.</li>
+</ol>
+
+<h2 id="check">9. Self-check</h2>
+<details><summary>What's the key difference between an RLM and summarisation-based compaction?</summary><p>Compaction replaces history with a lossy summary. An RLM keeps the full context available as a variable and lets the model choose what to read or delegate. Nothing is thrown away by default.</p></details>
+<details><summary>Why does Prime Intellect's RLM give tools only to sub-LLMs?</summary><p>Tools often produce many tokens. Pushing tool use to sub-LLMs keeps the root model's context lean, and the root sees only the condensed results.</p></details>
+<details><summary>What does "reset-free" mean in Continual Harness, and why does it matter for robots?</summary><p>The agent refines its prompts, skills, memory and sub-agents online within a single run, without restarting the environment. Real robots can't reset the world between attempts.</p></details>
+<details><summary>Name three safeguards on Prime Agent's self-improvement.</summary><p>Small, evidence-backed edits with recorded triggers and outcomes; an immutable base system prompt; and rollback of refinements by ID.</p></details>
+<details><summary>Why should benchmark results be read as "model + harness"?</summary><p>The harness shapes what the model can do: tools, context handling, budgets, gates. Different harnesses give the same model very different scores, which is the paper's own central claim.</p></details>
+<details><summary>How do Module 05's linear attention and an RLM both address long context?</summary><p>Linear attention changes the architecture so memory stays fixed-size. An RLM changes the scaffolding so the model manages context with code and sub-calls. They're complementary approaches.</p></details>
+
+<h2 id="glossary">10. Glossary &amp; further reading</h2>
+<div class="table-wrap"><table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<tr><td>Harness / scaffold</td><td>Software around a model: tools, memory, prompts, control loop</td></tr>
+<tr><td>RLM</td><td>Recursive Language Model: the model manages context as REPL variables and recursively calls sub-LMs</td></tr>
+<tr><td>Prompt-as-a-variable</td><td>Context held in program memory, not in the model's context window</td></tr>
+<tr><td>Programmatic tool calling</td><td>Calling tools and sub-agents as functions from code, not via fixed schemas</td></tr>
+<tr><td>Continual Harness</td><td>A reset-free method where the agent refines its own prompt, sub-agents, skills and memory</td></tr>
+<tr><td>/refine</td><td>Prime Agent's step that makes small, evidence-backed harness edits</td></tr>
+<tr><td>Context rot</td><td>Quality decline as context grows</td></tr>
+<tr><td>Context folding</td><td>Methods that manage the context window during a long rollout (branch/return, hierarchical summaries)</td></tr>
+<tr><td>Quality gate</td><td>A command (e.g. tests) that must pass before an autonomous run may finish</td></tr>
+</table></div>
+<ul>
+<li>Karten, Zhang et al., <a href="https://arxiv.org/abs/2608.23552">Prime Agent: A Self-Improving RLM Harness</a> (arXiv 2608.23552) · <a href="https://github.com/PrimeIntellect-ai/prime-agent">repo</a> · <a href="https://www.primeintellect.ai/blog/prime-agent">launch post</a> · <a href="https://sethkarten.ai/papers/prime-agent.html">project page</a></li>
+<li>Zhang, Kraska &amp; Khattab, <a href="https://arxiv.org/abs/2512.24601">Recursive Language Models</a> (arXiv 2512.24601) · <a href="https://alexzhang13.github.io/blog/2025/rlm/">original blog post</a> · <a href="https://github.com/alexzhang13/rlm">library</a> · <a href="https://github.com/alexzhang13/rlm-minimal">minimal implementation</a></li>
+<li>Karten et al., <a href="https://arxiv.org/abs/2605.09998">Continual Harness: Online Adaptation for Self-Improving Foundation Agents</a> (arXiv 2605.09998)</li>
+<li>Prime Intellect, <a href="https://www.primeintellect.ai/blog/rlm">Recursive Language Models: the paradigm of 2026</a> · <a href="https://github.com/PrimeIntellect-ai/verifiers">verifiers</a> · <a href="https://github.com/PrimeIntellect-ai/prime-rl">prime-rl</a></li>
+<li><a href="https://www.youtube.com/watch?v=znotMe8NaHc">The 2h36m video walkthrough</a> (Yacine Mahdid with Seth Karten)</li>
+<li>In this course: <a href="05-trillion-scale-architecture.html#length">05</a> (architectural long context), <a href="06-30u30/17-neural-turing-machines.html">06 Day 17</a> (external memory), <a href="07-post-training.html">07</a> (verifiers and process rewards), <a href="04-distill-small-models.html">04</a> (teacher relabelling), <a href="03-shared-autonomy.html">03</a> (levels of autonomy), <a href="08-ai-research-engineer/10-evals-red-teaming.html">08 Stage 10</a> (evals)</li>
+</ul>
+
+<footer>Module 10 · added 2026-10-24 · <a href="../index.html">Back to course index</a></footer>
+</main>
+
+<script>
+const cv = document.getElementById('tree'), ctx = cv.getContext('2d');
+const cIn = document.getElementById('ctx'), wIn = document.getElementById('win'), nIn = document.getElementById('note');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = v => v >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(2) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(0) + 'k' : Math.round(v) + '';
+
+// Build levels bottom-up: leaves read raw chunks; each parent reads the notes of up to `fan` children.
+function plan(L, W, note) {
+  const leaves = Math.ceil(L / W), fan = Math.max(2, Math.floor(W / note));
+  const levels = [leaves];
+  let n = leaves;
+  while (n > 1 && n * note > W) { n = Math.ceil(n / fan); levels.push(n); }
+  const subCalls = levels.reduce((a, b) => a + b, 0);
+  const rootReads = L <= W ? L : n * note;
+  const total = L + levels.slice(1).reduce((a, k, i) => a + levels[i] * note, 0) + (L <= W ? 0 : n * note);
+  return {levels: L <= W ? [] : levels, subCalls: L <= W ? 0 : subCalls, rootReads, total, depth: L <= W ? 0 : levels.length};
+}
+
+function draw() {
+  const L = Math.round(Math.pow(10, +cIn.value)), W = +wIn.value, note = +nIn.value, p = plan(L, W, note);
+  document.getElementById('ctxv').textContent = fmt(L) + ' tokens';
+  document.getElementById('winv').textContent = fmt(W) + ' tokens';
+  document.getElementById('notev').textContent = note;
+  document.getElementById('lv').textContent = p.depth;
+  document.getElementById('calls').textContent = p.subCalls.toLocaleString();
+  document.getElementById('root').textContent = fmt(p.rootReads);
+  document.getElementById('tot').textContent = fmt(p.total) + ' (' + (p.total / L).toFixed(2) + '×)';
+  const Wd = cv.width, H = cv.height, rows = [1, ...p.levels.slice().reverse()], rh = H / (rows.length + 0.5);
+  ctx.clearRect(0, 0, Wd, H);
+  ctx.font = '12px sans-serif'; ctx.textBaseline = 'middle';
+  rows.forEach((n, r) => {
+    const y = rh * (r + 0.6), shown = Math.min(n, 40), w = Math.min(60, (Wd - 120) / shown - 4);
+    const x0 = (Wd - shown * (w + 4)) / 2 + 40;
+    for (let i = 0; i < shown; i++) {
+      ctx.fillStyle = r === 0 ? css('--accent') : css('--pass');
+      ctx.fillRect(x0 + i * (w + 4), y - 9, w, 18);
+    }
+    ctx.fillStyle = css('--muted');
+    ctx.fillText(r === 0 ? 'root' : `level ${p.levels.length - r + 1}: ${n.toLocaleString()} call${n > 1 ? 's' : ''}${n > shown ? ' (40 shown)' : ''}`, 4, y - 16 > 0 ? y - 16 : y);
+  });
+  if (!p.depth) { ctx.fillStyle = css('--fg'); ctx.fillText('Fits in one window: no sub-calls needed', Wd / 2 - 110, H / 2); }
+}
+cIn.oninput = wIn.oninput = nIn.oninput = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Three Books and a Gym</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../index.html">← LLMs &amp; Robotics</a> · Module 11</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 11 · Study path</div>
+<h1>The LLM self-study stack: CS336, Build a Reasoning Model, the RLHF Book (and a gym plan)</h1>
+<p class="lede">A four-line answer to "what should young people do in the AI era?": build a language model from scratch, build a reasoning model, learn post-training properly, and train your body too. This module turns it into a plan and maps it onto the rest of the course.</p>
+<p class="meta">Source: Dongxi (东锡), <a href="https://x.com/dongxi_nlp/status/2114597689228698006">X post</a> (in Chinese), 26 Oct 2026 · original text and translation in <code>sources/11-dongxi-young-people-ai.md</code></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Want to really understand AI? Build it yourself, step by step, and keep your body strong while you do it.</p>
+<h3>Think of it like this</h3>
+<p>Learning to cook properly isn't watching cooking videos. It's making the dish yourself, many times, from basic ingredients. These three "books" are like a cooking course for AI:</p>
+<ul>
+<li><b>Course 1 (CS336):</b> build the whole kitchen, from the oven up. Make a language model from scratch.</li>
+<li><b>Book 2 (Build a Reasoning Model):</b> teach the dish to "think before it answers", like showing your working in maths.</li>
+<li><b>Book 3 (the RLHF Book):</b> how to train the model to be helpful, using feedback, like a coach giving notes after practice.</li>
+<li><b>Number 4 is a gym plan.</b> Long study needs energy, sleep and a healthy body.</li>
+</ul>
+<h3>How it works</h3>
+<ol>
+<li>Pick one resource and do a little every day.</li>
+<li>Type the code yourself. Don't just read it.</li>
+<li>When something breaks, figure out why. That's where the learning happens.</li>
+<li>Move your body a few times a week, so your brain has energy for the hard parts.</li>
+</ol>
+<h3>Why robots care</h3>
+<p>The robot "brains" in this course are built on the same kind of model. Book 2 teaches a model to try several answers and check them, which is how a robot can try plans in its head before moving. Book 3 teaches learning from feedback, which is how robots learn what people prefer.</p>
+<h3>Try it</h3>
+<ul>
+<li>Plan one week: three study sessions and three exercise sessions. Tick them off on paper.</li>
+<li>In the demo below, set <b>Hours per week</b> to what you could really do, and see how long each resource might take.</li>
+</ul>
+<h3>Words to know</h3>
+<dl>
+<dt>From scratch</dt><dd>Building something yourself without using a ready-made version.</dd>
+<dt>Reasoning model</dt><dd>A model that works through steps before giving an answer.</dd>
+<dt>RLHF</dt><dd>Training a model using people's feedback about which answers are better.</dd>
+<dt>Training split</dt><dd>A gym plan that works different muscles on different days.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> the full study plan follows.</p>
+
+<div class="card note"><p><strong>Track: LLM.</strong> All three resources are about language models. They feed robotics through VLAs, robot foundation models built on LLM backbones and post-trained in similar ways (<a href="07-post-training.html#why-robotics">Module 07</a>).</p></div>
+
+<div class="toc">
+<strong>In this module</strong>
+<ol>
+<li><a href="#summary">Summary</a></li>
+<li><a href="#cs336">Stanford CS336: Language Modeling from Scratch</a></li>
+<li><a href="#raschka">Build a Reasoning Model (From Scratch)</a></li>
+<li><a href="#rlhf">The RLHF Book</a></li>
+<li><a href="#gym">Number 4: the three-way training split</a></li>
+<li><a href="#plan">A combined plan (interactive)</a></li>
+<li><a href="#map">How it maps onto this course</a></li>
+<li><a href="#why-robotics">Why it matters for robotics</a></li>
+<li><a href="#check">Self-check</a></li>
+<li><a href="#links">Links</a></li>
+</ol>
+</div>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Three resources that together cover a modern LLM end to end, plus advice to look after yourself:</p>
+<ul>
+<li><strong>CS336</strong> covers <em>pre-training</em>: tokenizer, Transformer, optimiser, GPU systems, scaling, data.</li>
+<li><strong>Raschka</strong> covers <em>reasoning</em>: inference-time scaling, RL with GRPO, distillation.</li>
+<li><strong>Lambert</strong> covers <em>post-training</em>: instruction tuning, reward models, RL, direct alignment.</li>
+</ul>
+<p>They're ordered from foundation to frontier, and all three are code-first or have companion code.</p>
+</div>
+<div class="table-wrap"><table>
+<tr><th></th><th>CS336</th><th>Build a Reasoning Model</th><th>RLHF Book</th></tr>
+<tr><td>Author(s)</td><td>Tatsunori Hashimoto &amp; Percy Liang (Stanford)</td><td>Sebastian Raschka</td><td>Nathan Lambert</td></tr>
+<tr><td>Format</td><td>University course: lectures + 5 assignments</td><td>Book (Manning) + notebooks + a video course</td><td>Book (free web version; print edition July 2026) + code + course</td></tr>
+<tr><td>Focus</td><td>Pre-training and systems</td><td>Reasoning on top of a pre-trained LLM</td><td>Post-training</td></tr>
+<tr><td>Hardware</td><td>GPU rental for big runs (the site suggests debugging on CPU first)</td><td>Pure PyTorch, aimed at a laptop</td><td>Mostly reading; the code needs a GPU for real runs</td></tr>
+<tr><td>Cost</td><td>Materials free; GPU time extra</td><td>Book purchase; code and video course free</td><td>Free online</td></tr>
+</table></div>
+
+<h2 id="cs336">2. Stanford CS336: Language Modeling from Scratch</h2>
+<p>An implementation-heavy course that walks through building a language model end to end. The site warns it involves far more code than most AI classes, with minimal scaffolding. The five assignments, from the Spring 2025 site:</p>
+<ol>
+<li><strong>Basics:</strong> implement the tokenizer, Transformer and optimiser, then train a minimal LM.</li>
+<li><strong>Systems:</strong> profile and benchmark, write FlashAttention2 in Triton, and build memory-efficient distributed training.</li>
+<li><strong>Scaling:</strong> fit a scaling law using a training API.</li>
+<li><strong>Data:</strong> turn raw Common Crawl into pre-training data with filtering and deduplication.</li>
+<li><strong>Alignment &amp; reasoning RL:</strong> SFT and RL for maths reasoning, with optional DPO and safety alignment.</li>
+</ol>
+<p>This course is already the spine of <a href="08-ai-research-engineer/index.html#courses">Module 08's course map</a>, covering stages 1–6 and 11.</p>
+
+<h2 id="raschka">3. Build a Reasoning Model (From Scratch), by Sebastian Raschka</h2>
+<p>The sequel to his <em>Build a Large Language Model (From Scratch)</em>. It starts from a pre-trained model and adds reasoning, in PyTorch, step by step. Chapters, from the book's repository:</p>
+<ol>
+<li>Understanding reasoning models</li>
+<li>Generating text with a pre-trained LLM</li>
+<li>Evaluating reasoning models</li>
+<li>Improving reasoning with inference-time scaling</li>
+<li>Inference-time scaling via self-refinement</li>
+<li>Training reasoning models with reinforcement learning</li>
+<li>Improving GRPO for reinforcement learning</li>
+<li>Distilling reasoning models for efficient reasoning</li>
+</ol>
+<p>Appendices include Qwen3 source code, using larger LLMs, batching and throughput, LLM evaluation approaches, and a chat interface. Raschka also published a free video course based on the material.</p>
+<p class="meta">Listings disagree on some edition details (dates, ISBNs), so check Manning's page for the authoritative edition.</p>
+
+<h2 id="rlhf">4. The RLHF Book, by Nathan Lambert</h2>
+<p>A comprehensive introduction to post-training, organised around the canonical RLHF recipe. From the book's own description, it covers:</p>
+<ul>
+<li>why RLHF exists and its history</li>
+<li>an RL primer</li>
+<li>instruction tuning</li>
+<li>reward models</li>
+<li>rejection sampling</li>
+<li>RL</li>
+<li>on-policy distillation</li>
+<li>direct alignment algorithms (DPO and friends)</li>
+<li>advanced topics: synthetic data, tool use, character training, evaluation</li>
+</ul>
+<p>It also traces RLHF's roots in economics, philosophy and <strong>optimal control</strong>, which matters for robotics. The site notes a print edition from July 2026, with a corrected reprint in October 2026.</p>
+<p>This course has already used it as a reference in <a href="07-post-training.html">Module 07</a> and <a href="08-ai-research-engineer/05-alignment-preference.html">Module 08 Stage 05</a>.</p>
+
+<h2 id="gym">5. Number 4: the three-way training split (谭成义三分化)</h2>
+<p>The last "keyword" isn't about AI. It's a strength-training series by Chinese fitness creators 凯圣王 (Kai Sheng Wang) and 谭成义 (Tan Chengyi), published as a <a href="https://www.bilibili.com/video/BV17ooLBUEqS/">video collection on Bilibili</a>. A "three-way split" works different muscle groups on different days. Their episodes cover a training plan, a chest/shoulders/triceps day, a back/rear-delts/biceps day and a legs day. Secondary write-ups describe it as push / pull / legs. The series says it suits beginners and keen trainees.</p>
+<p>The point of putting it in a list of AI resources is clear even without the details. The three items above are months of hard, focused work, and sustaining that takes energy, sleep and health. Treat it as "make exercise part of the plan", not as fitness advice from this course. If you're new to strength training, learn the movements with a qualified coach.</p>
+
+<h2 id="plan">6. A combined plan</h2>
+<p>A sensible order is <strong>CS336 assignments 1–2 → Raschka → CS336 assignments 3–5 alongside the RLHF Book</strong>. CS336 A1 gives you the model internals Raschka assumes. Raschka gives you hands-on reasoning RL before CS336 A5. Lambert gives the theory behind A5 and Module 07.</p>
+
+<div class="card demo">
+<h3>Interactive: how long will this take?</h3>
+<p class="legend">Every hour estimate is an <b>assumption</b> you can change. Neither the source post nor the resources give official hour counts. Run the plan in order, at your weekly study hours.</p>
+<canvas id="planner" width="700" height="200" aria-label="Timeline of the study plan in weeks"></canvas>
+<label for="hpw">Hours per week: <span id="hpwv" class="num"></span></label>
+<input id="hpw" type="range" min="3" max="40" step="1" value="10">
+<label for="h1">CS336 assignments 1–2 (assumed hours): <span id="h1v" class="num"></span></label>
+<input id="h1" type="range" min="20" max="200" step="5" value="80">
+<label for="h2">Build a Reasoning Model (assumed hours): <span id="h2v" class="num"></span></label>
+<input id="h2" type="range" min="10" max="150" step="5" value="50">
+<label for="h3">CS336 assignments 3–5 + RLHF Book (assumed hours): <span id="h3v" class="num"></span></label>
+<input id="h3" type="range" min="20" max="250" step="5" value="110">
+<div class="stats">
+  <div class="stat"><div class="k">Total hours</div><div class="v" id="tot">–</div></div>
+  <div class="stat"><div class="k">Weeks</div><div class="v" id="wk">–</div></div>
+  <div class="stat"><div class="k">≈ Months</div><div class="v" id="mo">–</div></div>
+</div>
+</div>
+
+<h2 id="map">7. How it maps onto this course</h2>
+<div class="table-wrap"><table>
+<tr><th>Resource part</th><th>Read alongside</th></tr>
+<tr><td>CS336 A1 (basics)</td><td><a href="06-30u30/13-attention.html">06 Day 13 Attention</a>, <a href="06-30u30/14-annotated-transformer.html">Day 14</a>, <a href="08-ai-research-engineer/01-tensor-math-autograd.html">08 Stage 01</a></td></tr>
+<tr><td>CS336 A2 (systems)</td><td><a href="08-ai-research-engineer/06-distributed-training.html">08 Stage 06</a>, <a href="09-inference-engineering/02-kv-cache-attention.html">09 FlashAttention</a>, <a href="09-inference-engineering/07-profiling-kernels.html">09 profiling</a></td></tr>
+<tr><td>CS336 A3–A4 (scaling, data)</td><td><a href="06-30u30/25-scaling-laws.html">06 Day 25</a>, <a href="08-ai-research-engineer/02-scaling-data-mixing.html">08 Stage 02</a></td></tr>
+<tr><td>Raschka ch. 4–5 (inference-time scaling)</td><td><a href="10-rlm-harness.html">10 RLM harnesses</a> (test-time compute as a program), <a href="09-inference-engineering/05-latency.html">09 latency</a></td></tr>
+<tr><td>Raschka ch. 6–7 (RL, GRPO)</td><td><a href="07-post-training.html#rlvr">07 RLVR</a>, <a href="06-30u30/29-ppo.html">06 Day 29 PPO</a>, <a href="02-tensortonic.html#rl">02 RL ladder</a></td></tr>
+<tr><td>Raschka ch. 8 (distillation)</td><td><a href="04-distill-small-models.html">04 Teacher → student</a></td></tr>
+<tr><td>RLHF Book</td><td><a href="07-post-training.html">07</a>, <a href="08-ai-research-engineer/05-alignment-preference.html">08 Stage 05</a>, <a href="06-30u30/30-rlhf.html">06 Day 30</a>, <a href="01-decision-model-evals.html">01</a> (reward models are classifiers)</td></tr>
+</table></div>
+
+<h2 id="why-robotics">8. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>VLAs are LLMs plus actions.</strong> Everything in CS336 A1–A2 (Transformer internals, efficient training) is the base of robot foundation models.</li>
+<li><strong>Inference-time scaling = thinking before acting.</strong> Sampling and checking several candidate plans before moving is the robot version of Raschka's chapters 4–5. It trades latency for reliability (<a href="04-distill-small-models.html#latency">Module 04</a>).</li>
+<li><strong>GRPO-style RL with verifiers</strong> maps onto robot RL with success detectors (<a href="07-post-training.html#rlvr">Module 07</a>).</li>
+<li><strong>RLHF has roots in optimal control</strong>, the classical robotics discipline. Lambert's book traces that history.</li>
+<li><strong>Distillation</strong> (Raschka ch. 8) is how big reasoning models get onto small robot computers.</li>
+</ul>
+</div>
+
+<h2 id="check">9. Self-check</h2>
+<details><summary>Which resource covers pre-training, which covers reasoning, and which covers post-training?</summary><p>CS336 covers pre-training and systems, Raschka covers reasoning, and Lambert covers post-training.</p></details>
+<details><summary>Why do CS336 A1 before Raschka?</summary><p>Raschka starts from a pre-trained model. A1 makes you build the tokenizer, Transformer and optimiser, so the internals aren't a black box when you add reasoning on top.</p></details>
+<details><summary>What is GRPO, and where else in the course does that family of ideas appear?</summary><p>An RL method that scores each sampled answer against its group's average, so it needs no separate value model. See Module 07 (RLVR) and Module 08 Stage 03/05.</p></details>
+<details><summary>What's the point of item 4?</summary><p>It's a strength-training plan. Months of deep study take energy and health, so make exercise part of the plan too.</p></details>
+
+<h2 id="links">10. Links</h2>
+<ul>
+<li><a href="https://stanford-cs336.github.io/spring2025/">Stanford CS336, Spring 2025</a> (lectures, assignments, schedule)</li>
+<li><a href="https://github.com/rasbt/reasoning-from-scratch">Build a Reasoning Model (From Scratch): code repository</a> · <a href="https://magazine.sebastianraschka.com/p/building-reasoning-models">Raschka's free video course</a></li>
+<li><a href="https://rlhfbook.com/">RLHF Book</a> (free web version, code and course links)</li>
+<li><a href="https://www.bilibili.com/video/BV17ooLBUEqS/">凯圣王 × 谭成义 three-way split series (Bilibili)</a></li>
+<li>Earlier Dongxi module: <a href="07-post-training.html">07, post-training</a>. His series promises deeper posts on each technique.</li>
+</ul>
+
+<footer>Module 11 · added 2026-10-26 · <a href="../index.html">Back to course index</a></footer>
+</main>
+
+<script>
+const cv = document.getElementById('planner'), ctx = cv.getContext('2d');
+const ids = ['hpw', 'h1', 'h2', 'h3'], el = Object.fromEntries(ids.map(i => [i, document.getElementById(i)]));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const LABELS = ['CS336 A1–A2', 'Reasoning book', 'CS336 A3–A5 + RLHF Book'];
+
+function draw() {
+  const hpw = +el.hpw.value, hrs = [+el.h1.value, +el.h2.value, +el.h3.value];
+  ids.forEach(i => document.getElementById(i + 'v').textContent = el[i].value);
+  const weeks = hrs.map(h => h / hpw), total = hrs.reduce((a, b) => a + b), totW = total / hpw;
+  document.getElementById('tot').textContent = total;
+  document.getElementById('wk').textContent = totW.toFixed(1);
+  document.getElementById('mo').textContent = (totW / 4.345).toFixed(1);
+  const W = cv.width, H = cv.height, L = 190, R = 30, sc = (W - L - R) / Math.max(totW, 1), rh = (H - 30) / 3;
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '13px sans-serif'; ctx.textBaseline = 'middle';
+  let start = 0;
+  const colors = [css('--accent'), css('--pass'), css('--warn')];
+  weeks.forEach((w, i) => {
+    const y = 6 + i * rh;
+    ctx.fillStyle = css('--fg'); ctx.fillText(LABELS[i], 4, y + rh / 2);
+    ctx.fillStyle = colors[i]; ctx.fillRect(L + start * sc, y + 6, w * sc, rh - 12);
+    ctx.fillStyle = css('--muted'); ctx.fillText(w.toFixed(1) + ' wk', L + (start + w) * sc + 4 > W - 50 ? L + start * sc + 4 : L + (start + w) * sc + 4, y + rh / 2);
+    start += w;
+  });
+  ctx.strokeStyle = css('--line'); ctx.beginPath(); ctx.moveTo(L, H - 20); ctx.lineTo(W - R, H - 20); ctx.stroke();
+  ctx.fillStyle = css('--muted');
+  const step = totW > 60 ? 10 : totW > 24 ? 4 : 2;
+  for (let t = 0; t <= totW; t += step) ctx.fillText(t + '', L + t * sc - 4, H - 8);
+}
+ids.forEach(i => el[i].oninput = draw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

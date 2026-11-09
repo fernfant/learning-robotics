@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inference · Request lifecycle</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 09 · Inference engineering</a> › Page 01</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 09 · Problems 1–2</div>
+<h1>The request lifecycle: from arrival to first token, and streaming</h1>
+<p class="lede">A chat request crosses the network, waits in a queue, gets turned into tokens, runs one big forward pass, and then trickles out one token at a time. Knowing where each millisecond goes is the base of every other inference question. So is knowing how to stream those tokens and stop the work the moment nobody is listening.</p>
+
+<div class="facts">
+  <div><b>Problems covered</b>1 (arrival to first token) · 2 (SSE streaming, disconnects, cancellation)</div>
+  <div><b>Interview level</b>Junior to mid. Seniors are expected to add numbers and failure modes.</div>
+  <div><b>Key ideas</b>TTFT, TPOT, queueing, tokenisation, prefill vs decode, incremental detokenisation, SSE, abort on disconnect</div>
+  <div><b>Time to prep</b>2–3 h: 1 h reading, 1–2 h for the streaming exercise</div>
+</div>
+<p class="meta">Source: <a href="https://x.com/vishalsingh2972/status/2113830444722741637">Vishal Singh's post of 25 inference-engineering interview problems</a> · saved in <code>sources/09-vishal-inference-25.md</code></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">When you ask a chatbot something, your question waits its turn, gets read all at once, and then the answer is written one word at a time. The wait before the first word appears is what makes it feel fast or slow.</p>
+
+<h3>Think of it like this</h3>
+<p>Think of a busy burger restaurant. You place your order at the till (the request arrives). If there's a line, you wait (the queue). The cook reads your whole order and gets everything on the grill at once (reading your whole question in one go). Then the food comes out one item at a time: fries first, then the burger, then the drink (the answer, word by word). If you walk out halfway, a good kitchen stops cooking your food so the grill is free for the next person. A bad kitchen keeps cooking for an empty table.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Your message travels over the internet to the computer running the model.</li>
+<li>It waits in a line if the computer is busy with other people.</li>
+<li>The words are chopped into small pieces called tokens, and the model reads all of them in one big step.</li>
+<li>The model picks the first word of the answer and sends it to you straight away.</li>
+<li>It keeps picking one word at a time and sending each one as soon as it's ready, until it's done or you leave.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot that hears "stop, there's a cat behind you" can't wait two seconds for the first word of its plan. If its model answers in a fixed time, say a tenth of a second, the robot can react safely. The wait before the first word is the robot's reaction time.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>With a friend, time how long it takes them to start answering "what did you eat yesterday?" and then how long the whole answer takes. Now ask a question that needs a long think first. Which part grew: the wait to start, or the talking?</li>
+<li>In the demo further down, push <b>Prompt tokens</b> up to 32,000 and watch <b>Time to first token</b> grow. Raise <b>Queue wait</b> to see a busy server. Then slide <b>Client leaves at</b> to 50% and untick <b>Cancel on disconnect</b> to see wasted work.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Token</dt><dd>A small piece of text, often part of a word, that the model reads and writes.</dd>
+<dt>Prefill</dt><dd>The first big step where the model reads your whole question at once.</dd>
+<dt>Decode</dt><dd>The repeated step where the model writes one token at a time.</dd>
+<dt>TTFT</dt><dd>Time to first token: how long until the first piece of the answer arrives.</dd>
+<dt>Streaming</dt><dd>Sending each piece of the answer as soon as it exists, instead of all at the end.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="p1">Problem 1 · What happens between a request arriving and the first token leaving?</h2>
+<p><strong>What the interviewer is testing:</strong> whether you can name every stage on the path, say which ones are usually big and which are small, and put rough numbers on them. They want to hear "prefill is compute-bound, decode is memory-bound" and "queueing dominates under load".</p>
+
+<h3>The concepts</h3>
+<p>Follow one chat request through a typical serving stack (an API gateway in front of an engine such as vLLM, SGLang or TensorRT-LLM):</p>
+<ol>
+<li><strong>Network and gateway.</strong> TCP and TLS setup (skipped if the connection is reused), HTTP parsing, authentication, rate limits, request validation. A router or load balancer picks a replica, ideally one that already holds the conversation's prefix in cache (page 04).</li>
+<li><strong>Templating and tokenisation.</strong> The server applies the model's chat template (system prompt, role markers), then turns text into token IDs. This runs on the CPU. It's cheap for normal prompts but not free for very long ones.</li>
+<li><strong>Admission and queueing.</strong> The scheduler decides when the request joins the running batch. It needs a batch slot and enough free KV-cache memory for the prompt. Under load this wait is often the biggest part of TTFT.</li>
+<li><strong>Prefix-cache lookup.</strong> If the first part of the prompt (system prompt, earlier turns) was seen recently, its keys and values are reused and that part skips computation.</li>
+<li><strong>Prefill.</strong> One forward pass over all remaining prompt tokens in parallel. It writes the KV cache for every token and produces logits for the last position. Many tokens share each weight read, so prefill is <em>compute-bound</em>.</li>
+<li><strong>Sampling.</strong> Logits go through temperature, top-p or top-k, penalties, and any grammar or JSON constraints. Out comes the first token ID. The first token comes from prefill, not from a separate decode step.</li>
+<li><strong>Detokenisation and send.</strong> The token ID becomes text (carefully, because one character can span several tokens), is framed as a server-sent event, and is flushed back through every proxy to the client.</li>
+<li><strong>Decode loop.</strong> Every later token is one forward pass that processes one new token per sequence but reads all the weights and the sequence's whole KV cache. With little arithmetic per byte read, decode is <em>memory-bandwidth-bound</em>.</li>
+</ol>
+<p>The two numbers that summarise the user's experience:</p>
+<pre><code>TTFT  = t_network + t_gateway + t_queue + t_tokenise + t_prefill + t_sample
+TPOT  = time per output token after the first (also called inter-token latency)
+E2E   = TTFT + (N_out − 1) × TPOT
+
+Rough floors on one GPU (dense model with P parameters, T_in prompt tokens):
+  t_prefill ≈ 2 × P × T_in / (peak_FLOPs × MFU)          compute-bound
+  TPOT      ≥ (weight_bytes + KV_bytes_read) / mem_bandwidth   memory-bound</code></pre>
+<p>MFU (model FLOPs utilisation) is the share of peak arithmetic you actually achieve. The factor 2 is one multiply and one add per parameter per token. Attention adds extra FLOPs that grow with T_in², small at a few thousand tokens and large at 100K.</p>
+
+<h3>A worked answer with real numbers</h3>
+<p><strong>Assumptions.</strong> A Llama-3-8B-shaped model (8 billion parameters, 32 layers, 8 KV heads, head dim 128) in BF16. One NVIDIA H100 SXM. A 2,000-token prompt and a 300-token answer. An empty queue. Network round trip 40 ms (assumed; it depends on where the user is). 50% MFU in prefill (an assumption; real values vary with kernel and batch).</p>
+<p><strong>GPU specs</strong> (NVIDIA's H100 product page, SXM column): BF16 Tensor Core 1,979 TFLOPS <em>with sparsity</em>, so about 989 TFLOPS dense; memory bandwidth 3.35 TB/s; 80 GB HBM. The PCIe-class H100 NVL differs (94 GB, 3.9 TB/s, lower FLOPs), so always say which variant you mean.</p>
+<pre><code>Prefill FLOPs  = 2 × 8e9 × 2,000          = 3.2e13 FLOPs
+               (+ about 2e12 for attention at 2K tokens, less with causal masking: ignore)
+Effective rate = 989e12 × 0.5             ≈ 4.95e14 FLOP/s
+t_prefill      = 3.2e13 / 4.95e14         ≈ 65 ms
+               (≈ 31,000 prompt tokens/s on one GPU at this MFU)
+
+Decode floor   = 16 GB of weights / 3.35 TB/s ≈ 4.8 ms per token at batch 1
+KV read        = 128 KiB/token × 2,000 tokens = 250 MiB  (small next to 16 GB here)
+Assume TPOT    ≈ 7 ms (the floor plus real-world overheads; an assumption)
+
+TTFT ≈ 40 ms (network) + ~1 ms (tokenise, assumed) + 0 (queue) + 65 ms (prefill)
+     ≈ 106 ms
+E2E  ≈ 106 ms + 299 × 7 ms ≈ 2.2 s</code></pre>
+<p>Now change one thing at a time and see what moves:</p>
+<ul>
+<li><strong>32,000-token prompt:</strong> prefill grows 16× to about 1 s (more, because attention FLOPs grow with the square of length). TTFT goes from ~0.1 s to over 1 s. This is problem 7's territory (page 03).</li>
+<li><strong>Busy server:</strong> if 20 prompts like this are ahead in the queue and prefills run one after another, the wait is about 20 × 65 ms = 1.3 s. Queueing, not the model, sets TTFT.</li>
+<li><strong>Repeat conversation with prefix caching:</strong> if 1,800 of the 2,000 tokens are a cached history, prefill only computes 200 tokens: about 6.5 ms. TTFT falls to about 48 ms, almost all network.</li>
+<li><strong>70B model:</strong> about 9× the FLOPs per token, so prefill on one GPU would be ~9× slower. In practice it's split over several GPUs with tensor parallelism, which adds communication per layer (see <a href="../08-ai-research-engineer/06-distributed-training.html">Module 08 · Distributed training</a>).</li>
+</ul>
+
+<h3>Trade-offs</h3>
+<div class="table-wrap"><table>
+<tr><th>Lever</th><th>Helps</th><th>Costs</th></tr>
+<tr><td>Bigger decode batches</td><td>Throughput, cost per token</td><td>Higher TPOT; longer queue for new prompts if memory is full</td></tr>
+<tr><td>Prioritise new prefills</td><td>TTFT</td><td>Running streams stall while a big prefill runs (decode hiccups)</td></tr>
+<tr><td>Chunked prefill</td><td>Smooth TPOT, bounded stall</td><td>Slightly worse TTFT for the long prompt itself; tuning a chunk size</td></tr>
+<tr><td>Prefix caching</td><td>TTFT and GPU work for repeated prefixes</td><td>Cache memory, routing complexity</td></tr>
+<tr><td>More replicas closer to users</td><td>Network and queue time</td><td>Idle GPUs at off-peak; lower cache hit rates per replica</td></tr>
+</table></div>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>"The request goes through the gateway for auth and rate limiting, gets routed to a replica, templated and tokenised, then waits for a batch slot and KV memory. Then one prefill pass processes the whole prompt in parallel, writes the KV cache, and the first token is sampled from its last logits. Prefill is compute-bound: for an 8B model and a 2K prompt that's 3.2e13 FLOPs, about 65 ms on one H100 at 50% utilisation. Decode is memory-bound: each token reads all 16 GB of weights, so at 3.35 TB/s the floor is about 5 ms per token. Under real load, queueing usually dominates TTFT, so I'd measure queue time separately before touching kernels."</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Forgetting the queue. A model that does 65 ms prefill can still show 3 s TTFT under load.</li>
+<li>Saying the first token needs a decode step. It comes out of prefill's final logits.</li>
+<li>Treating prefill and decode as the same kind of work. One is limited by FLOPs, the other by memory bandwidth, and the fixes differ.</li>
+<li>Quoting spec-sheet FLOPs without saying "with sparsity" or which variant (SXM vs PCIe/NVL).</li>
+</ul>
+
+<h2 id="p2">Problem 2 · Stream tokens over SSE, handle disconnects, cancel in-flight generation</h2>
+<p><strong>What the interviewer is testing:</strong> practical serving engineering. Do you know the wire format, the proxy traps, how to detect that a client left, and why cancelling matters for GPU capacity, not just tidiness?</p>
+
+<h3>The concepts</h3>
+<p><strong>Server-sent events (SSE)</strong> is a simple one-way stream over plain HTTP. The server responds with <code>Content-Type: text/event-stream</code> and keeps the connection open, writing events as lines of text. Each event ends with a blank line. Lines starting with a colon are comments, handy as heartbeats. Most LLM APIs follow the OpenAI style: one JSON chunk per event and a final <code>[DONE]</code> marker.</p>
+<pre><code>HTTP/1.1 200 OK
+Content-Type: text/event-stream
+Cache-Control: no-cache
+
+id: 17
+data: {"delta": "Hel"}
+
+id: 18
+data: {"delta": "lo"}
+
+: keep-alive
+
+data: [DONE]
+</code></pre>
+<p>Why SSE and not WebSockets? Token streaming is one-way, and SSE works through normal HTTP infrastructure (load balancers, auth, HTTP/2 multiplexing). WebSockets earn their keep when the client must also push data mid-stream, as in voice. One catch: the browser's <code>EventSource</code> API only does GET, so chat clients usually POST with <code>fetch</code> and parse the stream themselves.</p>
+
+<p><strong>Things that break streaming in practice:</strong></p>
+<ul>
+<li><strong>Buffering proxies.</strong> A reverse proxy or compression layer may hold bytes until a buffer fills, so the user sees nothing and then everything. Turn off response buffering for the stream route (for nginx, the <code>X-Accel-Buffering: no</code> header or <code>proxy_buffering off</code>) and don't gzip the event stream.</li>
+<li><strong>Idle timeouts.</strong> Proxies and load balancers close connections that go quiet. A long prefill or a queue wait can be silent for seconds. Send a comment line every few seconds as a heartbeat.</li>
+<li><strong>Broken characters.</strong> Tokens are not characters. An emoji or a Chinese character can span two or three tokens, and decoding each token alone yields replacement characters. Detokenise incrementally: decode the running sequence, and emit only text that's complete. Engines do this for you; hand-rolled servers often get it wrong.</li>
+<li><strong>Stop strings across tokens.</strong> A stop sequence like <code>"\nUser:"</code> may arrive split over several tokens. Hold back a small tail of text until you know it isn't the start of a stop string.</li>
+</ul>
+
+<p><strong>Detecting disconnects.</strong> TCP doesn't announce that the other side vanished. The server finds out in one of three ways: the ASGI server delivers an <code>http.disconnect</code> message (exposed in Starlette/FastAPI as <code>await request.is_disconnected()</code>), a write fails, or a heartbeat write fails. That means detection lags by up to one write interval. Heartbeats during long silent phases shorten that lag.</p>
+
+<p><strong>Cancelling.</strong> Breaking out of your HTTP loop is not enough. The engine still holds the sequence in its running batch and its KV blocks in memory, and keeps decoding. You must tell the engine to abort that request ID. Engines such as vLLM expose an abort call keyed by request ID; the scheduler then drops the sequence at the next step and returns its KV blocks to the free pool.</p>
+<pre><code>import json, uuid
+from fastapi import FastAPI, Request
+from fastapi.responses import StreamingResponse
+
+app = FastAPI()
+
+@app.post("/v1/generate")
+async def generate(req: Request):
+    body = await req.json()
+    rid = uuid.uuid4().hex
+
+    async def events():
+        try:
+            async for out in engine.generate(body["prompt"], params, rid):
+                if await req.is_disconnected():
+                    break
+                yield f"data: {json.dumps({'delta': out.delta})}\n\n"
+            else:
+                yield "data: [DONE]\n\n"
+        finally:
+            await engine.abort(rid)   # frees the batch slot and KV blocks; no-op if finished
+
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})</code></pre>
+<p>The <code>finally</code> block matters most: it runs on a normal finish, a client disconnect, a server error, or task cancellation. <code>engine</code> stands for your engine's async client; check its docs for the exact method names.</p>
+
+<p><strong>Reconnecting.</strong> SSE has a built-in resume hook: the server tags events with <code>id:</code> and a reconnecting client sends <code>Last-Event-ID</code>. For LLMs that only works if the server keeps the generated tokens for a short time, keyed by request ID, so it can replay what was missed. Re-running the generation is not a safe substitute: with sampling, and even with greedy decoding under different batch sizes, the output can differ.</p>
+
+<h3>A worked answer with real numbers</h3>
+<p><strong>Why cancellation is a capacity issue.</strong> Assume (all assumptions) 1,000 requests per minute, answers that would run to 800 tokens, and 10% of users leaving after 200 tokens (they got what they needed, or hit "stop").</p>
+<pre><code>Useful tokens/min  = 900 × 800 + 100 × 200        = 740,000
+Without abort      : 100 users × 600 extra tokens = 60,000 wasted tokens/min
+Waste              = 60,000 / 740,000            ≈ 8% of decode capacity
+
+KV memory held per zombie (8B shape, BF16, 2,000-token prompt + 800 output):
+  128 KiB × 2,800 tokens ≈ 350 MiB, held until the zombie finishes</code></pre>
+<p>Eight percent of a GPU fleet is real money, and zombies also take batch slots and KV memory, which pushes up queue time and TTFT for live users. With abort, waste drops to the tokens decoded between the user leaving and the server noticing: at 7 ms per token and a 40 ms round trip, a handful of tokens.</p>
+<p><strong>Heartbeat interval.</strong> If a proxy closes idle connections after an idle timeout (check your load balancer's setting) and a long prompt sits in the queue for 10 s, a heartbeat every 5 s keeps the stream alive and lets the server detect a gone client within about 5 s instead of only after prefill finishes.</p>
+
+<h3>Trade-offs</h3>
+<div class="table-wrap"><table>
+<tr><th>Choice</th><th>Upside</th><th>Downside</th></tr>
+<tr><td>Flush every token</td><td>Lowest perceived latency</td><td>More syscalls and small packets; at very high stream counts, batch 2–3 tokens per write</td></tr>
+<tr><td>Check disconnect every token</td><td>Fast abort</td><td>A little CPU per token in the HTTP layer; checking every few tokens is usually fine</td></tr>
+<tr><td>Replay buffer for resume</td><td>Clean reconnects on mobile networks</td><td>Memory and state on the server; needs sticky routing or shared storage</td></tr>
+<tr><td>SSE vs WebSocket</td><td>SSE: simple, HTTP-native</td><td>No client-to-server messages mid-stream; WebSocket needed for duplex use like voice</td></tr>
+</table></div>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>"I'd return a text/event-stream response, write one JSON event per token with a final DONE marker, set no-cache, and disable proxy buffering and compression on that route. Detokenisation is incremental so multi-token characters and stop strings come out right. I'd send heartbeat comments during queueing and long prefills so proxies don't time out and so I notice dead clients. On disconnect, the generator's finally block calls the engine's abort for that request ID, which frees the batch slot and KV blocks. That matters: if 10% of users leave early, not aborting can waste around 8% of decode capacity and inflate everyone else's TTFT."</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Stopping the HTTP loop but never aborting the engine request, so the GPU keeps generating for nobody.</li>
+<li>Decoding each token on its own and shipping broken multi-byte characters.</li>
+<li>Testing locally and missing a buffering proxy or CDN that only exists in production.</li>
+<li>Assuming a reconnect can "just regenerate" the same text.</li>
+</ul>
+
+<div class="card demo">
+<h3>Interactive: one request, from send to last token</h3>
+<p class="legend">Top row: what the server does (network in, queue, tokenise, prefill, then one tick per decoded token). Bottom row: what the client sees, each token arriving half a round trip later. The red line is when the client leaves. Red ticks are tokens generated for nobody.</p>
+<canvas id="tl" width="700" height="210" aria-label="Timeline of one request: queue, tokenise, prefill and decode on the server, and token arrivals at the client"></canvas>
+<label for="pt">Prompt tokens: <span id="ptv" class="num"></span></label>
+<input id="pt" type="range" min="100" max="32000" step="100" value="2000">
+<label for="ot">Output tokens: <span id="otv" class="num"></span></label>
+<input id="ot" type="range" min="10" max="2000" step="10" value="300">
+<label for="qw">Queue wait: <span id="qwv" class="num"></span> ms</label>
+<input id="qw" type="range" min="0" max="5000" step="50" value="0">
+<label for="rt">Network round trip: <span id="rtv" class="num"></span> ms</label>
+<input id="rt" type="range" min="0" max="300" step="5" value="40">
+<label for="pf">Prefill speed (assumed): <span id="pfv" class="num"></span>k tokens/s</label>
+<input id="pf" type="range" min="5" max="100" step="1" value="31">
+<label for="tp">Time per output token (assumed): <span id="tpv" class="num"></span> ms</label>
+<input id="tp" type="range" min="2" max="60" step="1" value="7">
+<label for="lv">Client leaves at: <span id="lvv" class="num"></span></label>
+<input id="lv" type="range" min="5" max="100" step="5" value="100">
+<label><input id="cc" type="checkbox" checked> Cancel on disconnect</label>
+<div class="stats">
+  <div class="stat"><div class="k">Time to first token</div><div class="v" id="sttft">–</div></div>
+  <div class="stat"><div class="k">Time to last token</div><div class="v" id="se2e">–</div></div>
+  <div class="stat"><div class="k">Stream speed</div><div class="v" id="ssp">–</div></div>
+  <div class="stat"><div class="k">Wasted tokens</div><div class="v" id="swa">–</div></div>
+</div>
+<p class="meta">Try this: the defaults match the worked example (8B model on one H100, 2,000-token prompt, 31k tokens/s prefill, 7 ms per token, 40 ms round trip): TTFT about 106 ms and the last token at about 2.20 s. Set the prompt to 32,000 tokens and TTFT passes 1 s. Put it back and set queue wait to 2,000 ms: the model didn't get slower, but the user waits 2 s. Then set <b>Client leaves at</b> 50% and untick <b>Cancel on disconnect</b>: about 160 tokens are generated for nobody. Tick it again and the waste falls to about 6 tokens in flight. Tokenisation is fixed at 1 ms (assumed). The prefill model is linear in prompt length, so it understates very long prompts, where attention cost grows faster.</p>
+</div>
+
+<h2 id="practise">Practise it</h2>
+<ol>
+<li><strong>Serve a small model.</strong> On a free Colab GPU or any machine with a modest GPU, start vLLM's OpenAI-compatible server with a small instruct model (0.5B–1.5B parameters). With no GPU, use llama.cpp's server on a laptop; the same measurements apply.</li>
+<li><strong>Measure TTFT and TPOT from the client.</strong> Write a 30-line Python client that POSTs with <code>"stream": true</code>, records the time of the first event and of every later one, and prints TTFT, mean and p95 inter-token gap, and end-to-end time.</li>
+<li><strong>Sweep prompt length.</strong> 100, 1K, 4K, 16K tokens. Plot TTFT against length. It should be roughly linear, bending upward at long lengths. Fit tokens/s of prefill and compare with the 2 × P × T formula and your GPU's spec.</li>
+<li><strong>Add load.</strong> Fire 1, 8, 32 concurrent streams. Watch TTFT split into queue time and prefill time (vLLM's metrics endpoint reports queue time separately). TPOT should rise slowly with batch size, TTFT faster once memory is full.</li>
+<li><strong>Test cancellation.</strong> Start 20 long generations, kill 10 clients after 1 s, and watch the engine's running-request count and KV-cache usage in its metrics. With a correct abort they drop within a second. Then write your own FastAPI proxy in front of the engine without the abort and watch them not drop.</li>
+<li><strong>Break streaming on purpose.</strong> Put nginx in front with default buffering and see the stream arrive in clumps. Fix it with the header.</li>
+</ol>
+
+<h2 id="course">In this course</h2>
+<ul>
+<li><a href="../08-ai-research-engineer/08-inference-aware-design.html">Module 08 · Inference-aware design</a>: the KV-cache formula and why decode is bandwidth-bound, used throughout this page.</li>
+<li><a href="../05-trillion-scale-architecture.html#serving">Module 05 · Serving</a>: paged KV pool, prefix caching and speculative decoding in a production-scale system.</li>
+<li><a href="../04-distill-small-models.html#latency">Module 04 · Latency is a safety number</a>: measuring wait-after-speech on a device, the robot version of TTFT.</li>
+<li><a href="../08-ai-research-engineer/06-distributed-training.html">Module 08 · Distributed training</a>: tensor parallelism, which large models need even to serve one request.</li>
+<li><a href="../01-decision-model-evals.html">Module 01 · Decision-model evals</a>: setting thresholds and choosing metrics, the habit behind TTFT targets.</li>
+</ul>
+
+<h2 id="robotics">Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>TTFT is reaction time.</strong> For a robot that plans with a language model, the time from a spoken command to the first useful output is the stretch where the robot carries on doing whatever it was doing. Budget it like a control deadline, not like a web metric.</li>
+<li><strong>The cloud adds a round trip you don't control.</strong> A 40 ms round trip is a good day; Wi-Fi in a warehouse or a mobile link can spike to seconds. That's the main argument for an onboard model for anything safety-related, with the cloud for slower, harder reasoning.</li>
+<li><strong>Batch 1 changes the picture.</strong> An onboard model serves one robot, so there's no queue to speak of, and decode speed is set by how fast the robot's memory can stream the weights. Smaller or quantised models are the main lever there.</li>
+<li><strong>Cancellation is a safety feature too.</strong> If the scene changes mid-plan, the robot should abort the stale generation at once and start a new one, the same pattern as a dropped client.</li>
+<li><strong>Streaming partial output is only useful if it's actionable.</strong> Words for a human can stream; an action needs to be complete and checked before it moves a motor. Design the output so early tokens carry the decision (stop, slow, continue) and later tokens carry detail.</li>
+</ul>
+</div>
+
+<h2 id="check">Self-check</h2>
+<details><summary>Why is prefill compute-bound while decode is memory-bound?</summary><p>Prefill processes many tokens per weight read, so each byte fetched is used for many multiply-adds. Decode processes one new token per sequence per step but must still read every weight and the whole KV cache, so there's little arithmetic per byte.</p></details>
+<details><summary>Estimate prefill time for a 4,000-token prompt on an 8B model, one H100 SXM, 50% MFU.</summary><p>2 × 8e9 × 4,000 = 6.4e13 FLOPs. At about 989 TFLOPS dense × 0.5 ≈ 4.95e14 FLOP/s, that's about 130 ms, plus some attention cost.</p></details>
+<details><summary>A user reports 3 s TTFT, but your prefill benchmark says 100 ms. What's your first guess?</summary><p>Queueing. Check scheduler queue time and KV-cache usage. If the cache is full, new requests wait for memory. Network and gateway are the next suspects.</p></details>
+<details><summary>Why isn't breaking out of the streaming loop enough on disconnect?</summary><p>The engine still has the request in its batch and its KV blocks allocated, and keeps decoding. You need to call the engine's abort for that request ID to free the slot and memory.</p></details>
+<details><summary>Why do some streamed responses show garbled characters?</summary><p>Each token was decoded on its own. A character can span several tokens, so you must decode incrementally and emit only complete text.</p></details>
+<details><summary>A stream works locally but arrives all at once in production. Why?</summary><p>A proxy, CDN or compression layer is buffering the response. Disable buffering and compression for the stream route.</p></details>
+
+<h2 id="resources">Resources</h2>
+<ul>
+<li><a href="https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html">vLLM · OpenAI-compatible server</a> and <a href="https://docs.vllm.ai/en/latest/">vLLM documentation</a></li>
+<li><a href="https://docs.sglang.ai/">SGLang documentation</a></li>
+<li><a href="https://nvidia.github.io/TensorRT-LLM/">TensorRT-LLM documentation</a></li>
+<li><a href="https://docs.vllm.ai/en/latest/contributing/benchmarks.html">vLLM benchmark suite</a> (TTFT, TPOT and throughput tools)</li>
+<li><a href="https://html.spec.whatwg.org/multipage/server-sent-events.html">HTML Standard · Server-sent events</a> and <a href="https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events">MDN · Using server-sent events</a></li>
+<li><a href="https://docs.python.org/3/library/asyncio-task.html">Python asyncio · tasks and cancellation</a></li>
+<li><a href="https://www.usenix.org/conference/osdi22/presentation/yu">Orca: A Distributed Serving System for Transformer-Based Generative Models</a> (Yu et al., OSDI 2022): iteration-level scheduling</li>
+<li><a href="https://arxiv.org/abs/2403.02310">Taming Throughput-Latency Tradeoff in LLM Inference with Sarathi-Serve</a> (Agrawal et al., 2024): chunked prefill</li>
+<li><a href="https://arxiv.org/abs/2401.09670">DistServe</a> (Zhong et al., 2024) and <a href="https://arxiv.org/abs/2311.18677">Splitwise</a> (Patel et al., 2023): why prefill and decode are split onto different GPUs</li>
+<li><a href="https://www.nvidia.com/en-us/data-center/h100/">NVIDIA H100 product page</a> (spec table used above)</li>
+</ul>
+
+<nav class="pager">
+  <a href="index.html"><small>Previous</small>Module 09 hub</a>
+  <a class="next" href="02-kv-cache-attention.html"><small>Next</small>Page 02 · KV cache, PagedAttention and FlashAttention</a>
+</nav>
+<footer>Module 09 · Page 01 · written for this course from the source post, official docs and papers.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('tl'), ctx = cv.getContext('2d');
+const ids = ['pt', 'ot', 'qw', 'rt', 'pf', 'tp', 'lv'];
+const el = Object.fromEntries(ids.map(k => [k, document.getElementById(k)]));
+const cc = document.getElementById('cc');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = n => Math.round(n).toLocaleString('en-US');
+const ms = v => v >= 1000 ? (v / 1000).toFixed(2) + ' s' : fmt(v) + ' ms';
+const TOK_MS = 1;   // tokenisation, assumed
+
+// Times in ms from the moment the client sends. Token i is generated at gen(i).
+function model(P, N, q, rtt, pfk, tpot, leavePct, cancel) {
+  const half = rtt / 2, pre = P / (pfk * 1000) * 1000;
+  const qEnd = half + q, tEnd = qEnd + TOK_MS, s = tEnd + pre;
+  const gen = i => s + (i - 1) * tpot;
+  const ttft = s + half, e2e = gen(N) + half;
+  const leave = leavePct >= 100 ? Infinity : e2e * leavePct / 100;
+  // tokens that reach the server's socket after the client is gone are never seen
+  const lost = i => gen(i) + half > leave;
+  const stop = cancel ? leave + half : Infinity;   // server notices half a round trip later
+  let wasted = 0, made = 0;
+  for (let i = 1; i <= N; i++) {
+    if (gen(i) > stop) break;
+    made++;
+    if (lost(i)) wasted++;
+  }
+  return { half, qEnd, tEnd, s, gen, ttft, e2e, leave, made, wasted, lost };
+}
+
+function draw() {
+  const P = +el.pt.value, N = +el.ot.value, q = +el.qw.value, rtt = +el.rt.value;
+  const pfk = +el.pf.value, tpot = +el.tp.value, lp = +el.lv.value;
+  const m = model(P, N, q, rtt, pfk, tpot, lp, cc.checked);
+  const shown = { pt: fmt(P), ot: fmt(N), qw: fmt(q), rt: rtt, pf: pfk, tp: tpot, lv: lp >= 100 ? 'stays' : lp + '%' };
+  ids.forEach(k => document.getElementById(k + 'v').textContent = shown[k]);
+
+  const W = cv.width, H = cv.height, l = 70, r = 16, T = m.e2e * 1.04;
+  const px = t => l + t / T * (W - l - r);
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '12px sans-serif'; ctx.fillStyle = css('--muted'); ctx.textAlign = 'right';
+  ctx.fillText('Server', l - 8, 58); ctx.fillText('Client', l - 8, 128);
+
+  const seg = (a, b, y, col) => { ctx.fillStyle = col; ctx.fillRect(px(a), y, Math.max(1, px(b) - px(a)), 26); };
+  seg(0, m.half, 40, css('--line'));
+  seg(m.half, m.qEnd, 40, css('--warn'));
+  seg(m.qEnd, m.tEnd, 40, css('--muted'));
+  seg(m.tEnd, m.s, 40, css('--accent'));
+
+  const step = Math.max(1, Math.ceil(N / 300));
+  for (let i = 1; i <= m.made; i += step) {
+    const x = px(m.gen(i)), bad = m.lost(i);
+    ctx.fillStyle = bad ? css('--fail') : css('--pass');
+    ctx.fillRect(x, 40, 1.5, 26);
+    if (!bad) ctx.fillRect(px(m.gen(i) + m.half), 110, 1.5, 26);
+  }
+
+  if (m.leave < Infinity) {
+    ctx.strokeStyle = css('--fail'); ctx.lineWidth = 2; ctx.beginPath();
+    ctx.moveTo(px(m.leave), 30); ctx.lineTo(px(m.leave), 146); ctx.stroke();
+  }
+  ctx.strokeStyle = css('--fg'); ctx.lineWidth = 1; ctx.setLineDash([4, 4]); ctx.beginPath();
+  ctx.moveTo(px(m.ttft), 100); ctx.lineTo(px(m.ttft), 146); ctx.stroke(); ctx.setLineDash([]);
+
+  ctx.strokeStyle = css('--line'); ctx.beginPath(); ctx.moveTo(l, 165); ctx.lineTo(W - r, 165); ctx.stroke();
+  ctx.fillStyle = css('--muted'); ctx.textAlign = 'center';
+  const tick = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000].find(s => T / s <= 8);
+  for (let t = 0; t <= T; t += tick) ctx.fillText(ms(t), px(t), 182);
+  ctx.textAlign = 'left';
+  const keys = [['--line', 'network'], ['--warn', 'queue'], ['--muted', 'tokenise'], ['--accent', 'prefill'], ['--pass', 'decode'], ['--fail', 'wasted']];
+  keys.forEach(([c, t], i) => { ctx.fillStyle = css(c); ctx.fillRect(l + i * 100, 196, 10, 10); ctx.fillStyle = css('--muted'); ctx.fillText(t, l + 14 + i * 100, 205); });
+
+  document.getElementById('sttft').textContent = ms(m.ttft);
+  document.getElementById('se2e').textContent = ms(m.e2e);
+  document.getElementById('ssp').textContent = fmt(1000 / tpot) + ' tok/s';
+  document.getElementById('swa').textContent = fmt(m.wasted);
+}
+ids.forEach(k => el[k].oninput = draw);
+cc.onchange = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

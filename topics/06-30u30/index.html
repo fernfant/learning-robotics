@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ilya's 30 Papers</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">← LLMs &amp; Robotics</a> · Module 06</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 06 · Foundations of modern AI</div>
+<h1>Ilya's 30 papers: the shared foundations of LLMs and robotics</h1>
+<p class="lede">The 30 foundational papers Ilya Sutskever reportedly recommended to John Carmack, one per day. Each has its own page with a summary, core maths, deep dive, robotics angle, self-check and a link to code you can run.</p>
+<p class="meta">Companion repo: <a href="https://github.com/Ojhaharsh/30u30">Ojhaharsh/30u30</a> (from-scratch implementations, notebooks, 5 exercises per paper) · README saved in <code>sources/06-30u30-readme.md</code></p>
+
+<div class="card tldr">
+<h3>How to use this module</h3>
+<ul>
+<li><strong>One paper a day.</strong> Read the course page first (20 min), then the original paper, then run the repo's <code>train_minimal.py</code> and do its exercises.</li>
+<li><strong>The repo is licensed CC BY-NC-ND</strong>, so these pages don't copy it. They're written from the original papers and link to the repo for code and exercises.</li>
+<li><strong>Tick papers off below.</strong> Progress is saved in this browser only.</li>
+</ul>
+</div>
+<section class="kid">
+<h2>New to all this? Start here</h2>
+<p class="big">These 30 papers are some of the most important ideas behind today's AI, and behind the robots that learn.</p>
+<p>A "paper" is a write-up where scientists explain a new idea and test whether it works. Many of these papers are hard, so every day in this module begins with a <b>Start here</b> box written for someone around 13. You don't need any maths for it.</p>
+<h3>How to do one day</h3>
+<ol>
+<li>Read the <b>Start here</b> box (5–10 minutes).</li>
+<li>Try the "Try it" activity, and play with the interactive demo on the page.</li>
+<li>Check your understanding with the <b>Self-check</b> questions near the bottom. Click a question to see the answer.</li>
+<li>Only if you're curious: read the "Going deeper" parts and look at the code.</li>
+</ol>
+<p>Stuck on a word? Every Start-here box has a <b>Words to know</b> list.</p>
+</section>
+
+<div class="card note"><p><strong>Two tracks, one toolbox:</strong> these papers are the shared foundations of both today's LLMs and robot learning. Each day has a badge: <span class="track llm">LLM</span> (mainly language models), <span class="track robo">Robotics</span> (mainly perception and control) or <span class="track both">LLM + Robotics</span>. Every page also has a "Why it matters for robotics" box. Some links are direct (PPO, RLHF, ResNet), and some are honestly conceptual (complexodynamics, Kolmogorov complexity).</p></div>
+
+<h2>Progress</h2>
+<div class="stats">
+  <div class="stat"><div class="k">Done</div><div class="v" id="done">0 / 30</div></div>
+  <div class="stat"><div class="k">Next up</div><div class="v" id="next" style="font-size:1rem">–</div></div>
+</div>
+
+<h2>Three ways through</h2>
+<div class="table-wrap"><table>
+<tr><th>Path</th><th>Order</th><th>Why</th></tr>
+<tr><td><strong>The full 30 days</strong></td><td>01 → 30 in order</td><td>The repo's intended path: foundations → vision → transformers → specialised architectures → generative and scaling → RL.</td></tr>
+<tr><td><strong>LLM fast track</strong> (12 days)</td><td>01 → 02 → 15 → 13 → 14 → 24 → 25 → 12 → 05 → 26 → 29 → 30</td><td>Language modelling, attention, the Transformer, training giant models, scaling laws, compression as prediction, then PPO and RLHF, the core of post-training (<a href="../07-post-training.html">Module 07</a>).</td></tr>
+<tr><td><strong>Robotics fast track</strong> (12 days)</td><td>01 → 02 → 08 → 09 → 28 → 12 → 13 → 14 → 21 → 25 → 29 → 30</td><td>Sequence models, perception backbones, uncertainty, the Transformer, graphs, scaling, then RL and preference learning: the pieces of a modern robot-learning stack. Come back for the rest later.</td></tr>
+</table></div>
+
+<div class="unit">
+<h2>Unit 1 · The foundations (Days 1–7)</h2>
+<p class="meta">Sequence models, and the idea that learning is compression.</p>
+<div class="paper-row"><span class="d">01</span><div><label><input type="checkbox" data-d="01"><a href="01-rnn-effectiveness.html">The Unreasonable Effectiveness of RNNs</a><span class="track llm">LLM</span></label><p>Next-character prediction learns structure for free.</p></div></div>
+<div class="paper-row"><span class="d">02</span><div><label><input type="checkbox" data-d="02"><a href="02-lstm.html">Understanding LSTM Networks</a><span class="track both">LLM + Robotics</span></label><p>Gates and a cell state that let memory survive long sequences.</p></div></div>
+<div class="paper-row"><span class="d">03</span><div><label><input type="checkbox" data-d="03"><a href="03-rnn-regularization.html">RNN Regularization</a><span class="track llm">LLM</span></label><p>Dropout on non-recurrent connections only.</p></div></div>
+<div class="paper-row"><span class="d">04</span><div><label><input type="checkbox" data-d="04"><a href="04-mdl-noisy-weights.html">Keeping Neural Networks Simple (MDL of weights)</a><span class="track both">LLM + Robotics</span></label><p>Noisy weights carry fewer bits, which gives better generalisation.</p></div></div>
+<div class="paper-row"><span class="d">05</span><div><label><input type="checkbox" data-d="05"><a href="05-mdl-principle.html">A Tutorial on the MDL Principle</a><span class="track both">LLM + Robotics</span></label><p>The best model is the shortest description of the data.</p></div></div>
+<div class="paper-row"><span class="d">06</span><div><label><input type="checkbox" data-d="06"><a href="06-complexodynamics.html">The First Law of Complexodynamics</a><span class="track both">LLM + Robotics</span></label><p>Why "interesting" complexity rises and then falls while entropy only rises.</p></div></div>
+<div class="paper-row"><span class="d">07</span><div><label><input type="checkbox" data-d="07"><a href="07-coffee-automaton.html">The Coffee Automaton</a><span class="track both">LLM + Robotics</span></label><p>Measuring that rise and fall in a simulated mixing system.</p></div></div>
+</div>
+
+<div class="unit">
+<h2>Unit 2 · Deep learning explosion (Days 8–12)</h2>
+<p class="meta">The vision backbones every robot camera pipeline descends from.</p>
+<div class="paper-row"><span class="d">08</span><div><label><input type="checkbox" data-d="08"><a href="08-alexnet.html">ImageNet Classification with Deep CNNs (AlexNet)</a><span class="track robo">Robotics</span></label><p>GPUs + ReLU + dropout + data: the 2012 breakthrough.</p></div></div>
+<div class="paper-row"><span class="d">09</span><div><label><input type="checkbox" data-d="09"><a href="09-resnet.html">Deep Residual Learning (ResNet)</a><span class="track both">LLM + Robotics</span></label><p>Learn a residual on top of the identity, and 100+ layers train.</p></div></div>
+<div class="paper-row"><span class="d">10</span><div><label><input type="checkbox" data-d="10"><a href="10-resnet-identity-mappings.html">Identity Mappings in Deep Residual Networks</a><span class="track both">LLM + Robotics</span></label><p>Pre-activation keeps a clean signal highway through 1,000 layers.</p></div></div>
+<div class="paper-row"><span class="d">11</span><div><label><input type="checkbox" data-d="11"><a href="11-dilated-convolutions.html">Dilated Convolutions</a><span class="track robo">Robotics</span></label><p>Exponentially growing context without losing resolution.</p></div></div>
+<div class="paper-row"><span class="d">12</span><div><label><input type="checkbox" data-d="12"><a href="12-dropout.html">Dropout</a><span class="track both">LLM + Robotics</span></label><p>Randomly silence units: an ensemble for the price of one, and an uncertainty estimate.</p></div></div>
+</div>
+
+<div class="unit">
+<h2>Unit 3 · The Transformer era (Days 13–16)</h2>
+<p class="meta">Attention, the core of every modern robot foundation model.</p>
+<div class="paper-row"><span class="d">13</span><div><label><input type="checkbox" data-d="13"><a href="13-attention.html">Attention Is All You Need</a><span class="track both">LLM + Robotics</span></label><p>Self-attention replaces recurrence.</p></div></div>
+<div class="paper-row"><span class="d">14</span><div><label><input type="checkbox" data-d="14"><a href="14-annotated-transformer.html">The Annotated Transformer</a><span class="track llm">LLM</span></label><p>The paper, line by line in code.</p></div></div>
+<div class="paper-row"><span class="d">15</span><div><label><input type="checkbox" data-d="15"><a href="15-bahdanau-attention.html">Neural Machine Translation by Jointly Learning to Align and Translate</a><span class="track llm">LLM</span></label><p>The original attention: let the decoder look back.</p></div></div>
+<div class="paper-row"><span class="d">16</span><div><label><input type="checkbox" data-d="16"><a href="16-order-matters.html">Order Matters: Seq2Seq for Sets</a><span class="track both">LLM + Robotics</span></label><p>Handling inputs and outputs that are sets, not sequences.</p></div></div>
+</div>
+
+<div class="unit">
+<h2>Unit 4 · Specialised architectures (Days 17–22)</h2>
+<p class="meta">Memory, pointing, relations and graphs, plus speech.</p>
+<div class="paper-row"><span class="d">17</span><div><label><input type="checkbox" data-d="17"><a href="17-neural-turing-machines.html">Neural Turing Machines</a><span class="track both">LLM + Robotics</span></label><p>A network with differentiable read/write memory.</p></div></div>
+<div class="paper-row"><span class="d">18</span><div><label><input type="checkbox" data-d="18"><a href="18-pointer-networks.html">Pointer Networks</a><span class="track both">LLM + Robotics</span></label><p>Outputs that point at inputs: convex hull, TSP.</p></div></div>
+<div class="paper-row"><span class="d">19</span><div><label><input type="checkbox" data-d="19"><a href="19-relational-reasoning.html">Relational Reasoning (Relation Networks)</a><span class="track robo">Robotics</span></label><p>Reason over every pair of objects.</p></div></div>
+<div class="paper-row"><span class="d">20</span><div><label><input type="checkbox" data-d="20"><a href="20-relational-rnns.html">Relational Recurrent Neural Networks</a><span class="track both">LLM + Robotics</span></label><p>Memory slots that attend to each other at every step.</p></div></div>
+<div class="paper-row"><span class="d">21</span><div><label><input type="checkbox" data-d="21"><a href="21-message-passing.html">Neural Message Passing for Quantum Chemistry</a><span class="track both">LLM + Robotics</span></label><p>One framework for graph neural networks.</p></div></div>
+<div class="paper-row"><span class="d">22</span><div><label><input type="checkbox" data-d="22"><a href="22-deep-speech-2.html">Deep Speech 2</a><span class="track both">LLM + Robotics</span></label><p>End-to-end speech recognition with CTC.</p></div></div>
+</div>
+
+<div class="unit">
+<h2>Unit 5 · Generative models &amp; scaling (Days 23–28)</h2>
+<p class="meta">Latent models, giant-model training, scaling and the theory of intelligence.</p>
+<div class="paper-row"><span class="d">23</span><div><label><input type="checkbox" data-d="23"><a href="23-variational-lossy-autoencoder.html">Variational Lossy Autoencoder</a><span class="track both">LLM + Robotics</span></label><p>Make the latent code carry the global structure.</p></div></div>
+<div class="paper-row"><span class="d">24</span><div><label><input type="checkbox" data-d="24"><a href="24-gpipe.html">GPipe</a><span class="track llm">LLM</span></label><p>Pipeline parallelism with micro-batches.</p></div></div>
+<div class="paper-row"><span class="d">25</span><div><label><input type="checkbox" data-d="25"><a href="25-scaling-laws.html">Scaling Laws for Neural Language Models</a><span class="track llm">LLM</span></label><p>Loss falls as a power law in parameters, data and compute.</p></div></div>
+<div class="paper-row"><span class="d">26</span><div><label><input type="checkbox" data-d="26"><a href="26-kolmogorov-complexity.html">Kolmogorov Complexity</a><span class="track both">LLM + Robotics</span></label><p>The length of the shortest program as a measure of information.</p></div></div>
+<div class="paper-row"><span class="d">27</span><div><label><input type="checkbox" data-d="27"><a href="27-machine-super-intelligence.html">Machine Super Intelligence</a><span class="track both">LLM + Robotics</span></label><p>A formal definition of intelligence across environments.</p></div></div>
+<div class="paper-row"><span class="d">28</span><div><label><input type="checkbox" data-d="28"><a href="28-cs231n.html">CS231n: CNNs for Visual Recognition</a><span class="track robo">Robotics</span></label><p>The working toolkit of convolutional vision.</p></div></div>
+</div>
+
+<div class="unit">
+<h2>Unit 6 · Deep RL &amp; alignment (Days 29–30)</h2>
+<p class="meta">How robots, and LLMs, learn from reward and from people.</p>
+<div class="paper-row"><span class="d">29</span><div><label><input type="checkbox" data-d="29"><a href="29-ppo.html">Proximal Policy Optimization</a><span class="track both">LLM + Robotics</span></label><p>Clipped policy updates: the workhorse of sim-trained locomotion.</p></div></div>
+<div class="paper-row"><span class="d">30</span><div><label><input type="checkbox" data-d="30"><a href="30-rlhf.html">Deep RL from Human Preferences</a><span class="track both">LLM + Robotics</span></label><p>Learn the reward from human comparisons.</p></div></div>
+</div>
+
+<h2>How the 30 connect</h2>
+<div class="table-wrap"><table>
+<tr><th>Thread</th><th>Papers</th><th>Where it leads in robotics</th></tr>
+<tr><td>Memory over time</td><td>01 → 02 → 03 → 17 → 20 → 13</td><td>Recurrent policies → transformer policies with long context (<a href="../05-trillion-scale-architecture.html#length">Module 05</a>)</td></tr>
+<tr><td>Seeing</td><td>08 → 09 → 10 → 11 → 28</td><td>Perception backbones, segmentation for grasping, ViT encoders in VLAs</td></tr>
+<tr><td>Attention</td><td>15 → 13 → 14 → 16 → 18</td><td>Transformer policies, picking which object to act on</td></tr>
+<tr><td>Relations &amp; graphs</td><td>19 → 20 → 21</td><td>Scene graphs, multi-robot coordination, learned physics</td></tr>
+<tr><td>Compression = learning</td><td>04 → 05 → 26 → 27 → 06 → 07</td><td>Why prediction-based world models work. Simplicity priors.</td></tr>
+<tr><td>Uncertainty</td><td>04 → 12 → 23</td><td>Knowing when the robot doesn't know (<a href="../01-decision-model-evals.html#calibration">Module 01</a>)</td></tr>
+<tr><td>Scale</td><td>24 → 25</td><td>Training big robot models (<a href="../05-trillion-scale-architecture.html">Module 05</a>, <a href="../04-distill-small-models.html">Module 04</a>)</td></tr>
+<tr><td>Learning to act</td><td>29 → 30</td><td>Sim-to-real locomotion, learning rewards from people (<a href="../03-shared-autonomy.html">Module 03</a>, <a href="../02-tensortonic.html#rl">Module 02's RL ladder</a>)</td></tr>
+</table></div>
+
+<h2>Before you start</h2>
+<ul>
+<li><strong>Maths:</strong> matrix multiplication, gradients and the chain rule, softmax, log-probabilities. <a href="../02-tensortonic.html#track">Module 02 Stage A</a> covers them.</li>
+<li><strong>Setup:</strong> clone the repo, then for each day run <code>pip install -r requirements.txt</code> in that paper's folder. Most code is NumPy or PyTorch and CPU-friendly.</li>
+<li><strong>Habit:</strong> attempt each exercise before opening the solution (<a href="../03-shared-autonomy.html#learning">Module 03, don't automate your own learning</a>).</li>
+</ul>
+
+<footer>Module 06 · added 2026-10-21 · <a href="../../index.html">Back to course index</a> · Paper pages are written for this course from the original papers. The 30u30 repo (CC BY-NC-ND 4.0) is linked, not copied.</footer>
+</main>
+
+<script>
+const KEY = 'lr-30u30-done';
+const boxes = [...document.querySelectorAll('input[data-d]')];
+let done = {};
+try { done = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) {}
+
+function render() {
+  const n = boxes.filter(b => b.checked).length;
+  document.getElementById('done').textContent = n + ' / 30';
+  const nxt = boxes.find(b => !b.checked);
+  document.getElementById('next').innerHTML = nxt ? `<a href="${nxt.nextElementSibling.getAttribute('href')}">Day ${nxt.dataset.d}</a>` : 'All done 🎉';
+}
+boxes.forEach(b => {
+  b.checked = !!done[b.dataset.d];
+  b.onchange = () => {
+    done[b.dataset.d] = b.checked;
+    try { localStorage.setItem(KEY, JSON.stringify(done)); } catch (e) {}
+    render();
+  };
+});
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inference · Batching and scheduling</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 09 · Inference engineering</a> › Page 03</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 09 · Problems 6, 7, 21</div>
+<h1>Batching and scheduling: continuous batching, chunked prefill, fair multi-tenancy</h1>
+<p class="lede">A GPU serving a language model is only cheap when it works on many requests at once. The scheduler decides which requests share each step. Get it wrong and you either waste the GPU or make users wait. This page works through three interview problems about that scheduler, with real numbers and the trade-offs.</p>
+
+<div class="facts">
+  <div><b>Problems covered</b>6 (continuous batching under deadlines), 7 (chunked prefill for a 100K-token prompt), 21 (multi-tenant fairness, admission control, priorities)</div>
+  <div><b>Interview level</b>Mid (6, 7) to senior (21)</div>
+  <div><b>Key ideas</b>Iteration-level scheduling, step-time model, token budgets, prefill/decode interference, weighted fair sharing, load shedding</div>
+  <div><b>Time to prep</b>3–4 h: 1 h reading, 1 h with the demo, 1–2 h for the vLLM exercise</div>
+</div>
+<p class="meta">Source: <a href="https://x.com/vishalsingh2972/status/2113830444722741637">Vishal Singh's 25 inference-engineering interview problems</a> · saved in <code>sources/09-vishal-inference-25.md</code></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">A model server is like a kitchen with one very fast cook who can stir many pots at once. The trick is deciding which orders go on the stove, when, and making sure one giant order or one greedy customer doesn't make everyone else wait.</p>
+
+<h3>Think of it like this</h3>
+<p>Think of a ski lift. A bad way to run it is the tour-bus way: wait until 8 people are ready, send them all up together, and don't let anyone else on until the last of the 8 comes back down. Most chairs ride up empty while one slow skier finishes. The ski-lift way is better: the moment a chair is free, the next person in the queue hops on. That's continuous batching. Now imagine a school group of 100 arrives at once. If they all board before anyone else, the people behind wait ages. So you let the group board a few at a time, mixed in with everyone else. That's chunked prefill. And if three schools share the lift, you take turns between schools so one big school can't hog it. That's fair scheduling.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>The model writes one word (token) per step for every request in the batch.</li>
+<li>Old way: a fixed group starts together and the group ends when its longest answer ends.</li>
+<li>New way: after every step, finished requests leave and waiting ones join straight away.</li>
+<li>Reading a long question is done in slices, so short questions can slip in between slices.</li>
+<li>A gatekeeper decides who gets in, in what order, and turns some away politely when it's too busy.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot asking a cloud model "what should I do next?" needs the answer within a fixed time, say 300 milliseconds, or the robot has already moved on. If the server is busy reading someone's 300-page document, the robot's tiny question can wait seconds. Good scheduling is what keeps that small, urgent question fast.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>With friends, play "lift". One person is the lift with 4 seats. Each rider draws a card: the number is how many laps they ride. Run it the tour-bus way (wait for all 4 to finish) and then the ski-lift way (refill any free seat). Count laps until 12 riders are done.</li>
+<li>In the demo below, set <b>Scheduler</b> to Static and then Continuous, and compare <b>Output tokens/s</b> and <b>Mean TTFT</b>. Turn <b>100K-token prompt</b> on, and watch <b>Worst decode gap</b> jump. Then pick Continuous + chunked and move <b>Chunk budget</b>.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Batch</dt><dd>The group of requests the GPU works on in one step.</dd>
+<dt>Prefill</dt><dd>Reading the whole prompt at once, before the first word comes out.</dd>
+<dt>Decode</dt><dd>Writing the answer, one token per step.</dd>
+<dt>TTFT</dt><dd>Time to first token: how long until the first word appears.</dd>
+<dt>Tenant</dt><dd>One customer or team sharing the same servers with others.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings, the interview cards and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="model">0. One cost model for the whole page</h2>
+<p>All three problems use the same picture of one engine step. A step runs one forward pass over every token scheduled in it: prompt tokens being prefilled, plus one token per decoding request.</p>
+<pre><code>t_step ≈ t_0 + c_p × (prefill tokens in step) + c_d × (decoding requests in step)
+
+t_0  : fixed cost per step, mostly reading all weights from HBM once
+c_p  : cost per prompt token (compute-bound matrix multiplies)
+c_d  : cost per decoding request (its KV-cache reads; grows with its context)
+
+TPOT (time per output token) for every decoding request = t_step
+throughput (output tokens/s)                            = decoding requests / t_step</code></pre>
+<p>Working assumptions used throughout, for a Llama-style 70B model served on one 8-GPU tensor-parallel node. These are round numbers for practice, not measurements: <strong>t_0 = 20 ms</strong>, <strong>c_p = 0.1 ms per prompt token</strong> (10,000 prompt tokens/s), <strong>c_d = 0.2 ms per decoding request</strong> at a few thousand tokens of context. In an interview, say your numbers are assumptions and show how the answer changes if they move. The demo uses exactly these values.</p>
+
+<h2 id="p6">Problem 6 · Continuous batching under latency deadlines, and why it beats static batching</h2>
+<p><strong>What the interviewer is testing:</strong> that you know decode is memory-bound so batching is nearly free, that requests finish at very different times, and that you can turn latency targets into a concrete admission rule.</p>
+
+<h3>The concepts</h3>
+<p><strong>Static (request-level) batching</strong> groups B requests, runs them together until the longest finishes, then takes the next group. Two kinds of waste follow. Finished requests keep their slot (often still computing padding) until the longest one ends. And new arrivals wait for the whole group, however long it takes.</p>
+<pre><code>static slot utilisation = Σ out_i / (B × max_i out_i)</code></pre>
+<p><strong>Continuous (iteration-level) batching</strong> re-forms the batch after every step. Orca (Yu et al., OSDI 2022) introduced this as iteration-level scheduling, together with <em>selective batching</em>: the big matrix multiplies run over all tokens of all requests flattened together, while attention runs per request, so requests of different lengths can share a step without padding. vLLM, SGLang and TensorRT-LLM (where it's called in-flight batching) all work this way. PagedAttention (<a href="02-kv-cache-attention.html">Page 02</a>) makes it practical, because KV memory is allocated in blocks as requests grow and freed the moment they finish.</p>
+<p><strong>Why batching is nearly free during decode.</strong> At small batch each step is dominated by t_0, the weight read. Adding a request adds only c_d. So throughput rises almost linearly with batch size while TPOT rises slowly, until either the KV cache is full or the step becomes compute-bound.</p>
+<pre><code>TPOT(B)       = t_0 + c_d × B
+throughput(B) = B / (t_0 + c_d × B)    → approaches 1/c_d as B grows</code></pre>
+
+<h3>Worked answer with numbers</h3>
+<p><strong>Static vs continuous on one batch.</strong> Batch of 8: seven requests want 50 output tokens, one wants 1,000.</p>
+<pre><code>static utilisation = (7 × 50 + 1000) / (8 × 1000) = 1350 / 8000 = 16.9 %
+static step        = 20 + 8 × 0.2 = 21.6 ms
+static batch time  = 1000 steps × 21.6 ms = 21.6 s
+  → the seven short requests finish after ~1.1 s, but their slots sit idle
+    for 20.5 s and nothing new can start for 21.6 s.
+continuous         : each freed slot is refilled on the next step,
+                     so utilisation stays near 100 % while the queue is non-empty.</code></pre>
+<p>The demo shows the system-level effect with Poisson arrivals (2 requests/s, 32 slots, output lengths log-normal with median 150 tokens, capped at 1,000): static batching sustains about 117–182 output tokens/s and the queue keeps growing; continuous batching sustains about 380 tokens/s (it keeps up with all the traffic) with a mean TTFT of about 0.2 s.</p>
+
+<p><strong>Adding latency deadlines.</strong> Say the SLO is TTFT ≤ 1 s and TPOT ≤ 50 ms (20 tokens/s, faster than people read). Two limits cap the batch:</p>
+<pre><code>1. TPOT limit:  t_0 + c_d × B ≤ 50 ms  →  B ≤ (50 − 20) / 0.2 = 150 requests
+
+2. KV limit (assume 200 GB of HBM left for KV after weights and activations;
+   Llama-70B shape: 80 layers, 8 KV heads, head dim 128, fp16):
+   KV per token = 2 × 80 × 8 × 128 × 2 B = 327,680 B (320 KiB)
+   tokens that fit = 200e9 / 327,680 ≈ 610,000
+   at 4,096 tokens average context  →  610,000 / 4,096 ≈ 149 requests
+
+throughput at B = 150 ≈ 150 / 0.050 = 3,000 output tokens/s
+throughput at B = 32  ≈ 32 / 0.0264 ≈ 1,212 output tokens/s</code></pre>
+<p>Here both limits land near 150, which is a useful thing to notice out loud: buying more KV memory (FP8 cache, fewer KV heads) only helps if TPOT also has room. The scheduler then does this every step:</p>
+<ol>
+<li><strong>Keep running requests running</strong> (one decode token each). They already paid for their KV.</li>
+<li><strong>Admit waiting requests</strong> in order of deadline (earliest TTFT deadline first) while the predicted step time stays ≤ the TPOT target and KV blocks remain.</li>
+<li><strong>Bound prefill per step</strong> with a token budget so admissions don't blow the TPOT of everyone else (this is Problem 7).</li>
+<li><strong>If KV runs out mid-flight</strong>, preempt the lowest-priority or newest request: free its blocks and later recompute its prefill, or swap blocks to CPU memory. vLLM does recompute-based preemption by default.</li>
+<li><strong>If a request will miss its deadline anyway</strong> (waited longer than its TTFT SLO), consider rejecting it early rather than serving it late and slowing others.</li>
+</ol>
+
+<h3>Trade-offs</h3>
+<div class="table-wrap"><table>
+<tr><th>Choice</th><th>Gain</th><th>Cost</th></tr>
+<tr><td>Larger max batch</td><td>More throughput, lower cost per token</td><td>Higher TPOT for everyone, more KV pressure, more preemption</td></tr>
+<tr><td>Continuous vs static</td><td>No padding waste, new requests start next step</td><td>More complex scheduler, needs paged KV memory and per-request attention kernels</td></tr>
+<tr><td>Deadline-ordered admission</td><td>Fewer SLO misses</td><td>Long-waiting low-priority requests can starve; needs aging</td></tr>
+<tr><td>Recompute vs swap on preemption</td><td>Recompute: no CPU memory or PCIe traffic</td><td>Recompute redoes prefill; swap is better for very long contexts</td></tr>
+</table></div>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>Decode is memory-bound: each step reads all the weights once, so adding requests to the batch is almost free until the KV cache fills or the step gets slow. Static batching wastes that, because a group runs until its longest request ends; with seven 50-token answers and one 1,000-token answer, slot utilisation is under 17%. Continuous batching re-forms the batch every iteration, so finished requests leave and new ones join on the next step. To respect deadlines I'd model step time as a fixed weight-read cost plus a per-request cost, cap the batch so predicted TPOT stays under target and KV fits, admit by earliest deadline, and cap prefill tokens per step. With my assumed numbers both limits come out around 150 concurrent requests and about 3,000 tokens/s per node.</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Saying continuous batching lowers per-token latency. It mainly raises throughput and cuts queueing; each step can get slightly slower as the batch grows.</li>
+<li>Forgetting the KV-cache limit, so the batch looks unbounded.</li>
+<li>Treating "batch size" as a fixed config. In a continuous batcher it's the live number of running requests, set by the token budget, max sequences and free KV blocks.</li>
+<li>Ignoring preemption: without it, an overfull cache either crashes or stalls.</li>
+</ul>
+
+<div class="card demo">
+<h3>Interactive: static vs continuous batching, with and without chunked prefill</h3>
+<p class="legend">Each row is one GPU batch slot over the first 30 s of a 60 s simulation. Teal: prefill. Blue: decode. Amber: the 100K-token prompt. Gaps are idle slots. Arrivals are Poisson with a fixed seed; output lengths are log-normal (median 150, capped at 1,000); prompts are 200–2,000 tokens. Step time uses the cost model in section 0.</p>
+<canvas id="bt" width="700" height="260" aria-label="Timeline of batch slots showing prefill and decode work under the chosen scheduler"></canvas>
+<label for="md">Scheduler: <span id="mdv" class="num"></span></label>
+<input id="md" type="range" min="0" max="2" step="1" value="1">
+<label for="rt">Arrival rate: <span id="rtv" class="num"></span> requests/s</label>
+<input id="rt" type="range" min="0.5" max="4" step="0.5" value="2">
+<label for="sl">Batch slots: <span id="slv" class="num"></span></label>
+<input id="sl" type="range" min="8" max="64" step="8" value="32">
+<label for="ch">Chunk budget: <span id="chv" class="num"></span> tokens per step</label>
+<input id="ch" type="range" min="0" max="4" step="1" value="1">
+<label for="lg">100K-token prompt at t = 5 s: <span id="lgv" class="num"></span></label>
+<input id="lg" type="range" min="0" max="1" step="1" value="0">
+<div class="stats">
+  <div class="stat"><div class="k">Output tokens/s</div><div class="v" id="sthr">–</div></div>
+  <div class="stat"><div class="k">Mean TTFT</div><div class="v" id="sttf">–</div></div>
+  <div class="stat"><div class="k">p95 TTFT</div><div class="v" id="sp95">–</div></div>
+  <div class="stat"><div class="k">Worst decode gap</div><div class="v" id="sgap">–</div></div>
+  <div class="stat"><div class="k">Still waiting at 60 s</div><div class="v" id="swt">–</div></div>
+  <div class="stat"><div class="k">Long prompt TTFT</div><div class="v" id="slong">–</div></div>
+</div>
+<p class="meta">Try this: at the defaults (2 requests/s, 32 slots), Static gives about 182 tokens/s, a mean TTFT near 25 s and 62 requests still queued; Continuous gives about 378 tokens/s and a mean TTFT of 0.19 s. Now turn the 100K-token prompt on with Continuous: mean TTFT rises to about 1.6 s, p95 to about 9.7 s, and the worst decode gap is about 10 s, because every running chat froze during one giant prefill step. Switch to Continuous + chunked at 512: mean TTFT about 0.25 s, p95 about 0.5 s, worst gap about 74 ms. The price: the long prompt's own TTFT grows from 10 s to about 23 s. At a 2,048 budget it's about 15 s, with a worst gap of about 228 ms. TTFTs are for the short requests; the model ignores attention's quadratic cost, which makes the real long prefill slower.</p>
+</div>
+
+<h2 id="p7">Problem 7 · A 100K-token prompt stalls short chats: fix TTFT with chunked prefill and scheduling</h2>
+<p><strong>What the interviewer is testing:</strong> that you can see prefill/decode interference, size a chunk from a latency target, and know the other levers (ordering, isolation, caching) when chunking alone isn't enough.</p>
+
+<h3>The concepts</h3>
+<p><strong>Why one prompt stalls everyone.</strong> Without chunking, an engine prefills a whole prompt in one step. Every other request in the batch waits for that step to finish before getting its next token, and requests in the queue wait for their own first token. Prefill cost is roughly linear in prompt length for the matrix multiplies, plus a quadratic term for attention:</p>
+<pre><code>prefill FLOPs ≈ 2 × N × T  +  2 × L × d_model × T²      (causal attention)
+N = parameters, T = prompt tokens, L = layers</code></pre>
+<p><strong>Chunked prefill</strong> splits a long prompt into pieces and processes one piece per step, mixed with the decode tokens of other requests. Sarathi (Agrawal et al., 2023) proposed chunked prefills with "decode-maximal batching": fill each step with all ongoing decodes, then top it up with a prefill chunk. Sarathi-Serve (Agrawal et al., OSDI 2024) adds <em>stall-free scheduling</em> under a per-step token budget chosen from the TPOT target. vLLM exposes this as <code>--enable-chunked-prefill</code> with the budget set by <code>--max-num-batched-tokens</code>; recent versions turn chunked prefill on by default, so check the docs for your version.</p>
+<pre><code>choose budget C so that   t_0 + c_p × C + c_d × B_decode ≤ TPOT target
+→ C ≤ (TPOT target − t_0 − c_d × B_decode) / c_p</code></pre>
+
+<h3>Worked answer with numbers</h3>
+<p>Assumptions: the 70B model from section 0; a 100,000-token prompt; 32 chats decoding.</p>
+<pre><code>Size of the job
+  linear part   : 2 × 70e9 × 1e5            = 1.4e16 FLOPs
+  attention part: 2 × 80 × 8192 × (1e5)²    = 1.31e16 FLOPs
+  → at 100K tokens attention roughly doubles the work.
+  At the assumed 10,000 prompt tokens/s (linear part only): 10 s;
+  with the attention term, closer to 19 s.
+
+No chunking
+  one step ≈ 10 s  → every running chat's next token is 10 s late,
+  every queued chat's TTFT includes up to 10 s of waiting.
+
+Chunking (step = 20 ms + C × 0.1 ms + 32 × 0.2 ms, linear model)
+  C      step     chunks   long prompt prefill   decode gap for others
+  512    77.6 ms  196      ≈ 15.2 s              ≈ 78 ms
+  2,048  231 ms   49       ≈ 11.3 s              ≈ 231 ms
+  8,192  846 ms   13       ≈ 11.0 s              ≈ 846 ms
+
+Budget from a 100 ms TPOT target:
+  C ≤ (100 − 20 − 6.4) / 0.1 = 736 tokens  → pick 512</code></pre>
+<p>The pattern to say out loud: small chunks protect everyone else's latency, but every chunk pays the fixed t_0 again, so the long prompt itself finishes later. Later chunks also cost more than early ones, because each chunk attends to all the prompt tokens before it.</p>
+
+<p><strong>Chunking is half the fix. Scheduling is the other half.</strong></p>
+<ul>
+<li><strong>Order prefill by remaining length.</strong> Inside the per-step budget, give short new prompts their tokens before the long one's next chunk (shortest-remaining-prefill first). That's what the demo does in chunked mode, and it's why short-chat TTFT drops to about 0.25 s. Add aging so the long prompt can't starve.</li>
+<li><strong>Cap how much of the budget long prefills may take</strong>, for example at most one long prompt in prefill at a time, so two 100K prompts can't fill every step.</li>
+<li><strong>Separate the traffic.</strong> Route prompts above a threshold to a long-context pool, or disaggregate prefill from decode entirely (<a href="04-prefix-caching-disaggregation.html#p22">Page 04, Problem 22</a>).</li>
+<li><strong>Don't prefill it twice.</strong> Long prompts are often the same document asked about repeatedly. Prefix caching turns the second request into a cache hit (<a href="04-prefix-caching-disaggregation.html#p8">Page 04, Problem 8</a>).</li>
+<li><strong>Admission and pricing.</strong> Long prompts cost far more; per-tenant token limits (Problem 21) stop one user from sending many at once.</li>
+</ul>
+
+<h3>Trade-offs</h3>
+<div class="table-wrap"><table>
+<tr><th>Lever</th><th>Helps</th><th>Hurts</th></tr>
+<tr><td>Small chunk budget</td><td>TPOT and TTFT of short requests</td><td>Long prompt's TTFT; more per-step overhead; lower peak prefill efficiency</td></tr>
+<tr><td>Large chunk budget</td><td>Prefill efficiency, long prompt TTFT</td><td>Decode stalls return</td></tr>
+<tr><td>Shortest-prefill-first</td><td>Median and p95 TTFT</td><td>Fairness to long prompts unless aged</td></tr>
+<tr><td>Separate long-context pool</td><td>Isolation, predictable SLOs</td><td>Fragmented capacity, lower utilisation, routing logic</td></tr>
+</table></div>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>The stall happens because the engine prefills the 100K prompt in one step, roughly 10–20 seconds on a 70B model, and every other request waits for that step. I'd turn on chunked prefill with a per-step token budget: each step carries all running decodes plus at most C prompt tokens. I pick C from the TPOT target; with a 20 ms weight-read floor, 0.1 ms per prompt token and 32 decoders, a 100 ms target gives about 700 tokens, so 512. Inside the budget I'd serve short prompts first with aging, limit long prefills to one at a time, and if long prompts are common, route them to a separate pool or disaggregate prefill. The cost is that the long prompt itself finishes later, which I'd state as an explicit SLO for long-context requests.</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Thinking chunking makes the long prompt faster. It makes it slower; it makes everyone else faster.</li>
+<li>Forgetting the quadratic attention term, so the 100K estimate is off by about 2×.</li>
+<li>Chunking but keeping FCFS order inside the budget, so short prompts still queue behind the long one's chunks.</li>
+<li>Choosing the chunk size by feel instead of from the TPOT target.</li>
+</ul>
+
+<h2 id="p21">Problem 21 · Multi-tenant serving with fair scheduling, admission control and priority queues</h2>
+<p><strong>What the interviewer is testing:</strong> that you measure fairness in tokens, not requests; that you reject early instead of serving late; and that priorities come with starvation protection and preemption.</p>
+
+<h3>The concepts</h3>
+<p><strong>The cost unit is tokens.</strong> One request can be 50 tokens or 100,000. Counting requests lets a tenant with long prompts take most of the GPU while looking "fair". Prompt and output tokens also cost different amounts (prefill is cheap per token, decode is expensive per token), so weight them.</p>
+<pre><code>cost(request) = w_in × prompt tokens + w_out × output tokens     (w_out > w_in)</code></pre>
+<p><strong>Weighted fair queuing.</strong> Each tenant i has a weight w_i (its share). Classic weighted fair queuing gives each request a virtual finish tag and serves the smallest tag first:</p>
+<pre><code>F_new = max(V_now, F_prev_of_tenant) + cost / w_i</code></pre>
+<p>LLM serving has a twist: the output length is unknown when a request starts. The Virtual Token Counter (VTC; Sheng et al., OSDI 2024) handles this by keeping a counter per tenant, adding weighted tokens as they're actually processed, and always scheduling from the backlogged tenant with the smallest counter. When a tenant becomes active again, its counter is raised to the smallest counter among active tenants, so idle time can't be banked into a later burst.</p>
+<p><strong>Weighted max-min fairness</strong> describes the target allocation: nobody gets more than they ask for, and spare capacity is shared by weight among those who want more.</p>
+<p><strong>Admission control</strong> sits before the queue: per-tenant token buckets (a rate and a burst size in tokens per minute) and a global check of predicted wait. <strong>Priority classes</strong> (interactive, standard, batch) sit on top of fair sharing: strict priority between classes with aging, fair sharing between tenants inside a class.</p>
+
+<h3>Worked answer with numbers</h3>
+<p>Assume the pool serves 20,000 weighted tokens/s. Three tenants: A (free tier, weight 1, wants 15,000 tokens/s), B (paid, weight 3, wants 4,000), C (internal, weight 1, wants 10,000). Demand is 29,000, so someone gets less.</p>
+<pre><code>Round 1: shares by weight (1 : 3 : 1) of 20,000
+  A 4,000   B 12,000   C 4,000
+  B only wants 4,000 → give B 4,000, return 8,000 to the pool.
+
+Round 2: split remaining 16,000 between A and C (1 : 1)
+  A 8,000   C 8,000      both still want more → stop.
+
+Final: A 8,000 (53% of its demand), B 4,000 (100%), C 8,000 (80%).</code></pre>
+<p><strong>Admission check with Little's law.</strong> If the queue already holds requests expected to need 60,000 weighted tokens, the expected wait for a new arrival is about 60,000 / 20,000 = 3 s. With a 2 s TTFT SLO for interactive traffic, admitting more interactive work just creates late answers. Shed load instead: reject batch-class work with HTTP 429 and a Retry-After header, or cap <code>max_tokens</code> for the free tier, until predicted wait drops below the SLO.</p>
+<pre><code>expected wait ≈ queued work / service rate      (Little's law: L = λ × W)
+admit if   expected wait + own prefill time ≤ TTFT SLO   (per class)</code></pre>
+
+<p><strong>The design, front to back:</strong></p>
+<ol>
+<li><strong>Gateway:</strong> authenticate, find tenant and class, apply the tenant's token bucket. Over limit → 429 immediately.</li>
+<li><strong>Admission:</strong> estimate wait per class from queued work and recent throughput. Reject or degrade when it exceeds the SLO; reject lowest class first.</li>
+<li><strong>Queues:</strong> one queue per (class, tenant). Pick the class by strict priority with aging (a batch request waiting over, say, 10 minutes is promoted). Inside the class, pick the tenant by VTC.</li>
+<li><strong>Engine:</strong> the continuous batcher from Problem 6 pulls from this picker. When KV runs out, preempt the lowest class first.</li>
+<li><strong>Isolation for big customers:</strong> dedicated replicas or reserved capacity for tenants with contracts; shared pool for the rest. Per-tenant LoRA adapters can share one base model.</li>
+<li><strong>Observe:</strong> per-tenant tokens served, rejected, TTFT and TPOT percentiles, preemptions. Fairness bugs show up only in per-tenant views.</li>
+</ol>
+
+<h3>Trade-offs</h3>
+<div class="table-wrap"><table>
+<tr><th>Choice</th><th>Gain</th><th>Cost</th></tr>
+<tr><td>Fair by tokens (VTC) vs by requests</td><td>Long-prompt tenants can't hog the GPU</td><td>Needs token accounting inside the engine, not just at the gateway</td></tr>
+<tr><td>Strict priority between classes</td><td>Interactive SLOs protected</td><td>Batch starves without aging or a minimum share</td></tr>
+<tr><td>Reject early (429)</td><td>Accepted requests meet SLO; clients can retry elsewhere</td><td>Visible errors; needs good client retry with backoff</td></tr>
+<tr><td>Preempt low class on KV pressure</td><td>High class keeps latency</td><td>Recomputation wastes GPU time; batch jobs take longer</td></tr>
+<tr><td>Dedicated vs shared capacity</td><td>Predictability for big tenants</td><td>Idle reserved GPUs; lower utilisation</td></tr>
+</table></div>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>I'd measure fairness in weighted tokens, not requests, because one 100K-token prompt costs as much as hundreds of chats. At the gateway each tenant gets a token bucket, and an admission check estimates queue wait from queued work divided by throughput; if that exceeds the class's TTFT SLO I return 429 with Retry-After, shedding batch traffic first. Inside, I keep strict priority between interactive and batch classes, with aging so batch can't starve, and fair sharing between tenants within a class using a virtual token counter, which handles unknown output lengths. Under KV pressure the engine preempts the lowest class first. For example, with 20,000 tokens/s and weights 1:3:1, a paid tenant asking for 4,000 gets all of it, and the two others split the rest 8,000 each.</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Rate limiting by requests per minute only.</li>
+<li>Queuing without limit, so overload turns into timeouts for everyone instead of fast rejections for some.</li>
+<li>Strict priority with no aging or minimum share, so batch traffic never runs.</li>
+<li>Doing fairness only at the gateway, while the engine's batcher serves in arrival order.</li>
+</ul>
+
+<h2 id="practise">Practise it</h2>
+<ol>
+<li><strong>Run the simulator yourself.</strong> Copy this page's script into a Python or Node file, add a second "tenant" field to requests, and implement VTC in the admission step. Measure per-tenant tokens/s when one tenant sends 10× the traffic.</li>
+<li><strong>vLLM on a free Colab GPU.</strong> Serve a small instruct model (0.5–1.5B parameters) with vLLM's OpenAI-compatible server. Write an async Python client that sends 50 short chats (200-token prompts) at a steady rate and, at t = 10 s, one prompt as long as the model's context allows.</li>
+<li><strong>Measure</strong> TTFT and inter-token latency of the short chats with streaming. Run three settings: chunked prefill off (if your version allows), on with <code>--max-num-batched-tokens 512</code>, and on with 4096. Plot short-chat p50/p95 TTFT and the worst inter-token gap, plus the long prompt's TTFT.</li>
+<li><strong>Vary <code>--max-num-seqs</code></strong> (the batch cap) from 8 to 256 at a high request rate and plot throughput against median TPOT. Find the knee.</li>
+<li><strong>Write down</strong> your assumed t_0, c_p and c_d by fitting a line to step times from the server logs or your measurements, and check whether the section 0 model predicts your results.</li>
+</ol>
+
+<h2 id="course">In this course</h2>
+<ul>
+<li><a href="02-kv-cache-attention.html">Page 02 · KV cache, PagedAttention and FlashAttention</a>: why paged KV memory makes continuous batching possible.</li>
+<li><a href="04-prefix-caching-disaggregation.html">Page 04 · Prefix caching and disaggregation</a>: the next fixes for long prompts.</li>
+<li><a href="../05-trillion-scale-architecture.html#serving">Module 05 · Serving</a>: two caches in one paged pool and fleet scheduling for a trillion-parameter model.</li>
+<li><a href="../08-ai-research-engineer/08-inference-aware-design.html">Module 08 · Inference-aware design</a>: KV-cache maths and GQA, which set c_d and the KV limit.</li>
+<li><a href="../04-distill-small-models.html#latency">Module 04 · Latency is a safety number</a>: measuring wait-after-speech on the device.</li>
+<li><a href="../01-decision-model-evals.html">Module 01 · Decision-model evals</a>: thresholds and metrics, the same discipline as SLOs.</li>
+</ul>
+
+<h2 id="robotics">Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>On the robot, there's usually no batch.</strong> One robot runs one model for itself, at batch 1. Continuous batching and multi-tenancy are server-side ideas; they matter when a fleet of robots shares cloud or on-premises GPUs.</li>
+<li><strong>Prefill/decode interference happens on the robot too.</strong> If one onboard model handles both a long scene description and a short control query, a big prefill blocks the control query. Chunking or a separate small model for the urgent path keeps the reaction time bounded.</li>
+<li><strong>A robot fleet is a multi-tenant system.</strong> Robots asking for the next action are the interactive class; logs being summarised overnight are batch. Strict priority with preemption is the right shape, and admission control should fail fast so the robot can fall back to a safe local behaviour instead of waiting.</li>
+<li><strong>TTFT is reaction time.</strong> For a robot, a p95 TTFT of 10 s is not a slow answer, it's no answer. Size chunk budgets and batch caps from the control deadline, not from average throughput.</li>
+</ul>
+</div>
+
+<h2 id="check">Self-check</h2>
+<details><summary>Seven requests want 50 tokens and one wants 1,000. What fraction of slot-steps does a static batch of 8 use?</summary><p>(7 × 50 + 1000) / (8 × 1000) = 1350 / 8000 ≈ 16.9%.</p></details>
+<details><summary>Why does throughput rise almost linearly with batch size during decode, at first?</summary><p>Each step reads all the weights once regardless of batch size, and that fixed cost dominates. Each extra request adds only its own KV reads and a little compute, so you get more tokens per step for almost the same step time, until KV memory fills or the step becomes compute-bound.</p></details>
+<details><summary>With t_0 = 20 ms, c_p = 0.1 ms per prompt token and 32 decoders at 0.2 ms each, what chunk budget meets a 100 ms TPOT target?</summary><p>C ≤ (100 − 20 − 6.4) / 0.1 = 736 tokens. Round down to a convenient size such as 512.</p></details>
+<details><summary>Does chunked prefill make the 100K-token prompt faster?</summary><p>No. It makes it slower, because each chunk pays the fixed step cost again and shares the step with decodes. It makes every other request faster.</p></details>
+<details><summary>Why measure tenant fairness in tokens rather than requests?</summary><p>Requests vary from tens to hundreds of thousands of tokens. Request counts let a tenant with long prompts or long outputs take most of the GPU while looking equal.</p></details>
+<details><summary>Capacity 20,000 tokens/s, queued work 60,000 tokens, TTFT SLO 2 s. Admit a new interactive request?</summary><p>Expected wait ≈ 60,000 / 20,000 = 3 s, above the 2 s SLO. Shed lower-priority work or reject with 429 and Retry-After until the predicted wait falls below the SLO.</p></details>
+
+<h2 id="resources">Resources</h2>
+<ul>
+<li><a href="https://www.usenix.org/conference/osdi22/presentation/yu">Orca: A Distributed Serving System for Transformer-Based Generative Models</a> (Yu et al., OSDI 2022): iteration-level scheduling and selective batching</li>
+<li><a href="https://arxiv.org/abs/2308.16369">SARATHI: Efficient LLM Inference by Piggybacking Decodes with Chunked Prefills</a> (Agrawal et al., 2023)</li>
+<li><a href="https://arxiv.org/abs/2403.02310">Taming Throughput-Latency Tradeoff in LLM Inference with Sarathi-Serve</a> (Agrawal et al., OSDI 2024)</li>
+<li><a href="https://arxiv.org/abs/2401.00588">Fairness in Serving Large Language Models</a> (Sheng et al., OSDI 2024): the Virtual Token Counter</li>
+<li><a href="https://arxiv.org/abs/2309.06180">Efficient Memory Management for LLM Serving with PagedAttention</a> (Kwon et al., 2023)</li>
+<li>Docs: <a href="https://docs.vllm.ai/en/latest/configuration/optimization.html">vLLM · Optimization and tuning</a> (chunked prefill, batch token budget, preemption)</li>
+<li>Docs: <a href="https://docs.sglang.ai/">SGLang documentation</a></li>
+<li>Docs: <a href="https://nvidia.github.io/TensorRT-LLM/">TensorRT-LLM documentation</a> (in-flight batching, chunked context)</li>
+</ul>
+
+<nav class="pager">
+  <a href="02-kv-cache-attention.html"><small>Previous</small>Page 02 · KV cache, PagedAttention and FlashAttention</a>
+  <a class="next" href="04-prefix-caching-disaggregation.html"><small>Next</small>Page 04 · Prefix caching and disaggregation</a>
+</nav>
+<footer>Module 09 · Page 03 · written for this course from the source post, official docs and papers.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('bt'), ctx = cv.getContext('2d');
+const ids = ['md', 'rt', 'sl', 'ch', 'lg'];
+const el = Object.fromEntries(ids.map(k => [k, document.getElementById(k)]));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const MODES = ['Static', 'Continuous', 'Continuous + chunked'], CHUNKS = [256, 512, 1024, 2048, 4096];
+const T0 = 0.020, CP = 0.0001, CD = 0.0002, HORIZON = 60, VIEW = 30;
+const fmt = n => Math.round(n).toLocaleString('en-US');
+const sec = s => s == null ? '–' : s < 1 ? fmt(s * 1000) + ' ms' : s.toFixed(1) + ' s';
+
+function rng(s) { return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 2 ** 32; }; }
+
+function makeReqs(rate, long) {
+  const r = rng(7), q = [];
+  let t = 0;
+  while (t < HORIZON) {
+    t += -Math.log(1 - r()) / rate;
+    const z = Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(2 * Math.PI * r());
+    const out = Math.min(1000, Math.round(Math.exp(Math.log(150) + 0.8 * z)));
+    q.push({ arr: t, prompt: 200 + Math.floor(r() * 1800), out: Math.max(5, out) });
+  }
+  if (long) { q.push({ arr: 5, prompt: 100000, out: 200, long: 1 }); q.sort((a, b) => a.arr - b.arr); }
+  return q;
+}
+
+// mode 0 static, 1 continuous, 2 continuous + chunked prefill (shortest remaining prefill first)
+function sim(mode, rate, B, chunk, long) {
+  const reqs = makeReqs(rate, long).map(o => ({ ...o, pre: o.prompt, gen: 0, ttft: null, slot: -1 }));
+  const slots = Array(B).fill(null), segs = [], wait = [];
+  let t = 0, i = 0, toks = 0, maxGap = 0;
+  while (t < HORIZON) {
+    while (i < reqs.length && reqs[i].arr <= t) wait.push(reqs[i++]);
+    if (mode > 0 || slots.every(q => !q))
+      for (let s = 0; s < B && wait.length; s++) if (!slots[s]) { slots[s] = wait.shift(); slots[s].slot = s; }
+    const act = slots.filter(Boolean);
+    if (!act.length) { if (i >= reqs.length) break; t = reqs[i].arr; continue; }
+    let budget = mode === 2 ? chunk : Infinity, pt = 0, dc = 0;
+    const work = [];
+    for (const q of act) if (q.pre === 0 && q.gen < q.out) { dc++; budget--; work.push([q, 'd', 0]); }
+    const pf = act.filter(q => q.pre > 0);
+    if (mode === 2) pf.sort((a, b) => a.pre - b.pre);
+    for (const q of pf) {
+      const n = Math.min(q.pre, Math.max(0, budget));
+      if (n > 0) { budget -= n; pt += n; work.push([q, 'p', n]); }
+    }
+    // static batching: finished requests keep computing padding until the batch ends
+    const pad = mode === 0 ? act.filter(q => q.pre === 0 && q.gen >= q.out).length : 0;
+    const dt = T0 + CP * pt + CD * (dc + pad);
+    for (const [q, k] of work) segs.push([q.slot, t, t + dt, q.long ? 'l' : k]);
+    t += dt;
+    for (const [q, k, n] of work) {
+      if (k === 'p') { q.pre -= n; if (q.pre === 0) { q.ttft = t - q.arr; q.gen = 1; toks++; } }
+      else { q.gen++; toks++; if (dt > maxGap) maxGap = dt; }
+    }
+    if (mode > 0) { for (let s = 0; s < B; s++) if (slots[s] && slots[s].gen >= slots[s].out) slots[s] = null; }
+    else if (slots.every(q => !q || (q.pre === 0 && q.gen >= q.out))) slots.fill(null);
+  }
+  const tt = reqs.filter(q => q.ttft !== null && !q.long).map(q => q.ttft).sort((a, b) => a - b);
+  const lq = reqs.find(q => q.long);
+  return {
+    thr: toks / Math.min(t, HORIZON), ttft: tt.reduce((a, b) => a + b, 0) / tt.length,
+    p95: tt[Math.floor(tt.length * 0.95)], gap: maxGap, segs,
+    waiting: reqs.filter(q => q.arr <= HORIZON && q.ttft === null).length, longTtft: lq ? lq.ttft : undefined
+  };
+}
+
+function draw() {
+  const mode = +el.md.value, rate = +el.rt.value, B = +el.sl.value, chunk = CHUNKS[+el.ch.value], long = +el.lg.value;
+  const shown = { md: MODES[mode], rt: rate, sl: B, ch: fmt(chunk) + (mode === 2 ? '' : ' (unused)'), lg: long ? 'on' : 'off' };
+  ids.forEach(k => document.getElementById(k + 'v').textContent = shown[k]);
+  const r = sim(mode, rate, B, chunk, long);
+
+  const W = cv.width, H = cv.height, l = 40, rr = 12, t = 10, b = 26;
+  const px = v => l + Math.min(v, VIEW) / VIEW * (W - l - rr), rowH = (H - t - b) / B;
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '12px sans-serif'; ctx.fillStyle = css('--muted'); ctx.strokeStyle = css('--line'); ctx.lineWidth = 1;
+  ctx.textAlign = 'center';
+  for (let s = 0; s <= VIEW; s += 5) {
+    ctx.beginPath(); ctx.moveTo(px(s), t); ctx.lineTo(px(s), H - b); ctx.stroke();
+    ctx.fillText(s + ' s', px(s), H - 8);
+  }
+  ctx.save(); ctx.translate(14, (H - b + t) / 2); ctx.rotate(-Math.PI / 2); ctx.fillText('slots', 0, 0); ctx.restore();
+  const col = { p: css('--accent'), d: css('--pass'), l: css('--warn') };
+  // merge consecutive segments of the same slot and kind before drawing
+  const last = {};
+  const flush = sg => { ctx.fillStyle = col[sg[3]]; ctx.fillRect(px(sg[1]), t + sg[0] * rowH, Math.max(1, px(sg[2]) - px(sg[1])), Math.max(1, rowH - 1)); };
+  for (const sg of r.segs) {
+    if (sg[1] > VIEW) continue;
+    const p = last[sg[0]];
+    if (p && p[3] === sg[3] && Math.abs(p[2] - sg[1]) < 1e-9) { p[2] = sg[2]; continue; }
+    if (p) flush(p);
+    last[sg[0]] = sg.slice();
+  }
+  Object.values(last).forEach(flush);
+
+  document.getElementById('sthr').textContent = fmt(r.thr);
+  document.getElementById('sttf').textContent = sec(r.ttft);
+  document.getElementById('sp95').textContent = sec(r.p95);
+  document.getElementById('sgap').textContent = sec(r.gap);
+  document.getElementById('swt').textContent = fmt(r.waiting);
+  document.getElementById('slong').textContent = long ? sec(r.longTtft) : '–';
+}
+ids.forEach(k => el[k].oninput = draw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

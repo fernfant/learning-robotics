@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inference · Latency</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 09 · Inference engineering</a> › Page 05</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 09 · Problems 9, 10, 17</div>
+<h1>Latency: inter-token latency, speculative decoding and tail latency</h1>
+<p class="lede">Three interview problems about time. How do you make each token arrive sooner without serving fewer users? When does guessing ahead with a draft model pay off, and when does it cost you? And when the slowest 1% of requests take ten times longer than the typical one, where do you look first?</p>
+
+<div class="facts">
+  <div><b>Problems covered</b>9 (cut inter-token latency), 10 (speculative decoding), 17 (p99 is 10× p50)</div>
+  <div><b>Interview level</b>Mid to senior. Problem 10 is a favourite senior follow-up.</div>
+  <div><b>Key ideas</b>Decode is bandwidth-bound · batch size trades per-user speed for total throughput · prefill interference · acceptance rate α · queueing and length variance in the tail</div>
+  <div><b>Time to prep</b>3–4 h: 1.5 h reading, 1.5 h working the numbers, 1 h with the demo and the exercise</div>
+</div>
+<p class="meta">Source: <a href="https://x.com/vishalsingh2972/status/2113830444722741637">Vishal Singh's post listing 25 inference-engineering interview problems</a> · saved in <code>sources/09-vishal-inference-25.md</code></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">A language model writes one word-piece at a time. How long you wait between pieces, and how long the unluckiest customers wait, are the numbers people feel. This page is about making both smaller.</p>
+
+<h3>Think of it like this</h3>
+<p>Picture a busy restaurant kitchen with one head chef. Every plate must pass the head chef, one at a time. The chef can carry a whole tray of plates per trip, so serving more tables at once barely slows each trip. But a giant banquet order that needs an hour of prep can block the pass, and every small table waits. Now add an apprentice who prepares the next four plates in advance. The head chef checks all four in one glance: if they're right, four plates go out for the price of one check. If the apprentice guesses badly, the chef throws them away and the trip was wasted. And a few tables always wait far longer than the rest, usually because they ordered something huge or arrived at the busiest moment.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Each new token needs one full pass through the model. That pass is mostly spent reading the model's weights from memory.</li>
+<li>Serving many users in the same pass (a batch) shares that reading cost, so total output goes up while each user's pace drops a little.</li>
+<li>A huge new prompt processed in one go can freeze everyone else's next token. Cutting it into slices keeps the stream smooth.</li>
+<li>A small draft model can guess several tokens. The big model checks all of them in one pass and keeps the ones it agrees with.</li>
+<li>The slowest requests are slow for a reason: very long answers, long queues, memory running out, or a sick machine. You find the reason by splitting each request's time into parts.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot's onboard model has a fixed time slot. If a planner must produce its next instruction every 100 ms, a token that takes 150 ms means the robot acts on stale information. The worst case matters more than the average: a robot that is usually quick but sometimes freezes for a second is not safe to stand next to.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>With a friend, read a paragraph aloud. One of you tries to say the next three words before the reader does. Count how often all three guesses are right. That fraction is close to what engineers call the acceptance rate.</li>
+<li>Time how long ten classmates take to get lunch from a queue. Is the slowest one ten times slower than the middle one? Ask why.</li>
+<li>In the demo below, move <b>Acceptance rate α</b> down from 0.8 and watch the speedup fall below 1×. Then raise <b>Draft length k</b>, the <b>Draft cost c</b> and the <b>Verify cost per extra token</b> to see what makes guessing ahead stop paying.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Inter-token latency (ITL)</dt><dd>The gap between two streamed tokens. Its average over a request is often called TPOT, time per output token.</dd>
+<dt>Throughput</dt><dd>Total tokens produced per second across all users.</dd>
+<dt>Speculative decoding</dt><dd>A cheap draft guesses several tokens; the big model checks them all at once.</dd>
+<dt>Acceptance rate (α)</dt><dd>The chance the big model agrees with a drafted token.</dd>
+<dt>p50 / p99</dt><dd>The latency that half / 99% of requests beat. p99 is the "unlucky 1%".</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="p9">Problem 9 · Cut inter-token latency without tanking throughput</h2>
+<p><strong>What the interviewer is testing:</strong> whether you know why decode is slow (memory bandwidth, not arithmetic), that latency and throughput are coupled through batch size, and which levers move one without wrecking the other.</p>
+
+<h3>The concepts</h3>
+<p>During decode, each step produces one token for every sequence in the batch. To do it, the GPU streams all the weights once (shared by the batch) plus each sequence's own KV cache. At normal batch sizes the arithmetic is tiny compared with the bytes moved, so the step time is close to a bandwidth floor:</p>
+<pre><code>t_step  ≈  (W + B × KV_seq) / BW  +  t_overhead
+
+W       = weight bytes            (params × bytes per weight)
+KV_seq  = KV-cache bytes per sequence (see Module 08, Stage 08)
+B       = sequences in the batch
+BW      = HBM bandwidth (bytes/s)
+
+ITL (per user)        = t_step
+throughput (tokens/s) = B / t_step</code></pre>
+<p>Two things follow. First, raising B grows throughput almost linearly while the weights dominate, but each step also gets longer because every sequence adds its own cache. Second, anything else that runs in the same step adds to everyone's ITL. The biggest offender is a <em>prefill</em>: processing a new prompt is compute-bound, and a long one can take longer than a hundred decode steps.</p>
+
+<h3>Worked answer with real numbers</h3>
+<p>Assumptions: a Llama-3-8B-shaped model (32 layers, 8 KV heads, head dim 128, about 8.0B parameters), BF16 weights (≈16 GB) and BF16 KV cache (128 KiB = 131,072 B per token), an average of 2,048 tokens of context per sequence (≈268 MB of cache each). GPU: H100 SXM, 80 GB, 3.35 TB/s and 989 TFLOPS dense BF16 (NVIDIA's table lists 1,979 TFLOPS <em>with sparsity</em>; dense is half). The bandwidth floor ignores kernel overhead and assumes 100% of peak bandwidth, so real numbers will be slower.</p>
+<pre><code>B = 1:    (16 GB +   1 × 0.268 GB) / 3.35 TB/s =  4.86 ms  → 206 tok/s per user,    206 tok/s total
+B = 32:   (16 GB +  32 × 0.268 GB) / 3.35 TB/s =  7.34 ms  → 136 tok/s per user,  4,360 tok/s total
+B = 128:  (16 GB + 128 × 0.268 GB) / 3.35 TB/s = 15.03 ms  →  67 tok/s per user,  8,515 tok/s total
+B = 256:  needs 16 + 68.7 = 84.7 GB of weights + cache  → does not fit in 80 GB
+
+Compute check at B = 128: 2 × 8.0e9 × 128 = 2.0 TFLOP per step
+                          ÷ 989 TFLOPS ≈ 2.1 ms  &lt; 15 ms, so still bandwidth-bound</code></pre>
+<p>Going from B = 32 to B = 128 doubles throughput and doubles ITL. That is the core trade-off. Now the prefill problem. Prefill costs about 2 × params FLOPs per prompt token. Assume 50% of dense peak is achieved (an assumption; measure yours):</p>
+<pre><code>4,096-token prompt in one step:  2 × 8.0e9 × 4,096 / (0.5 × 989e12) ≈ 133 ms
+512-token chunk per step:        2 × 8.0e9 ×   512 / (0.5 × 989e12) ≈  17 ms
+
+With B = 32 decoding: a normal step is 7.3 ms.
+  unchunked prefill step → ~140 ms  (a visible stall for 32 users)
+  chunked (512) steps    → ~24 ms each, for 8 steps</code></pre>
+<p>So the answer has a clear shape: first remove interference (chunked prefill, Sarathi-Serve style, or move prefill to separate GPUs), then shrink bytes per step (FP8 weights and FP8 KV), then cut fixed overhead (CUDA graphs, fused kernels), and only then reach for speculative decoding or more GPUs per replica. With FP8 weights (8 GB) and FP8 KV (134 MB per sequence), the floor at B = 128 becomes (8 + 17.2) GB / 3.35 TB/s = 7.5 ms. That is the same ITL as BF16 at B = 32, with four times the users.</p>
+
+<h3>Trade-offs</h3>
+<div class="table-wrap"><table>
+<tr><th>Lever</th><th>ITL</th><th>Throughput</th><th>Cost or risk</th></tr>
+<tr><td>Chunked prefill with a token budget per step</td><td>Smooths spikes, caps worst step</td><td>Roughly neutral</td><td>Long prompts take a little longer to first token</td></tr>
+<tr><td>Cap batch size or KV pages per replica</td><td>Better</td><td>Worse</td><td>Needs more replicas for the same load</td></tr>
+<tr><td>FP8 / FP4 weights, FP8 KV cache</td><td>Better (fewer bytes)</td><td>Better (bigger batches fit)</td><td>Quality must be re-measured (Page 06)</td></tr>
+<tr><td>Tensor parallelism across more GPUs</td><td>Better (more aggregate bandwidth)</td><td>Per GPU, often worse</td><td>All-reduce every layer; needs NVLink</td></tr>
+<tr><td>CUDA graphs, fused kernels</td><td>Better at small batch</td><td>Slightly better</td><td>Engine-specific; static shapes</td></tr>
+<tr><td>Speculative decoding</td><td>Much better at low load</td><td>Can drop at high load</td><td>Extra memory; gain depends on α (Problem 10)</td></tr>
+<tr><td>Prefill/decode disaggregation</td><td>Removes prefill interference</td><td>Depends on the split</td><td>KV transfer and more moving parts (Page 04)</td></tr>
+</table></div>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>Decode is memory-bandwidth bound: each step reads all weights plus every sequence's cache, so ITL is roughly bytes read divided by bandwidth. Batch size is the dial between per-user speed and total throughput, so I'd first set an ITL target, say 50 ms at p99, and size the batch to it. Then I'd remove interference: chunked prefill with a per-step token budget, so a 100K prompt can't freeze the stream. Next I'd cut the bytes with FP8 weights and KV, which helps both latency and throughput at once, and cut overhead with CUDA graphs. Speculative decoding and wider tensor parallelism come last, because they help latency but can cost throughput at high load.</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Treating latency and throughput as independent. They share one dial, the batch, so always quote both.</li>
+<li>Reporting average ITL. Users feel the spikes, so track ITL at p99 and the maximum gap per stream.</li>
+<li>Assuming a bigger GPU fixes ITL. Only bandwidth per token and interference move it; FLOPs barely matter for decode.</li>
+<li>Forgetting that memory caps the batch: in the example, B = 256 simply doesn't fit.</li>
+</ul>
+
+<h2 id="p10">Problem 10 · Speculative decoding: when it helps and when it hurts</h2>
+<p><strong>What the interviewer is testing:</strong> whether you can derive the expected speedup from the acceptance rate, and whether you know it is a latency tool that can lose throughput when the GPU is already busy.</p>
+
+<h3>The concepts</h3>
+<p>A cheap draft proposes k tokens. The target model scores all k in one forward pass, accepts a prefix of them using a modified rejection-sampling rule, and adds one token of its own (either the correction at the first rejection, or a bonus token if all were accepted). The rule keeps the output distribution exactly the same as the target's. Leviathan, Kalman and Matias (2023) and Chen et al. (2023) derived this independently.</p>
+<p>If each drafted token is accepted with probability α, independently, the expected tokens produced per verify round are:</p>
+<pre><code>E[tokens per round] = 1 + α + α² + … + α^k = (1 − α^(k+1)) / (1 − α)
+
+cost per round (in units of one target forward pass):
+    k × c        drafting (c = draft cost per token ÷ target cost)
+  + 1            the verify pass
+  + k × v        extra verify cost per drafted token (≈ 0 when memory-bound,
+                 grows when the GPU is compute-bound at large batch)
+
+speedup = E[tokens per round] / (k·c + 1 + k·v)</code></pre>
+<p>With v = 0 this is the improvement factor in the Leviathan paper. The key assumption is v ≈ 0: verifying k + 1 tokens costs about the same as producing one, because the pass is bound by reading weights, not by arithmetic. That holds at small batch. At large batch the GPU is closer to compute-bound, every rejected token is wasted arithmetic, and v grows.</p>
+
+<h3>Worked answer with real numbers</h3>
+<pre><code>α = 0.8, k = 4, c = 0.05, v = 0:
+  E = (1 − 0.8⁵) / 0.2 = (1 − 0.328) / 0.2 = 3.36 tokens per round
+  cost = 4 × 0.05 + 1 = 1.20
+  speedup = 3.36 / 1.20 = 2.80×
+
+Same, but α = 0.6:    E = 2.31,  speedup = 2.31 / 1.20 = 1.92×
+α = 0.5, k = 8, c = 0.1:   E = 2.00,  cost = 1.8,  speedup = 1.11×
+α = 0.3, k = 4, c = 0.1:   E = 1.43,  cost = 1.4,  speedup = 1.02×  (break-even)
+
+α = 0.8, k = 4, c = 0.05, but at high load v = 0.25:
+  cost = 0.2 + 1 + 1.0 = 2.2   → speedup = 1.53×
+Best k at α = 0.8, c = 0.05, v = 0:  k = 8, speedup ≈ 3.09×</code></pre>
+<p>The published numbers fit this picture. Leviathan et al. report 2–3× on T5-XXL; Chen et al. report 2–2.5× on Chinchilla 70B. EAGLE-3 (Li et al., 2025), which drafts from the target's own hidden features, reports up to 6.5× in its best setting but a 1.38× throughput gain at batch 64 in SGLang. The gain shrinks as the batch grows, exactly as the v term predicts. <a href="../05-trillion-scale-architecture.html#serving">Module 05</a> covers training an EAGLE-3 draft directly on acceptance rate.</p>
+
+<h3>When it helps, when it hurts</h3>
+<div class="table-wrap"><table>
+<tr><th>Helps</th><th>Hurts or does nothing</th></tr>
+<tr><td>Low concurrency, latency-sensitive (chat, agents, a robot at batch 1)</td><td>High concurrency where the GPU is already compute-saturated</td></tr>
+<tr><td>Predictable text: code, JSON, edits that copy the prompt (n-gram/prompt lookup works well)</td><td>High temperature or creative sampling, which lowers α</td></tr>
+<tr><td>A draft that is very cheap (c ≤ 0.05) and well aligned: EAGLE/Medusa heads, a small sibling model</td><td>A draft that is a big fraction of the target's cost, or a mismatched tokenizer</td></tr>
+<tr><td>Plenty of spare HBM for draft weights and draft KV cache</td><td>Memory-tight setups, where the draft's memory shrinks the batch</td></tr>
+</table></div>
+
+<div class="card demo">
+<h3>Interactive: speculative-decoding speedup</h3>
+<p class="legend">Speedup against acceptance rate α. Solid: your draft length k. Dashed: the best k at each α. The red line is 1× (break-even). The marker is your α; green above break-even, red below. Costs are in units of one target forward pass.</p>
+<canvas id="sd" width="700" height="260" aria-label="Speculative decoding speedup against acceptance rate"></canvas>
+<label for="al">Acceptance rate α: <span id="alv" class="num"></span></label>
+<input id="al" type="range" min="0" max="99" step="1" value="80">
+<label for="kk">Draft length k: <span id="kkv" class="num"></span> tokens</label>
+<input id="kk" type="range" min="1" max="16" step="1" value="4">
+<label for="cc">Draft cost c: <span id="ccv" class="num"></span> × target per token</label>
+<input id="cc" type="range" min="0" max="50" step="1" value="5">
+<label for="vv">Verify cost per extra token v: <span id="vvv" class="num"></span> (0 = memory-bound, small batch)</label>
+<input id="vv" type="range" min="0" max="50" step="1" value="0">
+<div class="stats">
+  <div class="stat"><div class="k">Tokens per verify</div><div class="v" id="sE">–</div></div>
+  <div class="stat"><div class="k">Cost per round</div><div class="v" id="sC">–</div></div>
+  <div class="stat"><div class="k">Speedup</div><div class="v" id="sS">–</div></div>
+  <div class="stat"><div class="k">Best k at this α</div><div class="v" id="sB">–</div></div>
+  <div class="stat"><div class="k">Break-even α</div><div class="v" id="sX">–</div></div>
+</div>
+<p class="meta">Try this: the defaults (α 0.8, k 4, c 0.05) give 3.36 tokens per verify and 2.80×. Raise v to 0.25 to mimic a busy GPU: 1.53×. Drop α to 0.3 with c = 0.1: you're at break-even. The model assumes each token is accepted independently with the same α, as in the Leviathan paper; real acceptance varies along the draft.</p>
+</div>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>Speculative decoding trades spare compute for fewer sequential steps. A draft proposes k tokens, the target verifies them in one pass, and rejection sampling keeps the output distribution unchanged. Expected tokens per pass are (1 − α^(k+1)) / (1 − α), so at α = 0.8 and k = 4 you get about 3.4 tokens for 1.2 passes of cost, roughly 2.8×. It helps most at low batch, where verification is nearly free because decode is bandwidth-bound. It hurts at high load, at high temperature, or when the draft is expensive or eats memory the batch needed. So I'd enable it per traffic class and watch acceptance rate and throughput, not just ITL.</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Saying it changes model quality. With the proper acceptance rule the output distribution is identical; only speed changes. (Lossy "accept if top-1 matches" shortcuts are a different, approximate thing.)</li>
+<li>Quoting a speedup without a batch size. The same setup can give 2.8× at batch 1 and nothing at batch 128.</li>
+<li>Forgetting the draft's own KV cache and weights in the memory budget.</li>
+<li>Picking k by gut. The best k depends on α and c; too long a draft wastes work on tokens that will be rejected.</li>
+</ul>
+
+<h2 id="p17">Problem 17 · Your p99 latency is 10× your p50. Diagnose it</h2>
+<p><strong>What the interviewer is testing:</strong> a calm, data-first method. Can you decompose latency, separate "slow because the request is big" from "slow because the system is unhealthy", and know the usual suspects in LLM serving?</p>
+
+<h3>The concepts</h3>
+<p>End-to-end latency for one request breaks into parts, and the first job is to log them per request:</p>
+<pre><code>E2E = t_network + t_queue + t_tokenise + TTFT_compute + (N_out − 1) × TPOT + t_stalls
+
+TTFT_compute grows with prompt length (prefill)
+(N_out − 1) × TPOT grows with output length
+t_queue grows sharply as utilisation ρ → 1
+t_stalls = preemption / recompute when the KV cache runs out, GC, retries</code></pre>
+<p>Three effects create a heavy tail even in a healthy system:</p>
+<ul>
+<li><strong>Length variance.</strong> E2E is proportional to output tokens. If most answers are 100 tokens and 1% are 2,000, then at 20 ms TPOT the p50 is about 2 s and the p99 about 40 s. That is a 20× ratio with nothing broken. Always normalise: look at TTFT and TPOT percentiles, not only E2E.</li>
+<li><strong>Queueing.</strong> In the textbook M/M/1 queue the time in system is exponential with rate μ − λ. Its p99/p50 ratio is ln(100)/ln(2) ≈ 6.6 at any load, and its mean scales as 1/(1 − ρ). Going from 50% to 90% utilisation makes the mean wait five times longer. Real LLM servers are not M/M/1, but the lesson holds: near saturation, small bursts create huge waits.</li>
+<li><strong>Fan-out.</strong> Dean and Barroso's "The Tail at Scale": if a request touches 100 servers and each is slow 1% of the time, 1 − 0.99¹⁰⁰ = 63% of requests hit at least one slow server. Agents that call the model many times per task inherit this.</li>
+</ul>
+
+<h3>Worked answer: a diagnosis plan</h3>
+<p>Assume a chat service, p50 E2E 2 s, p99 20 s. Work in this order:</p>
+<ol>
+<li><strong>Split by phase.</strong> Plot p50 and p99 for queue time, TTFT and TPOT separately. If TPOT p99 is flat and only E2E is bad, it is mostly output length. Report per-token latency and set a max-tokens policy.</li>
+<li><strong>Slice by request shape.</strong> Bucket by prompt length and output length. If TTFT p99 tracks long prompts, and short requests that arrived alongside them also have high TTFT, it is head-of-line blocking from prefill. Fix: chunked prefill, a per-step token budget, a separate queue or pool for long prompts.</li>
+<li><strong>Check queueing.</strong> Plot queue time against concurrency and utilisation. If queue time explodes at traffic peaks, you're over ρ ≈ 0.8. Fix: admission control, more replicas, autoscaling with warm capacity (Page 09).</li>
+<li><strong>Check KV-cache pressure.</strong> Look for preemptions and recomputes in the engine metrics (vLLM logs and exposes these). If they spike with p99, the cache is full. Fix: lower max concurrency, FP8 KV, prefix caching, more memory per replica.</li>
+<li><strong>Slice by replica and node.</strong> One slow GPU, a thermally throttled node, a noisy neighbour or a bad NIC shows up as a per-host outlier. Fix: drain it; add hedged or retried requests for idempotent calls.</li>
+<li><strong>Check the CPU side.</strong> Tokenisation, detokenisation, JSON grammar constraints, Python GC pauses and the HTTP layer all live outside the GPU and show up as gaps in a timeline trace.</li>
+</ol>
+<p>A numeric sanity check for step 2: with the Problem 9 numbers, a 4,096-token prompt prefilled in one step costs about 133 ms. If 30 such prompts arrive in a burst on one replica, a short chat queued behind them waits about 4 s before its own prefill even starts.</p>
+
+<h3>Trade-offs</h3>
+<div class="table-wrap"><table>
+<tr><th>Fix</th><th>Improves</th><th>Costs</th></tr>
+<tr><td>Run at lower utilisation (more headroom)</td><td>Queue tail</td><td>GPU cost per token</td></tr>
+<tr><td>Chunked prefill, separate long-prompt pool</td><td>TTFT tail for short requests</td><td>Slightly slower long prompts, more pools to manage</td></tr>
+<tr><td>Max-tokens limits, length-aware SLOs</td><td>E2E tail</td><td>Product constraints</td></tr>
+<tr><td>Hedged requests (send a backup after the p95 time)</td><td>Tail from slow hosts</td><td>A few % more load; only for idempotent calls</td></tr>
+<tr><td>Admission control and priority queues</td><td>Tail for high-priority traffic</td><td>Rejected or delayed low-priority requests (Page 03)</td></tr>
+</table></div>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>First I'd check whether it's a real problem or just length variance: end-to-end latency scales with output tokens, so I'd look at TTFT and TPOT percentiles separately. Then I'd decompose each slow request into queue, prefill, decode and stalls, and slice by prompt length, output length, replica and time. The usual LLM culprits are head-of-line blocking from long prefills, queueing near saturation, KV-cache preemption, and one bad host. Each has a signature and a fix: chunked prefill, headroom or admission control, more cache, or draining the host. I'd finish by setting SLOs per token, not per request, and alerting on the decomposed metrics.</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Jumping to fixes before splitting the latency into parts.</li>
+<li>Using averages. The mean hides the tail; p99 needs enough samples (at least a few thousand requests) to be stable.</li>
+<li>Treating p99/p50 = 10 as broken by itself. With mixed output lengths it can be normal; per-token metrics tell you.</li>
+<li>Forgetting client-side and network time, which the server's metrics never see.</li>
+</ul>
+
+<h2 id="practise">Practise it</h2>
+<p><strong>(a) Speculative decoding simulator (laptop, 20 minutes).</strong> Confirm the formula by Monte Carlo, then add a batch-dependent verify cost:</p>
+<pre><code>import random
+
+def sim(a, k, c, v=0.0, rounds=200_000, seed=0):
+    rng = random.Random(seed)
+    toks = 0
+    for _ in range(rounds):
+        n = 0
+        while n &lt; k and rng.random() &lt; a:
+            n += 1
+        toks += n + 1                      # accepted drafts + 1 target token
+    return toks / rounds, toks / rounds / (k * c + 1 + k * v)
+
+for a in (0.3, 0.6, 0.8):
+    print(a, sim(a, 4, 0.05))              # expect E ≈ (1 - a**5) / (1 - a)</code></pre>
+<p><strong>(b) Measure the latency/throughput dial with vLLM (one 16–24 GB GPU or Colab).</strong> Serve a small model such as Qwen2.5-1.5B-Instruct. Run <code>vllm bench serve</code> with random prompts (512 in, 256 out) at several request rates, and record TTFT, TPOT and ITL at p50 and p99, plus output tokens/s. Plot ITL against throughput: that curve is Problem 9.</p>
+<ul>
+<li>Repeat with a few 8K-token prompts mixed in, with and without chunked prefill, and compare short-request TTFT at p99.</li>
+<li>Enable n-gram speculative decoding (<code>--speculative-config</code>; check your vLLM version's docs for the exact keys) and compare ITL at request rates of 1 and at saturation. Note where the speedup disappears.</li>
+<li>Log per-request prompt and output lengths, then reproduce Problem 17's diagnosis: compute p99/p50 for E2E and for TPOT and explain the difference.</li>
+</ul>
+
+<h2 id="course">In this course</h2>
+<ul>
+<li><a href="../05-trillion-scale-architecture.html#serving">Module 05 · Serving</a>: speculative decoding with an EAGLE-3 draft trained on acceptance rate, and fleet scheduling.</li>
+<li><a href="../08-ai-research-engineer/08-inference-aware-design.html">Module 08 · Inference-aware design</a>: the KV-cache maths behind KV_seq, and design choices that make speculation cheap.</li>
+<li><a href="../04-distill-small-models.html#latency">Module 04 · Latency is a safety number</a>: measuring wait-after-speech on a device.</li>
+<li><a href="../01-decision-model-evals.html">Module 01 · Decision-model evals</a>: setting thresholds and choosing metrics, which applies to latency SLOs too.</li>
+<li><a href="03-batching-scheduling.html">Page 03 · Batching and scheduling</a> and <a href="04-prefix-caching-disaggregation.html">Page 04 · Prefix caching and disaggregation</a>: the scheduling fixes referenced above.</li>
+</ul>
+
+<h2 id="robotics">Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>The bandwidth floor is harsher on the robot.</strong> NVIDIA lists 204.8 GB/s for the Jetson AGX Orin 64GB module, against 3.35 TB/s for an H100 SXM. By the same formula, an 8B model at BF16 (16 GB) has a floor of about 78 ms per token on that module. At 4-bit weights it is closer to 20–25 ms. That is why robots run small, quantised models.</li>
+<li><strong>Batch 1 is where speculative decoding shines.</strong> A robot runs one episode at a time, so verification is nearly free and a well-aligned draft can cut action-token latency. Structured outputs (action tokens, JSON plans) tend to be predictable, which helps α.</li>
+<li><strong>Control loops care about the worst case.</strong> A 100 ms planner budget with a p99 of 1 s means the arm sometimes acts on a stale plan. Robot stacks bound this with timeouts, a fast fallback policy and fixed-length outputs, which also removes the length-variance source of tail latency.</li>
+<li><strong>TTFT is reaction time.</strong> A new camera frame or spoken command is a prefill. Keeping the prompt short and caching the fixed prefix (Page 04) is the robot version of chunked prefill.</li>
+<li><strong>Some of this is cloud-only.</strong> Queueing near saturation, fan-out and hedged requests matter for a fleet backend serving many robots, not for one onboard model.</li>
+</ul>
+</div>
+
+<h2 id="check">Self-check</h2>
+<details><summary>An 8B BF16 model with 268 MB of KV per sequence runs at batch 32 on a 3.35 TB/s GPU. What is the ITL floor and total throughput?</summary><p>(16 + 32 × 0.268) GB / 3.35 TB/s = 24.6 GB / 3.35 TB/s ≈ 7.3 ms. Throughput ≈ 32 / 7.3 ms ≈ 4,360 tokens/s. Real numbers are lower because peak bandwidth is never fully reached.</p></details>
+<details><summary>Why does a single 100K-token prompt hurt the ITL of everyone else on the replica?</summary><p>Its prefill is compute-heavy and, if run in one step, occupies the GPU for far longer than a decode step. Every sequence in the batch waits for that step. Chunked prefill caps the prefill tokens per step so decode steps stay short.</p></details>
+<details><summary>α = 0.7, k = 3, c = 0.1, v = 0. What is the expected speedup?</summary><p>E = (1 − 0.7⁴) / 0.3 = (1 − 0.2401) / 0.3 = 2.53 tokens. Cost = 3 × 0.1 + 1 = 1.3. Speedup ≈ 1.95×.</p></details>
+<details><summary>Why can speculative decoding reduce throughput at high batch?</summary><p>At high batch the GPU is closer to compute-bound, so verifying k extra tokens per sequence costs real arithmetic, and the rejected ones are wasted. The draft also takes memory that could have held more sequences.</p></details>
+<details><summary>Your E2E p99/p50 is 12, but TPOT p99/p50 is 1.4. What does that tell you?</summary><p>Per-token speed is healthy; the tail comes from request size, most likely long outputs (or long prompts if TTFT is also skewed). Report per-token SLOs and consider max-token limits rather than hunting for a system fault.</p></details>
+<details><summary>A request fans out to 50 calls, each with a 1% chance of being slow. What fraction of requests see a slow call?</summary><p>1 − 0.99⁵⁰ ≈ 39.5%.</p></details>
+
+<h2 id="resources">Resources</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/2211.17192">Fast Inference from Transformers via Speculative Decoding</a> (Leviathan, Kalman, Matias, ICML 2023)</li>
+<li><a href="https://arxiv.org/abs/2302.01318">Accelerating Large Language Model Decoding with Speculative Sampling</a> (Chen et al., 2023)</li>
+<li><a href="https://arxiv.org/abs/2503.01840">EAGLE-3: Scaling up Inference Acceleration of LLMs via Training-Time Test</a> (Li et al., 2025)</li>
+<li><a href="https://arxiv.org/abs/2401.10774">Medusa: Simple LLM Inference Acceleration Framework with Multiple Decoding Heads</a> (Cai et al., 2024)</li>
+<li><a href="https://arxiv.org/abs/2403.02310">Sarathi-Serve: Taming Throughput-Latency Tradeoff in LLM Inference</a> (Agrawal et al., 2024): chunked prefill and stall-free batching</li>
+<li><a href="https://www.usenix.org/conference/osdi22/presentation/yu">Orca: A Distributed Serving System for Transformer-Based Generative Models</a> (Yu et al., OSDI 2022): iteration-level scheduling</li>
+<li><a href="https://arxiv.org/abs/2401.09670">DistServe</a> (Zhong et al., 2024) and <a href="https://arxiv.org/abs/2311.18677">Splitwise</a> (Patel et al., 2024): prefill/decode disaggregation</li>
+<li><a href="https://arxiv.org/abs/2309.06180">Efficient Memory Management for LLM Serving with PagedAttention</a> (Kwon et al., 2023)</li>
+<li><a href="https://research.google/pubs/the-tail-at-scale/">The Tail at Scale</a> (Dean and Barroso, CACM 2013)</li>
+<li>Docs: <a href="https://docs.vllm.ai/en/latest/features/spec_decode.html">vLLM speculative decoding</a> · <a href="https://docs.vllm.ai/en/latest/cli/bench/serve.html">vLLM bench serve</a> · <a href="https://docs.sglang.ai/">SGLang</a> · <a href="https://nvidia.github.io/TensorRT-LLM/">TensorRT-LLM</a> · <a href="https://docs.nvidia.com/nsight-systems/UserGuide/index.html">Nsight Systems user guide</a></li>
+<li>Specs: <a href="https://www.nvidia.com/en-us/data-center/h100/">NVIDIA H100</a> · <a href="https://www.nvidia.com/en-us/autonomous-machines/embedded-systems/jetson-orin/">NVIDIA Jetson Orin</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="04-prefix-caching-disaggregation.html"><small>Previous</small>Page 04 · Prefix caching and disaggregation</a>
+  <a class="next" href="06-quantization-hardware.html"><small>Next</small>Page 06 · Quantisation and choosing GPUs</a>
+</nav>
+<footer>Module 09 · Page 05 · written for this course from the source post, official docs and papers.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('sd'), ctx = cv.getContext('2d');
+const ids = ['al', 'kk', 'cc', 'vv'];
+const el = Object.fromEntries(ids.map(k => [k, document.getElementById(k)]));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+const tokens = (a, k) => a >= 1 ? k + 1 : (1 - a ** (k + 1)) / (1 - a);
+const cost = (k, c, v) => k * c + 1 + k * v;
+const speed = (a, k, c, v) => tokens(a, k) / cost(k, c, v);
+function bestK(a, c, v) {
+  let b = [1, speed(a, 1, c, v)];
+  for (let k = 2; k <= 16; k++) { const s = speed(a, k, c, v); if (s > b[1]) b = [k, s]; }
+  return b;
+}
+function breakEven(k, c, v) {
+  for (let i = 0; i <= 999; i++) if (speed(i / 1000, k, c, v) >= 1) return i / 1000;
+  return null;
+}
+
+function draw() {
+  const a = +el.al.value / 100, k = +el.kk.value, c = +el.cc.value / 100, v = +el.vv.value / 100;
+  const shown = { al: a.toFixed(2), kk: k, cc: c.toFixed(2), vv: v.toFixed(2) };
+  ids.forEach(n => document.getElementById(n + 'v').textContent = shown[n]);
+
+  const W = cv.width, H = cv.height, l = 44, r = 16, t = 12, b = 32, Y1 = 6;
+  const px = x => l + x / 0.99 * (W - l - r);
+  const py = y => t + (Y1 - Math.min(Math.max(y, 0), Y1)) / Y1 * (H - t - b);
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = css('--line'); ctx.lineWidth = 1; ctx.font = '12px sans-serif'; ctx.fillStyle = css('--muted');
+  for (let y = 0; y <= Y1; y++) {
+    ctx.beginPath(); ctx.moveTo(l, py(y)); ctx.lineTo(W - r, py(y)); ctx.stroke();
+    ctx.textAlign = 'right'; ctx.fillText(y + '×', l - 6, py(y) + 4);
+  }
+  ctx.textAlign = 'center';
+  for (let x = 0; x <= 0.9 + 1e-9; x += 0.1) ctx.fillText(x.toFixed(1), px(x), H - 12);
+  ctx.fillText('acceptance rate α', (l + W - r) / 2, H - 1);
+
+  const curve = (f, col, dash) => {
+    ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.setLineDash(dash); ctx.beginPath();
+    for (let i = 0; i <= 99; i++) { const x = i / 100, y = f(x); i ? ctx.lineTo(px(x), py(y)) : ctx.moveTo(px(x), py(y)); }
+    ctx.stroke(); ctx.setLineDash([]);
+  };
+  curve(x => bestK(x, c, v)[1], css('--muted'), [6, 5]);
+  curve(x => speed(x, k, c, v), css('--accent'), []);
+  ctx.strokeStyle = css('--fail'); ctx.lineWidth = 1.5; ctx.beginPath();
+  ctx.moveTo(l, py(1)); ctx.lineTo(W - r, py(1)); ctx.stroke();
+
+  const s = speed(a, k, c, v);
+  ctx.fillStyle = s >= 1 ? css('--pass') : css('--fail');
+  ctx.beginPath(); ctx.arc(px(a), py(s), 6, 0, 7); ctx.fill();
+
+  const bk = bestK(a, c, v), be = breakEven(k, c, v);
+  document.getElementById('sE').textContent = tokens(a, k).toFixed(2);
+  document.getElementById('sC').textContent = cost(k, c, v).toFixed(2);
+  document.getElementById('sS').textContent = s.toFixed(2) + '×';
+  document.getElementById('sB').textContent = `k = ${bk[0]} (${bk[1].toFixed(2)}×)`;
+  document.getElementById('sX').textContent = be === null ? 'never' : be.toFixed(2);
+}
+ids.forEach(k => el[k].oninput = draw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

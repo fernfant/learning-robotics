@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 18 · Pointer Networks</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 18</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Unit 4 · Specialised architectures · Day 18</div>
+<h1>Pointer Networks</h1>
+<p class="lede">When the answer is "which of the inputs", don't predict from a fixed vocabulary. Use the attention weights themselves as the output.</p>
+
+<div class="facts">
+  <div><b>Authors</b>Oriol Vinyals, Meire Fortunato, Navdeep Jaitly</div>
+  <div><b>Year / venue</b>2015 · NIPS (NeurIPS)</div>
+  <div><b>Core idea</b>Attention as an output pointer</div>
+  <div><b>Study time</b>3–4 h</div>
+</div>
+<p class="meta">Original: <a href="https://arxiv.org/abs/1506.03134">arXiv:1506.03134</a> · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/18_pointer_networks">30u30 Day 18</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">When the answer is "one of the things you were given", a Pointer Network simply points at it, instead of choosing from a fixed list of answers.</p>
+
+<h3>Think of it like this</h3>
+<p>Stick some pins in a board and stretch a rubber band around all of them. The band touches only the outer pins. Now say which pins it touches, in order around the outside. Your answer is just pointing: "this one, then this one, then that one". It works the same with 5 pins or 500. A Pointer Network answers the same way. It doesn't need a fixed list of possible answers, because the answers are always the inputs themselves.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>The network looks at all the points and makes a note about each one.</li>
+<li>At each step, it gives every point a score: how likely is this one to be next?</li>
+<li>The scores become shares that add up to 100%. The point with the biggest share is its pick.</li>
+<li>Points already used are crossed out, so it can't pick them again.</li>
+<li>It repeats until it is done. Because it only ever points, the same network works for any number of points.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A delivery robot with eight stops has to choose the order to visit them. At each step it can point at the best next stop and cross off the ones it has done. Crossing off also works for safety: any spot that is blocked or unsafe can be crossed out before the robot chooses.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Put a handful of coins on a table. Pretend a rubber band is stretched around them. Go around the outside, pointing at each coin the band would touch, in order. You are doing the network's job.</li>
+<li>In the demo further down, press <b>Next step</b> again and again. Bigger circles mean the network is pointing more strongly at that point, and hollow points are crossed out. Use <b>Restart</b> or <b>New points</b> to try again, and move the <b>Number of points n</b> slider to see that it still works with more points.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Pointer</dt><dd>An answer that picks one of the inputs.</dd>
+<dt>Convex hull</dt><dd>The outside shape you get by stretching a rubber band around all the points.</dd>
+<dt>Mask</dt><dd>Crossing out choices that aren't allowed, like points already used.</dd>
+<dt>Vocabulary</dt><dd>The list of answers a network can give. For a pointer, it is the inputs.</dd>
+<dt>Travelling salesperson problem</dt><dd>Finding the shortest route that visits every stop once.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>A seq2seq model ends in a softmax over a fixed vocabulary. That breaks when the output is a choice among the inputs: the convex hull of 10 points has indices up to 10, of 500 points up to 500. Pointer Networks (Ptr-Nets) keep the attention score from <a href="15-bahdanau-attention.html">Day 15</a> but stop there. The softmax over input positions <em>is</em> the output distribution. The output vocabulary grows and shrinks with the input, so one model can run on any number of points. The authors trained Ptr-Nets on examples alone to produce convex hulls, Delaunay triangulations and short travelling-salesman tours.</p>
+</div>
+<ul>
+<li><strong>Encoder:</strong> an LSTM reads the input points, giving one state per point.</li>
+<li><strong>Decoder:</strong> an LSTM; at each step its state is compared with every encoder state, and the softmax picks a point.</li>
+<li><strong>Convex hull:</strong> 72.6% exact accuracy at n = 50 versus 38.9% for an LSTM with attention and 1.9% for a plain LSTM.</li>
+<li><strong>Generalisation:</strong> trained on 5–50 points, the same model covered 99.2% of the true hull's area at n = 500, although exact accuracy fell to 1.3%.</li>
+<li><strong>TSP:</strong> near-optimal for small n. For n = 50, trained on a weak heuristic's tours, it beat that heuristic (6.42 vs 6.46 tour length).</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<p>Encoder states <code>e_1 … e_n</code>, decoder state <code>d_i</code> at output step i:</p>
+<pre><code>Attention (Day 15):   u_j^i = vᵀ tanh(W_1 e_j + W_2 d_i)
+                      a^i   = softmax(u^i)
+                      d'_i  = Σ_j a_j^i e_j       → feed to a fixed-vocabulary softmax
+
+Pointer:              u_j^i = vᵀ tanh(W_1 e_j + W_2 d_i)     j = 1 … n
+                      p(C_i | C_1 … C_{i−1}, P) = softmax(u^i)</code></pre>
+<ul>
+<li><code>u_j^i</code> scores input j for output step i. Same additive form as Bahdanau attention.</li>
+<li><code>W_1</code>, <code>W_2</code>, <code>v</code> are the only pointer parameters, and none of their shapes depend on n. That's why the model runs on any input size.</li>
+<li><code>softmax(u^i)</code> has exactly n entries. Picking its argmax means "output input number j".</li>
+<li><code>C_i</code> is the index chosen at step i, <code>P</code> the input point set. Training is plain maximum likelihood on example index sequences; decoding uses beam search.</li>
+<li>Models were single-layer LSTMs with 256 or 512 units, trained on points sampled uniformly from the unit square.</li>
+</ul>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>Why a fixed vocabulary fails here</h3>
+<p>A seq2seq baseline needs a separate output class for "point 1", "point 2", and so on. It must be trained and tested at the same n, and it has to learn what "point 7" means from scratch. A pointer instead compares content: "which of these encoder states fits what I need next?" The Ptr-Net trained on mixed sizes 5–50 reached 92.0% hull accuracy at n = 5 and 87.0% at n = 10, against 87.7% and 29.9% for LSTMs trained specifically at those sizes.</p>
+
+<h3>Decoding a convex hull, step by step</h3>
+<div class="card demo">
+<h3>Interactive: pointing at the next hull point</h3>
+<p class="legend">The output vocabulary is the input points. At each step, circle size shows the pointer distribution over all n points. Hollow points are masked (already used). Scores here come from a hand-written gift-wrapping rule (score falls with the number of points on the wrong side of the edge), standing in for what a trained Ptr-Net computes with vᵀtanh(W₁e + W₂d). The mechanics are the real ones: one softmax over the inputs, masking, and a vocabulary of size n.</p>
+<canvas id="ptr" width="700" height="220" aria-label="Points with pointer probabilities and the hull built so far"></canvas>
+<label for="np">Number of points n: <span id="npv" class="num"></span></label>
+<input id="np" type="range" min="5" max="40" step="1" value="14">
+<p><button id="step">Next step</button> <button id="reset">Restart</button> <button id="pts">New points</button></p>
+<div class="stats">
+  <div class="stat"><div class="k">Step</div><div class="v" id="st">–</div></div>
+  <div class="stat"><div class="k">Vocabulary size</div><div class="v" id="vs">–</div></div>
+  <div class="stat"><div class="k">P(chosen point)</div><div class="v" id="pc">–</div></div>
+  <div class="stat"><div class="k">Hull points so far</div><div class="v" id="hp">–</div></div>
+</div>
+</div>
+<p>Two practical details from the paper. First, the output order is fixed by convention for training: for TSP, every training tour starts at the first city. <a href="16-order-matters.html">Day 16</a> shows why such conventions matter. Second, nothing in the bare model stops it pointing at the same city twice, so for TSP the authors restricted beam search to valid tours. For n &gt; 20, at least 10% of instances produced no valid tour otherwise. Masking already-chosen inputs, as in the demo, is the now-standard fix.</p>
+
+<h3>Results and limits</h3>
+<ul>
+<li><strong>TSP, exact training data (Held-Karp):</strong> tour length 2.12 at n = 5 (optimal 2.12) and 2.88 at n = 10 (optimal 2.87).</li>
+<li><strong>TSP generalisation:</strong> trained on 5–20 cities, results were near perfect at n = 25 and good at 30, but broke down from 40 up (7.66 vs 5.79 for Christofides at n = 50).</li>
+<li><strong>Delaunay triangulation:</strong> 80.7% exact at n = 5, 22.6% at n = 10. Harder structure, weaker results.</li>
+<li>Later work (for example attention-based models trained with reinforcement learning) pushed learned routing much further, but the pointer output head stayed.</li>
+</ul>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>"Grasp that one" is a pointer.</strong> Given N detected objects or N candidate grasp poses, a policy can score each and softmax over them, instead of regressing coordinates. It works for any number of objects, and the output is always a valid candidate.</li>
+<li><strong>Task ordering and routing.</strong> Visiting inspection points, picking orders in a warehouse, or ordering welds is TSP-like. Pointer-style decoders with masking are a common learned heuristic for these, usually checked against or combined with classical solvers.</li>
+<li><strong>Masking encodes constraints.</strong> Already picked, unreachable, or in collision: set those scores to −∞ and the policy can't choose them. It's a simple way to put hard safety and feasibility rules around a learned selector.</li>
+<li><strong>Be honest about scale.</strong> The paper's TSP results degrade past the training range. For real fleets, classical solvers and heuristics remain the baseline to beat.</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Read sections 2 (models) and 4 (results) of the paper. Compare equation 3 with Bahdanau's alignment model from Day 15.</li>
+<li>In the 30u30 Day 18 folder, read <code>implementation.py</code> (it uses sorting as the task) and run <code>train_minimal.py</code>. Plot pointer distributions with <code>visualization.py</code>.</li>
+<li>Do the exercises: pointer attention, masking, convex hull, TSP cost, greedy decoding.</li>
+<li>Test size generalisation yourself: train on n ≤ 10, evaluate at n = 20 and 40, and plot accuracy versus n.</li>
+<li>Stretch: replace the LSTM encoder with a Transformer encoder without positional encodings, so the input is treated as a set.</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>What is the one change from Bahdanau attention to a pointer?</summary><p>The attention distribution over inputs is used directly as the output distribution, instead of being used to mix encoder states into a context vector.</p></details>
+<details><summary>Why can one Ptr-Net handle any number of inputs?</summary><p>Its parameters (W_1, W_2, v) act per input, and the softmax simply has one entry per input. Nothing is sized to a fixed n.</p></details>
+<details><summary>On the hull task at n = 500, why is accuracy 1.3% but area coverage 99.2%?</summary><p>Accuracy needs every hull point exactly right. With 500 points a single near-collinear mistake fails the example, while the polygon produced still covers almost all the true hull.</p></details>
+<details><summary>How do you stop a pointer network from visiting a city twice?</summary><p>Mask already-chosen inputs by setting their scores to −∞ before the softmax, or restrict beam search to valid outputs, as the paper did for TSP.</p></details>
+<details><summary>Why did a Ptr-Net trained on A1's tours beat A1?</summary><p>It learned a smoothed general rule from many examples rather than reproducing each tour's specific mistakes. It's evidence the model isn't just memorising, but the gain was small (6.42 vs 6.46).</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/1506.03134">The original paper</a> (arXiv; published at NIPS 2015)</li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/18_pointer_networks">30u30 Day 18</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Next: <a href="19-relational-reasoning.html">Day 19, A Simple Neural Network Module for Relational Reasoning</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="17-neural-turing-machines.html"><small>Previous</small>Day 17 · Neural Turing Machines</a>
+  <a class="next" href="19-relational-reasoning.html"><small>Next</small>Day 19 · Relational Reasoning</a>
+</nav>
+<footer>Module 06 · Day 18 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('ptr'), ctx = cv.getContext('2d'), nIn = document.getElementById('np');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const rng = s => () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+const TAU = 0.5;
+let seed = 18, P = [], path = [], done = false;
+
+const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+function init() { const r = rng(seed); P = Array.from({ length: +nIn.value }, () => [r(), r()]); reset(); }
+function reset() { const s = P.reduce((b, p, i) => p[0] < P[b][0] ? i : b, 0); path = [s]; done = false; draw(); }
+
+// pointer distribution over all inputs from the current hull point (counter-clockwise gift wrapping)
+function pointer() {
+  const cur = P[path[path.length - 1]];
+  const u = P.map((p, j) => {
+    if (j === path[path.length - 1] || (path.includes(j) && !(j === path[0] && path.length > 2))) return -Infinity;
+    return -P.filter((q, k) => k !== j && cross(cur, p, q) < 0).length / TAU;
+  });
+  const m = Math.max(...u), e = u.map(v => v === -Infinity ? 0 : Math.exp(v - m)), s = e.reduce((a, b) => a + b);
+  return e.map(v => v / s);
+}
+
+function draw() {
+  const W = cv.width, H = cv.height, pad = 14, sx = x => pad + x * (W - 2 * pad), sy = y => H - pad - y * (H - 2 * pad);
+  const p = done ? P.map(() => 0) : pointer();
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = css('--accent'); ctx.lineWidth = 2; ctx.beginPath();
+  path.forEach((k, i) => i ? ctx.lineTo(sx(P[k][0]), sy(P[k][1])) : ctx.moveTo(sx(P[k][0]), sy(P[k][1])));
+  ctx.stroke(); ctx.lineWidth = 1;
+  P.forEach((q, j) => {
+    const used = path.includes(j);
+    ctx.beginPath(); ctx.arc(sx(q[0]), sy(q[1]), 3 + 14 * Math.sqrt(p[j]), 0, 2 * Math.PI);
+    if (used && !(j === path[0] && p[j] > 0)) { ctx.strokeStyle = css('--muted'); ctx.stroke(); }
+    else { ctx.fillStyle = p[j] > 0.01 ? css('--pass') : css('--muted'); ctx.fill(); }
+  });
+  const best = p.indexOf(Math.max(...p));
+  document.getElementById('npv').textContent = P.length;
+  document.getElementById('st').textContent = done ? 'done' : path.length;
+  document.getElementById('vs').textContent = P.length;
+  document.getElementById('pc').textContent = done ? '–' : (p[best] * 100).toFixed(0) + '%';
+  document.getElementById('hp').textContent = done ? path.length - 1 : path.length;
+}
+function step() {
+  if (done) return;
+  const p = pointer(), j = p.indexOf(Math.max(...p));
+  path.push(j);
+  if (j === path[0]) done = true;
+  draw();
+}
+document.getElementById('step').onclick = step;
+document.getElementById('reset').onclick = reset;
+document.getElementById('pts').onclick = () => { seed++; init(); };
+nIn.oninput = init;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+init();
+</script>
+</body>
+</html>

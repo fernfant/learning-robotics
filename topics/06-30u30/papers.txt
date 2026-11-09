@@ -1,0 +1,31 @@
+day|slug|repo_dir|title|unit
+01|01-rnn-effectiveness|01_Unreasonable_Effectiveness|The Unreasonable Effectiveness of RNNs|Unit 1 · The foundations
+02|02-lstm|02_Understanding_LSTM|Understanding LSTM Networks|Unit 1 · The foundations
+03|03-rnn-regularization|03_RNN_Regularization|Recurrent Neural Network Regularization|Unit 1 · The foundations
+04|04-mdl-noisy-weights|04_Minimizing_Description_Length|Keeping Neural Networks Simple by Minimizing the Description Length of the Weights|Unit 1 · The foundations
+05|05-mdl-principle|05_MDL_Principle|A Tutorial Introduction to the Minimum Description Length Principle|Unit 1 · The foundations
+06|06-complexodynamics|06_Complexodynamics|The First Law of Complexodynamics|Unit 1 · The foundations
+07|07-coffee-automaton|07_coffee_automaton|Quantifying the Rise and Fall of Complexity in Closed Systems: The Coffee Automaton|Unit 1 · The foundations
+08|08-alexnet|08_alexnet|ImageNet Classification with Deep Convolutional Neural Networks (AlexNet)|Unit 2 · Deep learning explosion
+09|09-resnet|09_resnet|Deep Residual Learning for Image Recognition (ResNet)|Unit 2 · Deep learning explosion
+10|10-resnet-identity-mappings|10_resnet_v2|Identity Mappings in Deep Residual Networks|Unit 2 · Deep learning explosion
+11|11-dilated-convolutions|11_dilated_convolutions|Multi-Scale Context Aggregation by Dilated Convolutions|Unit 2 · Deep learning explosion
+12|12-dropout|12_dropout|Dropout: A Simple Way to Prevent Neural Networks from Overfitting|Unit 2 · Deep learning explosion
+13|13-attention|13_attention|Attention Is All You Need|Unit 3 · The Transformer era
+14|14-annotated-transformer|14_annotated_transformer|The Annotated Transformer|Unit 3 · The Transformer era
+15|15-bahdanau-attention|15_bahdanau_attention|Neural Machine Translation by Jointly Learning to Align and Translate|Unit 3 · The Transformer era
+16|16-order-matters|16_order_matters|Order Matters: Sequence to Sequence for Sets|Unit 3 · The Transformer era
+17|17-neural-turing-machines|17_neural_turing_machines|Neural Turing Machines|Unit 4 · Specialised architectures
+18|18-pointer-networks|18_pointer_networks|Pointer Networks|Unit 4 · Specialised architectures
+19|19-relational-reasoning|19_relational_reasoning|A Simple Neural Network Module for Relational Reasoning|Unit 4 · Specialised architectures
+20|20-relational-rnns|20_Relational_RNNs|Relational Recurrent Neural Networks|Unit 4 · Specialised architectures
+21|21-message-passing|21_Neural_Message_Passing|Neural Message Passing for Quantum Chemistry|Unit 4 · Specialised architectures
+22|22-deep-speech-2|22_deep_speech_2|Deep Speech 2: End-to-End Speech Recognition in English and Mandarin|Unit 4 · Specialised architectures
+23|23-variational-lossy-autoencoder|23_variational_lossy_autoencoder|Variational Lossy Autoencoder|Unit 5 · Generative models & scaling
+24|24-gpipe|24_gpipe|GPipe: Efficient Training of Giant Neural Networks using Pipeline Parallelism|Unit 5 · Generative models & scaling
+25|25-scaling-laws|25_scaling_laws|Scaling Laws for Neural Language Models|Unit 5 · Generative models & scaling
+26|26-kolmogorov-complexity|26_kolmogorov_complexity|Kolmogorov Complexity and Algorithmic Randomness|Unit 5 · Generative models & scaling
+27|27-machine-super-intelligence|27_MSI|Machine Super Intelligence (Shane Legg)|Unit 5 · Generative models & scaling
+28|28-cs231n|28_CS231n|CS231n: Convolutional Neural Networks for Visual Recognition|Unit 5 · Generative models & scaling
+29|29-ppo|29_PPO|Proximal Policy Optimization Algorithms|Unit 6 · Deep RL & alignment
+30|30-rlhf|30_RLHF|Deep Reinforcement Learning from Human Preferences|Unit 6 · Deep RL & alignment

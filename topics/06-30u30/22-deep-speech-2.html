@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 22 · Deep Speech 2</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 22</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Unit 4 · Specialised architectures · Day 22</div>
+<h1>Deep Speech 2: End-to-End Speech Recognition in English and Mandarin</h1>
+<p class="lede">Replace a hand-built speech pipeline with one deep network trained on spectrograms, feed it about 12,000 hours of audio, and engineer the training like a supercomputer job. It then matches human transcribers on several benchmarks.</p>
+
+<div class="facts">
+  <div><b>Authors</b>Dario Amodei and 33 co-authors, Baidu Research Silicon Valley AI Lab (alphabetical order)</div>
+  <div><b>Year / venue</b>2016 · ICML (arXiv Dec 2015)</div>
+  <div><b>Core idea</b>End-to-end RNN + CTC, scaled with data and HPC</div>
+  <div><b>Study time</b>3–4 h</div>
+</div>
+<p class="meta">Original: <a href="https://arxiv.org/abs/1512.02595">arXiv:1512.02595</a> · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/22_deep_speech_2">30u30 Day 22</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">One big neural network, trained on thousands of hours of recorded speech, can turn sound straight into written words.</p>
+
+<h3>Think of it like this</h3>
+<p>When you talk to a voice assistant like Siri, it has to turn your voice into text. Older systems did this in many separate steps, each built by experts. Deep Speech 2 learns the whole job in one go, by listening to about 12,000 hours of people talking along with what they said. That's well over a year of non-stop audio.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>The sound is turned into a picture of which pitches are loud at each moment.</li>
+<li>The network looks at that picture one tiny slice of time at a time.</li>
+<li>For each slice it guesses a letter, or "blank" if nothing new is happening.</li>
+<li>Repeated letters are squashed together and blanks are removed. "hh_e_ll_ll_oo" becomes "hello".</li>
+<li>Training means checking these guesses against the real words and adjusting, over and over.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>You want to shout "stop!" at a robot and have it react right away. That's why the paper also built a version that writes words while you are still speaking, instead of waiting for the end of the sentence.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Say "hello" very slowly, stretching each sound. Write down a letter for every beat, using "_" when there's a pause. Then cross out repeats and blanks. Do you get "hello" back?</li>
+<li>In the demo further down, move the <b>Frames T</b> slider to change how many time slices there are. Press <b>Another alignment</b> to see a different way of spelling out "hello" over time. Each one still squashes down to the same word.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Speech recognition</dt><dd>Turning spoken words into written text.</dd>
+<dt>Spectrogram</dt><dd>A picture of sound showing which pitches are loud at each moment.</dd>
+<dt>Frame</dt><dd>One tiny slice of time in the audio.</dd>
+<dt>Blank</dt><dd>A special symbol meaning "nothing new here".</dd>
+<dt>CTC</dt><dd>The training method that lets the network learn without being told which slice goes with which letter.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Classic speech recognisers were pipelines: feature extraction, an acoustic model, a pronunciation dictionary, a language model, each tuned by experts. Deep Speech 2 (DS2) trains one network that maps spectrogram frames straight to characters, using the CTC loss so no frame-by-frame alignment is needed. The same recipe worked for English and Mandarin with almost no language-specific changes. The paper is as much about <em>scale</em> as architecture: 11,940 hours of English, up to about 100M parameters, a training system about 7× faster than their previous one, and a deployment design that keeps latency low.</p>
+</div>
+<ul>
+<li><strong>Model:</strong> 1–3 convolution layers over the spectrogram, up to 7 recurrent layers, a fully connected layer, then a softmax over characters plus a "blank".</li>
+<li><strong>Training tricks:</strong> batch normalisation adapted to RNNs, and SortaGrad, which feeds short utterances first in the first epoch.</li>
+<li><strong>Results:</strong> on WSJ eval'92, 3.60% WER vs 5.03% for human transcribers. On LibriSpeech test-clean, 5.33% vs 5.83%. On real noisy speech (CHiME), still well behind: 21.79% vs 11.84%.</li>
+<li><strong>Data scaling:</strong> WER fell about 40% (relative) for each 10× more training data, following a power law.</li>
+<li><strong>Deployment:</strong> forward-only RNNs plus a small look-ahead layer, 16-bit weights and request batching. Median latency 44 ms at 10 concurrent streams, for a 5% relative accuracy cost.</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<p>The network outputs, for every audio frame <code>t</code>, a probability over symbols: letters, space, apostrophe and a special <strong>blank</strong> (for Mandarin, about 6,000 characters). A transcript is much shorter than the frame sequence, and nobody labels which frame belongs to which letter. CTC solves this by summing over every frame-level path that collapses to the right text:</p>
+<pre><code>L(x, y) = −log  Σ_{ℓ ∈ Align(x, y)}  Π_t  p(ℓ_t | x)
+
+collapse(ℓ): merge repeated symbols, then delete blanks
+  "hh_e_ll_ll_oo"  →  "hel_lo"  →  "hello"</code></pre>
+<ul>
+<li><code>ℓ</code>: one alignment, a symbol for each frame.</li>
+<li><code>Align(x, y)</code>: all alignments that collapse to transcript <code>y</code>. There are many, and a dynamic program sums them efficiently.</li>
+<li>The blank lets the network say "nothing new here", and it separates genuine double letters like the "ll" in "hello".</li>
+</ul>
+<p>At test time, a beam search combines the network with an n-gram language model:</p>
+<pre><code>Q(y) = log p_ctc(y | x) + α · log p_lm(y) + β · word_count(y)</code></pre>
+<p><code>α</code> weights the language model and <code>β</code> stops the search from favouring too-short outputs. Both are tuned on a development set.</p>
+<div class="card demo">
+<h3>Interactive: many alignments, one transcript</h3>
+<p class="legend">A random valid frame-level path for "hello" (<b>_</b> = blank), and what it collapses to. Change the frame count and see how many paths CTC sums over.</p>
+<canvas id="ctc" width="700" height="170" aria-label="Frame-level CTC alignment and its collapsed transcript"></canvas>
+<label for="f">Frames T: <span id="fv" class="num"></span></label>
+<input id="f" type="range" min="6" max="24" step="1" value="12">
+<p><button id="again" type="button">Another alignment</button></p>
+<div class="stats">
+  <div class="stat"><div class="k">Collapsed output</div><div class="v" id="out">–</div></div>
+  <div class="stat"><div class="k">Valid alignments</div><div class="v" id="cnt">–</div></div>
+</div>
+</div>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>Making deep RNNs trainable</h3>
+<p><strong>Sequence-wise batch norm.</strong> Normalising the recurrent term step by step didn't help. What worked was normalising only the input-to-hidden part, with statistics over the whole minibatch and the whole sequence: <code>h_t = f(B(W·h_t^{l−1}) + U·h_{t−1})</code>. The gain grew with depth, about 12% for the deepest network in their comparison. At deployment they use running averages from training, so single utterances work.</p>
+<p><strong>SortaGrad.</strong> The CTC loss for a long utterance is a product of many probabilities below 1, so long clips have large losses and large gradients early in training. In the first epoch, DS2 sorts minibatches by length, short first, then goes back to random order. It's a cheap curriculum that makes training more stable.</p>
+<p><strong>Convolutions and striding.</strong> 2D convolutions over time and frequency at the bottom helped most on noisy speech: three 2D layers instead of one 1D layer cut noisy-set WER by 23.9%. Striding shortens the sequence for the RNNs. In English that can leave too few frames per character, so they predict non-overlapping bigrams ("th", "e", …) and can stride by 3.</p>
+
+<h3>Scale is part of the method</h3>
+<p>Training a model took tens of exaFLOPs. Their system ran synchronous SGD across 8–16 GPUs, with a custom all-reduce, a GPU CTC implementation and a custom memory allocator. It sustained about 50 teraFLOP/s on 16 GPUs, so a model trained in 3–5 days instead of weeks. Faster experiments meant more of them. The data table shows a clean power law, an early hint of what <a href="25-scaling-laws.html">Day 25</a> formalises. They also note that activations, not weights, dominate training memory, the problem <a href="24-gpipe.html">Day 24</a> attacks with re-materialisation.</p>
+
+<h3>From research model to product</h3>
+<p>Bidirectional RNNs must hear the whole utterance before transcribing. For deployment they used forward-only layers plus a <strong>row convolution</strong> on top, which lets each step peek at a small window of future frames:</p>
+<pre><code>r_{t,i} = Σ_{j=1}^{τ+1}  W_{i,j} · h_{t+j−1, i}</code></pre>
+<p>The deployed Mandarin model used <code>τ = 19</code>, five forward-only recurrent layers and 16-bit arithmetic, which they found didn't measurably change accuracy. <strong>Batch Dispatch</strong> groups concurrent user requests into small batches on a GPU, trading a little waiting for much better throughput. The deployed system had 6.10% character error vs 5.81% for the research model. For the latency side of this trade-off on small on-device models, see <a href="../04-distill-small-models.html#latency">Module 04</a>.</p>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Voice is a natural robot interface.</strong> "Stop", "bring me the red cup", "go back to the dock". DS2 showed one end-to-end model can do this without hand-built pronunciation dictionaries, which is the basis of today's on-robot speech front ends.</li>
+<li><strong>Streaming matters more than benchmark WER.</strong> A robot can't wait for the full sentence before it reacts to "stop". The forward-only + small look-ahead design is exactly the latency-vs-accuracy trade a robot needs. <a href="../04-distill-small-models.html#latency">Module 04</a> turns latency into stopping distance.</li>
+<li><strong>Robots are noisy places.</strong> Motors, fans and far-field microphones look like the CHiME conditions, where DS2 was still far worse than humans. Test on your robot's own audio, not clean benchmarks.</li>
+<li><strong>WER isn't the metric you care about.</strong> For commands, one wrong word can mean a wrong action. <a href="../04-distill-small-models.html#eval">Module 04</a> shows why "exactly right" per command matters more.</li>
+<li><strong>Small batches on the edge.</strong> On a robot the batch size is often 1. DS2's finding that RNN inference at small batch is memory-bandwidth bound, and its use of 16-bit weights, still apply to embedded boards.</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Read sections 3 (architecture) and 7 (deployment) of the paper, about 1.5 h. Skim section 4 on the training system and section 6 on results by condition.</li>
+<li>In the 30u30 Day 22 folder, run <code>setup.py</code>, then <code>train_minimal.py</code> on the synthetic data, and <code>visualization.py</code> to look at spectrograms and outputs.</li>
+<li>Read <code>implementation.py</code>: find the CTC loss, the greedy decoder (collapse repeats, drop blanks) and the sequence-wise batch norm.</li>
+<li>Do the exercises: spectrogram, CTC loss and greedy decoding, the RNN with batch norm, SortaGrad, then the full pipeline.</li>
+<li>Stretch: record a few of your own commands, run them through a pretrained open-source CTC model, and measure both WER and "exactly right".</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>Why does CTC need a blank symbol?</summary><p>To output "nothing new" on frames between characters, and to separate genuine repeated letters. Without a blank, "ll" would collapse to "l".</p></details>
+<details><summary>Why are longer utterances harder early in training?</summary><p>The CTC likelihood is a product over many frames, so long clips have much larger losses and gradients. SortaGrad starts with short ones to keep early training stable.</p></details>
+<details><summary>Why can't a bidirectional RNN stream?</summary><p>Its backward direction starts at the end of the utterance, so nothing can be output until the speaker finishes. Forward-only layers with a short look-ahead fix that.</p></details>
+<details><summary>What does the language-model term in decoding add?</summary><p>Knowledge from far more text than the labelled audio. It helps choose between acoustically similar transcripts. Its gain shrank as the acoustic model got deeper.</p></details>
+<details><summary>What did the data-scaling experiment show?</summary><p>WER fell as a power law in training hours, about 40% relative per 10× data, on both clean and noisy development sets.</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/1512.02595">The original paper</a></li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/22_deep_speech_2">30u30 Day 22</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Next: <a href="23-variational-lossy-autoencoder.html">Day 23, Variational Lossy Autoencoder</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="21-message-passing.html"><small>Previous</small>Day 21 · Message Passing</a>
+  <a class="next" href="23-variational-lossy-autoencoder.html"><small>Next</small>Day 23 · Variational Lossy Autoencoder</a>
+</nav>
+<footer>Module 06 · Day 22 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('ctc'), ctx = cv.getContext('2d'), fIn = document.getElementById('f');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function rng(s) { return () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const WORD = 'hello', B = '_', EXT = [B, ...[...WORD].flatMap(c => [c, B])];  // _h_e_l_l_o_
+let seed = 22;
+
+// CTC forward recursion, counting paths instead of summing probabilities
+function forward(T) {
+  const S = EXT.length, a = Array.from({length: T}, () => new Array(S).fill(0));
+  a[0][0] = 1; a[0][1] = 1;
+  for (let t = 1; t < T; t++) for (let s = 0; s < S; s++) {
+    let v = a[t - 1][s] + (s > 0 ? a[t - 1][s - 1] : 0);
+    if (s > 1 && EXT[s] !== B && EXT[s] !== EXT[s - 2]) v += a[t - 1][s - 2];
+    a[t][s] = v;
+  }
+  return a;
+}
+const total = (a, T) => a[T - 1][EXT.length - 1] + a[T - 1][EXT.length - 2];
+
+// sample one alignment uniformly by walking the table backwards
+function sample(a, T, r) {
+  const S = EXT.length, pick = opts => {
+    let u = r() * opts.reduce((x, o) => x + o.w, 0);
+    for (const o of opts) { if ((u -= o.w) < 0) return o.s; }
+    return opts[opts.length - 1].s;
+  };
+  let s = pick([{s: S - 1, w: a[T - 1][S - 1]}, {s: S - 2, w: a[T - 1][S - 2]}]);
+  const path = [EXT[s]];
+  for (let t = T - 1; t > 0; t--) {
+    const opts = [{s, w: a[t - 1][s]}];
+    if (s > 0) opts.push({s: s - 1, w: a[t - 1][s - 1]});
+    if (s > 1 && EXT[s] !== B && EXT[s] !== EXT[s - 2]) opts.push({s: s - 2, w: a[t - 1][s - 2]});
+    s = pick(opts.filter(o => o.w > 0));
+    path.unshift(EXT[s]);
+  }
+  return path;
+}
+
+function collapse(p) {
+  return p.filter((c, i) => i === 0 || c !== p[i - 1]).filter(c => c !== B).join('');
+}
+
+function draw() {
+  const T = +fIn.value, a = forward(T), path = sample(a, T, rng(seed * 100 + T)), out = collapse(path);
+  document.getElementById('fv').textContent = T;
+  const W = cv.width, pad = 10, w = (W - 2 * pad) / T;
+  ctx.clearRect(0, 0, W, cv.height);
+  ctx.textAlign = 'center'; ctx.font = '15px monospace';
+  ctx.fillStyle = css('--muted'); ctx.textAlign = 'left'; ctx.fillText('frames →', pad, 18); ctx.textAlign = 'center';
+  path.forEach((c, i) => {
+    const x = pad + i * w, newChar = c !== B && (i === 0 || c !== path[i - 1]);
+    ctx.fillStyle = c === B ? css('--bg') : newChar ? css('--accent') : css('--pass');
+    ctx.fillRect(x + 2, 30, w - 4, 44);
+    ctx.strokeStyle = css('--line'); ctx.strokeRect(x + 2, 30, w - 4, 44);
+    ctx.fillStyle = css('--fg'); ctx.fillText(c, x + w / 2, 58);
+  });
+  ctx.fillStyle = css('--muted'); ctx.font = '13px sans-serif';
+  ctx.fillText('merge repeats, drop blanks', W / 2, 100);
+  ctx.fillStyle = css('--fg'); ctx.font = '22px monospace'; ctx.fillText(out, W / 2, 140);
+  document.getElementById('out').textContent = out;
+  document.getElementById('cnt').textContent = total(a, T).toLocaleString('en');
+}
+fIn.oninput = draw;
+document.getElementById('again').onclick = () => { seed++; draw(); };
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

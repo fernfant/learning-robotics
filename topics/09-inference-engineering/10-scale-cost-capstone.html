@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inference · Scale and cost</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 09 · Inference engineering</a> › Page 10</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 09 · Problems 23–25</div>
+<h1>MoE serving, cutting cost and the 1M-user capstone</h1>
+<p class="lede">The last three problems are about scale and money. How do you split a 2.8-trillion-parameter mixture-of-experts model across GPUs? How do you cut the cost per token by 70% without making answers worse? And how many GPUs, and how many dollars, does a chat service for a million daily users need? The answers are estimates built from stated assumptions, and the skill being tested is making those assumptions visible.</p>
+
+<div class="facts">
+  <div><b>Problems covered</b>23 (MoE parallelism and all-to-all) · 24 (cut cost per million tokens by 70%) · 25 (design for 1M daily active users)</div>
+  <div><b>Interview level</b>Senior. Problem 25 is a common system-design round at every level.</div>
+  <div><b>Key ideas</b>Expert parallelism, all-to-all, PP × EP layouts, cost per token, stacking multipliers, peak QPS, Little's law, provisioned vs autoscaled cost</div>
+  <div><b>Time to prep</b>4–5 h: 1.5 h on MoE layouts, 1 h on cost levers, 1.5 h rehearsing the capstone estimate with the calculator</div>
+</div>
+<p class="meta">Source: <a href="https://x.com/vishalsingh2972/status/2113830444722741637">Vishal Singh's post of 25 inference interview problems</a>, problems 23–25 · saved in <code>sources/09-vishal-inference-25.md</code></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Big AI models are expensive to run. Engineers work out how many computers they need by doing simple multiplication with guesses they write down, then they find ways to do the same work with fewer computers.</p>
+
+<h3>Think of it like this</h3>
+<p>Imagine a pizza company that delivers to a whole city. Its kitchen is enormous, with hundreds of specialist cooks: one only makes dough, one only does toppings, one only does sauces. Each order visits just a few of them, and runners carry half-made pizzas from station to station. If the stations are in one building, runners are quick. If half the stations are across the road, every pizza waits at the traffic lights. Now the owner asks two questions. How many ovens do we need for Friday at 8pm, when everyone orders at once? And how can we make each pizza 70% cheaper without it tasting worse? You answer both with guesses you write down: how many people order, how many pizzas each, how fast an oven bakes, what an oven costs per hour.</p>
+
+<h3>How it works</h3>
+<ol>
+<li><strong>Split the giant model.</strong> A mixture-of-experts model has hundreds of small "expert" networks. Each GPU holds some of them, and each word is sent to the few experts it needs.</li>
+<li><strong>Keep the runners close.</strong> Sending words between GPUs in the same server is fast. Between servers it's much slower, so you arrange the split to keep most trips inside one server.</li>
+<li><strong>Count the customers.</strong> Users per day, times chats per user, times messages per chat, gives requests per day. The busiest hour is a few times the average.</li>
+<li><strong>Turn requests into GPUs.</strong> Each request reads and writes a number of tokens. Divide by how many tokens one GPU handles per second.</li>
+<li><strong>Turn GPUs into money,</strong> then look for the biggest savings: smaller numbers, reused work, smart routing.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot fleet that asks a cloud model for help pays for every token. Knowing the cost per question tells you whether a robot can afford to "ask the big brain" every second or only when it's stuck. The robot's own computer has a fixed amount of memory, so a huge expert model can't live on board at all.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Estimate how many slices of pizza your school eats on pizza day: number of students × how many eat pizza × slices each. Then guess the busiest 10 minutes. Write every guess down and ask a friend to change one. Whose guess changes the answer most?</li>
+<li>In the calculator further down, double <b>Daily active users</b> and watch the GPUs double. Then double <b>Output tokens per request</b>. Then move the two price sliders, <b>$/GPU-hour (low)</b> and <b>$/GPU-hour (high)</b>, and see how wide the cost range gets.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Mixture of experts (MoE)</dt><dd>A model made of many small expert networks, with a router picking a few for each token.</dd>
+<dt>Expert parallelism</dt><dd>Putting different experts on different GPUs and sending each token to the GPUs that hold its experts.</dd>
+<dt>All-to-all</dt><dd>A communication step where every GPU sends something to every other GPU.</dd>
+<dt>QPS</dt><dd>Queries (requests) per second.</dd>
+<dt>GPU-hour</dt><dd>One GPU rented for one hour, the basic unit of serving cost.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="p23">Problem 23 · Serve a large MoE model: choose tensor, pipeline and expert parallelism, and explain all-to-all overhead</h2>
+<p><strong>What the interviewer is testing:</strong> whether you can size the model against real GPU memory, match each kind of parallelism to the link it needs, and estimate all-to-all cost for prefill and decode separately.</p>
+
+<h3>The concepts</h3>
+<p>Module 08 Stage 06 explains the three classic splits for training (<a href="../08-ai-research-engineer/06-distributed-training.html">distributed training</a>). Serving adds expert parallelism and changes the priorities, because decode steps are tiny and latency-sensitive.</p>
+<ul>
+<li><strong>Tensor parallelism (TP)</strong> splits each weight matrix across GPUs. It needs all-reduces on activations twice per layer, on the critical path, so it belongs inside one NVLink domain. For small experts, TP slices already-small matrices into slivers that run inefficiently.</li>
+<li><strong>Pipeline parallelism (PP)</strong> gives each group of GPUs a contiguous block of layers. Traffic is one point-to-point send of the hidden states per stage boundary, so it tolerates slower links between servers. It doesn't make any single token faster, and it needs several batches in flight to keep every stage busy.</li>
+<li><strong>Expert parallelism (EP)</strong> keeps each expert whole and puts different experts on different GPUs. Every MoE layer then needs two all-to-alls: <em>dispatch</em> (send each token to the GPUs holding its chosen experts) and <em>combine</em> (send the expert outputs back and sum them).</li>
+<li><strong>Data parallelism for attention.</strong> With MLA-style attention, the per-token cache is one small latent shared by all heads, so splitting heads with TP would copy the same cache onto every GPU. Engines such as SGLang offer data-parallel attention instead: each GPU runs attention for its own requests, then joins the expert-parallel MoE layer.</li>
+</ul>
+<pre><code>all-to-all bytes per token per MoE layer ≈ k × d_dispatch × (bytes_dispatch + bytes_combine)
+  k            experts chosen per token
+  d_dispatch   width of the vector sent to each expert
+fraction that leaves the GPU ≈ (E − 1) / E   for EP degree E and even routing
+
+time per MoE layer ≈ max(compute, communication)   if overlapped well
+                   ≈ compute + communication        if not
+step time is set by the busiest GPU, so load imbalance multiplies everything</code></pre>
+<p>The rule of thumb: <strong>prefill is bandwidth-bound</strong> (thousands of tokens per step, so the all-to-all moves gigabytes), and <strong>decode is latency-bound</strong> (a few hundred tokens per step, so messages are small but there are two collectives per layer per token on the critical path).</p>
+
+<h3>Worked answer: Kimi K3 on H200s</h3>
+<p>Use Kimi K3, the model studied in <a href="../05-trillion-scale-architecture.html#width">Module 05</a>. From its technical report: 93 layers (1 dense, so 92 MoE layers), 2.78T total and 104.2B active parameters, hidden size 7,168, 896 routed experts per layer with 16 active plus 2 shared, routed experts working in a 3,584-wide latent space with an expert hidden size of 3,072, expert weights in MXFP4 and activations in MXFP8, other components at higher precision. GPU figures are from NVIDIA's product pages: H200 SXM has 141 GB of HBM3e at 4.8 TB/s and 900 GB/s NVLink; a DGX B200 has 1,440 GB across 8 GPUs; DGX systems use 400 Gb/s ConnectX-7 network ports, one per GPU.</p>
+<p><strong>Step 1: does it fit?</strong> MXFP4 stores 4-bit values in blocks of 32 that share one 8-bit scale: 4 + 8/32 = 4.25 bits per weight. Assume each routed expert is a gated MLP with three 3,584 × 3,072 matrices.</p>
+<pre><code>routed expert params  = 3 × 3,584 × 3,072          = 33.0 M
+× 896 experts × 92 layers                          = 2.72 T   (matches most of 2.78 T)
+expert weights        = 2.72 T × 4.25 / 8 bytes    ≈ 1.45 TB
+everything else       ≈ 0.06 T at BF16 (2 B)       ≈ 0.11 TB   (assumption: BF16)
+total weights                                      ≈ 1.56 TB
+
+one 8 × H200 node:  8 × 141 GB = 1,128 GB   → does not fit
+one DGX B200:       1,440 GB                → does not fit
+two 8 × H200 nodes: 2,256 GB                → fits, ≈ 0.7 TB left for KV cache and activations</code></pre>
+<p>So the minimum serving unit is two nodes. Now, how to split across them?</p>
+
+<p><strong>Step 2: all-to-all volume.</strong> Dispatch sends the 3,584-wide latent to 16 experts in FP8 (1 byte); assume combine returns BF16 (2 bytes).</p>
+<pre><code>per token per MoE layer = 16 × 3,584 × (1 + 2) B = 172,032 B ≈ 172 KB
+× 92 MoE layers                                 ≈ 15.8 MB per token
+(an upper bound: no deduplication when two chosen experts share a GPU)</code></pre>
+
+<p><strong>Step 3: compare two layouts for one 16,384-token prefill chunk.</strong> Compute per MoE layer ≈ 2 × active params × tokens ÷ layers = 2 × 104.2 B × 16,384 ÷ 93 ≈ 3.67 × 10<sup>13</sup> FLOPs. NVIDIA lists H200 FP8 at 3,958 TFLOPS <em>with sparsity</em>, so about 1,979 TFLOPS dense. Assume 50% of that is achieved. Treat NVLink's 900 GB/s as 450 GB/s each way, and each 400 Gb/s port as 50 GB/s each way.</p>
+<div class="table-wrap"><table>
+<tr><th></th><th>Layout A: EP16 across both nodes</th><th>Layout B: PP2 × EP8 (one stage per node)</th></tr>
+<tr><td>GPUs per MoE layer</td><td>16</td><td>8</td></tr>
+<tr><td>Compute per layer</td><td>3.67e13 ÷ (16 × 990 TFLOPS) ≈ 2.3 ms</td><td>3.67e13 ÷ (8 × 990 TFLOPS) ≈ 4.6 ms</td></tr>
+<tr><td>Tokens held per GPU</td><td>1,024</td><td>2,048</td></tr>
+<tr><td>All-to-all per GPU per layer</td><td>1,024 × 172 KB = 176 MB: half (88 MB) crosses the network at 50 GB/s ≈ 1.8 ms</td><td>2,048 × 172 KB × 7/8 = 308 MB, all on NVLink at 450 GB/s ≈ 0.7 ms</td></tr>
+<tr><td>Comms ÷ compute</td><td>≈ 76%: needs near-perfect overlap</td><td>≈ 15%: easy to hide</td></tr>
+<tr><td>Extra cost</td><td>none</td><td>stage boundary: 16,384 × 7,168 × 2 B ≈ 235 MB per chunk over 8 ports ≈ 0.6 ms, once per chunk, not per layer</td></tr>
+<tr><td>Decode</td><td>2 × 92 = 184 collectives per token, all crossing nodes</td><td>184 collectives per token on NVLink, plus one network hop</td></tr>
+<tr><td>Memory per node</td><td>half of every layer's experts</td><td>all experts of half the layers ≈ 0.78 TB, ≈ 0.35 TB left</td></tr>
+</table></div>
+<p>For decode, the bytes are small: 256 tokens per step gives about 4.8 MB per GPU per layer, around 10 µs on NVLink. What hurts is the fixed cost of each collective. Assume (to be measured with your own stack) about 15–30 µs per all-to-all inside a node and 50–100 µs across nodes at decode sizes. Then 184 collectives cost about 2.8–5.5 ms per token in Layout B and 9–18 ms in Layout A, against a TPOT target of perhaps 30–50 ms. That's why I'd pick <strong>Layout B for a two-node deployment</strong>: keep the all-to-all inside the NVLink domain, and put pipeline stages on the slower link where traffic is once per chunk.</p>
+<p>Production systems push further: separate layouts for prefill and decode (disaggregation, <a href="04-prefix-caching-disaggregation.html">page 04</a>), routing limited to a few nodes per token, communication libraries such as DeepEP with a low-latency mode for decode, overlapping two micro-batches so one computes while the other communicates, and extra replicas of hot experts. The K3 report also describes a custom MoE decode kernel for small batches, where routed experts become memory-bound weight streaming, and overlapping the latent projections' communication with shared-expert compute (<a href="../05-trillion-scale-architecture.html#serving">Module 05 · Serving</a>).</p>
+<p><strong>Load imbalance.</strong> Each MoE layer waits for its busiest GPU. If the hottest GPU gets 1.5× the average number of tokens, that layer runs at two-thirds of its ideal speed. Balanced routing from training (K3's Quantile Balancing, in <a href="../05-trillion-scale-architecture.html#moe">Module 05</a>) and redundant copies of hot experts at serving time both attack this.</p>
+
+<h3>Trade-offs</h3>
+<div class="table-wrap"><table>
+<tr><th>Split</th><th>Communication</th><th>Link it needs</th><th>Good for</th><th>Cost</th></tr>
+<tr><td>TP</td><td>2 all-reduces per layer</td><td>NVLink</td><td>Attention, large dense layers</td><td>Inefficient on small experts; duplicates MLA cache</td></tr>
+<tr><td>PP</td><td>1 send per stage boundary</td><td>Network is fine</td><td>Spanning nodes cheaply</td><td>Bubbles; needs several batches in flight; no per-token speed-up</td></tr>
+<tr><td>EP</td><td>2 all-to-alls per MoE layer</td><td>NVLink ideally</td><td>Hundreds of experts</td><td>Latency per layer; load imbalance</td></tr>
+<tr><td>DP attention</td><td>None for attention</td><td>n/a</td><td>MLA-style small caches</td><td>Uneven requests per GPU</td></tr>
+</table></div>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>I start with memory: Kimi K3's 2.72T routed-expert parameters at MXFP4's 4.25 bits are about 1.45 TB, plus about 0.1 TB of higher-precision parts, so it doesn't fit one 8-GPU H200 node (1,128 GB) and needs two. Experts go on expert parallelism, because tensor-parallel slicing of small experts is inefficient, and attention runs data-parallel because MLA's cache is shared across heads. The all-to-all is about 172 KB per token per layer, so I keep it on NVLink: pipeline-parallel across the two nodes, EP8 within each. For a 16K-token prefill chunk that puts communication at about 15% of compute instead of about 76% with EP16 across the network. In decode the bytes are tiny but there are 184 collectives per token, so per-collective latency, overlap and load balance dominate; I'd measure them first.</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Sizing memory from active parameters. All 2.78T parameters must be resident; only compute scales with the 104B active.</li>
+<li>Using the sparsity TFLOPS figure from a spec sheet as dense throughput.</li>
+<li>Talking only about bandwidth. Decode all-to-all is dominated by per-collective latency, not bytes.</li>
+<li>Ignoring the busiest GPU. Average expert load says nothing about step time.</li>
+</ul>
+
+<h2 id="p24">Problem 24 · Reduce cost per million tokens by 70% without hurting quality</h2>
+<p><strong>What the interviewer is testing:</strong> whether you can write down the cost equation, see that 70% means a 3.3× improvement, and reach it with several measured levers, each guarded by a quality check.</p>
+
+<h3>The concepts</h3>
+<pre><code>cost per 1M tokens = ($ per GPU-hour) / (tokens per second per GPU × 3,600) × 1,000,000
+
+a 70% cut means cost × 0.3  →  tokens per GPU-dollar × 1 / 0.3 = 3.33×
+independent levers multiply:   total = m1 × m2 × m3 × …</code></pre>
+<p>There are only three knobs: cheaper GPU-hours, more tokens per GPU-hour, or fewer GPU-hours spent on work that isn't needed. Every lever falls into one of them:</p>
+<ul>
+<li><strong>Fewer bytes per token.</strong> FP8 or 4-bit weights and an FP8 KV cache. Fewer GPUs per replica and bigger batches per GPU (<a href="06-quantization-hardware.html">page 06</a>).</li>
+<li><strong>Bigger, fuller batches.</strong> Continuous batching, chunked prefill and admission control raise the batch size at your latency target (<a href="03-batching-scheduling.html">page 03</a>).</li>
+<li><strong>Don't redo work.</strong> Prefix caching for system prompts and chat history; cache-aware routing so hits actually happen (<a href="04-prefix-caching-disaggregation.html">page 04</a>).</li>
+<li><strong>Fewer big-model steps per token.</strong> Speculative decoding, which helps most at small and medium batch sizes (<a href="05-latency.html">page 05</a>).</li>
+<li><strong>Use a smaller model where it's enough.</strong> A router or cascade sends easy requests to a distilled model (<a href="../04-distill-small-models.html">Module 04</a>).</li>
+<li><strong>Cheaper hardware-hours.</strong> Reserved or committed pricing, a GPU type with better tokens per dollar for this workload, and autoscaling so idle GPUs aren't paid for (<a href="09-production-operations.html#p20">page 09</a>).</li>
+</ul>
+
+<h3>Worked answer with illustrative numbers</h3>
+<p>Baseline assumptions: $3 per GPU-hour, 1,500 output tokens per second per GPU at the latency target.</p>
+<pre><code>baseline = 3 / (1,500 × 3,600) × 1,000,000 = $0.556 per 1M output tokens
+target   = 0.556 × 0.3                     = $0.167</code></pre>
+<p>The multipliers below are <em>assumptions for illustration</em>. The real ones come from benchmarking your workload, and they don't compose perfectly (bigger batches from FP8 shrink the speculative-decoding gain, for example).</p>
+<div class="table-wrap"><table>
+<tr><th>Lever</th><th>Assumed gain</th><th>Running total</th><th>Quality guard</th></tr>
+<tr><td>BF16 → FP8 weights and FP8 KV cache</td><td>1.6×</td><td>1.6×</td><td>Eval suite plus logit agreement vs BF16</td></tr>
+<tr><td>Prefix caching with cache-aware routing (prefill saved on long chats)</td><td>1.25×</td><td>2.0×</td><td>None needed: outputs are identical</td></tr>
+<tr><td>Speculative decoding at moderate batch</td><td>1.3×</td><td>2.6×</td><td>None needed if verification is exact</td></tr>
+<tr><td>Route the easiest 50% of requests to a model 5× cheaper: cost 0.5 × 1 + 0.5 × 0.2 = 0.6</td><td>1.67×</td><td>4.3×</td><td>Router accuracy; non-inferiority test on routed traffic</td></tr>
+</table></div>
+<pre><code>1.6 × 1.25 × 1.3          = 2.6×   → cost × 0.385 (−62%): not enough alone
+… × 1.67 (routing)         = 4.3×   → cost × 0.23  (−77%)
+or … × 1.36 ($3 → $2.20 committed pricing) = 3.5× → cost × 0.28 (−72%)</code></pre>
+<p>"Without hurting quality" needs a definition you can test: a fixed eval suite with thresholds, plus a non-inferiority test online (the new system is no worse than the old by more than a small margin), using the canary process from <a href="09-production-operations.html#p19">Problem 19</a>. The lossless levers (prefix caching, exact speculative decoding, batching, pricing) need no quality argument at all, so take them first.</p>
+
+<h3>Trade-offs</h3>
+<div class="table-wrap"><table>
+<tr><th>Lever</th><th>Quality risk</th><th>Latency effect</th><th>Effort</th></tr>
+<tr><td>Quantisation</td><td>Some; must measure</td><td>Usually better</td><td>Low to medium</td></tr>
+<tr><td>Prefix caching</td><td>None</td><td>Better TTFT</td><td>Low; routing is the hard part</td></tr>
+<tr><td>Speculative decoding</td><td>None if exact</td><td>Better TPOT at low batch</td><td>Medium; needs a draft</td></tr>
+<tr><td>Model routing / cascade</td><td>Real; the router can misjudge</td><td>Better for routed requests</td><td>High</td></tr>
+<tr><td>Bigger batches</td><td>None</td><td>Worse TPOT past a point</td><td>Low</td></tr>
+<tr><td>Pricing / autoscaling</td><td>None</td><td>Risk of cold-start queues</td><td>Contracts and ops work</td></tr>
+</table></div>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>Cost per million tokens is dollars per GPU-hour divided by tokens per GPU-hour, so a 70% cut means 3.3× more tokens per dollar, and I'd get it by stacking levers rather than hoping one does it all. I'd take the lossless ones first: fuller continuous batches, prefix caching with cache-aware routing, exact speculative decoding, and committed pricing with autoscaling. Then FP8 weights and KV cache, gated by evals and logit agreement. If that's still short, route easy traffic to a distilled model, which carries the most quality risk and gets a non-inferiority canary. I'd measure each lever's real multiplier on our traffic, because they interact: bigger batches shrink the speculative gain.</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Quoting one lever as "the" answer. No single lever reliably gives 3.3×.</li>
+<li>Multiplying vendor-claimed speed-ups as if they were independent and measured on your traffic.</li>
+<li>Gaming the metric. Shorter outputs cut cost per request but not cost per token; cheaper tokens that need more retries cost more per task.</li>
+<li>Forgetting idle GPUs. A fleet sized for peak and left running all day can pay for two to three times the GPU-hours actually needed.</li>
+</ul>
+
+<h2 id="p25">Problem 25 · Design ChatGPT-style inference for 1M daily active users</h2>
+<p><strong>What the interviewer is testing:</strong> structured estimation (requests, peak, tokens, GPUs, dollars), awareness that every number is an assumption, and a sensible serving architecture around the estimate.</p>
+
+<h3>The concepts</h3>
+<p>First, clarify. Which model size? What latency targets (say, p95 TTFT under 1 s and TPOT under 50 ms)? How long are conversations? Free and paid tiers? One region or several? Then estimate in a chain, stating each assumption:</p>
+<pre><code>requests/day   = DAU × sessions per user × requests per session
+average QPS    = requests/day / 86,400
+peak QPS       = average QPS × peak factor
+peak tokens/s  = peak QPS × tokens in   (prefill)
+               + peak QPS × tokens out  (decode)
+GPUs at peak   = (decode tok/s ÷ decode tok/s per GPU
+               +  prefill tok/s ÷ prefill tok/s per GPU) ÷ target utilisation
+cost/day       = GPU-hours/day × $ per GPU-hour
+   provisioned for peak:  GPUs at peak × 24
+   autoscaled (ideal):    Σ over hours of GPUs needed that hour</code></pre>
+<p>Cross-check the GPU count with Little's law: concurrent streams = arrival rate × time each request is in the system. That gives the KV-cache memory you need, which must fit next to the weights.</p>
+
+<h3>Worked answer (every number is an assumption)</h3>
+<div class="table-wrap"><table>
+<tr><th>Assumption</th><th>Value</th><th>Why this value</th></tr>
+<tr><td>Daily active users</td><td>1,000,000</td><td>Given</td></tr>
+<tr><td>Sessions per user per day</td><td>3</td><td>Guess; check against product analytics</td></tr>
+<tr><td>Requests per session</td><td>5</td><td>Guess</td></tr>
+<tr><td>Input tokens per request</td><td>1,500</td><td>System prompt plus chat history plus message; history grows within a session</td></tr>
+<tr><td>Output tokens per request</td><td>400</td><td>Guess; reasoning models can be 10× this</td></tr>
+<tr><td>Peak-to-average factor</td><td>3</td><td>One region with an evening peak; global traffic is flatter</td></tr>
+<tr><td>Model and hardware</td><td>Dense ~70B in FP8 on H100/H200-class GPUs</td><td>A plausible mid-size chat model</td></tr>
+<tr><td>Decode throughput per GPU</td><td>1,500 output tok/s</td><td>Assumption at a ~30 ms TPOT target; benchmark it</td></tr>
+<tr><td>Prefill throughput per GPU</td><td>15,000 input tok/s</td><td>Assumption; benchmark it</td></tr>
+<tr><td>Target utilisation</td><td>70%</td><td>Headroom for bursts and imbalance</td></tr>
+<tr><td>Price per GPU-hour</td><td>$2–$4</td><td>Assumed range; varies widely by provider, commitment and GPU type</td></tr>
+</table></div>
+<pre><code>requests/day  = 1,000,000 × 3 × 5                 = 15,000,000
+average QPS   = 15,000,000 / 86,400               = 173.6
+peak QPS      = 173.6 × 3                          = 520.8
+
+peak prefill  = 520.8 × 1,500                      = 781,250 tok/s
+peak decode   = 520.8 × 400                        = 208,333 tok/s
+
+GPU time      = 208,333 / 1,500  = 138.9   (decode)
+              + 781,250 / 15,000 =  52.1   (prefill)
+              = 191.0 GPUs at 100%
+at 70%        = 191.0 / 0.7 = 272.8      → 273 GPUs at peak
+
+provisioned for peak: 273 × 24        = 6,552 GPU-hours/day
+autoscaled (ideal, daily curve below) = 2,196 GPU-hours/day
+
+cost/day   low  = 2,196 × $2 =  $4,392    (autoscaled, cheap GPUs)
+           high = 6,552 × $4 = $26,208    (peak-provisioned, expensive GPUs)
+cost/month (30 days)          ≈ $132k to $786k
+per DAU per month             ≈ $0.13 to $0.79
+per 1M tokens (in + out)      ≈ $0.15 to $0.92   (28.5 B tokens/day)</code></pre>
+<p><strong>Little's law cross-check.</strong> Each request is in the system for about 0.5 s of queue and prefill plus 400 tokens × 30 ms ≈ 12.5 s. Concurrent streams at peak ≈ 520.8 × 12.5 ≈ 6,500. With the Llama-70B attention shape (80 layers, 8 KV heads, head dim 128) and an FP8 cache, each token costs 2 × 80 × 8 × 128 × 1 B = 160 KiB. At about 1,900 tokens per stream that's about 297 MiB per stream and about 1.9 TB in total, roughly 7 GB per GPU across 273 GPUs. That fits easily next to 70 GB of FP8 weights on an H200 (141 GB), or on an H100 (80 GB) using tensor parallelism of 2. It also means about 24 streams per GPU at peak, comfortably below the roughly 45 that 1,500 tok/s at 33 tok/s per stream implies, so the throughput assumption isn't contradicted.</p>
+<p><strong>The range matters more than the midpoint.</strong> The six-fold spread between $4.4k and $26.2k a day comes from two choices you control (autoscaling, pricing) and one you mostly don't (the peak factor). Real autoscaling can't follow the curve perfectly, because of cold starts (Problem 20), so expect to land between the two bounds. The single biggest uncertainty is usually output length: a reasoning model producing 4,000 tokens instead of 400 multiplies decode GPUs by ten.</p>
+
+<p><strong>The architecture around the numbers:</strong></p>
+<ol>
+<li><strong>Edge and API gateway:</strong> authentication, per-user and per-tier rate limits, request size limits.</li>
+<li><strong>Router:</strong> session-sticky and cache-aware, so a conversation's prefix stays on one replica (<a href="04-prefix-caching-disaggregation.html">page 04</a>). Picks a model pool by tier or difficulty.</li>
+<li><strong>Model pools:</strong> replicas of vLLM, SGLang or TensorRT-LLM with continuous batching, chunked prefill, prefix caching and FP8 KV cache (<a href="08-engines-observability.html">page 08</a>). Optionally disaggregated prefill and decode once traffic justifies it.</li>
+<li><strong>Streaming:</strong> tokens over SSE; cancel generation when the client disconnects (<a href="01-request-lifecycle.html">page 01</a>).</li>
+<li><strong>Admission control and priority queues</strong> by tier, with graceful degradation under overload (<a href="03-batching-scheduling.html">page 03</a>).</li>
+<li><strong>Autoscaling</strong> on queue depth and KV utilisation, with a predictive schedule for the daily curve (<a href="09-production-operations.html#p20">page 09</a>).</li>
+<li><strong>Observability:</strong> TTFT, TPOT, queue depth, KV utilisation, prefix-hit rate, and cost per request, per tier.</li>
+<li><strong>Two or more regions</strong> for availability; this also flattens the peak factor if users span time zones.</li>
+</ol>
+
+<div class="card demo">
+<h3>Interactive: capacity and cost estimator</h3>
+<p class="legend">Bars: GPUs needed in each hour of the day if autoscaling followed demand perfectly (assumed shape: one evening peak at 20:00, average 1, peak equal to the peak factor). Dashed line: GPUs if you provision for the peak all day. Every slider is an assumption; the cost is shown as a range from autoscaled at the low price to peak-provisioned at the high price.</p>
+<canvas id="cc" width="700" height="260" aria-label="GPUs needed per hour of the day, autoscaled versus provisioned for peak"></canvas>
+<label for="dau">Daily active users: <span id="dauv" class="num"></span></label>
+<input id="dau" type="range" min="0.1" max="5" step="0.1" value="1">
+<label for="ses">Sessions per user per day: <span id="sesv" class="num"></span></label>
+<input id="ses" type="range" min="1" max="10" step="1" value="3">
+<label for="rps">Requests per session: <span id="rpsv" class="num"></span></label>
+<input id="rps" type="range" min="1" max="20" step="1" value="5">
+<label for="tin">Input tokens per request: <span id="tinv" class="num"></span></label>
+<input id="tin" type="range" min="200" max="8000" step="100" value="1500">
+<label for="tout">Output tokens per request: <span id="toutv" class="num"></span></label>
+<input id="tout" type="range" min="50" max="4000" step="50" value="400">
+<label for="pk">Peak-to-average factor: <span id="pkv" class="num"></span>×</label>
+<input id="pk" type="range" min="1.5" max="5" step="0.5" value="3">
+<label for="dec">Decode throughput per GPU (assumed): <span id="decv" class="num"></span> output tok/s</label>
+<input id="dec" type="range" min="250" max="5000" step="250" value="1500">
+<label for="pre">Prefill throughput per GPU (assumed): <span id="prev" class="num"></span> input tok/s</label>
+<input id="pre" type="range" min="2000" max="50000" step="1000" value="15000">
+<label for="util">Target utilisation: <span id="utilv" class="num"></span>%</label>
+<input id="util" type="range" min="40" max="90" step="5" value="70">
+<label for="plo">$/GPU-hour (low): <span id="plov" class="num"></span></label>
+<input id="plo" type="range" min="1" max="10" step="0.25" value="2">
+<label for="phi">$/GPU-hour (high): <span id="phiv" class="num"></span></label>
+<input id="phi" type="range" min="1" max="10" step="0.25" value="4">
+<div class="stats">
+  <div class="stat"><div class="k">Peak QPS</div><div class="v" id="sqps">–</div></div>
+  <div class="stat"><div class="k">GPUs at peak</div><div class="v" id="sgpu">–</div></div>
+  <div class="stat"><div class="k">GPU-hours/day (auto–peak)</div><div class="v" id="sgh">–</div></div>
+  <div class="stat"><div class="k">Cost per month</div><div class="v" id="smon">–</div></div>
+  <div class="stat"><div class="k">Per DAU per month</div><div class="v" id="sdau">–</div></div>
+  <div class="stat"><div class="k">Per 1M tokens</div><div class="v" id="stok">–</div></div>
+</div>
+<p class="meta" id="sline">–</p>
+<p class="meta">Try this: the defaults reproduce the worked answer: 520.8 peak QPS, 273 GPUs, 2,196–6,552 GPU-hours a day, about $132k–$786k a month. Set output tokens to 4,000 (a reasoning model) and GPUs at peak jump to about 2,060. Set the peak factor to 1.5 (global traffic): peak GPUs halve to 137, and provisioned GPU-hours fall from 3× the autoscaled figure to 1.5×. If the low price is set above the high one, the two are swapped.</p>
+</div>
+
+<h3>Trade-offs</h3>
+<div class="table-wrap"><table>
+<tr><th>Decision</th><th>Cheaper option</th><th>Safer option</th></tr>
+<tr><td>Capacity</td><td>Autoscale tightly to the curve</td><td>Provision near peak, absorb surprises</td></tr>
+<tr><td>Model</td><td>Smaller or routed model for most traffic</td><td>One large model for everything</td></tr>
+<tr><td>Utilisation target</td><td>85–90%</td><td>60–70%, for p99 latency headroom</td></tr>
+<tr><td>Regions</td><td>One region</td><td>Two or more, active-active</td></tr>
+<tr><td>Pricing</td><td>Committed or reserved capacity</td><td>On-demand flexibility</td></tr>
+</table></div>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>I'll state every assumption so we can change any of them. One million DAU at 3 sessions of 5 requests is 15 million requests a day, about 174 QPS on average and about 520 at a 3× peak. At 1,500 input and 400 output tokens, the peak is about 780K prefill and 208K decode tokens a second. Assuming a 70B FP8 model at 1,500 decode and 15,000 prefill tokens a second per GPU and 70% utilisation, that's about 273 GPUs at peak, and Little's law says about 6,500 concurrent streams needing roughly 7 GB of KV cache per GPU, which fits. At an assumed $2–$4 per GPU-hour that's about $4.4K a day autoscaled at the low price, up to $26K provisioned for peak at the high price, or $0.13–$0.79 per user per month. Output length and the peak factor move the answer most, so those are what I'd measure first.</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Sizing for average QPS. Users wait at the peak.</li>
+<li>Presenting one number as a fact. The interviewer wants the chain and the assumptions, and a range.</li>
+<li>Forgetting input tokens. Chat history makes prefill a large share of work, and it grows within a session; prefix caching is what keeps it affordable.</li>
+<li>Never cross-checking memory. GPU count from throughput must also hold the KV cache for every concurrent stream.</li>
+</ul>
+
+<h2 id="practice">Practise it</h2>
+<ol>
+<li><strong>Replace the assumptions with measurements.</strong> On one GPU (Colab or rented), serve a small instruct model with vLLM and run its benchmark tool at several concurrency levels with 1,500-token inputs and 400-token outputs. Record output tok/s per GPU at the concurrency where TPOT stays under your target, and prefill tok/s from a prefill-only run. Put your numbers into the calculator and scale them by model size with care: say what you assumed.</li>
+<li><strong>Build the cost waterfall.</strong> On the same setup, measure tokens per second for: baseline BF16, FP8 weights (if your GPU supports FP8; otherwise a 4-bit checkpoint), prefix caching on a workload with a shared 1,000-token system prompt, and speculative decoding. Compute each lever's real multiplier and cost per 1M tokens. Check whether they multiply or interfere.</li>
+<li><strong>MoE all-to-all on paper, then in code.</strong> Recompute Problem 23's table for DeepSeek-V3 or another open MoE using its published config (layers, hidden size, experts, top-k). Then, on any machine with two or more GPUs, run <code>nccl-tests</code>' all-to-all benchmark at message sizes from 64 KB to 256 MB and find where it switches from latency-bound to bandwidth-bound. That crossover tells you which side of the line your decode and prefill steps sit on.</li>
+</ol>
+
+<h2 id="course">In this course</h2>
+<ul>
+<li><a href="../05-trillion-scale-architecture.html#width">Module 05 · Routing 896 experts</a>: Kimi K3's MoE, latent experts and load balancing, the model in Problem 23.</li>
+<li><a href="../05-trillion-scale-architecture.html#serving">Module 05 · Serving</a>: K3's paged pool for two caches, prefix caching with KDA checkpoints, speculative decoding, fleet scheduling and MXFP4 QAT.</li>
+<li><a href="../08-ai-research-engineer/06-distributed-training.html">Module 08 Stage 06 · Distributed training</a>: tensor, pipeline and expert parallelism and the NCCL collectives behind them.</li>
+<li><a href="../08-ai-research-engineer/08-inference-aware-design.html">Module 08 Stage 08 · Inference-aware design</a>: the KV-cache formula used in the Little's-law check.</li>
+<li><a href="../04-distill-small-models.html">Module 04 · Distilling small models</a>: the smaller model a cost-cutting router sends easy traffic to.</li>
+<li><a href="09-production-operations.html">Page 09 · Rollouts and autoscaling</a>: the canary gates for cost cuts and the cold-start limits on autoscaled cost.</li>
+<li><a href="../08-ai-research-engineer/index.html#courses">Module 08 · Course map</a>: further courses on serving and scale.</li>
+</ul>
+
+<h2 id="robotics">Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Problem 25 is cloud-only.</strong> A million chat users is not a robotics problem. But the same chain (units × calls per unit × tokens per call ÷ throughput) sizes the cloud back-end for a robot fleet.</li>
+<li><strong>Robot traffic doesn't look like chat traffic.</strong> 1,000 robots each calling a VLM twice a second is a steady 2,000 QPS during working hours, with a peak factor near 1 while the shift runs and a synchronised ramp when it starts. Provisioned capacity is less wasteful there than for chat.</li>
+<li><strong>Cost per call decides the edge–cloud split.</strong> If a cloud call costs a fraction of a cent and adds a network round trip, a robot can afford it for planning when stuck, but not inside a fast control loop. Latency, not just cost, keeps the control loop on board (<a href="../04-distill-small-models.html#latency">Module 04</a>).</li>
+<li><strong>MoE saves compute, not memory.</strong> Every expert must be stored even if few run per token. On a memory-poor embedded GPU that's a poor fit; on-robot models are usually small dense or distilled ones.</li>
+<li><strong>Multi-robot models may use experts.</strong> Module 05 notes MoE as a natural fit for one policy across many robot bodies, but that's a server-side serving problem, with the all-to-all costs above.</li>
+</ul>
+</div>
+
+<h2 id="check">Self-check</h2>
+<details><summary>Why can't Kimi K3 be served from one 8 × H200 node?</summary><p>Its weights are about 1.56 TB even with experts in MXFP4 (about 1.45 TB of experts plus about 0.1 TB of higher-precision parts). One node has 8 × 141 GB = 1,128 GB. All parameters must be resident, not just the 104B active ones.</p></details>
+<details><summary>Why is MoE prefill bandwidth-bound and decode latency-bound in the all-to-all?</summary><p>Prefill moves thousands of tokens per step, so each all-to-all carries hundreds of megabytes. Decode moves a few hundred tokens, so messages are small, but there are two collectives per MoE layer per token on the critical path, and each has a fixed latency.</p></details>
+<details><summary>Why put pipeline stages across nodes and expert parallelism within a node?</summary><p>PP sends hidden states once per stage boundary, which slower network links handle. EP needs two all-to-alls per layer, which need NVLink-class bandwidth and latency.</p></details>
+<details><summary>Current cost is $0.60 per 1M tokens. What throughput multiplier gives a 70% cut?</summary><p>Target $0.18 = 0.3 × 0.60, so you need 1 / 0.3 ≈ 3.33× more tokens per dollar.</p></details>
+<details><summary>2M DAU, 2 sessions, 4 requests per session, peak factor 4. Peak QPS?</summary><p>16M requests/day ÷ 86,400 ≈ 185 average QPS; × 4 ≈ 741 peak QPS.</p></details>
+<details><summary>Why give the capstone cost as a range rather than one number?</summary><p>Every input is an assumption: throughput per GPU, price per GPU-hour, peak factor, tokens per request, and how well autoscaling follows demand. The defaults here already span about 6× between autoscaled at a low price and peak-provisioned at a high price.</p></details>
+
+<h2 id="resources">Resources</h2>
+<ul>
+<li><a href="https://github.com/MoonshotAI/Kimi-K3">Kimi K3 repository and technical report</a>: the architecture table, MXFP4 QAT and serving sections used in Problem 23.</li>
+<li><a href="https://www.nvidia.com/en-us/data-center/h200/">NVIDIA H200</a>, <a href="https://www.nvidia.com/en-us/data-center/h100/">NVIDIA H100</a> and <a href="https://www.nvidia.com/en-us/data-center/dgx-b200/">NVIDIA DGX B200</a> product pages: memory, bandwidth, NVLink and networking figures.</li>
+<li><a href="https://arxiv.org/abs/2310.10537">Microscaling Data Formats for Deep Learning</a> (Rouhani et al., 2023): the MX formats, including MXFP4's shared block scale.</li>
+<li><a href="https://arxiv.org/abs/2006.16668">GShard</a> (Lepikhin et al., 2020) and <a href="https://arxiv.org/abs/2101.03961">Switch Transformers</a> (Fedus et al., 2021): expert parallelism and all-to-all dispatch.</li>
+<li><a href="https://arxiv.org/abs/2201.05596">DeepSpeed-MoE</a> (Rajbhandari et al., 2022): MoE inference, combining expert, tensor and data parallelism.</li>
+<li><a href="https://arxiv.org/abs/2412.19437">DeepSeek-V3 Technical Report</a> (2024) and <a href="https://github.com/deepseek-ai/DeepEP">DeepEP</a>: large-scale expert parallelism, separate prefill and decode deployments, all-to-all kernels.</li>
+<li><a href="https://arxiv.org/abs/1909.08053">Megatron-LM</a> (Shoeybi et al., 2019): tensor parallelism.</li>
+<li><a href="https://docs.vllm.ai/en/latest/serving/parallelism_scaling.html">vLLM · Parallelism and scaling</a>, <a href="https://docs.sglang.ai/">SGLang docs</a>, <a href="https://nvidia.github.io/TensorRT-LLM/">TensorRT-LLM docs</a>: how each engine exposes TP, PP, EP and DP attention.</li>
+<li><a href="https://arxiv.org/abs/2309.06180">PagedAttention</a> (Kwon et al., 2023), <a href="https://arxiv.org/abs/2403.02310">Sarathi-Serve</a> (Agrawal et al., 2024), <a href="https://arxiv.org/abs/2401.09670">DistServe</a> (Zhong et al., 2024), <a href="https://arxiv.org/abs/2311.18677">Splitwise</a> (Patel et al., 2023): the throughput levers behind Problem 24.</li>
+<li><a href="https://arxiv.org/abs/2211.17192">Speculative decoding</a> (Leviathan et al., 2023) and <a href="https://arxiv.org/abs/2302.01318">speculative sampling</a> (Chen et al., 2023).</li>
+<li><a href="https://jax-ml.github.io/scaling-book/">How To Scale Your Model</a> and <a href="https://huggingface.co/spaces/nanotron/ultrascale-playbook">The Ultra-Scale Playbook</a>: parallelism and serving arithmetic with worked examples.</li>
+</ul>
+
+<nav class="pager">
+  <a href="09-production-operations.html"><small>Previous</small>Page 09 · Safe rollouts and GPU autoscaling</a>
+  <a class="next" href="index.html"><small>Next</small>Module 09 hub</a>
+</nav>
+<footer>Module 09 · Page 10 · written for this course from the source post, official docs and papers.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('cc'), ctx = cv.getContext('2d');
+const ids = ['dau', 'ses', 'rps', 'tin', 'tout', 'pk', 'dec', 'pre', 'util', 'plo', 'phi'];
+const el = Object.fromEntries(ids.map(k => [k, document.getElementById(k)]));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = n => Math.round(n).toLocaleString('en-US');
+const usd = n => n >= 1e6 ? '$' + (n / 1e6).toFixed(2) + 'M' : n >= 1e4 ? '$' + Math.round(n / 1e3) + 'k' : n >= 1 ? '$' + fmt(n) : '$' + n.toFixed(2);
+
+// 24 hourly multipliers: mean 1, max = P at 20:00, trough kept above zero
+function shape(P) {
+  const th = h => 2 * Math.PI * (h - 20) / 24;
+  for (let n = 1; n < 60; n++) {
+    const s = [...Array(24)].map((_, h) => ((1 + Math.cos(th(h))) / 2) ** n);
+    const mu = s.reduce((a, b) => a + b) / 24;
+    if (mu <= 0.9 / P) { const tr = (1 - P * mu) / (1 - mu); return s.map(v => tr + (P - tr) * v); }
+  }
+}
+
+function capacity(a) {
+  const req = a.dau * a.ses * a.rps, avg = req / 86400, peak = avg * a.pk;
+  const inS = peak * a.tin, outS = peak * a.tout;
+  const eq = (outS / a.dec + inS / a.pre) / (a.util / 100);
+  const peakG = Math.ceil(eq);
+  const hourly = shape(a.pk).map(m => Math.ceil(eq * m / a.pk));
+  const ghProv = peakG * 24, ghAuto = hourly.reduce((x, y) => x + y);
+  const lo = ghAuto * a.plo, hi = ghProv * a.phi, tok = req * (a.tin + a.tout);
+  return { req, avg, peak, inS, outS, peakG, hourly, ghProv, ghAuto, lo, hi, tok };
+}
+
+function draw() {
+  const v = Object.fromEntries(ids.map(k => [k, +el[k].value]));
+  const a = { ...v, dau: v.dau * 1e6, plo: Math.min(v.plo, v.phi), phi: Math.max(v.plo, v.phi) };
+  const shown = { dau: fmt(a.dau), ses: v.ses, rps: v.rps, tin: fmt(v.tin), tout: fmt(v.tout), pk: v.pk,
+    dec: fmt(v.dec), pre: fmt(v.pre), util: v.util, plo: '$' + v.plo.toFixed(2), phi: '$' + v.phi.toFixed(2) };
+  ids.forEach(k => document.getElementById(k + 'v').textContent = shown[k]);
+  const c = capacity(a);
+
+  const W = cv.width, H = cv.height, l = 56, r = 14, t = 14, b = 30;
+  const ymax = c.peakG * 1.15, bw = (W - l - r) / 24;
+  const py = y => t + (1 - y / ymax) * (H - t - b);
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '12px sans-serif'; ctx.lineWidth = 1;
+  const stepY = Math.pow(10, Math.floor(Math.log10(ymax / 4)));
+  const st = [1, 2, 5, 10].map(m => m * stepY).find(s => ymax / s <= 6);
+  ctx.strokeStyle = css('--line'); ctx.fillStyle = css('--muted');
+  for (let y = 0; y <= ymax; y += st) {
+    ctx.beginPath(); ctx.moveTo(l, py(y)); ctx.lineTo(W - r, py(y)); ctx.stroke();
+    ctx.textAlign = 'right'; ctx.fillText(fmt(y), l - 6, py(y) + 4);
+  }
+  ctx.textAlign = 'center';
+  for (let h = 0; h < 24; h += 3) ctx.fillText(String(h).padStart(2, '0') + ':00', l + (h + 0.5) * bw, H - 10);
+  ctx.save(); ctx.translate(12, (H - b) / 2); ctx.rotate(-Math.PI / 2); ctx.fillText('GPUs', 0, 0); ctx.restore();
+
+  ctx.fillStyle = css('--accent');
+  c.hourly.forEach((g, h) => ctx.fillRect(l + h * bw + 2, py(g), bw - 4, py(0) - py(g)));
+  ctx.strokeStyle = css('--fail'); ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+  ctx.beginPath(); ctx.moveTo(l, py(c.peakG)); ctx.lineTo(W - r, py(c.peakG)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = css('--fail'); ctx.textAlign = 'left';
+  ctx.fillText('provisioned for peak: ' + fmt(c.peakG) + ' GPUs', l + 6, py(c.peakG) - 6);
+
+  const set = (id, s) => document.getElementById(id).textContent = s;
+  set('sqps', c.peak.toFixed(1));
+  set('sgpu', fmt(c.peakG));
+  set('sgh', fmt(c.ghAuto) + '–' + fmt(c.ghProv));
+  set('smon', usd(c.lo * 30) + '–' + usd(c.hi * 30));
+  set('sdau', '$' + (c.lo * 30 / a.dau).toFixed(2) + '–$' + (c.hi * 30 / a.dau).toFixed(2));
+  set('stok', '$' + (c.lo / c.tok * 1e6).toFixed(2) + '–$' + (c.hi / c.tok * 1e6).toFixed(2));
+  set('sline', `${fmt(c.req)} requests/day · average ${c.avg.toFixed(1)} QPS · peak ${fmt(c.inS)} prefill + ${fmt(c.outS)} decode tok/s · cost/day ${usd(c.lo)} (autoscaled, low price) to ${usd(c.hi)} (peak-provisioned, high price)`);
+}
+ids.forEach(k => el[k].oninput = draw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

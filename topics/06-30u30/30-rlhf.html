@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 30 · RL from Human Preferences</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 30</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Unit 6 · Deep RL &amp; alignment · Day 30</div>
+<h1>Deep Reinforcement Learning from Human Preferences</h1>
+<p class="lede">When you can't write the reward function, show a person two short clips, ask which is better, and learn the reward from their answers.</p>
+
+<div class="facts">
+  <div><b>Authors</b>Paul F. Christiano, Jan Leike, Tom B. Brown, Miljan Martic, Shane Legg, Dario Amodei</div>
+  <div><b>Year / venue</b>2017 · NIPS (OpenAI and DeepMind)</div>
+  <div><b>Core idea</b>Reward model from pairwise comparisons</div>
+  <div><b>Study time</b>3–5 h</div>
+</div>
+<p class="meta">Original: <a href="https://arxiv.org/abs/1706.03741">arXiv:1706.03741</a> · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/30_RLHF">30u30 Day 30</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">When it's too hard to write down exactly what you want, you can teach a computer by showing a person two short videos and asking "which one is better?"</p>
+
+<h3>Think of it like this</h3>
+<p>Imagine teaching a dog a new trick, but you can't explain the trick in words. Instead, you watch two of its attempts and give a treat for the better one. Over time the dog figures out what you like. Here the computer does something extra: it builds its own "guess of what the person likes" from all the answers. Then it practises against that guess, so the person only has to answer now and then.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>The robot tries the task and records short video clips, 1–2 seconds each.</li>
+<li>A person watches two clips side by side and clicks the better one.</li>
+<li>A "reward model" learns to predict which clips the person will prefer.</li>
+<li>The robot practises lots, using the reward model's scores as points.</li>
+<li>Keep asking the person about new clips, so the reward model doesn't get fooled.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>In this paper a simulated one-legged hopping robot learned to do backflips and land on its foot. Nobody wrote a rule for a "good backflip". People just picked the better of two clips, about 900 times, in under an hour. The same idea is now used to train chatbots to give helpful answers.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Ask a friend to draw a "cool" animal. Don't describe it. Just look at two drawings at a time and point to the one you like more. How many rounds until they draw what you had in mind?</li>
+<li>In the demo further down, slide <b>Reward difference ΔR̂</b>. The further right, the surer the model is that the person prefers clip 1. Then set <b>Random-answer rate</b> to 0 and see how big the penalty gets when the person makes a careless click.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Preference</dt><dd>Which of two options a person likes more.</dd>
+<dt>Reward model</dt><dd>A program that learns to guess what a person would like.</dd>
+<dt>Reward hacking</dt><dd>When the robot finds a sneaky way to get points without doing what you really wanted.</dd>
+<dt>RLHF</dt><dd>Reinforcement learning from human feedback: learning from people's choices instead of a written score.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Many tasks have goals that are easy to recognise and hard to specify, like "clean the table" or "do a backflip". This paper trains a reward model from human comparisons of 1–2 second video clips, and trains a policy with RL on that learned reward, all at the same time. The human labels under 1% of the agent's experience. With 700 human labels, agents nearly matched RL with the true reward on MuJoCo robot tasks. With 900 queries and under an hour of an author's time, the Hopper robot learned repeated backflips, a behaviour with no obvious hand-written reward. The same recipe, scaled up and run with PPO, later became RLHF for language models.</p>
+</div>
+<ul>
+<li><strong>Three loops run asynchronously:</strong> the policy acts, pairs of clips go to a human, and the reward model is refit to all comparisons so far.</li>
+<li><strong>Comparisons, not scores:</strong> people give more consistent answers to "which is better" than to "rate this 1–10".</li>
+<li><strong>Bradley-Terry model:</strong> the probability a clip is preferred grows with the difference in summed predicted reward. Fit by cross-entropy.</li>
+<li><strong>Robustness tricks:</strong> an ensemble of reward models, queries chosen where the ensemble disagrees, ℓ2 regularisation, and a 10% "the human answered at random" term.</li>
+<li><strong>Online labelling matters:</strong> a reward model trained only on early data got exploited. On Pong the agent learned to avoid losing points without ever scoring.</li>
+<li><strong>Cost:</strong> about three orders of magnitude less human interaction than labelling every step.</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<pre><code>P̂[σ¹ ≻ σ²] = exp(Σ_t r̂(o¹_t, a¹_t)) / ( exp(Σ_t r̂(o¹_t, a¹_t)) + exp(Σ_t r̂(o²_t, a²_t)) )
+            = sigmoid( R̂(σ¹) − R̂(σ²) )
+
+loss(r̂) = − Σ_{(σ¹, σ², μ) ∈ D}  μ(1)·log P̂[σ¹ ≻ σ²] + μ(2)·log P̂[σ² ≻ σ¹]
+
+with label noise:  P = 0.9 · sigmoid(ΔR̂) + 0.1 · 0.5</code></pre>
+<ul>
+<li><code>σ¹, σ²</code> are trajectory segments: short sequences of (observation, action) pairs shown as video clips.</li>
+<li><code>r̂</code> is the reward network. <code>R̂(σ)</code> is its reward summed over the clip, with no discounting.</li>
+<li><code>≻</code> means "the human preferred". The probability is a softmax over the two summed rewards, which is a sigmoid of their difference. This is the Bradley-Terry model, the same maths as chess Elo ratings.</li>
+<li><code>μ</code> is the label: all mass on one clip, or split 50/50 for "equally good". "Can't tell" answers are dropped.</li>
+<li><strong>The loss</strong> is ordinary binary cross-entropy. The reward model is a classifier that predicts the human's choice.</li>
+<li><strong>Noise term:</strong> the paper assumes a 10% chance the human answers uniformly at random. That keeps the predicted probability between 0.05 and 0.95, so a single mislabelled pair can't produce an unbounded loss.</li>
+</ul>
+<p>Only reward <em>differences</em> are identified, so the paper normalises r̂ to a fixed mean and standard deviation before handing it to the RL algorithm.</p>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>The preference model, made concrete</h3>
+<div class="card demo">
+<h3>Interactive: Bradley-Terry with a noisy human</h3>
+<p class="legend">x-axis: predicted reward difference ΔR̂ = R̂(σ¹) − R̂(σ²). Dashed: plain sigmoid. Solid: with the random-answer rate you pick (the paper uses 10%). The marker is the ΔR̂ you pick.</p>
+<canvas id="bt" width="700" height="220" aria-label="Preference probability against reward difference"></canvas>
+<label for="dr">Reward difference ΔR̂: <span id="drv" class="num"></span></label>
+<input id="dr" type="range" min="-8" max="8" step="0.1" value="5">
+<label for="er">Random-answer rate: <span id="erv" class="num"></span></label>
+<input id="er" type="range" min="0" max="0.3" step="0.01" value="0.1">
+<div class="stats">
+  <div class="stat"><div class="k">P(σ¹ preferred)</div><div class="v" id="p1">–</div></div>
+  <div class="stat"><div class="k">Loss if human picks σ¹</div><div class="v" id="l1">–</div></div>
+  <div class="stat"><div class="k">Loss if human picks σ²</div><div class="v" id="l2">–</div></div>
+  <div class="stat"><div class="k">Worst-case loss</div><div class="v" id="lw">–</div></div>
+</div>
+<p class="meta">Try this: keep ΔR̂ = 5 and set the random-answer rate to 0. If the human picks σ² anyway (a slip), the loss is about 5 nats and keeps growing as ΔR̂ grows. At 10% it's capped near 3 nats. One careless click can't dominate training.</p>
+</div>
+
+<h3>What the experiments showed</h3>
+<ul>
+<li><strong>MuJoCo (8 tasks):</strong> 700 labels from contractors nearly matched RL on the true reward. With 1,400 synthetic labels the method slightly <em>beat</em> true-reward RL, perhaps because the learned reward was better shaped. On Ant, humans told to prefer "standing upright" gave better shaping than the hand-written reward.</li>
+<li><strong>Atari (7 games):</strong> 5,500 human labels. Harder to match RL, but substantial learning on most games. On Enduro, human labellers rewarded progress toward passing cars and beat A3C.</li>
+<li><strong>Novel behaviours:</strong> Hopper backflips (900 queries, under an hour), Half-Cheetah moving forward on one leg (800 queries), and driving alongside other cars in Enduro (about 1,300 queries).</li>
+<li><strong>The RL algorithms were TRPO for robotics and A2C for Atari</strong>, not PPO. PPO entered the recipe later with InstructGPT.</li>
+<li><strong>Ablations:</strong> clips beat single frames per label. Comparisons beat regressing on scores for continuous control. Offline-only labels led to reward hacking.</li>
+</ul>
+<p>The paper also removed hidden hints from the environments, such as episode termination when the robot falls, because that alone encodes part of the task. A neat detail worth copying when you evaluate learned rewards.</p>
+
+<h3>From backflips to chatbots</h3>
+<p>InstructGPT (2022) kept the structure: collect comparisons, fit a Bradley-Terry reward model, optimise with RL. It used PPO from <a href="29-ppo.html">Day 29</a> plus a KL penalty that keeps the policy close to the starting model, the guard against reward hacking this paper warned about. Two links back into this course: the reward model is a classifier whose probabilities should be <em>calibrated</em> (<a href="../01-decision-model-evals.html#calibration">Module 01</a>), and modelling the human as "usually picks the better clip, sometimes not" is the noisily-rational human model from <a href="../03-shared-autonomy.html#intent">Module 03</a>. Shane Legg, a co-author, wrote <a href="27-machine-super-intelligence.html">Day 27</a>.</p>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>This is a robotics paper.</strong> The headline demo is a simulated MuJoCo robot learning backflips from comparisons, and the motivating examples are a robot cleaning a table or scrambling an egg.</li>
+<li><strong>It solves the hardest part of robot RL: the reward.</strong> Hand-written rewards for manipulation are brittle and get exploited. Preferences let a non-expert say "this one's better" without writing maths.</li>
+<li><strong>It works where demonstrations don't.</strong> Teleoperating a robot with very non-human morphology is hard. Judging two clips of it is easy.</li>
+<li><strong>Reward hacking is real on robots too.</strong> A policy trained on a frozen reward model finds the model's blind spots. Keep collecting labels on the current policy's behaviour.</li>
+<li><strong>Honest gap:</strong> the paper ran in simulation with fast resets. On real hardware each clip costs real robot time, so preference learning is usually combined with sim training, demonstrations or offline data.</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Read sections 1–3 of the paper (about 1 h), then appendix A for the details on removing termination signals and label scheduling.</li>
+<li>Watch the backflip video linked from the paper and the OpenAI blog post.</li>
+<li>In the 30u30 Day 30 folder, read <code>implementation.py</code>: the reward network, the preference loss, a synthetic oracle and the RLHF loop with a PPO agent. Run <code>train_minimal.py</code>.</li>
+<li>Work through <code>notebook.ipynb</code>, then the exercises: Bradley-Terry, preference loss, reward normalisation, synthetic oracle, full loop.</li>
+<li>Stretch: train the reward model on early data only and watch the policy exploit it, reproducing the paper's offline ablation.</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>Why compare two clips instead of asking for a score?</summary><p>People give much more consistent comparisons than absolute scores. Comparisons also avoid the scale problem: rewards vary hugely across tasks, and predicting which is better is an easier learning problem than regressing exact values.</p></details>
+<details><summary>Why can the reward model only be identified up to an offset?</summary><p>The Bradley-Terry probability depends only on the difference of summed rewards. Adding a constant to every reward changes nothing, so the paper normalises rewards before RL.</p></details>
+<details><summary>What does the 10% random-response assumption buy?</summary><p>Human errors don't vanish when the reward gap is large. Without the term, a confident wrong label creates an unbounded loss. With it, predicted probabilities stay in [0.05, 0.95] and the loss is capped.</p></details>
+<details><summary>Why keep asking for labels during training?</summary><p>As the policy improves it visits new states the reward model never saw. A frozen model gets exploited there, as the Pong agent that never scored showed.</p></details>
+<details><summary>How many queries did the Hopper backflip take?</summary><p>900, in under an hour of human time, with feedback from the authors.</p></details>
+<details><summary>Which RL algorithms did the paper use, and what replaced them in LLM RLHF?</summary><p>TRPO for MuJoCo and A2C for Atari. InstructGPT-style RLHF used PPO with a KL penalty to the initial model.</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/1706.03741">The original paper</a> (Christiano et al., 2017)</li>
+<li><a href="https://arxiv.org/abs/2203.02155">Training language models to follow instructions with human feedback</a> (Ouyang et al., 2022), InstructGPT</li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/30_RLHF">30u30 Day 30</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Back to the <a href="index.html">Module 06 hub</a>: that's all 30 days</li>
+<li>Course link: <a href="../07-post-training.html">Module 07, After pre-training</a>: where PPO and RLHF sit in today's post-training pipeline, plus a KL-leash / reward-hacking demo</li>
+</ul>
+
+<nav class="pager">
+  <a href="29-ppo.html"><small>Previous</small>Day 29 · PPO</a>
+  <a class="next" href="index.html"><small>Next</small>Module 06 hub</a>
+</nav>
+<footer>Module 06 · Day 30 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('bt'), ctx = cv.getContext('2d');
+const dIn = document.getElementById('dr'), eIn = document.getElementById('er');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const sig = x => 1 / (1 + Math.exp(-x));
+const pref = (d, e) => (1 - e) * sig(d) + e / 2;
+
+function draw() {
+  const d = +dIn.value, e = +eIn.value, p = pref(d, e);
+  document.getElementById('drv').textContent = d.toFixed(1);
+  document.getElementById('erv').textContent = (e * 100).toFixed(0) + '%';
+  const W = cv.width, H = cv.height, L = 40, R = 12, T = 10, B = 24, X0 = -8, X1 = 8;
+  const px = x => L + (x - X0) / (X1 - X0) * (W - L - R), py = y => T + (1 - y) * (H - T - B);
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '12px sans-serif'; ctx.strokeStyle = css('--line'); ctx.fillStyle = css('--muted'); ctx.lineWidth = 1;
+  ctx.textAlign = 'right';
+  [0, 0.5, 1].forEach(v => { ctx.beginPath(); ctx.moveTo(L, py(v)); ctx.lineTo(W - R, py(v)); ctx.stroke(); ctx.fillText(v, L - 6, py(v) + 4); });
+  ctx.textAlign = 'center';
+  [-8, -4, 0, 4, 8].forEach(v => { ctx.beginPath(); ctx.moveTo(px(v), T); ctx.lineTo(px(v), H - B); ctx.stroke(); ctx.fillText(v, px(v), H - 8); });
+  const line = (f, col, dash) => {
+    ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.setLineDash(dash); ctx.beginPath();
+    for (let i = 0; i <= 200; i++) { const x = X0 + (X1 - X0) * i / 200; i ? ctx.lineTo(px(x), py(f(x))) : ctx.moveTo(px(x), py(f(x))); }
+    ctx.stroke(); ctx.setLineDash([]);
+  };
+  line(sig, css('--muted'), [6, 5]);
+  line(x => pref(x, e), css('--accent'), []);
+  ctx.fillStyle = css('--accent'); ctx.beginPath(); ctx.arc(px(d), py(p), 6, 0, 7); ctx.fill();
+  document.getElementById('p1').textContent = p.toFixed(3);
+  document.getElementById('l1').textContent = (-Math.log(p)).toFixed(2);
+  document.getElementById('l2').textContent = (-Math.log(1 - p)).toFixed(2);
+  document.getElementById('lw').textContent = e > 0 ? (-Math.log(e / 2)).toFixed(2) : '∞';
+}
+dIn.oninput = eIn.oninput = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

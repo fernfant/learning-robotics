@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video 02 · 5D parallelism</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 12 · Training &amp; inference videos</a> › Video 02</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 12 · Video 02</div>
+<h1>5D parallelism: data, tensor, context, pipeline and expert</h1>
+<p class="lede">When data parallelism and ZeRO run out, there are four more ways to cut a training job across GPUs. Each one splits a different axis of the work and pays with a different kind of network traffic. This guide names the axis, the traffic and the original paper for each, and ends with how the pieces are stacked on a real cluster.</p>
+
+<div class="facts">
+  <div><b>Video length</b>40:27</div>
+  <div><b>Published</b>22 October 2026</div>
+  <div><b>Level</b>Intermediate to advanced: watch <a href="01-zero-fsdp.html">Video 01</a> first</div>
+  <div><b>Builds on</b><a href="01-zero-fsdp.html">Video 01 · ZeRO &amp; FSDP</a>, <a href="../08-ai-research-engineer/06-distributed-training.html">Module 08 · Distributed training</a>, <a href="../06-30u30/24-gpipe.html">30u30 Day 24 · GPipe</a></div>
+</div>
+<p class="meta">Video by Jia-Bin Huang · <a href="https://www.youtube.com/watch?v=SlNxNpaNPdA">Watch on YouTube</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Training a giant AI is too much work for one computer chip, so thousands of chips share it. There are five different ways to share the work, and real systems use several at once, like a big kitchen splitting a banquet.</p>
+
+<h3>Think of it like this</h3>
+<p>A school kitchen has to make 1,000 sandwiches, each with five layers. You could give each cook their own pile of orders (that's splitting the data). You could have two cooks build every sandwich together, one doing the left half and one the right (splitting the maths inside a step). You could line the cooks up so the first does bread, the next does filling, and so on (a pipeline of layers). For a giant sandwich, you could cut it into slices along its length (splitting a long sequence). And you could have specialist cooks, one for salad and one for cheese, and send each order to whoever is needed (experts). Every choice means the cooks pass different things to each other, and passing things across the room is slower than passing them to the cook next to you.</p>
+
+<h3>How it works</h3>
+<ol>
+<li><strong>Data:</strong> every chip runs the whole model on different examples, then they agree on one update.</li>
+<li><strong>Tensor:</strong> each big multiplication is split across chips that sit very close together.</li>
+<li><strong>Context:</strong> one very long text is cut into pieces, and chips swap notes so every word can still look at every earlier word.</li>
+<li><strong>Pipeline:</strong> the model's layers are split into stages, and examples flow through them like a factory line.</li>
+<li><strong>Expert:</strong> in a mixture-of-experts model, different chips hold different experts, and each word is sent to the right one.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Robot foundation models are trained on huge piles of video and sensor data, and some long-horizon tasks need long sequences of camera frames. The same five tricks decide how fast those models can be trained and how long a history they can learn from.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>With three friends, copy a 40-word paragraph four ways: each person copies a whole paragraph of their own, each copies 10 words of the same paragraph, or you pass the page along with each person adding one sentence. Time each and count how often you had to talk.</li>
+<li>In the demo further down, move <b>Data</b>, <b>Context</b>, <b>Pipeline</b> and <b>Tensor</b> and watch the cube split. Then read the <b>GPUs</b> and <b>Servers</b> totals, and check whether tensor parallelism still fits inside one server.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Parallelism</dt><dd>Doing parts of a job at the same time on different chips.</dd>
+<dt>All-reduce</dt><dd>Every chip adds up a shared list of numbers and ends with the same total.</dd>
+<dt>All-to-all</dt><dd>Every chip sends a different piece of data to every other chip.</dd>
+<dt>Pipeline bubble</dt><dd>Time when a chip in a pipeline is idle, waiting for work from its neighbour.</dd>
+<dt>Mixture of experts</dt><dd>A model with many specialist sub-networks, where each word uses only a few of them.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="watch">1. Watch</h2>
+<div class="card"><div style="position:relative;padding-top:56.25%"><iframe style="position:absolute;inset:0;width:100%;height:100%;border:0" src="https://www.youtube-nocookie.com/embed/SlNxNpaNPdA" title="How Thousands of GPUs Train One AI: 5 Ways They Work Together, by Jia-Bin Huang" loading="lazy" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div></div>
+
+<h3>Chapter guide</h3>
+<p>Timestamps come from the video's description. The right-hand column is this course's reading guide, written from the chapter titles; it doesn't describe what the video shows frame by frame.</p>
+<div class="table-wrap"><table>
+<tr><th>Time</th><th>Chapter</th><th>What to look for</th></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=SlNxNpaNPdA&amp;t=0s">0:00</a></td><td>5D parallelism: Five ways to cut the workload</td><td>The five names. Try to say, for each, what gets split.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=SlNxNpaNPdA&amp;t=33s">0:33</a></td><td>Recap: data parallelism and ZeRO</td><td>A summary of <a href="01-zero-fsdp.html">Video 01</a>. Skip if it's fresh.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=SlNxNpaNPdA&amp;t=289s">4:49</a></td><td>The work cube: tokens × sequences × layers</td><td>The mental model for the whole video: each method slices one axis. The demo below draws it.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=SlNxNpaNPdA&amp;t=360s">6:00</a></td><td>Three limits of data parallelism</td><td>What data parallelism (even with ZeRO) can't fix: think activation memory, per-GPU batch size and communication.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=SlNxNpaNPdA&amp;t=524s">8:44</a></td><td>Tensor parallelism: column-linear and row-linear</td><td>Splitting a weight matrix by columns needs no communication on the way in; splitting by rows needs a sum on the way out.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=SlNxNpaNPdA&amp;t=624s">10:24</a></td><td>The MLP and attention: one all-reduce each</td><td>The Megatron-LM trick of pairing a column split with a row split so each block needs a single all-reduce.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=SlNxNpaNPdA&amp;t=850s">14:10</a></td><td>Sequence parallelism</td><td>The parts tensor parallelism leaves replicated (LayerNorm, dropout) and how splitting them along the sequence saves activation memory.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=SlNxNpaNPdA&amp;t=976s">16:16</a></td><td>Context parallelism: long sequences across servers</td><td>Why attention is the hard part when a single sequence is split across GPUs.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=SlNxNpaNPdA&amp;t=1044s">17:24</a></td><td>Ring attention, online softmax and zig-zag</td><td>Keys and values travel around a ring; online softmax lets each GPU merge partial results; zig-zag balances the causal mask.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=SlNxNpaNPdA&amp;t=1251s">20:51</a></td><td>Pipeline parallelism 1: the naive schedule and GPipe</td><td>Where the bubble comes from and how micro-batches shrink it.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=SlNxNpaNPdA&amp;t=1383s">23:03</a></td><td>Pipeline parallelism 2: 1F1B and interleaved stages</td><td>1F1B caps how many micro-batches' activations are alive at once; interleaving gives each GPU several smaller stages.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=SlNxNpaNPdA&amp;t=1530s">25:30</a></td><td>Pipeline parallelism 3: Zero-bubble and DualPipe</td><td>Splitting the backward pass into input-gradient and weight-gradient parts, and using the weight part to fill the gaps.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=SlNxNpaNPdA&amp;t=1643s">27:23</a></td><td>Expert parallelism: mixture of experts and all-to-all</td><td>Tokens are dispatched to the GPU that holds their expert and sent back. Note the two all-to-alls per MoE layer.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=SlNxNpaNPdA&amp;t=1808s">30:08</a></td><td>Pipeline vs ZeRO-3</td><td>Both split the model's layers, but one moves activations and the other moves weights.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=SlNxNpaNPdA&amp;t=1918s">31:58</a></td><td>Communication cost and the network hierarchy</td><td>Fast links inside a server, slower links between servers. Which traffic goes where.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=SlNxNpaNPdA&amp;t=1978s">32:58</a></td><td>Llama 3's 16,384-GPU layout</td><td>A real production layout. Check that the degrees multiply to the GPU count.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=SlNxNpaNPdA&amp;t=2055s">34:15</a></td><td>The cheatsheet: three steps to your own layout</td><td>The decision order. Compare it with the rules of thumb at the end of section 2.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=SlNxNpaNPdA&amp;t=2361s">39:21</a></td><td>Recap</td><td>Test yourself with the self-check below.</td></tr>
+</table></div>
+
+<h2 id="ideas">2. The ideas, explained</h2>
+
+<h3 id="cube">The work cube</h3>
+<p>One training step processes a batch of sequences, each made of tokens, through a stack of layers. Picture that as a cube with three axes: sequences × tokens × layers. Each parallelism slices a different part of it:</p>
+<pre><code>data parallelism     splits sequences        traffic: gradients, once per step
+context parallelism  splits tokens           traffic: keys/values, every attention layer
+pipeline parallelism splits layers           traffic: activations, at stage boundaries
+tensor parallelism   splits inside a layer   traffic: activations, twice per layer
+expert parallelism   splits the MoE experts  traffic: tokens, all-to-all per MoE layer
+
+total GPUs = DP × TP × CP × PP   (EP usually reuses GPUs from the DP/CP groups)</code></pre>
+
+<h3 id="sec-dp">Recap: data parallelism and its limits</h3>
+<p>Data parallelism and ZeRO are explained in <a href="01-zero-fsdp.html">Video 01</a> and <a href="../08-ai-research-engineer/06-distributed-training.html">Module 08 · Distributed training</a>. The limits that push you to the other four methods: ZeRO shards model states but not <em>activations</em>, which grow with sequence length; the global batch is at least DP × (one sequence), and very large batches stop helping optimisation; and gradient synchronisation over thousands of GPUs eventually costs more than it saves.</p>
+
+<h3 id="sec-tp">Tensor parallelism (Megatron-LM)</h3>
+<p>Shoeybi et al. (2019) split each transformer block's matrices across GPUs. For the MLP <code>Z = GeLU(X·A)·B</code>:</p>
+<pre><code>column-linear:  A = [A1 | A2]       GPU i computes Y_i = GeLU(X·A_i)
+                (GeLU is elementwise, so no communication is needed here)
+row-linear:     B = [B1 ; B2]       GPU i computes Z_i = Y_i·B_i
+                Z = Z1 + Z2         ← one all-reduce
+
+attention: split the heads (Q, K, V projections column-wise),
+           output projection row-wise  ← one all-reduce
+per layer: 2 all-reduces in the forward pass, 2 in the backward pass</code></pre>
+<p>Every layer waits on these all-reduces, so tensor parallelism is kept inside one server, where GPUs share fast NVLink-class links. The communication volume scales with batch × sequence × hidden size, so it grows with the activations, not the weights.</p>
+
+<h3 id="sp">Sequence parallelism</h3>
+<p>Korthikanti et al. (2022) noticed that tensor parallelism leaves LayerNorm and dropout replicated on every GPU, with full-size activations. They split those regions along the sequence dimension instead, and replace each all-reduce with a reduce-scatter (into the sequence-split region) and an all-gather (back into the tensor-split region). That's the same total communication as the all-reduce, and much less activation memory. The same paper introduced selective activation recomputation.</p>
+
+<h3 id="sec-cp">Context parallelism and ring attention</h3>
+<p>Context parallelism splits every layer's tokens across GPUs, so one long sequence spreads over several servers. Everything except attention is per-token and needs no communication. Attention needs each query to see every earlier key and value. Ring attention (Liu, Zaharia and Abbeel, 2023) arranges the GPUs in a ring: each holds a block of queries, and key/value blocks are passed around the ring while each GPU computes attention against the block it currently holds, overlapping the transfer with compute.</p>
+<p>That only works because softmax can be computed in pieces. Online softmax (Milakov and Gimelshein, 2018) keeps a running maximum and a running sum, and rescales when a new block raises the maximum:</p>
+<pre><code>for each incoming K,V block:
+    s     = q·Kᵀ / √d
+    m_new = max(m, max(s))
+    l     = l·exp(m − m_new) + Σ exp(s − m_new)
+    o     = o·exp(m − m_new) + exp(s − m_new)·V
+    m     = m_new
+output = o / l          (exactly equal to softmax over all blocks)</code></pre>
+<p>With a causal mask, a GPU holding early tokens has little work and a GPU holding late tokens has a lot. The zig-zag fix cuts the sequence into 2N chunks and gives GPU i chunks i and 2N−1−i, so every GPU gets one early and one late chunk. Ring attention is covered in more depth in <a href="../08-ai-research-engineer/03-beyond-transformers.html#ring">Module 08 · Beyond transformers</a>.</p>
+
+<h3 id="sec-pp">Pipeline parallelism: GPipe, 1F1B, interleaving</h3>
+<p>Pipeline parallelism gives consecutive layers to different GPUs (stages) and sends activations between neighbours. A naive schedule leaves all but one stage idle. GPipe (Huang et al., 2018) splits the batch into m micro-batches so stages overlap; with p stages the idle fraction is</p>
+<pre><code>bubble ≈ (p − 1) / (m + p − 1)       p = 8, m = 32  →  7/39 ≈ 18%
+interleaved (v chunks per GPU):  bubble time shrinks by about v</code></pre>
+<p>GPipe runs all forwards, then all backwards, so it stores activations for all m micro-batches. The <strong>1F1B</strong> schedule, from PipeDream (Harlap, Narayanan et al., 2018), alternates one forward and one backward once the pipeline is full, so at most about p micro-batches are in flight. Narayanan et al. (2021) added the synchronous 1F1B schedule with <strong>interleaved stages</strong> to Megatron-LM: each GPU holds several non-adjacent chunks of layers, which shrinks the bubble at the cost of more point-to-point messages. The GPipe schedule and its bubble are animated in <a href="../06-30u30/24-gpipe.html">30u30 Day 24 · GPipe</a>.</p>
+
+<h3 id="zb">Zero-bubble pipelines and DualPipe</h3>
+<p>Qi et al. (2023, "Zero Bubble Pipeline Parallelism") split the backward pass into two parts: B, the gradient with respect to the layer's input (which the previous stage is waiting for), and W, the gradient with respect to the weights (which nobody is waiting for). Doing B first and slotting W into the gaps removes the bubble. The paper reports the first zero-bubble schedules under synchronous training and up to 23% higher throughput than 1F1B at a similar memory limit. DeepSeek-V3 (2024) describes DualPipe, a bidirectional schedule that feeds micro-batches from both ends of the pipeline and overlaps forward and backward computation with the expert-parallel communication of another micro-batch.</p>
+
+<h3 id="ep">Expert parallelism</h3>
+<p>In a mixture-of-experts layer, a router sends each token to its top-k experts. Expert parallelism places different experts on different GPUs (GShard, Lepikhin et al., 2020; Switch Transformer, Fedus et al., 2021). Each MoE layer then needs two all-to-alls: dispatch tokens to their experts, then combine the outputs back. Experts' weights aren't duplicated, so it scales parameters cheaply, but the all-to-all is sensitive to load imbalance and network topology. Routing, load balancing and capacity are covered in <a href="../08-ai-research-engineer/03-beyond-transformers.html#moe">Module 08 · Beyond transformers</a> (with a load-balancing demo) and <a href="../05-trillion-scale-architecture.html#moe">Module 05 · Trillion-scale architecture</a>.</p>
+
+<h3 id="ppzero">Pipeline vs ZeRO-3</h3>
+<p>Both spread the layers' weights so no GPU holds the whole model. ZeRO-3 shards every layer across all GPUs and moves <em>weights</em>: each layer is all-gathered before use. Pipeline parallelism gives whole layers to one stage and moves <em>activations</em>, point-to-point, at stage boundaries. ZeRO-3 has no bubble and no scheduling to tune, but its weight traffic only hides behind compute if each GPU has enough tokens per step. Pipeline traffic is small, but you must feed enough micro-batches to hide the bubble, and the stages must be balanced.</p>
+
+<h3 id="layout">Network hierarchy and a real layout</h3>
+<p>A GPU server typically has 8 GPUs joined by very fast links; servers are joined by a slower network. So the chattiest traffic goes innermost:</p>
+<pre><code>innermost (inside a server):  TP      all-reduce every layer
+                              CP, EP  per attention / MoE layer
+                              PP      point-to-point at stage edges
+outermost (across the cluster): DP    one gradient sync per step</code></pre>
+<p>The Llama 3 paper (Grattafiori, Dubey et al., 2024) trained the 405B model with this four-dimensional layout, ordered TP, CP, PP, DP from innermost to outermost. Its scaling table lists, for 16,384 GPUs at 8K context, TP 8 × PP 16 × DP 128 = 16,384; for the 128K-context stage it adds CP 16 and reduces DP to 8. Read the paper's parallelism section for the exact batch sizes and utilisation figures.</p>
+
+<h3 id="cheat">Rules of thumb</h3>
+<p>The video ends with its own three-step cheatsheet; watch it for the author's version. The common rules in the literature (for instance Hugging Face's Ultra-Scale Playbook) are: first make the model fit (TP inside a server, then PP or ZeRO-3 across servers, CP if long sequences blow up activations, EP for MoE); then use DP for the remaining GPUs to reach the target global batch; then tune micro-batch size, recomputation and overlap for throughput.</p>
+
+<div class="card demo">
+<h3>Interactive: slicing the work cube</h3>
+<p class="legend">The cube is one training step: sequences (left to right), tokens (bottom to top) and layers (front to back). Each coloured block is the share of work owned by one group of GPUs. Lines across a block mean its maths is split further by tensor parallelism. Servers are assumed to hold 8 GPUs.</p>
+<canvas id="wc" width="700" height="330" aria-label="A cube of sequences by tokens by layers, split into blocks by data, context and pipeline parallelism, with tensor-parallel lines inside each block"></canvas>
+<label for="dp">Data (splits sequences): <span id="dpv" class="num"></span></label>
+<input id="dp" type="range" min="0" max="3" step="1" value="2">
+<label for="cp">Context (splits tokens): <span id="cpv" class="num"></span></label>
+<input id="cp" type="range" min="0" max="3" step="1" value="0">
+<label for="pp">Pipeline (splits layers): <span id="ppv" class="num"></span></label>
+<input id="pp" type="range" min="0" max="3" step="1" value="1">
+<label for="tp">Tensor (splits inside a layer): <span id="tpv" class="num"></span></label>
+<input id="tp" type="range" min="0" max="4" step="1" value="2">
+<div class="stats">
+  <div class="stat"><div class="k">GPUs</div><div class="v" id="sg">–</div></div>
+  <div class="stat"><div class="k">Servers (8 GPUs)</div><div class="v" id="ss">–</div></div>
+  <div class="stat"><div class="k">Blocks of work</div><div class="v" id="sk">–</div></div>
+  <div class="stat"><div class="k">TP inside one server?</div><div class="v" id="st">–</div></div>
+</div>
+<p id="comm" class="meta"></p>
+<p class="meta">Try this: start at Data 4, Pipeline 2, Tensor 4 (32 GPUs, 4 servers). Push Tensor to 16 and the TP group spills across two servers, so its per-layer all-reduces would cross the slow network. Set Context to 4 for long sequences and watch the cube split along the tokens axis instead.</p>
+</div>
+
+<h2 id="course">3. Where the course goes deeper</h2>
+<div class="table-wrap"><table>
+<tr><th>Topic</th><th>Course page</th></tr>
+<tr><td>Data parallelism, ZeRO, FSDP, 3D parallelism, NCCL collectives</td><td><a href="../08-ai-research-engineer/06-distributed-training.html">Module 08 · Distributed training</a>, <a href="01-zero-fsdp.html">Video 01</a></td></tr>
+<tr><td>Pipeline schedule and bubble, with an animation</td><td><a href="../06-30u30/24-gpipe.html">30u30 Day 24 · GPipe</a></td></tr>
+<tr><td>Ring attention and MoE routing</td><td><a href="../08-ai-research-engineer/03-beyond-transformers.html#ring">Module 08 · Beyond transformers (ring)</a>, <a href="../08-ai-research-engineer/03-beyond-transformers.html#moe">(MoE)</a></td></tr>
+<tr><td>MoE at trillion scale, expert parallelism in Kimi K3</td><td><a href="../05-trillion-scale-architecture.html#moe">Module 05 · Trillion-scale architecture</a></td></tr>
+<tr><td>Parallelism for serving: TP vs PP vs EP at inference time</td><td><a href="../09-inference-engineering/10-scale-cost-capstone.html">Module 09 · Scale &amp; cost capstone</a></td></tr>
+<tr><td>Online softmax inside attention kernels</td><td><a href="../09-inference-engineering/02-kv-cache-attention.html">Module 09 · KV cache &amp; attention</a></td></tr>
+</table></div>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Robot foundation models are trained the same way.</strong> A VLA built on a multi-billion-parameter VLM backbone is trained with FSDP or ZeRO plus, at larger scale, tensor and pipeline parallelism, using the same libraries as LLMs.</li>
+<li><strong>Long robot histories make context parallelism relevant.</strong> Many camera frames over many timesteps turn into long token sequences. If a lab wants a policy to learn from minutes of video, activation memory grows with sequence length, and CP is the tool for that.</li>
+<li><strong>MoE is appearing in embodied models,</strong> for example to give different embodiments or skills their own experts. If you train one, expert parallelism and its all-to-all come with it.</li>
+<li><strong>Weak link for most robot work:</strong> the biggest robot models today are far smaller than frontier LLMs, and most robot learning runs fit on one server. Five-way parallelism matters mainly if you work on pre-training robot foundation models at a large lab.</li>
+</ul>
+</div>
+
+<h2 id="check">Self-check</h2>
+<details><summary>Which axis of the work cube does each method split?</summary><p>Data: sequences. Context: tokens within a sequence. Pipeline: layers. Tensor: the matrices inside each layer. Expert: the experts of MoE layers.</p></details>
+<details><summary>Why does a Megatron MLP block need only one all-reduce in the forward pass?</summary><p>The first matrix is split by columns, so each GPU can apply GeLU to its own slice without talking to the others. The second matrix is split by rows, so each GPU produces a partial sum of the output, and one all-reduce adds them up.</p></details>
+<details><summary>Why is tensor parallelism kept inside one server?</summary><p>It needs all-reduces in every layer, forward and backward, sized by the activations. That traffic is only cheap on the fast links inside a server.</p></details>
+<details><summary>What makes ring attention exact rather than approximate?</summary><p>Online softmax. Each GPU keeps a running maximum and normaliser and rescales its partial output when a new key/value block arrives, so the final result equals softmax over the whole sequence.</p></details>
+<details><summary>With 4 pipeline stages and 12 micro-batches, roughly what fraction of time is bubble in a GPipe schedule?</summary><p>(p − 1)/(m + p − 1) = 3/15 = 20%.</p></details>
+<details><summary>How does a zero-bubble schedule fill the gaps?</summary><p>It splits the backward pass into the input gradient (needed by the previous stage right away) and the weight gradient (needed only at the optimiser step), and schedules the weight-gradient work into slots that would otherwise be idle.</p></details>
+
+<h2 id="refs">References</h2>
+<p>The video's description lists no references. Primary papers cited in this guide:</p>
+<ul>
+<li><a href="https://arxiv.org/abs/1909.08053">Megatron-LM: Training Multi-Billion Parameter Language Models Using Model Parallelism</a> (Shoeybi et al., 2019)</li>
+<li><a href="https://arxiv.org/abs/2205.05198">Reducing Activation Recomputation in Large Transformer Models</a> (Korthikanti et al., 2022)</li>
+<li><a href="https://arxiv.org/abs/2310.01889">Ring Attention with Blockwise Transformers for Near-Infinite Context</a> (Liu, Zaharia, Abbeel, 2023)</li>
+<li><a href="https://arxiv.org/abs/1805.02867">Online normalizer calculation for softmax</a> (Milakov, Gimelshein, 2018)</li>
+<li><a href="https://arxiv.org/abs/1811.06965">GPipe: Efficient Training of Giant Neural Networks using Pipeline Parallelism</a> (Huang et al., 2018)</li>
+<li><a href="https://arxiv.org/abs/1806.03377">PipeDream: Fast and Efficient Pipeline Parallel DNN Training</a> (Harlap, Narayanan et al., 2018)</li>
+<li><a href="https://arxiv.org/abs/2104.04473">Efficient Large-Scale Language Model Training on GPU Clusters Using Megatron-LM</a> (Narayanan et al., 2021)</li>
+<li><a href="https://arxiv.org/abs/2401.10241">Zero Bubble Pipeline Parallelism</a> (Qi et al., 2023)</li>
+<li><a href="https://arxiv.org/abs/2412.19437">DeepSeek-V3 Technical Report</a> (DeepSeek-AI, 2024)</li>
+<li><a href="https://arxiv.org/abs/2006.16668">GShard: Scaling Giant Models with Conditional Computation and Automatic Sharding</a> (Lepikhin et al., 2020)</li>
+<li><a href="https://arxiv.org/abs/2101.03961">Switch Transformers: Scaling to Trillion Parameter Models</a> (Fedus, Zoph, Shazeer, 2021)</li>
+<li><a href="https://arxiv.org/abs/2407.21783">The Llama 3 Herd of Models</a> (Grattafiori, Dubey et al., 2024)</li>
+<li><a href="https://huggingface.co/spaces/nanotron/ultrascale-playbook">The Ultra-Scale Playbook: Training LLMs on GPU Clusters</a> (Hugging Face)</li>
+</ul>
+
+<nav class="pager">
+  <a href="01-zero-fsdp.html"><small>Previous</small>Video 01 · ZeRO &amp; FSDP</a>
+  <a class="next" href="03-lora.html"><small>Next</small>Video 03 · LoRA and its descendants</a>
+</nav>
+<footer>Module 12 · Video 02 · a watch guide written for this course from the video's chapter list, its references and the original papers. Video © Jia-Bin Huang.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('wc'), ctx = cv.getContext('2d');
+const ids = ['dp', 'cp', 'pp', 'tp'];
+const el = Object.fromEntries(ids.map(k => [k, document.getElementById(k)]));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const PER_SERVER = 8;
+
+function layout(dp, cp, pp, tp) {
+  const gpus = dp * cp * pp * tp;
+  return { gpus, blocks: dp * cp * pp, servers: Math.ceil(gpus / PER_SERVER), tpFits: tp <= PER_SERVER };
+}
+
+function draw() {
+  const dp = 2 ** +el.dp.value, cp = 2 ** +el.cp.value, pp = 2 ** +el.pp.value, tp = 2 ** +el.tp.value;
+  const shown = { dp, cp, pp, tp };
+  ids.forEach(k => document.getElementById(k + 'v').textContent = shown[k]);
+  const L = layout(dp, cp, pp, tp);
+
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+  const SX = 300, SY = 200, DX = 150, DY = 90, ox = 150, oy = H - 30;
+  // x: sequences, y: tokens, z: layers (depth, going back and up-right)
+  const P = (x, y, z) => [ox + x * SX + z * DX, oy - y * SY - z * DY];
+  const poly = (pts, fill) => {
+    ctx.beginPath(); pts.forEach(([a, b], i) => i ? ctx.lineTo(a, b) : ctx.moveTo(a, b)); ctx.closePath();
+    ctx.fillStyle = fill; ctx.fill(); ctx.stroke();
+  };
+  const hue = (i, j, k) => (((i * cp + j) * pp + k) * 360 / L.blocks * 0.85 + 200) % 360;
+  const cells = [];
+  for (let i = 0; i < dp; i++) for (let j = 0; j < cp; j++) for (let k = 0; k < pp; k++) cells.push([i, j, k]);
+  cells.sort((a, b) => b[2] - a[2] || a[0] - b[0] || a[1] - b[1]);   // back to front
+  ctx.strokeStyle = css('--bg'); ctx.lineWidth = 1.2;
+  for (const [i, j, k] of cells) {
+    const x0 = i / dp, x1 = (i + 1) / dp, y0 = j / cp, y1 = (j + 1) / cp, z0 = k / pp, z1 = (k + 1) / pp, h = hue(i, j, k);
+    poly([P(x0, y0, z0), P(x1, y0, z0), P(x1, y1, z0), P(x0, y1, z0)], `hsl(${h} 55% 52%)`);
+    poly([P(x0, y1, z0), P(x1, y1, z0), P(x1, y1, z1), P(x0, y1, z1)], `hsl(${h} 55% 66%)`);
+    poly([P(x1, y0, z0), P(x1, y0, z1), P(x1, y1, z1), P(x1, y1, z0)], `hsl(${h} 50% 40%)`);
+    if (tp > 1) {   // tensor-parallel split lines on the front face of the block
+      ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 1;
+      for (let t = 1; t < tp; t++) {
+        const y = y0 + (y1 - y0) * t / tp, [a, b] = P(x0, y, z0), [c, d] = P(x1, y, z0);
+        ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(c, d); ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+  ctx.fillStyle = css('--muted'); ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+  const [ax, ay] = P(0.5, 0, 0); ctx.fillText('sequences → (data)', ax, ay + 18);
+  const [bx, by] = P(0, 0.5, 0); ctx.save(); ctx.translate(bx - 14, by); ctx.rotate(-Math.PI / 2); ctx.fillText('tokens → (context)', 0, 0); ctx.restore();
+  const [cx, cy] = P(1, 0, 0.5); ctx.textAlign = 'left'; ctx.fillText('layers → (pipeline)', cx + 8, cy + 10);
+
+  document.getElementById('sg').textContent = L.gpus.toLocaleString('en-US');
+  document.getElementById('ss').textContent = L.servers.toLocaleString('en-US');
+  document.getElementById('sk').textContent = L.blocks.toLocaleString('en-US');
+  const st = document.getElementById('st');
+  st.textContent = L.tpFits ? 'yes' : 'no, crosses servers';
+  st.style.color = L.tpFits ? css('--pass') : css('--fail');
+  const msgs = [];
+  if (dp > 1) msgs.push(`Data ${dp}: gradient all-reduce (or reduce-scatter + all-gather with ZeRO) once per step.`);
+  if (cp > 1) msgs.push(`Context ${cp}: key/value blocks passed around a ring in every attention layer.`);
+  if (pp > 1) msgs.push(`Pipeline ${pp}: activations sent point-to-point between ${pp} stages; needs micro-batches to hide the bubble.`);
+  if (tp > 1) msgs.push(`Tensor ${tp}: an all-reduce of activations after attention and after the MLP in every layer.`);
+  document.getElementById('comm').textContent = msgs.length ? 'Traffic: ' + msgs.join(' ') : 'One GPU, no traffic.';
+}
+ids.forEach(k => el[k].oninput = draw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

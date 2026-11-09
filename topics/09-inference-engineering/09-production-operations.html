@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inference · Rollouts and autoscaling</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 09 · Inference engineering</a> › Page 09</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 09 · Problems 19–20</div>
+<h1>Safe rollouts and GPU autoscaling</h1>
+<p class="lede">Two operations problems. The first: ship a new model or a new quantisation without hurting users, and get back fast if you do. The second: add GPUs when traffic rises, even though a new GPU server can take ten minutes to become useful. Both come down to the same habit: measure before you trust, and plan for the slow part.</p>
+
+<div class="facts">
+  <div><b>Problems covered</b>19 (safe rollout with rollback) · 20 (autoscaling with slow cold starts)</div>
+  <div><b>Interview level</b>Mid to senior. Expect follow-ups on metrics, statistics and cost.</div>
+  <div><b>Key ideas</b>Shadow traffic, canary stages, automatic rollback, sample size, cold-start budget, leading signals, warm pools, load shedding</div>
+  <div><b>Time to prep</b>3–4 h: 1 h reading, 1 h with the simulator, 1–2 h practising answers aloud</div>
+</div>
+<p class="meta">Source: <a href="https://x.com/vishalsingh2972/status/2113830444722741637">Vishal Singh's post of 25 inference interview problems</a>, problems 19 and 20 · saved in <code>sources/09-vishal-inference-25.md</code></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">When you change the model behind an app, you try it on a few people first and keep the old one ready. When lots of people suddenly arrive, you add more computers, but new ones take a while to start, so you have to add them early.</p>
+
+<h3>Think of it like this</h3>
+<p>Your school canteen wants to try a new pasta recipe. It doesn't swap the whole menu on Monday. It serves the new pasta to one table first, watches faces and leftovers, then to half the room, then to everyone. The old recipe stays in the fridge, so if kids hate the new one, lunch goes back to normal in minutes. Now the lunch bell rings and the queue triples. The canteen can open more serving counters, but setting up a counter takes ten minutes: unpack trays, heat the food. If they wait until the queue is out the door, kids miss lunch. So a smart canteen starts setting up counters when it sees the bell is about to ring, and keeps one counter half-ready just in case.</p>
+
+<h3>How it works</h3>
+<ol>
+<li><strong>Test quietly.</strong> Send copies of real requests to the new model and compare its answers, without showing them to anyone.</li>
+<li><strong>Try it on a few.</strong> Give the new model a small slice of real users, then a bigger slice, checking quality, speed and errors at every step.</li>
+<li><strong>Keep the old one running.</strong> If any check fails, switch everyone back automatically.</li>
+<li><strong>Scale early.</strong> Watch the queue, not just how busy the GPUs look, and start new servers before you need them, because they're slow to start.</li>
+<li><strong>Have a plan B.</strong> If the queue still overflows, give shorter answers or use a smaller model for a while rather than turning people away.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Robot fleets get software updates too. A new driving or grasping model goes to a few robots first, and each robot keeps the old model so it can switch back. A robot can't "add more GPUs" while it's working, though. Its computer is fixed. So when it's overloaded it has to do less, not buy more.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>With a friend, time how long it takes to set up a board game from the box. That's your "cold start". Now imagine ten groups arrive at once. How many games would you need to set up before they walk in?</li>
+<li>In the demo further down, set <b>Cold start</b> to 2 minutes and watch dropped requests vanish. Put it back to 10 and try fixing it with <b>Headroom</b>, then with <b>Warm pool</b>. Watch what each fix costs in <b>Replica-hours</b>.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Canary</dt><dd>A small share of real traffic sent to the new version first, to catch problems early.</dd>
+<dt>Rollback</dt><dd>Switching back to the previous version when the new one misbehaves.</dd>
+<dt>Autoscaling</dt><dd>Adding or removing servers automatically as traffic changes.</dd>
+<dt>Cold start</dt><dd>The time from "start a new server" to "it's answering requests".</dd>
+<dt>Warm pool</dt><dd>Spare servers kept ready, with the model already loaded, so they can join in seconds.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="p19">Problem 19 · Roll out a new model or quantisation safely, with rollback</h2>
+<p><strong>What the interviewer is testing:</strong> whether you treat a model change like a risky deploy with measurable gates, and whether you know the LLM-specific ways a "small" change breaks things (quality drift, longer outputs, a changed chat template, a cold prefix cache).</p>
+
+<h3>The concepts</h3>
+<p>A model rollout is two questions. <em>Is the new version at least as good?</em> And <em>if it isn't, how fast can we undo it?</em> The first needs metrics with enough data behind them. The second needs the old version to still be running when you find out.</p>
+<p><strong>What counts as "the model".</strong> Pin everything that changes outputs under one immutable version ID: weights, quantisation recipe, tokenizer, chat template, default sampling parameters, maximum context, and the serving engine version. Many "the new model is worse" incidents turn out to be a changed chat template or a new engine release, not the weights. If you can't name the exact bundle, you can't roll back to it.</p>
+<p><strong>The stages.</strong></p>
+<ol>
+<li><strong>Offline evals.</strong> Run the fixed evaluation suite: task accuracy, safety and refusal tests, long-context retrieval, tool-call format checks. Set pass thresholds in advance (<a href="../01-decision-model-evals.html">Module 01</a> covers thresholds). For a quantisation change, also compare against the unquantised model on a fixed prompt set: top-1 token agreement and the KL divergence between their next-token distributions.</li>
+<li><strong>Shadow traffic.</strong> Mirror a copy of real requests to the new version and throw its answers away. You learn latency, memory use, error rates and output-length shifts under real load, with zero user risk. It costs extra GPUs for the duration.</li>
+<li><strong>Canary.</strong> Route a small share of users (1%, then 5%, 25%, 50%, 100%) to the new version. Hold each stage for a fixed "bake time" and compare against the old version on the same time window, so daily traffic patterns cancel out.</li>
+<li><strong>Automatic gates.</strong> At every stage, compare canary to baseline. Any gate breached means automatic rollback, not a meeting.</li>
+<li><strong>Keep the old version warm</strong> until the new one has run at 100% for a full traffic cycle (at least a day). Then scale the old one down.</li>
+</ol>
+<pre><code>gates (canary vs baseline, same window):
+  errors:   5xx rate, timeouts, malformed tool calls
+  latency:  p50 / p99 TTFT, p50 / p99 TPOT
+  quality:  automated judge score on sampled traffic, thumbs-down rate,
+            refusal rate, mean output length
+  cost:     GPU-seconds per request, KV-cache utilisation
+rollback if any gate is worse than its threshold with enough samples</code></pre>
+<p><strong>Routing details that matter for LLMs.</strong> Make assignment sticky per conversation. Switching models mid-conversation changes tone and can break tool-call formats. It also throws away the prefix cache, because cached keys and values belong to one exact model. New replicas start with a cold prefix cache, so their TTFT looks worse at first; compare after warm-up, or you'll roll back a good model. (<a href="04-prefix-caching-disaggregation.html">Page 04</a> covers prefix caching.)</p>
+<p><strong>Rollback speed</strong> depends on where the old version is. If old replicas are still running, rollback is a router weight change: seconds. If you scaled them to zero, rollback is a cold start: minutes (see Problem 20). That's why you keep the old fleet warm during the canary, and why blue/green (a full second fleet) is the fastest rollback but costs up to double the GPUs during the switch.</p>
+
+<h3>Worked answer: how much traffic does a gate need?</h3>
+<p>Say the baseline thumbs-down rate is 5.0%, and you want to catch a regression to 5.5%. How many rated responses does each arm need, at a 5% false-alarm rate and 80% power? The standard two-proportion formula:</p>
+<pre><code>n per arm ≈ (z_α/2 + z_β)² × [p1(1−p1) + p2(1−p2)] / (p2 − p1)²
+
+z_α/2 = 1.96 (α = 0.05, two-sided)   z_β = 0.842 (power 0.8)
+p1 = 0.050, p2 = 0.055
+
+(1.96 + 0.842)²            = 7.851
+p1(1−p1) + p2(1−p2)        = 0.0475 + 0.051975 = 0.099475
+(p2 − p1)²                 = 0.000025
+
+n ≈ 7.851 × 0.099475 / 0.000025 ≈ 31,240 rated responses per arm</code></pre>
+<p>Now plug in traffic. Assume a service with 2 million requests a day and a 5% canary: 100,000 canary requests a day.</p>
+<ul>
+<li>If an automated judge scores <em>every</em> canary response, 31,240 samples take about 7.5 hours.</li>
+<li>If only 2% of users ever click a rating, you need 31,240 ÷ 0.02 ≈ 1.56 million canary requests, about 15.6 days at 5%.</li>
+</ul>
+<p>The lesson: user feedback is too sparse to catch small regressions quickly. Use offline evals and an automated judge on sampled traffic for fast gates. Keep user signals for slower, confirming checks. Tail latency has the same problem: to say anything about p99 TTFT you need thousands of requests, because only 1 in 100 lands in the tail.</p>
+
+<h3>Trade-offs</h3>
+<div class="table-wrap"><table>
+<tr><th>Strategy</th><th>User risk</th><th>Extra GPUs</th><th>Rollback time</th><th>Catches</th></tr>
+<tr><td>Offline evals only</td><td>None, but blind to real traffic</td><td>Small, temporary</td><td>n/a</td><td>Known task regressions</td></tr>
+<tr><td>Shadow traffic</td><td>None</td><td>Up to a full copy while it runs</td><td>n/a</td><td>Latency, memory, errors, output-length drift</td></tr>
+<tr><td>Canary (1→100%)</td><td>Small slice at a time</td><td>A few replicas</td><td>Seconds if old fleet is warm</td><td>Everything, given enough samples</td></tr>
+<tr><td>Blue/green</td><td>All at once on switch</td><td>Up to 2× during switch</td><td>Seconds</td><td>Only what the switch reveals</td></tr>
+<tr><td>Big-bang replace</td><td>Everyone</td><td>None</td><td>A cold start, minutes</td><td>Too late</td></tr>
+</table></div>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>I treat a model or quantisation change as a versioned bundle: weights, tokenizer, chat template, sampling defaults and engine version, under one ID. It passes offline evals with thresholds set in advance, including a logit-agreement check against the unquantised model. Then it takes shadow traffic to check latency, memory and output length under real load. Then a sticky, per-conversation canary at 1, 5, 25, 50 and 100%, with automatic gates on errors, p99 TTFT and TPOT, an automated quality score and cost per request. I size each stage so the gates have enough samples: catching a 5.0 to 5.5% thumbs-down shift needs about 31,000 rated responses per arm. The old fleet stays warm until a full day at 100%, so rollback is a router change that takes seconds.</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Comparing canary to last week instead of to the baseline in the same time window.</li>
+<li>Judging after five minutes. Small regressions need thousands of samples; cold prefix caches make a new version look slow at first.</li>
+<li>Scaling the old version to zero on day one, so rollback becomes a ten-minute cold start.</li>
+<li>Checking only accuracy. Quantised models often fail as longer outputs, more refusals, broken JSON, or worse long-context recall.</li>
+</ul>
+
+<h2 id="p20">Problem 20 · Design autoscaling for GPUs with slow cold starts</h2>
+<p><strong>What the interviewer is testing:</strong> whether you know why CPU-style autoscaling fails for LLM serving, can break a cold start into parts and shorten each one, and can size spare capacity from the traffic ramp and the cold-start time.</p>
+
+<h3>The concepts</h3>
+<p><strong>Where the minutes go.</strong> A new replica isn't ready until every step below finishes. The numbers are rough assumptions for a 70B model in FP8 (about 70 GB of weights), to show the shape. Measure your own.</p>
+<div class="table-wrap"><table>
+<tr><th>Step</th><th>Assumed time</th><th>How to shorten it</th></tr>
+<tr><td>Get a GPU node from the cloud</td><td>2–10 min, or never if the region has no capacity</td><td>Reserved capacity, a standby pool of nodes, several regions</td></tr>
+<tr><td>Pull the container image (CUDA images are often 10–20 GB)</td><td>Tens of seconds to minutes</td><td>Pre-pulled images on the node image, smaller images, lazy-loading snapshotters</td></tr>
+<tr><td>Fetch weights (70 GB)</td><td>About 35–70 s at an assumed 1–2 GB/s from object storage; about 14 s at an assumed 5 GB/s from local NVMe</td><td>Cache weights on local disk, stream straight to GPU, copy from a peer GPU</td></tr>
+<tr><td>Engine start-up (memory profiling, CUDA graph capture, compilation)</td><td>Tens of seconds to minutes</td><td>Cache compiled artefacts, capture fewer graph sizes</td></tr>
+<tr><td>Health check, warm-up requests</td><td>Seconds</td><td>Keep, but make it quick</td></tr>
+</table></div>
+<p>Even with every trick, a cold node is minutes away. A node already running with weights on local disk is tens of seconds away. A loaded, idle replica is a router change away. That ladder is the whole design space.</p>
+
+<p><strong>Scale on leading signals, not GPU utilisation.</strong> GPU utilisation says a kernel was running, not whether users are waiting. A continuously batched server can show high utilisation at light load and stay at the same number while its queue explodes. Better signals, all exported by vLLM, SGLang and TensorRT-LLM in some form (<a href="08-engines-observability.html">page 08</a> covers them):</p>
+<ul>
+<li><strong>Waiting requests</strong> (queue depth) per replica.</li>
+<li><strong>KV-cache utilisation.</strong> Near 100% means new requests can't be admitted, or running ones get preempted.</li>
+<li><strong>Pending tokens</strong>: prompt tokens waiting for prefill plus expected output tokens. Requests vary 1,000× in cost, so tokens beat request counts.</li>
+<li><strong>TTFT p95</strong>, as a lagging check that the others are working.</li>
+</ul>
+
+<p><strong>Size headroom from the ramp and the cold start.</strong> While a replica boots, traffic keeps growing. Spare capacity must cover that growth:</p>
+<pre><code>spare capacity needed ≈ traffic growth rate × cold-start time
+
+replicas of headroom = ⌈ (dλ/dt × t_cold) / μ ⌉
+  dλ/dt   traffic growth (requests/s per minute)
+  t_cold  cold-start time (minutes)
+  μ       requests/s one replica sustains at the latency target
+
+queue growth while short of capacity:  dQ/dt = λ − N·μ   (N ready replicas)</code></pre>
+
+<p><strong>The toolkit:</strong></p>
+<ul>
+<li><strong>Predictive scaling.</strong> LLM traffic is strongly daily and weekly. Scale up on a schedule before the morning ramp, and let reactive scaling handle the error.</li>
+<li><strong>Warm pool.</strong> Keep k loaded, idle replicas (or nodes with weights on disk). They join in seconds. You pay for them while idle.</li>
+<li><strong>Fast scale-up, slow scale-down.</strong> Add replicas as soon as a signal crosses its threshold. Remove them only after the signal stays low for a cooldown (say 10–15 minutes), and drain in-flight streams first. Otherwise you'll flap, paying a cold start every few minutes.</li>
+<li><strong>Admission control and graceful degradation.</strong> When the queue exceeds what you can serve within the timeout, shed load deliberately: cap max output tokens, route free-tier users to a smaller model, return a fast "busy, retry" to batch jobs. A queue that grows without limit just turns every request into a timeout.</li>
+<li><strong>Bin-pack across models.</strong> If you serve several models, a shared pool of nodes with weights cached locally lets you shift GPUs between models faster than buying new ones.</li>
+</ul>
+
+<h3>Worked answer: how much headroom for a spike?</h3>
+<p>Assumptions (all illustrative): baseline 200 requests/s; a launch spike takes traffic to 500 requests/s over 10 minutes; one replica sustains 25 requests/s at the latency target; a cold start takes 10 minutes; the autoscaler keeps 20% headroom over current demand.</p>
+<pre><code>starting replicas  = ⌈200 × 1.2 / 25⌉ = ⌈9.6⌉ = 10    → 250 req/s capacity
+growth rate        = (500 − 200) / 10 min = 30 req/s per minute
+growth unseen during one cold start = 30 × 10 = 300 req/s
+replicas to cover it                = 300 / 25 = 12
+spare already running               = (250 − 200) / 25 = 2
+→ need about 10 more replicas ready the moment the ramp starts
+   (a warm pool of 10, or a schedule that adds them before the launch)
+
+with no warm pool: demand passes 250 req/s about 2 minutes into the ramp.
+New replicas arrive 10 minutes after they're requested.
+Meanwhile the queue grows at up to 500 − 250 = 250 req/s.</code></pre>
+<p>The demo below runs exactly this scenario. With the defaults (spike 2.5×, cold start 10 min, headroom 20%, no warm pool), about 2.3% of requests are dropped, queue waits hit the 30-second timeout, and waits exceed 2 seconds for 13 minutes. A warm pool of 10 removes the drops entirely, but the replica-hours over three hours rise from about 55 to about 78, roughly 41% more GPU cost for that window. Raising headroom to 60% alone costs about 74 replica-hours and still drops 0.8%: headroom over <em>current</em> demand can't cover a spike that's 2.5× the baseline.</p>
+
+<div class="card demo">
+<h3>Interactive: autoscaling with a cold start</h3>
+<p class="legend">Three hours of traffic, one-minute steps. Thin line: demand (requests/s). Solid step line: capacity of ready replicas. Dotted line: capacity once booting replicas are ready. Red fill: demand above capacity, so the queue grows. Bars along the bottom: queue wait (red when over 2 s; the timeout is 30 s, after which requests are dropped). Assumed: baseline 200 req/s, 25 req/s per replica, 10-minute scale-down cooldown, warm-pool replicas join in 1 minute and are refilled after one cold start.</p>
+<canvas id="as" width="700" height="280" aria-label="Demand and replica capacity over three hours during a traffic spike"></canvas>
+<label for="sp">Spike size: <span id="spv" class="num"></span>× baseline</label>
+<input id="sp" type="range" min="1.5" max="4" step="0.5" value="2.5">
+<label for="cs">Cold start: <span id="csv" class="num"></span> min</label>
+<input id="cs" type="range" min="1" max="20" step="1" value="10">
+<label for="hr">Headroom: <span id="hrv" class="num"></span>% over current demand</label>
+<input id="hr" type="range" min="0" max="100" step="10" value="20">
+<label for="wp">Warm pool: <span id="wpv" class="num"></span> replicas</label>
+<input id="wp" type="range" min="0" max="12" step="1" value="0">
+<div class="stats">
+  <div class="stat"><div class="k">Requests dropped</div><div class="v" id="sdrop">–</div></div>
+  <div class="stat"><div class="k">Worst queue wait</div><div class="v" id="swait">–</div></div>
+  <div class="stat"><div class="k">Minutes with wait over 2 s</div><div class="v" id="sslo">–</div></div>
+  <div class="stat"><div class="k">Replica-hours (cost)</div><div class="v" id="scost">–</div></div>
+</div>
+<p class="meta">Try this: defaults give about 2.3% dropped and 55 replica-hours. Cold start 2 min: no drops, about 51 replica-hours. Back to 10 min, warm pool 10: no drops, about 78 replica-hours. Cold start 20 min with no pool: about 6% dropped. Replica-hours count ready, booting and warm-pool replicas, because you pay for all of them.</p>
+</div>
+
+<h3>Trade-offs</h3>
+<div class="table-wrap"><table>
+<tr><th>Lever</th><th>Cost</th><th>Helps with</th><th>Weakness</th></tr>
+<tr><td>Static headroom</td><td>Paid all day</td><td>Small, fast bursts</td><td>Large spikes beat any sensible percentage</td></tr>
+<tr><td>Warm pool</td><td>Idle GPUs</td><td>Sudden spikes</td><td>Must be refilled after use; sized by guesswork</td></tr>
+<tr><td>Predictive schedule</td><td>Little, if the forecast is good</td><td>Daily and weekly ramps, planned launches</td><td>Blind to surprises</td></tr>
+<tr><td>Faster cold starts</td><td>Engineering time, local disk</td><td>Everything</td><td>Node availability is outside your control</td></tr>
+<tr><td>Load shedding / degrade</td><td>Some users get less</td><td>Anything that gets past the others</td><td>Visible to users; needs product agreement</td></tr>
+</table></div>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>I'd first break the cold start down (node, image, weights, engine start-up) and shorten each part: pre-pulled images, weights on local NVMe, cached compile artefacts. I scale on leading signals, meaning queue depth, KV-cache utilisation and pending tokens, not GPU utilisation, which stays high while queues explode. Headroom has to cover traffic growth during one cold start: at 30 requests/s per minute and a 10-minute cold start, that's 300 requests/s, or 12 replicas at 25 requests/s each. I get that from a predictive schedule for the daily ramp plus a small warm pool for surprises, scaling up fast and down slowly with draining. Past that, admission control sheds or degrades load on purpose, so overload means shorter answers for some users rather than timeouts for all.</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Autoscaling on GPU utilisation or CPU, which don't track user waiting time for batched LLM servers.</li>
+<li>Counting requests instead of tokens. One 100K-token prompt costs as much as hundreds of short chats.</li>
+<li>Scaling down as fast as up. The system flaps and pays a cold start each time.</li>
+<li>Assuming the cloud always has GPUs to give you. At peak, "request a node" can fail; reserved capacity or a second region is part of the design.</li>
+</ul>
+
+<h2 id="practice">Practise it</h2>
+<ol>
+<li><strong>Measure a real cold start.</strong> On a Colab GPU or any single GPU, time each phase of starting vLLM with a small model (for example a 0.5–1.5B instruct model): Python import, weight download, weight load, engine ready (the first successful request). Run it twice to see the effect of a warm disk cache. Then try <code>--enforce-eager</code> to skip CUDA graph capture, and note how start-up time and decode speed both change.</li>
+<li><strong>Build a canary gate.</strong> Serve the same small model twice, once in BF16 and once quantised (FP8 if your GPU supports it, otherwise a 4-bit checkpoint). Send the same 500 prompts to both. Record top-1 agreement on greedy decoding of the first token, mean output length, JSON validity on a structured-output prompt, and p50/p99 TTFT. Write the gate as code: thresholds in, pass/fail plus a reason out.</li>
+<li><strong>Simulate the autoscaler.</strong> Port the demo's logic to Python. Replace the synthetic spike with a daily curve, add a predictive schedule that scales 15 minutes ahead of the forecast, and plot replica-hours against dropped requests for warm pools of 0 to 12. Find the cheapest setting with zero drops.</li>
+</ol>
+
+<h2 id="course">In this course</h2>
+<ul>
+<li><a href="08-engines-observability.html">Page 08 · Serving engines and observability</a>: the metrics these gates and scaling signals are built on.</li>
+<li><a href="06-quantization-hardware.html">Page 06 · Quantisation</a>: how to measure the loss a quantised rollout must pass.</li>
+<li><a href="03-batching-scheduling.html">Page 03 · Batching and scheduling</a>: admission control and priority queues, the last line of defence in a spike.</li>
+<li><a href="../01-decision-model-evals.html">Module 01 · Decision-model evals</a>: setting thresholds before you look at results.</li>
+<li><a href="../05-trillion-scale-architecture.html#serving">Module 05 · Serving</a>: why request costs span about 1,000×, which is why tokens beat request counts as a scaling signal.</li>
+<li><a href="../04-distill-small-models.html#latency">Module 04 · Latency is a safety number</a>: the robot side of "waiting too long".</li>
+</ul>
+
+<h2 id="robotics">Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Fleet updates are canaries.</strong> Shipping a new policy or a quantised perception model to a robot fleet follows the same stages: simulation and offline evals, a few robots in controlled sites, then wider. Robots typically keep the previous model on board so they can roll back without a network connection.</li>
+<li><strong>Gates are physical.</strong> Robot rollout gates include intervention rate, task success and near-miss counts, which are rarer than thumbs-downs. The sample-size arithmetic above says small fleets catch only large regressions quickly.</li>
+<li><strong>A robot can't autoscale.</strong> Its onboard computer is fixed. Overload has to be handled by doing less: a smaller model, a lower planning rate, or a safe stop. Problem 20 itself applies only to the cloud side.</li>
+<li><strong>Cloud back-ends for robots do face spikes.</strong> A fleet that starts a shift at 8:00 sends a synchronised burst to any shared planning or VLM service. That's a predictable ramp, so schedule capacity for it.</li>
+<li><strong>Boot time is a robot cold start.</strong> Loading a model into an embedded GPU's memory after a power cycle takes real seconds. Measure it, because it decides how long the robot sits idle after a restart.</li>
+</ul>
+</div>
+
+<h2 id="check">Self-check</h2>
+<details><summary>Why keep conversations sticky to one model version during a canary?</summary><p>Switching mid-conversation changes tone and can break tool-call formats, it mixes the two versions' quality signals, and it throws away the prefix cache, which only works for the exact model that produced it.</p></details>
+<details><summary>Baseline error rate 5.0%; you want to detect 5.5% at α = 0.05 and 80% power. Roughly how many samples per arm?</summary><p>About 31,000: (1.96 + 0.842)² × (0.0475 + 0.051975) / 0.000025 ≈ 31,240.</p></details>
+<details><summary>A new version's TTFT looks 30% worse in the first ten minutes of its canary. Roll back?</summary><p>Not yet. New replicas start with a cold prefix cache, so early TTFT is pessimistic. Compare after warm-up, against the baseline in the same window, with enough samples. Roll back if it's still worse.</p></details>
+<details><summary>Why is GPU utilisation a poor autoscaling signal for an LLM server?</summary><p>It measures whether a kernel was running, not whether users are waiting. A continuously batched server can sit at high utilisation across a wide range of load while its queue grows. Queue depth, KV-cache utilisation and pending tokens track user pain directly.</p></details>
+<details><summary>Traffic grows 40 req/s per minute, cold start is 6 minutes and a replica handles 20 req/s. How many replicas of headroom do you need?</summary><p>Growth during one cold start = 40 × 6 = 240 req/s. 240 / 20 = 12 replicas, either already running, in a warm pool, or added ahead of time by a schedule.</p></details>
+<details><summary>Why scale down slowly?</summary><p>Removing replicas the moment load dips means paying a full cold start when it rises again minutes later. A cooldown and draining in-flight streams avoid flapping and dropped streams.</p></details>
+
+<h2 id="resources">Resources</h2>
+<ul>
+<li><a href="https://sre.google/workbook/canarying-releases/">Google SRE Workbook · Canarying releases</a>: canary design, metric selection and comparison windows.</li>
+<li><a href="https://sre.google/sre-book/handling-overload/">Google SRE Book · Handling overload</a>: load shedding and graceful degradation.</li>
+<li><a href="https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/">Kubernetes · Horizontal Pod Autoscaler</a>: scaling on custom metrics, stabilisation windows for scale-down.</li>
+<li><a href="https://keda.sh/docs/latest/concepts/">KEDA · Concepts</a>: event-driven scaling on queue length and Prometheus metrics.</li>
+<li><a href="https://docs.vllm.ai/en/latest/usage/metrics.html">vLLM · Metrics</a>: waiting requests, KV-cache usage and latency histograms to scale on.</li>
+<li><a href="https://docs.sglang.ai/">SGLang docs</a> and <a href="https://nvidia.github.io/TensorRT-LLM/">TensorRT-LLM docs</a>: the equivalent metrics and start-up options in the other engines.</li>
+<li><a href="https://arxiv.org/abs/2401.14351">ServerlessLLM: Low-Latency Serverless Inference for Large Language Models</a> (Fu et al., 2024): fast checkpoint loading and locality-aware placement to cut cold starts.</li>
+<li><a href="https://arxiv.org/abs/2309.06180">Efficient Memory Management for LLM Serving with PagedAttention</a> (Kwon et al., 2023): why KV-cache utilisation is the capacity number that matters.</li>
+</ul>
+
+<nav class="pager">
+  <a href="08-engines-observability.html"><small>Previous</small>Page 08 · Serving engines and observability</a>
+  <a class="next" href="10-scale-cost-capstone.html"><small>Next</small>Page 10 · MoE serving, cost and the 1M-user capstone</a>
+</nav>
+<footer>Module 09 · Page 09 · written for this course from the source post, official docs and papers.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('as'), ctx = cv.getContext('2d');
+const ids = ['sp', 'cs', 'hr', 'wp'];
+const el = Object.fromEntries(ids.map(k => [k, document.getElementById(k)]));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+function rng(s) { return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 2 ** 32; }; }
+
+// one-minute steps; queue capped at 30 s of capacity (the timeout), overflow is dropped
+function simulate(spike, cold, head, pool) {
+  const N = 180, base = 200, cap = 25, r = rng(7);
+  const dem = [], capA = [], capB = [], wait = [];
+  const want = q => Math.ceil(q * (1 + head / 100) / cap);
+  let ready = want(base), boot = [], warm = pool, refill = [], queue = 0, low = 0;
+  let drop = 0, tot = 0, worst = 0, slo = 0, repMin = 0;
+  for (let t = 0; t < N; t++) {
+    let f = 1;
+    if (t >= 30 && t < 40) f = 1 + (spike - 1) * (t - 30) / 10;
+    else if (t >= 40 && t < 100) f = spike;
+    else if (t >= 100 && t < 120) f = spike - (spike - 1) * (t - 100) / 20;
+    const d = base * f * (0.95 + 0.1 * r());
+    boot = boot.filter(b => b > t || (ready++, false));
+    refill = refill.filter(b => b > t || (warm++, false));
+    const A = d * 60, C = ready * cap * 60;
+    const served = Math.min(queue + A, C);
+    queue += A - served;
+    const maxQ = ready * cap * 30;
+    if (queue > maxQ) { drop += queue - maxQ; queue = maxQ; }
+    tot += A;
+    const w = queue / (ready * cap);
+    worst = Math.max(worst, w); if (w > 2) slo++;
+    const des = want(d + queue / 60);
+    if (des > ready + boot.length) {
+      let n = des - ready - boot.length;
+      const fromPool = Math.min(n, warm);
+      warm -= fromPool; n -= fromPool;
+      for (let i = 0; i < fromPool; i++) { boot.push(t + 1); refill.push(t + cold); }
+      for (let i = 0; i < n; i++) boot.push(t + cold);
+      low = 0;
+    } else if (des < ready && boot.length === 0) {
+      if (++low >= 10) { ready = Math.max(des, 1); low = 0; }
+    } else low = 0;
+    repMin += ready + boot.length + warm;
+    dem.push(d); capA.push(ready * cap); capB.push((ready + boot.length) * cap); wait.push(w);
+  }
+  return { dem, capA, capB, wait, dropPct: 100 * drop / tot, worst, slo, repHours: repMin / 60 };
+}
+
+function draw() {
+  const sp = +el.sp.value, cs = +el.cs.value, hr = +el.hr.value, wp = +el.wp.value;
+  const shown = { sp, cs, hr, wp };
+  ids.forEach(k => document.getElementById(k + 'v').textContent = shown[k]);
+  const s = simulate(sp, cs, hr, wp);
+
+  const W = cv.width, H = cv.height, l = 50, r = 14, t = 12, b = 64, wb = 36;
+  const N = s.dem.length, ymax = Math.max(1100, ...s.capB) * 1.05;
+  const px = i => l + i / (N - 1) * (W - l - r);
+  const py = v => t + (1 - v / ymax) * (H - t - b);
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '12px sans-serif'; ctx.lineWidth = 1;
+  ctx.strokeStyle = css('--line'); ctx.fillStyle = css('--muted');
+  for (let v = 0; v <= ymax; v += 250) {
+    ctx.beginPath(); ctx.moveTo(l, py(v)); ctx.lineTo(W - r, py(v)); ctx.stroke();
+    ctx.textAlign = 'right'; ctx.fillText(v, l - 6, py(v) + 4);
+  }
+  ctx.textAlign = 'center';
+  for (let m = 0; m <= 180; m += 30) ctx.fillText(m + ' min', px(Math.min(m, N - 1)), H - 6);
+  ctx.save(); ctx.translate(12, (H - b) / 2); ctx.rotate(-Math.PI / 2); ctx.fillText('req/s', 0, 0); ctx.restore();
+
+  // shortfall
+  ctx.fillStyle = css('--fail'); ctx.globalAlpha = 0.25;
+  for (let i = 0; i < N - 1; i++) if (s.dem[i] > s.capA[i]) {
+    ctx.fillRect(px(i), py(s.dem[i]), px(i + 1) - px(i), py(s.capA[i]) - py(s.dem[i]));
+  }
+  ctx.globalAlpha = 1;
+
+  const line = (arr, col, w, dash, step) => {
+    ctx.strokeStyle = col; ctx.lineWidth = w; ctx.setLineDash(dash); ctx.beginPath();
+    arr.forEach((v, i) => {
+      if (i === 0) ctx.moveTo(px(i), py(v));
+      else { if (step) ctx.lineTo(px(i), py(arr[i - 1])); ctx.lineTo(px(i), py(v)); }
+    });
+    ctx.stroke(); ctx.setLineDash([]);
+  };
+  line(s.capB, css('--muted'), 1.5, [2, 4], true);
+  line(s.capA, css('--accent'), 2.5, [], true);
+  line(s.dem, css('--fg'), 1.2, [], false);
+
+  // queue-wait bars, 0..30 s
+  const y0 = H - 22;
+  for (let i = 0; i < N; i++) {
+    const h = s.wait[i] / 30 * wb;
+    if (h <= 0) continue;
+    ctx.fillStyle = s.wait[i] > 2 ? css('--fail') : css('--muted');
+    ctx.fillRect(px(i), y0 - h, Math.max(1, px(1) - px(0) - 0.5), h);
+  }
+  ctx.fillStyle = css('--muted'); ctx.textAlign = 'left';
+  ctx.fillText('queue wait (0–30 s)', l + 4, y0 - wb + 2);
+
+  document.getElementById('sdrop').textContent = s.dropPct.toFixed(1) + '%';
+  document.getElementById('swait').textContent = s.worst.toFixed(1) + ' s';
+  document.getElementById('sslo').textContent = s.slo;
+  document.getElementById('scost').textContent = s.repHours.toFixed(0);
+}
+ids.forEach(k => el[k].oninput = draw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

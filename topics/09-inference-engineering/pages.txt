@@ -1,0 +1,11 @@
+page|slug|title|problems|track
+01|01-request-lifecycle|The request lifecycle: from arrival to first token, and streaming|1,2|llm
+02|02-kv-cache-attention|KV cache, PagedAttention and FlashAttention|3,4,5|both
+03|03-batching-scheduling|Batching and scheduling: continuous batching, chunked prefill, fair multi-tenancy|6,7,21|llm
+04|04-prefix-caching-disaggregation|Prefix caching, cache-aware routing and prefill/decode disaggregation|8,22|llm
+05|05-latency|Latency: inter-token latency, speculative decoding and tail latency|9,10,17|both
+06|06-quantization-hardware|Quantisation and choosing GPUs|11,12|both
+07|07-profiling-kernels|Profiling, GPU utilisation and writing a fused kernel|13,14,15|both
+08|08-engines-observability|Serving engines and observability|16,18|llm
+09|09-production-operations|Safe rollouts and GPU autoscaling|19,20|llm
+10|10-scale-cost-capstone|MoE serving, cutting cost and the 1M-user capstone|23,24,25|llm

@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deep-ML Deep-Path</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../index.html">← LLMs &amp; Robotics</a> · Module 14</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 14 · Practice platform &amp; placement</div>
+<h1>Deep-ML's Deep-Path: 103 concepts from classical ML to GPU kernels, mapped onto this course (with a placement check)</h1>
+<p class="lede">One ordered route through every problem on Deep-ML, framed as a dive from the sunlit surface to the ocean trench. This module explains it, maps all 14 parts onto the course, and gives you a 25-question self-check to find where to start.</p>
+<p class="meta">Source: <a href="https://www.deep-ml.com/deep-path/diagnostic">Deep-ML Deep-Path placement test</a> and the <a href="https://www.deep-ml.com/deep-path">Deep-Path map</a>, read on 31 Oct 2026. The map was rendered in a browser. The placement test itself needs an account, so it wasn't taken, and the self-check below is my own. Structure saved in <code>sources/14-deep-ml-deep-path.json</code>.</p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">A giant practice map for AI skills, drawn like a dive into the ocean. Easy topics are near the surface, and harder ones are deeper down.</p>
+<h3>Think of it like this</h3>
+<p>Imagine a video game with levels from the beach down to the deepest trench. Before you start, a quick test checks how far down you can already go, so you don't waste time on levels that are too easy. Then each day the game gives you a few new challenges at your level. It also brings back old ones just before you'd forget them.</p>
+<h3>How it works</h3>
+<ol>
+<li>Take a short test (about 25 questions) to find your level.</li>
+<li>Each day, do a few steps: a bit of maths, some coding problems, sometimes a project.</li>
+<li>The site brings back topics you're about to forget, so they stick.</li>
+<li>Go deeper as you improve, from basic machine learning down to GPU programming.</li>
+</ol>
+<h3>Why robots care</h3>
+<p>The map includes reinforcement learning (how robots learn by trial and error), a section on training robots in simulation before the real world, and robot arm maths. That robotics part is still small, though, so this course fills the gap.</p>
+<h3>Try it</h3>
+<p>Do the 25-question self-check further down. It tells you which "depth zone" to start in.</p>
+<h3>Words to know</h3>
+<dl>
+<dt>Placement test</dt><dd>A short quiz that finds your level.</dd>
+<dt>Frontier</dt><dd>The edge of what you know: just hard enough to learn from.</dd>
+<dt>Spaced repetition</dt><dd>Reviewing things right before you'd forget them.</dd>
+<dt>Concept</dt><dd>One topic on the map, like "Attention" or "Decision Trees".</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> the full route, the crosswalk and the self-check.</p>
+
+<div class="card note"><p><strong>Track: LLM + Robotics.</strong> Deep-Path covers the whole ML stack, with LLMs and inference most heavily. It includes RL with a sim-to-real unit and a small robotics-and-control toolbox. It's the same kind of resource as <a href="02-tensortonic.html">TensorTonic (Module 02)</a>.</p></div>
+
+<div class="toc">
+<strong>In this module</strong>
+<ol>
+<li><a href="#summary">Summary</a></li>
+<li><a href="#route">The route: five zones, 14 parts</a></li>
+<li><a href="#crosswalk">Crosswalk: Deep-Path ↔ this course</a></li>
+<li><a href="#placement">Self-placement check (interactive)</a></li>
+<li><a href="#method">Why placement + spaced repetition works</a></li>
+<li><a href="#compare">Deep-Path vs TensorTonic vs 30u30</a></li>
+<li><a href="#why-robotics">Why it matters for robotics</a></li>
+<li><a href="#check">Self-check</a></li>
+</ol>
+</div>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Deep-Path puts every problem on Deep-ML into one order: <strong>103 concepts in 14 parts</strong>. Each concept teaches the maths it needs, then gives problems, and sometimes a project and a lab. There are two tracks:</p>
+<ul>
+<li><strong>Everything:</strong> 103 concepts, 2,126 steps. By the site's totals, that's 329 maths items, 1,659 problems, 87 projects and 51 labs.</li>
+<li><strong>Essentials:</strong> 69 concepts, 456 steps.</li>
+</ul>
+<p>A placement test of about 25 short questions finds your frontier. After that, the daily "Today" view gives a few steps at that frontier and brings back concepts you're about to forget.</p>
+</div>
+<ul>
+<li><strong>Deep-ML itself</strong> describes itself as a free, open-source ML challenge platform with 1,200+ problems, labs, projects and maths. There's also a paid Premium tier.</li>
+<li><strong>The depth metaphor:</strong> Sunlit (classical ML, deep learning) → Twilight (LLMs, diffusion and world models) → Midnight (RL, GNNs) → Abyss (inference engineering, CUDA/Triton, ML compilers, safety) → Trench (toolboxes: SQL, algorithms, robotics and control, maths drills).</li>
+<li><strong>It's deepest where the job market is hot:</strong> LLMs (20 concepts) and inference engineering (10 concepts) get a lot of space. Robotics and control has a single concept.</li>
+<li><strong>Some concepts are still filling in</strong> ("no project or lab yet"), and a couple of projects are marked as built but held. It's a living route.</li>
+</ul>
+
+<h2 id="route">2. The route: five zones, 14 parts</h2>
+<div class="table-wrap"><table>
+<tr><th>Zone</th><th>Parts</th><th>Concepts</th></tr>
+<tr><td>Sunlit · 0–200 m</td><td>1 Classical ML · 2 Deep Learning</td><td class="num">21 + 16</td></tr>
+<tr><td>Twilight · 200–1,000 m</td><td>3 Large Language Models · 4 Diffusion &amp; World Models</td><td class="num">20 + 2</td></tr>
+<tr><td>Midnight · 1,000–4,000 m</td><td>5 Reinforcement Learning (Sutton &amp; Barto) · 6 Graph Neural Networks</td><td class="num">10 + 3</td></tr>
+<tr><td>Abyss · 4,000–6,000 m</td><td>7 Inference Engineering · 8 GPU Programming · 9 ML Compilers · 10 AI Safety &amp; Governance</td><td class="num">10 + 4 + 3 + 1</td></tr>
+<tr><td>Trench · 6,000 m+</td><td>11 SQL &amp; pandas · 12 Algorithms &amp; Data Structures · 13 Robotics &amp; Control · 14 Math Drills</td><td class="num">4 + 5 + 1 + 3</td></tr>
+</table></div>
+<p class="meta">The trench holds "toolbox" parts. They're placed at the bottom of the map, but they're supporting skills, not the hardest material.</p>
+
+<h2 id="crosswalk">3. Crosswalk: Deep-Path ↔ this course</h2>
+<p>Use this table both ways. Read the course page to understand a concept, and do the Deep-Path problems to drill it. Open a part to see every concept.</p>
+<div class="table-wrap"><table>
+<tr><th>Deep-Path part</th><th>Course pages that teach it</th></tr>
+<tr><td>1 Classical ML</td><td><a href="01-decision-model-evals.html">01</a> (thresholds, calibration), <a href="02-tensortonic.html#math">02 maths map</a>, <a href="06-30u30/04-mdl-noisy-weights.html">06 Days 4–5</a> (MDL)</td></tr>
+<tr><td>2 Deep Learning</td><td><a href="06-30u30/index.html">06 · 30 papers</a> (RNN → Transformer), <a href="08-ai-research-engineer/01-tensor-math-autograd.html">08 Stage 01</a>, <a href="12-training-inference-videos/07-adamw.html">12 · AdamW</a>, <a href="12-training-inference-videos/08-muon.html">Muon</a></td></tr>
+<tr><td>3 Large Language Models</td><td><a href="05-trillion-scale-architecture.html">05</a>, <a href="07-post-training.html">07</a>, <a href="08-ai-research-engineer/index.html">08 (all stages)</a>, <a href="10-rlm-harness.html">10</a>, <a href="11-three-book-path.html">11</a>, <a href="12-training-inference-videos/03-lora.html">12 · LoRA</a></td></tr>
+<tr><td>4 Diffusion &amp; World Models</td><td><a href="02-tensortonic.html#track">02 Stage D</a> (DDPM → diffusion policy), <a href="06-30u30/23-variational-lossy-autoencoder.html">06 Day 23</a></td></tr>
+<tr><td>5 Reinforcement Learning</td><td><a href="02-tensortonic.html#rl">02 RL ladder</a>, <a href="06-30u30/29-ppo.html">06 Day 29</a>, <a href="06-30u30/30-rlhf.html">Day 30</a>, <a href="12-training-inference-videos/06-grpo.html">12 · GRPO</a>, <a href="03-shared-autonomy.html">03</a></td></tr>
+<tr><td>6 Graph Neural Networks</td><td><a href="06-30u30/21-message-passing.html">06 Day 21</a>, <a href="06-30u30/19-relational-reasoning.html">Day 19</a>, <a href="06-30u30/20-relational-rnns.html">Day 20</a></td></tr>
+<tr><td>7 Inference Engineering</td><td><a href="09-inference-engineering/index.html">09 (all 25 problems)</a>, <a href="13-100-days-inference.html">13</a>, <a href="12-training-inference-videos/09-llm-serving.html">12 · serving</a>, <a href="04-distill-small-models.html">04</a></td></tr>
+<tr><td>8 GPU Programming</td><td><a href="09-inference-engineering/07-profiling-kernels.html">09 · kernels</a>, <a href="08-ai-research-engineer/01-tensor-math-autograd.html">08 Stage 01</a>, <a href="02-tensortonic.html">02</a> (CUDA/Triton tracks)</td></tr>
+<tr><td>9 ML Compilers</td><td>Not covered yet. The nearest is <a href="09-inference-engineering/07-profiling-kernels.html">09 · fusion &amp; CUDA graphs</a>.</td></tr>
+<tr><td>10 AI Safety &amp; Governance</td><td><a href="07-post-training.html#pref">07 reward hacking</a>, <a href="08-ai-research-engineer/10-evals-red-teaming.html">08 Stage 10</a>, <a href="10-rlm-harness.html#safety">10 safety bounds</a></td></tr>
+<tr><td>11–12 SQL, pandas, algorithms</td><td>Not covered. These are interview toolbox skills.</td></tr>
+<tr><td>13 Robotics &amp; Control</td><td><a href="02-tensortonic.html#transforms">02 transforms &amp; 2-link arm</a>, <a href="03-shared-autonomy.html">03 shared autonomy</a>. Kalman filtering and control are course gaps (see below).</td></tr>
+<tr><td>14 Math Drills</td><td><a href="02-tensortonic.html#math">02 maths for robots</a></td></tr>
+</table></div>
+<h3>Every concept, by part</h3>
+<details><summary>Part 1 · Classical Machine Learning <span class="meta">(Sunlit zone, 21 concepts)</span></summary><ol style="list-style:none;padding-left:0"><li><span class="num">001</span> Vectors and Matrices</li><li><span class="num">002</span> Linear Regression</li><li><span class="num">003</span> Data, Splits and Baselines</li><li><span class="num">004</span> Regression Metrics and Diagnosis</li><li><span class="num">005</span> Regularization and Generalization</li><li><span class="num">006</span> Linear Regression as Statistics (inference)</li><li><span class="num">007</span> Hypothesis Testing and Experiments</li><li><span class="num">008</span> Bayesian Inference</li><li><span class="num">009</span> Survival Analysis</li><li><span class="num">010</span> Logistic Regression</li><li><span class="num">011</span> Classification Metrics: thresholds, imbalance and calibration</li><li><span class="num">012</span> Generative Classifiers and Nearest Neighbours</li><li><span class="num">013</span> Decision Trees</li><li><span class="num">014</span> Ensembles and Boosting</li><li><span class="num">015</span> Support Vector Machines and Kernels</li><li><span class="num">016</span> Beyond Linearity: Polynomials, Splines, Local Regression and GAMs</li><li><span class="num">017</span> Clustering and Mixture Models</li><li><span class="num">018</span> PCA and Dimensionality Reduction</li><li><span class="num">019</span> Anomaly Detection</li><li><span class="num">020</span> Text, Retrieval and Ranking (classical)</li><li><span class="num">021</span> Time Series and Financial ML</li></ol></details>
+<details><summary>Part 2 · Deep Learning <span class="meta">(Sunlit zone, 16 concepts)</span></summary><ol style="list-style:none;padding-left:0"><li><span class="num">022</span> Tensor Puzzles: broadcasting fluency</li><li><span class="num">023</span> Neurons, Activations and Backprop</li><li><span class="num">024</span> Training an MLP: initialization, parameters and convergence</li><li><span class="num">025</span> PyTorch: tensors, autograd and modules</li><li><span class="num">026</span> tinygrad and JAX</li><li><span class="num">027</span> Optimizers and Learning-Rate Schedules</li><li><span class="num">028</span> Normalization Layers</li><li><span class="num">029</span> Regularization and Losses for Deep Nets</li><li><span class="num">030</span> Training Mechanics: precision, checkpointing, data loading</li><li><span class="num">031</span> Convolutional Networks and Computer Vision</li><li><span class="num">032</span> Recurrent Networks and Sequences</li><li><span class="num">033</span> Attention</li><li><span class="num">034</span> The Transformer Block: positions, feed-forward, residuals</li><li><span class="num">035</span> Autoencoders, GANs and Contrastive Learning</li><li><span class="num">036</span> Distillation and Pruning Basics</li><li><span class="num">037</span> Softmax in finite precision: collapse, cancellation and grokking</li></ol></details>
+<details><summary>Part 3 · Large Language Models <span class="meta">(Twilight zone, 20 concepts)</span></summary><ol style="list-style:none;padding-left:0"><li><span class="num">038</span> Tokenization</li><li><span class="num">039</span> Token embeddings and next-token data</li><li><span class="num">040</span> First language models: bigram, MLP and perplexity</li><li><span class="num">041</span> Build a GPT</li><li><span class="num">042</span> Decoding and sampling</li><li><span class="num">043</span> Positions and long context</li><li><span class="num">044</span> Efficient attention and hybrid architectures</li><li><span class="num">045</span> State space models: Mamba and the selective scan</li><li><span class="num">046</span> Mixture of experts</li><li><span class="num">047</span> Pretraining at scale: data, scaling laws, distributed training</li><li><span class="num">048</span> Supervised fine-tuning and PEFT</li><li><span class="num">049</span> Preference alignment</li><li><span class="num">050</span> RL for LLMs: PPO, GRPO and beyond</li><li><span class="num">051</span> Evaluating LLMs</li><li><span class="num">052</span> Embedding models, retrieval and RAG</li><li><span class="num">053</span> Interpretability</li><li><span class="num">054</span> Continual learning</li><li><span class="num">055</span> Research architectures: looped, latent and recurrent-depth transformers</li><li><span class="num">056</span> Lattice deduction transformers</li><li><span class="num">057</span> Vision-language and multimodal models</li></ol></details>
+<details><summary>Part 4 · Generative Modeling: Diffusion and World Models <span class="meta">(Twilight zone, 2 concepts)</span></summary><ol style="list-style:none;padding-left:0"><li><span class="num">058</span> Diffusion: from DDPM to flow matching</li><li><span class="num">059</span> Video, world models and latent actions</li></ol></details>
+<details><summary>Part 5 · Reinforcement Learning (Sutton and Barto) <span class="meta">(Midnight zone, 10 concepts)</span></summary><ol style="list-style:none;padding-left:0"><li><span class="num">060</span> Bandits</li><li><span class="num">061</span> MDPs and dynamic programming</li><li><span class="num">062</span> Monte Carlo and temporal-difference learning</li><li><span class="num">063</span> n-step Methods and Eligibility Traces</li><li><span class="num">064</span> Function Approximation: semi-gradient TD, tile coding, the deadly triad</li><li><span class="num">065</span> Planning and Dyna</li><li><span class="num">066</span> Policy Gradients and Actor-Critic</li><li><span class="num">067</span> Deep RL: DQN, replay, options and beyond</li><li><span class="num">068</span> Games, search and self-play</li><li><span class="num">069</span> RL systems, environments and sim-to-real</li></ol></details>
+<details><summary>Part 6 · Graph Neural Networks <span class="meta">(Midnight zone, 3 concepts)</span></summary><ol style="list-style:none;padding-left:0"><li><span class="num">070</span> Graphs as matrices</li><li><span class="num">071</span> Message passing and its limits</li><li><span class="num">072</span> Node embeddings, link prediction and spectral filters</li></ol></details>
+<details><summary>Part 7 · Inference Engineering <span class="meta">(The abyss, 10 concepts)</span></summary><ol style="list-style:none;padding-left:0"><li><span class="num">073</span> Latency, throughput and the roofline</li><li><span class="num">074</span> KV cache, paging, batching and scheduling</li><li><span class="num">075</span> Speculative decoding</li><li><span class="num">076</span> Quantization</li><li><span class="num">077</span> Decode kernels and fusion</li><li><span class="num">078</span> Parallelism and disaggregation</li><li><span class="num">079</span> Serving operations and MLOps</li><li><span class="num">080</span> Speech and multimodal serving</li><li><span class="num">081</span> Serving at DeepSeek scale: load balancing, the KV store and disaggregation</li><li><span class="num">082</span> Verifiable inference</li></ol></details>
+<details><summary>Part 8 · GPU Programming: CUDA and Triton <span class="meta">(The abyss, 4 concepts)</span></summary><ol style="list-style:none;padding-left:0"><li><span class="num">083</span> CUDA basics</li><li><span class="num">084</span> CUDA intermediate: memory, warps, scans</li><li><span class="num">085</span> CUDA pro: attention kernels</li><li><span class="num">086</span> Triton</li></ol></details>
+<details><summary>Part 9 · ML Compilers <span class="meta">(The abyss, 3 concepts)</span></summary><ol style="list-style:none;padding-left:0"><li><span class="num">087</span> Graph IR, rewrites and symbolic index math</li><li><span class="num">088</span> Views, movement ops and the scheduler</li><li><span class="num">089</span> Codegen: loops, tiling and GPU mapping</li></ol></details>
+<details><summary>Part 10 · AI Safety and Governance <span class="meta">(The abyss, 1 concepts)</span></summary><ol style="list-style:none;padding-left:0"><li><span class="num">090</span> Proxies, privacy, fairness and gates</li></ol></details>
+<details><summary>Part 11 · Toolbox: SQL and pandas <span class="meta">(The trench, 4 concepts)</span></summary><ol style="list-style:none;padding-left:0"><li><span class="num">091</span> SQL basics</li><li><span class="num">092</span> SQL intermediate: joins, windows, product metrics</li><li><span class="num">093</span> SQL hard: retention and streaks</li><li><span class="num">094</span> pandas</li></ol></details>
+<details><summary>Part 12 · Toolbox: Algorithms and Data Structures <span class="meta">(The trench, 5 concepts)</span></summary><ol style="list-style:none;padding-left:0"><li><span class="num">095</span> Arrays, strings and two pointers</li><li><span class="num">096</span> Hashing, heaps, stacks and queues</li><li><span class="num">097</span> Linked lists, trees and tries</li><li><span class="num">098</span> Graphs, grids and dynamic programming</li><li><span class="num">099</span> Systems-style design drills</li></ol></details>
+<details><summary>Part 13 · Toolbox: Robotics and Control <span class="meta">(The trench, 1 concepts)</span></summary><ol style="list-style:none;padding-left:0"><li><span class="num">100</span> Kinematics, rotations and filtering</li></ol></details>
+<details><summary>Part 14 · Toolbox: Math Drills <span class="meta">(The trench, 3 concepts)</span></summary><ol style="list-style:none;padding-left:0"><li><span class="num">101</span> Linear algebra drills</li><li><span class="num">102</span> Calculus drills</li><li><span class="num">103</span> Probability and statistics drills</li></ol></details>
+
+<h2 id="placement">4. Self-placement check</h2>
+<p>This is <strong>not</strong> Deep-ML's test; that one needs an account. It's 25 questions, five per zone, written for this course. Answer honestly and skip guessing. It shows a score per zone, and suggests where to start on Deep-Path and which course modules to read first.</p>
+<div class="card demo" id="quiz">
+<h3>Interactive: find your frontier</h3>
+<div id="qs"></div>
+<button id="score">Score my answers</button>
+<canvas id="bars" width="700" height="200" aria-label="Score per zone"></canvas>
+<p id="rec"></p>
+</div>
+
+<p class="meta">Looking for full university courses rather than drills? <a href="17-free-ai-curriculum.html">Module 17</a> has 391 free courses with every link checked, plus a robotics section.</p>
+
+<h2 id="method">5. Why placement + spaced repetition works</h2>
+<ul>
+<li><strong>Placement</strong> skips material you already know and starts you at your "frontier": hard enough to learn, not so hard you stall. That's scaffolding again (<a href="03-shared-autonomy.html#learning">Module 03</a>).</li>
+<li><strong>Spaced repetition</strong> brings a concept back just before you'd forget it. Combined with retrieval practice (actually solving, not re-reading), it builds durable memory. These are the "desirable difficulties" from Module 03.</li>
+<li><strong>Maths, then problems, then a project</strong> mirrors how this course pairs explanation, a demo and a hands-on build.</li>
+</ul>
+
+<h2 id="compare">6. Deep-Path vs TensorTonic vs 30u30</h2>
+<div class="table-wrap"><table>
+<tr><th></th><th>Deep-Path (Deep-ML)</th><th><a href="02-tensortonic.html">TensorTonic</a></th><th><a href="06-30u30/index.html">30u30</a></th></tr>
+<tr><td>Shape</td><td>One ordered route, 103 concepts, with placement and daily review</td><td>Problem bank, study plans, maths lessons, paper re-implementations</td><td>30 papers, one per day</td></tr>
+<tr><td>Strongest on</td><td>Breadth: classical ML through inference, CUDA, compilers, SQL</td><td>From-scratch ML/DL coding, CUDA/Triton, maths visualisations</td><td>Foundational papers with full implementations</td></tr>
+<tr><td>Robotics</td><td>RL incl. sim-to-real; 1 robotics &amp; control concept</td><td>3D transforms, CV, RL ladder</td><td>Indirect (PPO, RLHF, CNNs)</td></tr>
+<tr><td>Best use</td><td>Daily drilling at your frontier</td><td>Targeted practice by topic</td><td>Deep understanding of the classics</td></tr>
+</table></div>
+
+<h2 id="why-robotics">7. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Part 5's last unit, "RL systems, environments and sim-to-real",</strong> is the bridge to training robot policies in simulation.</li>
+<li><strong>Part 13's single concept</strong> (kinematics, rotations and filtering; its first problem is forward kinematics of a 2-link arm) shows the gap. Robotics needs far more: rotations and quaternions, Kalman and particle filters, control (PID, LQR, MPC), planning. These are the same gaps this course logged back in Module 02.</li>
+<li><strong>Part 4's "Video, world models and latent actions"</strong> connects to learning robot world models from video.</li>
+<li><strong>Parts 7–8 (inference, CUDA)</strong> are what put models onto robot hardware within a latency budget (<a href="04-distill-small-models.html#latency">Module 04</a>).</li>
+</ul>
+</div>
+
+<h2 id="check">8. Self-check</h2>
+<details><summary>What's the difference between Deep-Path's Everything and Essentials tracks?</summary><p>Everything is all 103 concepts (2,126 steps). Essentials is a 69-concept, 456-step subset.</p></details>
+<details><summary>What does the placement test do, and what happens after it?</summary><p>About 25 short questions find your frontier. The daily view then gives a few steps there and brings back concepts you're about to forget.</p></details>
+<details><summary>Is the "trench" the hardest material?</summary><p>No. The trench holds toolbox parts (SQL, algorithms, robotics and control, maths drills). They're supporting skills placed at the bottom of the map.</p></details>
+<details><summary>Which Deep-Path part has no matching module in this course yet?</summary><p>Part 9 (ML compilers), and the SQL/algorithms toolboxes. Robotics and control is only partly covered.</p></details>
+
+<footer>Module 14 · added 2026-10-31 · <a href="../index.html">Back to course index</a></footer>
+</main>
+
+<script>
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const ZONES = [
+  {name: 'Sunlit', parts: 'Parts 1–2 (Classical ML, Deep Learning)', course: ['01-decision-model-evals.html', '06-30u30/index.html']},
+  {name: 'Twilight', parts: 'Parts 3–4 (LLMs, Diffusion & World Models)', course: ['07-post-training.html', '08-ai-research-engineer/index.html']},
+  {name: 'Midnight', parts: 'Parts 5–6 (RL, GNNs)', course: ['02-tensortonic.html#rl', '12-training-inference-videos/06-grpo.html']},
+  {name: 'Abyss', parts: 'Parts 7–10 (Inference, GPU, Compilers, Safety)', course: ['09-inference-engineering/index.html', '13-100-days-inference.html']},
+  {name: 'Trench (toolbox)', parts: 'Parts 11–14 (SQL, Algorithms, Robotics & Control, Maths)', course: ['02-tensortonic.html#transforms']},
+];
+// [zone, question, options, index of correct option]
+const Q = [
+  [0, 'A classifier scores 99% accuracy on data that is 99% negative. Best next step?', ['Ship it', 'Check precision and recall on the positive class', 'Add more layers', 'Lower the learning rate'], 1],
+  [0, 'Why keep a separate test set?', ['To train faster', 'To get an unbiased estimate of generalisation after tuning on validation data', 'To increase accuracy', 'It is required by PyTorch'], 1],
+  [0, 'L2 regularisation mainly…', ['Shrinks weights towards zero', 'Removes features', 'Increases model size', 'Speeds up inference'], 0],
+  [0, 'Backpropagation computes gradients by…', ['Random search', 'Applying the chain rule from the loss backwards through the network', 'Finite differences on every weight', 'Solving a linear system'], 1],
+  [0, 'What does AdamW change compared with Adam?', ['It removes momentum', 'It decouples weight decay from the adaptive gradient update', 'It uses SGD for the last layer', 'It doubles the learning rate'], 1],
+  [1, 'Perplexity is…', ['The number of parameters', 'The exponential of the average per-token cross-entropy', 'The model\'s accuracy', 'The context length'], 1],
+  [1, 'Sampling with temperature below 1 makes outputs…', ['More random', 'More deterministic, because the softmax gets sharper', 'Longer', 'Unchanged'], 1],
+  [1, 'Why divide attention scores by √d_k?', ['To save memory', 'To stop dot products growing with dimension and saturating the softmax', 'To normalise the values', 'To add position information'], 1],
+  [1, 'LoRA fine-tunes a model by…', ['Updating every weight', 'Training small low-rank matrices added to frozen weights', 'Pruning heads', 'Quantising to 4 bits only'], 1],
+  [1, 'DPO learns from…', ['Labelled images', 'Pairs of preferred vs rejected responses, without a separate reward model', 'Only a reward model', 'Unlabelled text'], 1],
+  [2, 'The discount factor γ in RL…', ['Weights future rewards less than immediate ones', 'Sets the learning rate', 'Counts episodes', 'Clips gradients'], 0],
+  [2, 'Temporal-difference learning updates a value using…', ['Only the final return', 'A bootstrapped estimate of the next state\'s value', 'A human label', 'The policy entropy'], 1],
+  [2, 'Subtracting a baseline in policy gradients…', ['Biases the gradient', 'Reduces variance without changing the expected gradient', 'Removes the need for rewards', 'Makes the policy deterministic'], 1],
+  [2, 'PPO\'s clipping…', ['Limits how far the probability ratio can move in one update', 'Clips rewards to [−1, 1]', 'Clips the learning rate', 'Removes the value function'], 0],
+  [2, 'A message-passing GNN layer updates each node from…', ['Random noise', 'Aggregated features of its neighbours', 'Only its own features', 'The global loss'], 1],
+  [3, 'Decoding one sequence at a time on a GPU is usually…', ['Compute-bound', 'Memory-bandwidth-bound', 'Network-bound', 'Disk-bound'], 1],
+  [3, 'The KV cache stores…', ['The model weights', 'Keys and values of earlier tokens so they aren\'t recomputed', 'User prompts on disk', 'Gradients'], 1],
+  [3, 'Grouped-query attention saves memory by…', ['Sharing key/value heads across groups of query heads', 'Removing attention', 'Shortening prompts', 'Using FP64'], 0],
+  [3, 'Speculative decoding keeps the target model\'s output distribution because…', ['The draft model is always right', 'The target model verifies drafts with rejection sampling', 'It only works at temperature 0', 'It retrains the model'], 1],
+  [3, 'Coalesced memory access in CUDA means…', ['Threads use separate GPUs', 'Neighbouring threads read neighbouring addresses in one transaction', 'Memory is compressed', 'All threads read one address'], 1],
+  [4, 'ROW_NUMBER() OVER (PARTITION BY user ORDER BY ts) gives…', ['A global row count', 'A running number per user, ordered by time', 'Duplicate removal', 'The average ts'], 1],
+  [4, 'Average-case lookup in a hash table is…', ['O(1)', 'O(log n)', 'O(n)', 'O(n²)'], 0],
+  [4, 'Forward kinematics computes…', ['Joint angles from a target pose', 'The end-effector pose from joint angles', 'Motor torques', 'Camera calibration'], 1],
+  [4, 'A Kalman filter combines…', ['Two neural networks', 'A motion prediction and noisy measurements, weighted by their uncertainty', 'Images and text', 'Rewards and penalties'], 1],
+  [4, 'A 3D rotation matrix is…', ['Any 3×3 matrix', 'Orthogonal with determinant +1', 'Diagonal', 'Symmetric with trace 0'], 1],
+];
+
+const box = document.getElementById('qs');
+box.innerHTML = Q.map(([z, q, opts], i) => `
+  <fieldset class="card" style="margin:10px 0"><legend><b>${i + 1}.</b> <span class="meta">${ZONES[z].name}</span></legend>
+  <p style="margin:4px 0 8px">${q}</p>
+  ${opts.map((o, j) => `<label style="display:block"><input type="radio" name="q${i}" value="${j}"> ${o}</label>`).join('')}
+  </fieldset>`).join('');
+
+function scoreAll() {
+  const per = ZONES.map(() => 0);
+  Q.forEach(([z, , , ans], i) => {
+    const sel = document.querySelector(`input[name=q${i}]:checked`);
+    if (sel && +sel.value === ans) per[z]++;
+  });
+  return per;
+}
+// Frontier: the first of the four main zones scoring below 4/5. The toolbox zone is reported separately.
+function frontier(per) {
+  const f = per.slice(0, 4).findIndex(s => s < 4);
+  return f === -1 ? 4 : f;
+}
+function draw(per) {
+  const cv = document.getElementById('bars'), ctx = cv.getContext('2d'), W = cv.width, H = cv.height, L = 150, rh = H / 5;
+  ctx.clearRect(0, 0, W, H); ctx.font = '13px sans-serif'; ctx.textBaseline = 'middle';
+  per.forEach((s, i) => {
+    const y = i * rh + rh / 2;
+    ctx.fillStyle = css('--fg'); ctx.fillText(ZONES[i].name, 4, y);
+    ctx.fillStyle = css('--line'); ctx.fillRect(L, y - 9, W - L - 50, 18);
+    ctx.fillStyle = s >= 4 ? css('--accent') : css('--warn'); ctx.fillRect(L, y - 9, (W - L - 50) * s / 5, 18);
+    ctx.fillStyle = css('--muted'); ctx.fillText(s + '/5', W - 40, y);
+  });
+}
+function recommend(per) {
+  const f = frontier(per), tool = per[4] < 4 ? ' Your toolbox score suggests drilling Parts 11–14 alongside.' : '';
+  if (f === 4) return 'Strong across all four main zones. Start at the deepest parts you haven\'t done, or go straight to projects.' + tool;
+  const z = ZONES[f];
+  return `Your frontier looks like the <b>${z.name}</b> zone: start Deep-Path at ${z.parts}. Read first: ${z.course.map(c => `<a href="${c}">${c.replace('.html', '').replace(/#.*/, '')}</a>`).join(', ')}.` + tool;
+}
+document.getElementById('score').onclick = () => {
+  const per = scoreAll(); draw(per);
+  document.getElementById('rec').innerHTML = recommend(per);
+};
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => draw(scoreAll()));
+draw([0, 0, 0, 0, 0]);
+</script>
+</body>
+</html>

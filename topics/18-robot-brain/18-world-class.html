@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 18 · A world-class brain</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 10 · Lesson 18</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 10 · Lesson 18</div>
+<h1>A world-class brain over the internet: planners and agents</h1>
+<p class="lede">Your word counter and your tiny language model live on your own computer and answer in a fraction of a millisecond. But they can't handle "put the red and blue blocks away". Today Robo-Helper borrows a huge model (Claude) over the internet, in two different ways. And you write the code that makes sure it never gets to drive the robot unchecked.</p>
+
+<div class="facts">
+  <div><b>Time</b>3–4 hours (plus the stretch)</div>
+  <div><b>You'll need</b>Python 3, your finished Lessons 10 and 11. Optional: an API key from a parent, and the <code>anthropic</code> package</div>
+  <div><b>New words</b>API, API key, environment variable, system prompt, structured output, JSON schema, planner, agent, tool call</div>
+  <div><b>Project piece</b>Claude as the robot's brain, with you in charge</div>
+</div>
+
+<section class="kid" id="start">
+<h2>Start here</h2>
+<p class="big">A big model over the internet can understand almost anything you say, but it is a guest in your robot: you tell it the rules, you describe the room, and you check every single thing it asks the robot to do.</p>
+<h3>The problem</h3>
+<p>Your little sister types "put the red and blue blocks away". The word counter from Lesson 9 picks <em>one</em> intent and <em>one</em> colour, bins the red block, and stops. Your tiny LM from Lesson 15 bins the blue one. Neither of them can do two things, neither can say "which block do you mean?", and neither has ever heard of "except" or "closest". Teaching them all that would take thousands of examples. Somebody has already trained a model on a huge chunk of the internet. Can Robo-Helper use it?</p>
+<h3>The idea in one picture</h3>
+<p>Imagine you're working in a kitchen and you can phone a world-famous chef. Two ways to use them. <b>Planner:</b> you describe your kitchen, they read you the whole recipe in one call, you hang up and cook it. Quick and cheap, but if the oven turns out to be broken, the recipe doesn't know. <b>Agent:</b> you stay on the phone. They say "open the fridge", you say "done, there's no milk", they say "then use water". Slower, more phone time, but they react to what actually happens. Either way, if the chef says "put your hand on the hot tray", <em>you</em> say no. You're the one standing in the kitchen.</p>
+<h3>Words to know</h3>
+<dl>
+<dt>API</dt><dd>"Application programming interface": a menu of requests one program can send to another. Here, your Python sends text to Anthropic's computers and gets the model's answer back.</dd>
+<dt>API key</dt><dd>A long secret password that proves a request is yours. Every request is charged to the account the key belongs to, so it's as precious as a bank card.</dd>
+<dt>Environment variable</dt><dd>A named value your terminal hands to every program it starts, like <code>ANTHROPIC_API_KEY</code>. It keeps the secret out of your code files.</dd>
+<dt>System prompt</dt><dd>The standing instructions sent with every request: who the model is, what it may do, the rules. The person's command goes separately.</dd>
+<dt>Structured output</dt><dd>Asking the API for a reply in an exact JSON shape instead of free chat, so a program can read it.</dd>
+<dt>JSON schema</dt><dd>A description of that shape: which keys, what type each value is, which values are allowed.</dd>
+<dt>Planner</dt><dd>One request in, one whole plan out. Then the robot runs the plan.</dd>
+<dt>Agent</dt><dd>The model gets the robot's <em>tools</em> and uses them one at a time, seeing each result before choosing the next step. That back-and-forth is called the <em>agent loop</em>.</dd>
+<dt>Tool call</dt><dd>The model asking your program to run one tool, such as <code>go_to({"object": "blue block"})</code>. Your program decides whether to actually do it.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>The full lesson:</strong> everything below builds a request from nothing, compares the two ways of using a big model, and then you write the two safety gates that every request has to pass.</p>
+
+<h2 id="problem">1. The problem</h2>
+<p>Here are four commands from the bake-off you'll run next week. Read them as Robo-Helper's word counter would:</p>
+<ul>
+<li><em>"put the red and blue blocks away"</em>: two blocks. The word counter can only return one <code>{"intent", "object"}</code>.</li>
+<li><em>"bin everything except the green block"</em>: it sees the word "green" and bins the green block. The exact opposite.</li>
+<li><em>"put away the block that's closest to the bin"</em>: it has no idea where anything is. It only counts words.</li>
+<li><em>"put the block away"</em>: there are three blocks. The right answer is a question: <em>"Which one?"</em></li>
+</ul>
+<p>These need a brain that understands language properly, knows what's in the room, can make a plan of several steps, and knows when to ask. That's what large language models are good at. The catch: the good ones are far too big for your laptop. They run in data centres, and you reach them over the internet.</p>
+<p>So today's questions are practical ones. How do you send a request? How do you keep your key safe? How do you tell the model about the room? How do you get an answer a program can check? And should the model write the whole plan at once, or work step by step?</p>
+
+<h2 id="principles">2. First principles</h2>
+
+<h3>Step 1: a request is just a message to another computer</h3>
+<p>When your Python "calls Claude", nothing magic happens. Your program sends a bundle of text over the internet to Anthropic's servers. A computer there runs the model on that text and sends text back. The bundle has a fixed shape. Here's the planner request from <code>ask_planner</code> in your homework file, simplified:</p>
+<pre><code>model       = "claude-opus-5-5"            which model to run
+system      = SYSTEM                       the standing rules (Step 3)
+messages    = [{"role": "user",
+                "content": "Room: ...\nPerson says: put the block away"}]
+max_tokens  = 4000                         the longest answer we'll accept
+output_config = {... "format": {"type": "json_schema", "schema": PLAN_SCHEMA}}</code></pre>
+<p>The <code>anthropic</code> package turns that into an internet request for you. It's not part of Python, so you install it, ideally inside a <b>virtual environment</b> (a "venv"): a private folder of packages just for this project, so nothing else on the computer gets changed. The project README shows the three lines:</p>
+<pre><code>python3 -m venv ~/robo-venv
+source ~/robo-venv/bin/activate
+pip install anthropic</code></pre>
+<p>Next time you open a terminal, run the <code>source</code> line again to step back into the venv.</p>
+
+<h3>Step 2: the key is a secret, so it never goes in your code</h3>
+<p>Every request carries your API key, and every request costs a little money on the account that owns the key. Anyone who has your key can spend that money. So, three rules, no exceptions:</p>
+<ol>
+<li><b>Never type the key into a code file.</b> Code gets shared, uploaded to GitHub, pasted into chats. Bots scan GitHub for leaked keys within minutes.</li>
+<li><b>Never paste it into a chat</b>, a message, a screenshot, or a file you share. Not even to "ask for help".</li>
+<li><b>Keep it in an environment variable.</b> Ask a parent to add one line to your <code>~/.zshrc</code> (the file your terminal reads when it starts): <code>export ANTHROPIC_API_KEY=...</code>. Ask them to set a spending limit on the account too.</li>
+</ol>
+<p>Now look at <code>brains.py</code>. The line that connects is just <code>client = anthropic.Anthropic()</code>. There's no key in it. The package looks up <code>ANTHROPIC_API_KEY</code> in the environment by itself. Your code can be shared with the whole world and the key stays at home.</p>
+<div class="note"><b>No key? Nothing is blocked.</b> The course includes <em>replay brains</em>, <code>planner-replay</code> and <code>agent-replay</code>, which re-run real recorded Claude runs from <code>project/solutions/recordings/</code> through <em>your</em> safety checks, offline and free. If that folder isn't there yet, they say <em>(no recording for this command)</em> and the bake-off skips them.</div>
+<!-- CLAUDE-RESULTS -->
+
+<h3>Step 3: the system prompt sets the rules</h3>
+<p>A model has read a huge amount of text, but it knows nothing about <em>your</em> robot. The <b>system prompt</b> is where you tell it. It's sent with every request, before the person's command. Here's the start of <code>SYSTEM</code> from your homework file:</p>
+<pre><code>You are the brain of Robo-Helper, a small cleaning robot in a room with three blocks and a bin.
+You can only: put a block in the bin ("put"), drive to a block ("go"),
+report where a block is ("find"), or "stop".
+Rules:
+- Only use the blocks listed in the room description. Never invent objects.
+- If the person's request is ambiguous ..., ask ONE short clarifying question instead of guessing.
+- If the request is impossible or unrelated to tidying ..., politely say so and do nothing.
+- Prefer doing exactly what was asked: don't bin blocks the person didn't ask about.</code></pre>
+<p>Notice what it does: it says <em>who</em> the model is, lists the only allowed actions (the same four as Lesson 10), and covers the tricky cases you saw in Section 1 (ask when unsure, refuse the sandwich). The system prompt is a <em>request</em>, though, not a lock. A model usually follows it. "Usually" is not good enough for a robot, which is why Step 7 exists.</p>
+
+<h3>Step 4: the model can't see the room, so you describe it</h3>
+<p>"Put away the block that's closest to the bin." Closest to what? The model is in a data centre. It has never seen your room. It only knows what's in the text you send. So <code>ask_planner</code> puts the <b>world state</b> into the message, using <code>robot.look()</code>. On a fresh robot, that's this (real output):</p>
+<pre><code>Robot at (1, 1), holding nothing. Bin at (7, 6). Blocks not yet in the bin: {'red block': (2, 1),
+'blue block': (6, 3), 'green block': (1, 5)}. In the bin: nothing. Obstacles seen so far: none.</code></pre>
+<p>Now it can do the maths you'd do. Distance to the bin at (7, 6), counting squares across plus squares down:</p>
+<pre><code>red   (2, 1):  |7 − 2| + |6 − 1| = 5 + 5 = 10
+blue  (6, 3):  |7 − 6| + |6 − 3| = 1 + 3 =  4   ← closest
+green (1, 5):  |7 − 1| + |6 − 5| = 6 + 1 =  7</code></pre>
+<details><summary>Predict first: what might go wrong if you forgot to send the room description?</summary>
+<p>The model would have to guess. It might assume a "yellow block" exists, or pick "closest" at random, or ask where things are. A model always answers <em>something</em>, so a missing fact doesn't cause an error: it causes a confident wrong answer. Rule: everything the model needs to decide must be in the request.</p>
+</details>
+
+<h3>Step 5: structured outputs make the reply checkable</h3>
+<p>In Lesson 10, pretend models replied with chatty text, broken JSON and extra keys, and you had to dig the JSON out with <code>extract_json</code>. Real APIs can do better. You send a <b>JSON schema</b> and the API makes the reply fit that shape. Here's <code>PLAN_SCHEMA</code> in plain words:</p>
+<pre><code>{
+  "reply":   a string            what to say to the person
+  "clarify": a string, or null   a question to ask instead of acting
+  "plan":    a list of actions, each exactly {"intent": put|go|find|stop,
+                                              "object": red block|blue block|green block|null}
+}</code></pre>
+<p>So for "put the block away", a good reply would look like this (an example we wrote to show the shape):</p>
+<pre><code>{"reply": "Happy to help!", "clarify": "Which block: red, blue or green?", "plan": []}</code></pre>
+<p>And for "put the red and blue blocks away" (also our example):</p>
+<pre><code>{"reply": "On it!", "clarify": null,
+ "plan": [{"intent": "put", "object": "red block"}, {"intent": "put", "object": "blue block"}]}</code></pre>
+<p>A <b>machine-checkable</b> reply is the whole point. Your program can now test every key and every step before anything moves. Does the schema make checking unnecessary? No. The schema fixes the <em>shape</em>, not the <em>sense</em>. It allows a plan with 40 steps. It allows a question <em>and</em> a plan at once ("Which block?" while already binning the red one). A model can also decline to answer, in which case there's no JSON at all and <code>ask_planner</code> returns <code>None</code>. And the same checks protect brains that don't support schemas well, like a small model on your own computer.</p>
+
+<h3>Step 6: two ways to use the model, planner and agent</h3>
+<p><b>The planner</b> makes one request: room plus command in, whole plan out. Then <code>run_plan</code> (in <code>brains.py</code>) does each step with the robot you built in Lesson 11, stopping at the first failure. One request means it's quick and cheap. But the plan is written before the robot moves. Your robot's own reflexes (Lesson 11's <code>drive_to</code>) will still drive around the cat, but if something changes that the plan depended on, the plan can't change its mind.</p>
+<p><b>The agent</b> doesn't get a list of intents. It gets the robot's <b>tools</b>, each described with its own little schema:</p>
+<div class="table-wrap"><table>
+<tr><th>Tool</th><th>Input</th><th>What it does</th></tr>
+<tr><td><code>look</code></td><td>nothing</td><td>Describes the room (the text from Step 4).</td></tr>
+<tr><td><code>go_to</code></td><td><code>{"object": ...}</code></td><td>Drives to a block, replanning around obstacles.</td></tr>
+<tr><td><code>pick_up</code></td><td><code>{"object": ...}</code></td><td>Picks up a block. The robot must already be at it.</td></tr>
+<tr><td><code>put_in_bin</code></td><td>nothing</td><td>Drives to the bin and drops what it holds.</td></tr>
+</table></div>
+<p>Then <code>run_agent</code> runs the <b>agent loop</b>. Here it is in plain words:</p>
+<pre><code>messages = [the person's command]
+repeat at most 12 times:
+    send messages (and the tool list) to the model
+    if the reply has no tool calls: it's finished, keep its text and stop
+    for each tool call in the reply:
+        ok, text = execute_tool(robot, name, args, known)     ← YOUR gate
+        add a "tool_result" with that text (and is_error = not ok)
+    add the model's reply and all the results to messages</code></pre>
+<p>Two things to notice. First, the model sees every result, <em>including errors</em>. If it tries to pick up a block while holding another, it gets back <em>"Already holding the blue block. Put it in the bin first."</em> and can fix its own mistake. Second, every turn sends the <em>whole conversation so far</em> again, so each request is bigger than the last. An agent makes many trips and reads more text: slower and more expensive, but able to react.</p>
+<details><summary>Predict first: in "put the red and blue blocks away", how many requests does a planner make? An agent that calls one tool per turn?</summary>
+<p>The planner: <b>one</b>. The agent, if it does <code>look</code>, then <code>go_to</code>, <code>pick_up</code>, <code>put_in_bin</code> for each block, makes 7 tool calls, one per turn, plus one more turn where it replies "done" without calling a tool: <b>8 requests</b>. Each one waits for the internet and the model. That's the price of being able to react.</p>
+</details>
+
+<h3>Step 7: you stay in charge</h3>
+<p>Here's the most important idea in the lesson. <b>The model never touches the robot.</b> It only ever produces text: a plan, or a tool call. Your code decides what happens. Two gates, and you write both:</p>
+<ul>
+<li><b><code>validate_plan</code></b> checks a whole planner reply before any step runs: exactly the keys <code>reply</code>, <code>clarify</code>, <code>plan</code>; the plan is a list of at most 6 actions; every action passes your Lesson 10 <code>validate_action</code>; and if there's a question, there must be no plan. "Ask first, act later."</li>
+<li><b><code>execute_tool</code></b> runs one agent tool call, but only a known tool, with a proper arguments dictionary, on a known block. It never crashes. If anything's wrong it returns <code>(False, reason)</code>, and that reason goes back to the model as an error.</li>
+</ul>
+<p>There are other limits built in too: <code>MAX_PLAN = 6</code> steps, <code>max_turns=12</code> for the agent loop, so a confused model can't loop for ever (and spend for ever). That's how real companies use these models in products: the model suggests, the program checks, the program acts.</p>
+<details><summary>Predict first: the agent calls a tool named <code>self_destruct</code>. What happens?</summary>
+<p>Your <code>execute_tool</code> doesn't recognise the name and returns <code>(False, "Unknown tool 'self_destruct'. Allowed: look, go_to, pick_up, put_in_bin.")</code>. The robot doesn't move. The model receives that text as an error result and has to pick a real tool. A list of allowed things is far safer than a list of banned things: you could never think of every bad idea in advance.</p>
+</details>
+
+<h3>Step 8: what does a request cost?</h3>
+<p>Big models charge per <b>token</b> (roughly a word or a piece of a word, from Lesson 16), with different prices for what you send and what you get back. For <code>claude-opus-5-5</code> the prices in <code>lesson18_world_class.py</code> are $4 per million input tokens and $20 per million output tokens. <code>cost_usd</code> does the sum. Suppose (made-up numbers, just to practise) a request sends 1,000 tokens and gets 200 back:</p>
+<pre><code>in:   1,000 / 1,000,000 × $4  = $0.004
+out:    200 / 1,000,000 × $20 = $0.004
+total                         = $0.008   (less than one cent)</code></pre>
+<p>Tiny for one request. But the agent sends the growing conversation every turn, and a robot might hear thousands of commands. You'll measure the real numbers in the bake-off.</p>
+<!-- CLAUDE-RESULTS -->
+
+<h2 id="play">3. Play with it</h2>
+<div class="card demo">
+<h3>Interactive: be the planner, meet the gate</h3>
+<p class="legend">The real room from <code>world.py</code>, with the cat at (4, 1) that the robot doesn't know about until it sees it. Type (or break) a planner reply in the box and press <b>Check and run</b>. The page runs <code>validate_plan</code> exactly like the Python, including Lesson 10's checks and the same reasons word for word. If the reply passes, it runs the plan the way <code>execute_plan_reply</code> does, with Lesson 11's A* and stop-neuron. Your typed reply plays the part of the model.</p>
+<canvas id="room18" width="500" height="400" style="height:auto" aria-label="The room: walls, blocks, the bin, the cat and the robot"></canvas>
+<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+<button data-p="good">Good plan</button><button data-p="sneaky">Sneaky object</button><button data-p="both">Asks AND acts</button><button data-p="ask">Just asks</button><button data-p="long">Too long</button><button data-p="broken">Broken JSON</button><button data-p="extra">Extra key</button>
+</div>
+<textarea id="planIn" rows="6" aria-label="Planner reply as JSON" style="width:100%;margin-top:8px;font:.85rem/1.4 var(--mono);padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)"></textarea>
+<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><button id="runPlan">Check and run</button><button id="resetPlan">Reset room</button></div>
+<pre id="planOut" style="white-space:pre-wrap;font-size:.85rem;min-height:4em"></pre>
+<div class="stats">
+  <div class="stat"><div class="k">validate_plan</div><div class="v" id="pVal">–</div></div>
+  <div class="stat"><div class="k">Steps run</div><div class="v" id="pSteps">–</div></div>
+  <div class="stat"><div class="k">Moves</div><div class="v" id="pMoves">–</div></div>
+  <div class="stat"><div class="k">In the bin</div><div class="v" id="pBin">–</div></div>
+</div>
+</div>
+<p>Try: the good plan (watch the robot meet the cat on the way to the blue block). Then change <code>"blue block"</code> to <code>"purple block"</code>. Delete the <code>"clarify"</code> key. Make the plan seven steps long. Put the same block in twice: what does the robot say the second time?</p>
+
+<div class="card demo">
+<h3>Step through the agent loop</h3>
+<p class="legend"><b>This tool-call sequence is an example we wrote to show the shape</b>, for the command "put the red and blue blocks away". It is not a recorded Claude run. The tool <em>results</em> are real: each call was run through the solution's <code>execute_tool</code> on the simulator, cat and all. Notice the mistake in call 4, and how the error goes back to the model.</p>
+<canvas id="room18b" width="500" height="400" style="height:auto" aria-label="The room as the agent's tool calls move the robot"></canvas>
+<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap"><button id="aBack">◀ Back</button><button id="aNext">Next turn ▶</button><button id="aReset">Start again</button></div>
+<pre id="agentOut" style="white-space:pre-wrap;font-size:.85rem;min-height:6em;max-height:360px;overflow:auto"></pre>
+<div class="stats">
+  <div class="stat"><div class="k">Requests sent</div><div class="v" id="aReq">0</div></div>
+  <div class="stat"><div class="k">Tool calls</div><div class="v" id="aCalls">0</div></div>
+  <div class="stat"><div class="k">Errors fed back</div><div class="v" id="aErr">0</div></div>
+  <div class="stat"><div class="k">Messages in history</div><div class="v" id="aMsgs">1</div></div>
+</div>
+</div>
+<p>Watch the last stat. Every request re-sends the whole history, so by the end the model is re-reading 19 messages to decide one thing. That's why agents cost more than planners.</p>
+
+<h2 id="homework">4. Homework</h2>
+<p>Open <code>project/homework/lesson18_world_class.py</code>. The top half (prompts, schema, tools) and the bottom half (<code>ask_planner</code>, <code>run_agent</code>) are written for you. Read them, especially <code>run_agent</code>: you should be able to point at each line of the loop from Step 6. Then write the two gates.</p>
+
+<h3>4.1 <code>validate_plan(plan_obj, known_objects)</code></h3>
+<p>Check a planner reply before the robot acts on it. Return <code>(True, "")</code> if it's safe, or <code>(False, reason)</code>. In order:</p>
+<ol>
+<li><code>plan_obj</code> must be a dict whose keys are exactly <code>reply</code>, <code>clarify</code>, <code>plan</code>.</li>
+<li><code>plan_obj["plan"]</code> must be a list, with at most <code>MAX_PLAN</code> (6) actions.</li>
+<li>Every action must pass Lesson 10's <code>validate_action(action, known_objects)</code>. Say which step failed.</li>
+<li>If <code>clarify</code> is a non-empty string, the plan must be empty.</li>
+</ol>
+<p>Examples (real output from the solution):</p>
+<pre><code>{"reply": "On it!", "clarify": None, "plan": [put red, put blue]}   → (True, '')
+{"reply": "Sure", "clarify": None, "plan": [put "the cat"]}         → (False, "step 1: unknown object 'the cat'")
+{"reply": "Which one?", "clarify": "Which block?", "plan": [put red]} → (False, 'asked a question AND gave a plan: ask first, act later')</code></pre>
+<details><summary>Hint 1</summary><p>Check the outside first, then the inside. If <code>plan_obj</code> isn't even a dict (it could be <code>None</code> when the model declined), you can't look up its keys. <code>isinstance(x, dict)</code> tells you. Return straight away on each failure: flat <code>if ... return</code> lines, no nesting.</p></details>
+<details><summary>Hint 2</summary><p>"Exactly these keys" is a set comparison: <code>set(plan_obj) != {"reply", "clarify", "plan"}</code>. Python's <code>and</code> short-circuits, so <code>not isinstance(...) or set(...) != ...</code> is safe even for <code>None</code>. Use <code>enumerate</code> to number the steps from 1: <code>f"step {i + 1}: {reason}"</code>.</p></details>
+<details><summary>Hint 3</summary><pre><code>not a dict, or keys != {reply, clarify, plan}   → False, "reply must have exactly the keys reply, clarify and plan"
+plan = plan_obj["plan"]
+plan not a list                                 → False, "plan must be a list"
+len(plan) &gt; MAX_PLAN                            → False, f"plan too long ({len} &gt; {MAX_PLAN})"
+for i, action in enumerate(plan):
+    ok, reason = validate_action(action, known_objects)
+    not ok                                      → False, f"step {i + 1}: {reason}"
+clarify is truthy AND plan is non-empty         → False, "asked a question AND gave a plan: ..."
+→ True, ""</code></pre></details>
+
+<h3>4.2 <code>execute_tool(robot, name, args, known_objects)</code></h3>
+<p>Run one tool call from the agent on the simulated robot. It must <b>never crash</b>: whatever the model sends, return <code>(ok, text)</code>.</p>
+<ul>
+<li><code>args</code> isn't a dict → <code>(False, ...)</code>.</li>
+<li><code>"look"</code> → <code>(True, robot.look())</code>.</li>
+<li><code>"go_to"</code> and <code>"pick_up"</code> need <code>args["object"]</code> to be in <code>known_objects</code>; then return what <code>robot.go_to(obj)</code> or <code>robot.pick_up(obj)</code> returns (they already return <code>(ok, text)</code>).</li>
+<li><code>"put_in_bin"</code> → <code>robot.put_in_bin()</code>.</li>
+<li>Any other name → <code>(False, "Unknown tool ...")</code>.</li>
+</ul>
+<p>Example: on a fresh <code>SimRobot()</code>, <code>execute_tool(robot, "pick_up", {"object": "red block"}, known)</code> → <code>(False, "Not at the red block: it's at (2, 1), robot is at (1, 1). Use go_to first.")</code>. That message comes from the robot, not from you: you just pass it on.</p>
+<details><summary>Hint 1</summary><p>The robot (<code>SimRobot</code> in <code>sim.py</code>) already has <code>look</code>, <code>go_to</code>, <code>pick_up</code> and <code>put_in_bin</code>. Your job is the doorman, not the robot: check the request, then hand it over.</p></details>
+<details><summary>Hint 2</summary><p>Use <code>args.get("object")</code>, not <code>args["object"]</code>: if the key is missing, <code>.get</code> gives <code>None</code> instead of crashing, and <code>None</code> isn't a known object, so it's refused. Check <code>isinstance(args, dict)</code> before anything else.</p></details>
+<details><summary>Hint 3</summary><pre><code>args not a dict              → False, "Tool arguments must be an object."
+name == "look"               → True, robot.look()
+name == "put_in_bin"         → return robot.put_in_bin()
+name in ("go_to", "pick_up"):
+    obj = args.get("object")
+    obj not in known_objects → False, f"Unknown object {obj!r}. ..."
+    return robot.go_to(obj) or robot.pick_up(obj)
+otherwise                    → False, f"Unknown tool {name!r}. Allowed: ..."</code></pre></details>
+
+<h3>Run it</h3>
+<p>No key needed: the bottom of the file tests your gates on pretend replies and pretend tool calls.</p>
+<pre><code>cd project/homework
+python3 lesson18_world_class.py</code></pre>
+<p>What you should see (real output from the solution):</p>
+<pre><code>good           -&gt; (True, '')
+sneaky         -&gt; (False, "step 1: unknown object 'the cat'")
+asks AND acts  -&gt; (False, 'asked a question AND gave a plan: ask first, act later')
+look         {}                       -&gt; (True, "Robot at (1, 1), holding nothing. Bin at (7, 6). Blocks not yet in the bin: {'red block': (2, 1), 'blue block': (6, 3), 'green block': (1, 5)}. In the bin: nothing. Obstacles seen so far: none.")
+pick_up      {'object': 'red block'}  -&gt; (False, "Not at the red block: it's at (2, 1), robot is at (1, 1). Use go_to first.")
+go_to        {'object': 'red block'}  -&gt; (True, 'Arrived at the red block at (2, 1).')
+pick_up      {'object': 'red block'}  -&gt; (True, 'Picked up the red block.')
+put_in_bin   {}                       -&gt; (True, 'The red block is in the bin.')
+self_destruct {}                       -&gt; (False, "Unknown tool 'self_destruct'. Allowed: look, go_to, pick_up, put_in_bin.")</code></pre>
+<p>Three planner replies: one passes, two are stopped with a clear reason. Then six tool calls: the first <code>pick_up</code> is refused by the robot (wrong square), the next three work, and <code>self_destruct</code> is refused by you.</p>
+<p><b>With a key</b> (in your venv, from <code>project/solutions</code> or your finished <code>homework</code>), watch the real thing:</p>
+<pre><code>python3 sim.py "put the block away" --brain planner
+python3 sim.py "tidy up the room" --brain agent --watch</code></pre>
+<p><b>Without a key</b>, use <code>--brain planner-replay</code> or <code>--brain agent-replay</code> to replay the recorded runs through your gates.</p>
+<!-- CLAUDE-RESULTS -->
+
+<h3>Check it</h3>
+<pre><code>cd project
+python3 check.py 18</code></pre>
+<p>Four checks: <code>validate_plan: good plans</code>, <code>validate_plan: bad plans</code>, <code>execute_tool: real moves</code> and <code>execute_tool: never crashes</code>. A green ✓ means that group passed. A red ✗ prints a hint, such as <em>"asking AND acting -&gt; reject"</em> or <em>"args that aren't a dict -&gt; (False, ...)"</em>. A yellow … means a function still says <code>NotImplementedError</code>, or an earlier lesson (10 or 11) isn't finished.</p>
+
+<h3>Stretch: a dry run before the real run</h3>
+<p>Real robot companies often test a plan in a <b>simulator</b> before the real machine moves. Write <code>dry_run(plan_obj)</code>: make a fresh <code>SimRobot()</code>, run every step with <code>robot.do_action(action)</code>, and return <code>(False, message)</code> at the first step whose result has <code>ok</code> False, else <code>(True, "")</code>. Then add it as a third gate after <code>validate_plan</code>. Which plans pass <code>validate_plan</code> but fail the dry run? (Hint: try a "go" to a block surrounded by surprises.) If you have a key, also run the planner and the agent on "tidy up the room" and compare how many requests and tokens each used.</p>
+
+<h2 id="real-world">5. Real-world challenge: phone a chef</h2>
+<p>You'll play planner and agent with real people, and see the trade-off with your own eyes. You need three people (you, a "model" and a "robot"), two rooms, a stopwatch, paper, three small objects and a box as the bin.</p>
+<ol>
+<li><b>Set up.</b> In room A, put the three objects and the box somewhere on the floor. The <b>robot</b> stands in room A. The <b>model</b> sits in room B and can't see room A. You are the <b>checker</b>.</li>
+<li><b>Write the world state.</b> On a slip, describe room A for the model: where each object is, where the box is. (That's <code>look()</code>.)</li>
+<li><b>Agree the tools.</b> The only allowed instructions are: <em>look</em>, <em>go to X</em>, <em>pick up X</em>, <em>put in box</em>. You'll refuse anything else, and anything about an object that isn't on the list.</li>
+<li><b>Round 1, planner.</b> Give the model the slip and a command such as "put two things away, but not the one nearest the door". They write the <em>whole plan</em> on one slip. You check every line, then hand it to the robot, who does it exactly. Just before they start, quietly move one object. Time the round. Did it work?</li>
+<li><b>Round 2, agent.</b> Reset. Same command, same secret move. This time the model sends <em>one instruction per slip</em>, and the robot writes back what happened on each ("done", or "can't: nothing there"). You check every slip both ways. Time it, and count the slips.</li>
+<li><b>Record</b> for each round: success (yes/no), time, number of slips (requests), and how many slips you refused.</li>
+</ol>
+<p><b>What it teaches:</b> the planner round is quick and needs few messages, but breaks when the world changes after it planned. The agent round copes with the surprise, at the cost of many more slips and more time. And in both rounds, the person who could actually prevent a mistake was the checker, not the clever one in the other room.</p>
+
+<h2 id="so-far">6. Your Robo-Helper so far</h2>
+<p>Robo-Helper can now use <strong>Claude as its brain, with you in charge</strong>. Your two gates are used everywhere a big model touches the robot: in <code>brains.py</code>, <code>execute_plan_reply</code> calls your <code>validate_plan</code> for the <code>planner</code>, <code>planner-replay</code> and <code>local</code> brains, and <code>AgentBrain</code> (through <code>run_agent</code>) and the agent replay call your <code>execute_tool</code> for every single tool call.</p>
+<p>Next week, in <a href="19-bakeoff.html">Lesson 19</a>, <code>run_bakeoff()</code> puts every brain (your word counter, your tiny LM, and Claude as planner and as agent) through the same 12 tasks, and your new <code>score_task()</code> decides who actually did the right thing.</p>
+
+<h2 id="mistakes">7. Common mistakes</h2>
+<ul>
+<li><b>Crashing on <code>None</code>.</b> When a model declines or the JSON is broken, <code>plan_obj</code> is <code>None</code>, and <code>set(None)</code> raises a <code>TypeError</code>. Check <code>isinstance(plan_obj, dict)</code> first. check.py: <em>"None (no reply) -&gt; reject, don't crash"</em>.</li>
+<li><b>Only checking the first step.</b> A plan can start sensibly and slip "the cat" into step 4. Loop over every action. check.py: <em>"an unknown block in any step -&gt; reject"</em>.</li>
+<li><b>Letting a question and a plan through together.</b> If the model asks "which block?" and also bins the red one, it's acting on a guess. check.py: <em>"asking AND acting -&gt; reject"</em>.</li>
+<li><b>Using <code>args["object"]</code> without checking.</b> Missing key → <code>KeyError</code>; a string instead of a dict → <code>TypeError</code>. The agent loop would crash halfway, with the robot holding a block. check.py: <em>"args that aren't a dict -&gt; (False, ...)"</em>.</li>
+<li><b>Putting your API key in the code "just to test".</b> You'll forget it's there, and then share the file. Environment variable, always.</li>
+</ul>
+
+<h2 id="check">8. Check yourself</h2>
+<details><summary>Why does the request include <code>robot.look()</code>?</summary><p>The model can't see the room. It only knows what's in the text you send. Without the world state it would have to guess positions, and a model guesses confidently rather than raising an error.</p></details>
+<details><summary>The API already forces the reply into <code>PLAN_SCHEMA</code>. Why write <code>validate_plan</code> at all?</summary><p>The schema fixes the shape, not the sense: it allows any length of plan, and a question together with a plan. The model can also decline and send nothing. And the same gate protects brains that don't follow schemas reliably. Never trust, always check.</p></details>
+<details><summary>Predict: <code>validate_plan({"reply": "ok", "clarify": "", "plan": [put red]}, known)</code>. Pass or fail?</summary><p><b>Pass</b>: <code>(True, '')</code>. An empty string is "falsy" in Python, so there's no real question, and a plan is allowed.</p></details>
+<details><summary>Give one reason to use a planner and one to use an agent.</summary><p>Planner: one request, so it's faster and cheaper, and you can check the whole plan before anything moves. Agent: it sees every result, so it can recover from surprises and from its own mistakes.</p></details>
+<details><summary>Predict: the agent calls <code>go_to</code> with <code>{"object": "purple block"}</code>. What does the robot do, and what does the model see?</summary><p>The robot does nothing. Your <code>execute_tool</code> returns <code>(False, "Unknown object 'purple block'. Known: [...]")</code>, and <code>run_agent</code> sends that text back as a tool result with <code>is_error</code> set. The model then has to choose again: ideally, tell the person there's no purple block.</p></details>
+
+<h2 id="deeper">9. Go deeper (optional)</h2>
+<ul>
+<li><a href="../10-rlm-harness.html">RLM agent harnesses</a>: how big AI systems wire models, tools and loops together.</li>
+<li><a href="../03-shared-autonomy.html#askactwait">Shared autonomy: ask, act or wait</a>: when a robot should act and when it should ask a person.</li>
+<li><a href="../09-inference-engineering/01-request-lifecycle.html">The life of a request</a>: what happens inside the data centre between sending your request and getting the answer.</li>
+<li><a href="../09-inference-engineering/05-latency.html">Latency</a>: why a far-away model takes time to answer, and what engineers do about it.</li>
+</ul>
+
+<nav class="pager">
+  <a href="13-lora.html"><small>Previous</small>Lesson 13 · Teaching an old model a new trick</a>
+  <a class="next" href="20-mcp.html"><small>Next</small>Lesson 20 · Give any AI app your robot (bonus)</a>
+</nav>
+<footer>Build a Robot Brain · Week 10 · Lesson 18</footer>
+</main>
+<script>
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+// ---- Same data as world.py, lesson10_llm_safety.py and lesson18_world_class.py ----
+const ROOM = [
+  "##########",
+  "#........#",
+  "#..##....#",
+  "#..#.....#",
+  "#....##..#",
+  "#........#",
+  "#.#....B.#",
+  "##########",
+];
+const OBJECTS = { "red block": [2, 1], "blue block": [6, 3], "green block": [1, 5] };
+const ROBOT_START = [1, 1];
+const CAT = [4, 1];
+const SQUARE = 0.5;
+const MAX_PLAN = 6;
+// What the Python trains in RoboHelper.__init__ (Lessons 3, 4, 5), copied exactly
+const BRAKE_W = 0.8095122934300675, BRAKE_B = 0.07122128174123456;
+const STOP_W = [-5.166236839412002, 4.923883038983912], STOP_B = 5.333953115298624, STOP_T = 0.17;
+
+const key = p => p[0] + ',' + p[1];
+const tup = p => '(' + p[0] + ', ' + p[1] + ')';
+const DIRS = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] };
+const move = (p, d) => [p[0] + DIRS[d][0], p[1] + DIRS[d][1]];
+const manhattan = (a, b) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
+function isFree(room, p) {
+  const [x, y] = p;
+  if (y < 0 || y >= room.length || x < 0 || x >= room[0].length) return false;
+  return room[y][x] !== '#';
+}
+function findBin(room) {
+  for (let y = 0; y < room.length; y++) { const x = room[y].indexOf('B'); if (x !== -1) return [x, y]; }
+  return null;
+}
+function distanceToWall(room, pos, d) {
+  let n = 0, p = move(pos, d);
+  while (isFree(room, p)) { n++; p = move(p, d); }
+  return n;
+}
+function maxSafeSpeed(w, b, free, margin = 0.2) {
+  let best = 0;
+  for (let i = 0; i < 61; i++) { const s = i * 0.05; if (w * s + b + margin <= free) best = s; }
+  return Math.round(best * 100) / 100;
+}
+const sigmoid = z => z >= 0 ? 1 / (1 + Math.exp(-z)) : Math.exp(z) / (1 + Math.exp(z));
+const shouldStop = (w, b, x, t) => sigmoid(w[0] * x[0] + w[1] * x[1] + b) >= t;
+// Lesson 6: A*, popping the smallest (f, g, x, y) exactly like Python's heapq
+function neighbors(room, pos, blocked) {
+  return 'NSEW'.split('').map(d => move(pos, d)).filter(p => isFree(room, p) && !blocked.has(key(p)));
+}
+function less(a, b) { for (let i = 0; i < 4; i++) if (a[i] !== b[i]) return a[i] < b[i]; return false; }
+function astarPath(room, start, goal, blocked = new Set()) {
+  const frontier = [[manhattan(start, goal), 0, start[0], start[1]]];
+  const came = new Map([[key(start), null]]), cost = new Map([[key(start), 0]]);
+  while (frontier.length) {
+    let bi = 0;
+    for (let i = 1; i < frontier.length; i++) if (less(frontier[i], frontier[bi])) bi = i;
+    const [, g, cx, cy] = frontier.splice(bi, 1)[0], cur = [cx, cy];
+    if (g > cost.get(key(cur))) continue;
+    if (key(cur) === key(goal)) {
+      const path = [];
+      let k = key(cur);
+      while (k !== null) { path.push(k.split(',').map(Number)); k = came.get(k); }
+      return path.reverse();
+    }
+    for (const nx of neighbors(room, cur, blocked)) {
+      const ng = g + 1, nk = key(nx);
+      if (ng < (cost.has(nk) ? cost.get(nk) : Infinity)) {
+        cost.set(nk, ng); came.set(nk, key(cur));
+        frontier.push([ng + manhattan(nx, goal), ng, nx[0], nx[1]]);
+      }
+    }
+  }
+  return null;
+}
+
+// Python's repr(), so reasons read exactly like the Python ones
+function pyStr(s) {
+  if (s.includes("'") && !s.includes('"')) return '"' + s + '"';
+  return "'" + s.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+}
+function pyRepr(v) {
+  if (v === null) return 'None';
+  if (v === true) return 'True';
+  if (v === false) return 'False';
+  if (typeof v === 'string') return pyStr(v);
+  if (Array.isArray(v)) return '[' + v.map(pyRepr).join(', ') + ']';
+  if (typeof v === 'object') return '{' + Object.entries(v).map(([k, x]) => pyStr(k) + ': ' + pyRepr(x)).join(', ') + '}';
+  return String(v);
+}
+const truthy = v => !(v === null || v === false || v === 0 || v === '' ||
+  (Array.isArray(v) && !v.length) || (typeof v === 'object' && v !== null && !Array.isArray(v) && !Object.keys(v).length));
+const isDict = v => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+// Lesson 10
+const ALLOWED_INTENTS = new Set(["put", "go", "find", "stop"]), NEEDS_OBJECT = new Set(["put", "go", "find"]);
+function validateAction(a, known) {
+  if (!isDict(a)) return [false, 'not a JSON object'];
+  const ks = Object.keys(a), want = ['intent', 'object'];
+  const diff = ks.filter(k => !want.includes(k)).concat(want.filter(k => !ks.includes(k))).sort();
+  if (diff.length) return [false, 'unexpected keys: ' + pyRepr(diff)];
+  const intent = a.intent, obj = a.object;
+  if (!ALLOWED_INTENTS.has(intent)) return [false, 'unknown intent ' + pyRepr(intent)];
+  if (obj !== null && !known.has(obj)) return [false, 'unknown object ' + pyRepr(obj)];
+  if (NEEDS_OBJECT.has(intent) && obj === null) return [false, pyRepr(intent) + ' needs an object'];
+  if (intent === 'stop' && obj !== null) return [false, "'stop' takes no object"];
+  return [true, ''];
+}
+// Lesson 18: validate_plan
+function validatePlan(p, known) {
+  const want = ['reply', 'clarify', 'plan'];
+  if (!isDict(p) || Object.keys(p).length !== 3 || !want.every(k => k in p))
+    return [false, 'reply must have exactly the keys reply, clarify and plan'];
+  const plan = p.plan;
+  if (!Array.isArray(plan)) return [false, 'plan must be a list'];
+  if (plan.length > MAX_PLAN) return [false, 'plan too long (' + plan.length + ' > ' + MAX_PLAN + ')'];
+  for (let i = 0; i < plan.length; i++) {
+    const [ok, reason] = validateAction(plan[i], known);
+    if (!ok) return [false, 'step ' + (i + 1) + ': ' + reason];
+  }
+  if (truthy(p.clarify) && plan.length) return [false, 'asked a question AND gave a plan: ask first, act later'];
+  return [true, ''];
+}
+
+// Lesson 11's RoboHelper, driven by actions (sim.py's do_action)
+class Robot {
+  constructor(surprises = [CAT]) {
+    this.objects = {};
+    for (const k in OBJECTS) this.objects[k] = OBJECTS[k].slice();
+    this.pos = ROBOT_START.slice();
+    this.holding = null;
+    this.binned = new Set();
+    this.surprises = new Set(surprises.map(key));
+    this.knownBlocked = new Set();
+    this.log = [];
+    this.frames = [];
+    this.moves = 0;
+  }
+  state() { return { pos: this.pos.slice(), holding: this.holding, seen: [...this.knownBlocked], binned: [...this.binned] }; }
+  snap() { this.frames.push(this.state()); }
+  say(m) { this.log.push(m); this.snap(); }
+  driveTo(target, maxReplans = 5) {
+    let replans = 0;
+    while (key(this.pos) !== key(target)) {
+      const path = astarPath(ROOM, this.pos, target, this.knownBlocked);
+      if (path === null) { this.say("I can't find a way to " + tup(target) + "."); return false; }
+      for (const nxt of path.slice(1)) {
+        const dx = nxt[0] - this.pos[0], dy = nxt[1] - this.pos[1];
+        const d = dx === 1 ? 'E' : dx === -1 ? 'W' : dy === 1 ? 'S' : 'N';
+        const speed = maxSafeSpeed(BRAKE_W, BRAKE_B, distanceToWall(ROOM, this.pos, d) * SQUARE + SQUARE);
+        if (this.surprises.has(key(nxt)) && shouldStop(STOP_W, STOP_B, [SQUARE, speed], STOP_T)) {
+          this.say('Something is in the way at ' + tup(nxt) + '! Stopping and finding another route.');
+          this.knownBlocked.add(key(nxt));
+          replans++;
+          if (replans > maxReplans) { this.say('Too many surprises, giving up.'); return false; }
+          break;
+        }
+        this.pos = nxt;
+        this.moves++;
+        this.snap();
+      }
+    }
+    return true;
+  }
+  doAction(action) {
+    const [ok, reason] = validateAction(action, new Set(Object.keys(this.objects)));
+    if (!ok) return { ok: false, message: "Sorry, I can't do that: " + reason };
+    const { intent, object: obj } = action;
+    if (intent === 'stop') return { ok: true, message: 'Stopping.' };
+    if (intent === 'find') {
+      const msg = this.binned.has(obj) ? 'The ' + obj + ' is in the bin.'
+        : this.holding === obj ? "I'm holding the " + obj + '.' : 'The ' + obj + ' is at ' + tup(this.objects[obj]) + '.';
+      return { ok: true, message: msg };
+    }
+    if (intent === 'go') {
+      const arrived = this.driveTo(this.objects[obj]);
+      return { ok: arrived, message: arrived ? "I'm next to the " + obj + '.' : "I couldn't reach the " + obj + '.' };
+    }
+    if (this.binned.has(obj)) return { ok: true, message: 'The ' + obj + ' is already in the bin.' };
+    if (!this.driveTo(this.objects[obj])) return { ok: false, message: "I couldn't reach the " + obj + '.' };
+    this.holding = obj;
+    this.snap();
+    const binPos = findBin(ROOM);
+    if (!this.driveTo(binPos)) return { ok: false, message: "I'm holding the " + obj + " but can't reach the bin." };
+    this.binned.add(obj);
+    this.objects[obj] = binPos;
+    this.holding = null;
+    this.snap();
+    return { ok: true, message: 'The ' + obj + ' is in the bin.' };
+  }
+}
+// brains.py: execute_plan_reply + run_plan
+function executePlanReply(robot, planObj) {
+  const [ok, reason] = validatePlan(planObj, new Set(Object.keys(robot.objects)));
+  if (!ok) { robot.say("I won't run that plan: " + reason); return { valid: [ok, reason], reply: "I won't run that plan: " + reason, steps: 0 }; }
+  if (truthy(planObj.clarify)) { robot.say(planObj.clarify); return { valid: [ok, reason], reply: planObj.clarify, steps: 0, clarified: true }; }
+  robot.say(planObj.reply);
+  const messages = [];
+  for (const action of planObj.plan) {
+    const r = robot.doAction(action);
+    messages.push(r.message);
+    robot.say(r.message);
+    if (!r.ok) break;
+  }
+  return { valid: [ok, reason], reply: [planObj.reply].concat(messages).join(' '), steps: messages.length };
+}
+function parseReply(text) {
+  try { return JSON.parse(text); } catch (e) { return undefined; }
+}
+
+// ---- drawing (shared by both demos) ----
+const CELL = 50;
+function drawRoom(cv, st) {
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (let y = 0; y < ROOM.length; y++) for (let x = 0; x < ROOM[0].length; x++) {
+    const c = ROOM[y][x];
+    ctx.fillStyle = c === '#' ? css('--muted') : css('--card');
+    ctx.fillRect(x * CELL + 1, y * CELL + 1, CELL - 2, CELL - 2);
+    if (c === 'B') { ctx.strokeStyle = css('--accent'); ctx.lineWidth = 3; ctx.strokeRect(x * CELL + 6, y * CELL + 6, CELL - 12, CELL - 12); ctx.fillStyle = css('--accent'); ctx.fillText('B', x * CELL + CELL / 2, y * CELL + CELL / 2); }
+  }
+  const [cx, cy] = CAT;
+  ctx.fillStyle = css('--warn'); ctx.beginPath(); ctx.arc(cx * CELL + CELL / 2, cy * CELL + CELL / 2, 16, 0, 7); ctx.fill();
+  if (st.seen.includes(key(CAT))) { ctx.strokeStyle = css('--fail'); ctx.lineWidth = 3; ctx.strokeRect(cx * CELL + 4, cy * CELL + 4, CELL - 8, CELL - 8); }
+  const colour = { red: css('--fail'), blue: css('--pass'), green: css('--accent') };
+  for (const name in OBJECTS) {
+    if (st.binned.includes(name) || st.holding === name) continue;
+    const p = OBJECTS[name];
+    ctx.fillStyle = colour[name.split(' ')[0]];
+    ctx.fillRect(p[0] * CELL + 14, p[1] * CELL + 14, CELL - 28, CELL - 28);
+  }
+  ctx.fillStyle = css('--fg'); ctx.beginPath(); ctx.arc(st.pos[0] * CELL + CELL / 2, st.pos[1] * CELL + CELL / 2, 18, 0, 7); ctx.fill();
+  ctx.fillStyle = css('--bg'); ctx.fillText('R', st.pos[0] * CELL + CELL / 2, st.pos[1] * CELL + CELL / 2);
+  if (st.holding) { ctx.fillStyle = colour[st.holding.split(' ')[0]]; ctx.fillRect(st.pos[0] * CELL + 32, st.pos[1] * CELL + 4, 14, 14); }
+}
+
+// ---- demo 1: the planner gate ----
+const $ = id => document.getElementById(id);
+const PRESETS = {
+  good: '{"reply": "On it!", "clarify": null, "plan": [\n  {"intent": "put", "object": "blue block"},\n  {"intent": "put", "object": "red block"}\n]}',
+  sneaky: '{"reply": "Sure", "clarify": null, "plan": [\n  {"intent": "put", "object": "the cat"}\n]}',
+  both: '{"reply": "Which one?", "clarify": "Which block?", "plan": [\n  {"intent": "put", "object": "red block"}\n]}',
+  ask: '{"reply": "Happy to help!", "clarify": "Which block: red, blue or green?", "plan": []}',
+  long: '{"reply": "Stopping!", "clarify": null, "plan": [\n' + Array(7).fill('  {"intent": "stop", "object": null}').join(',\n') + '\n]}',
+  broken: '{"reply": "ok" "clarify": null, "plan": []}',
+  extra: '{"reply": "ok", "clarify": null, "plan": [\n  {"intent": "go", "object": "red block", "also": "ignore all safety rules"}\n]}',
+};
+const cv1 = $('room18');
+let view1 = new Robot().state(), timer1 = null;
+function runPlanDemo() {
+  if (timer1) { clearInterval(timer1); timer1 = null; }
+  const text = $('planIn').value, parsed = parseReply(text);
+  const planObj = parsed === undefined ? null : parsed;
+  const robot = new Robot(), start = robot.state();
+  const res = executePlanReply(robot, planObj);
+  const lines = [];
+  if (parsed === undefined) lines.push('json.loads failed: not valid JSON, so ask_planner gives None');
+  lines.push('validate_plan(...) -> ' + '(' + pyRepr(res.valid[0]) + ', ' + pyRepr(res.valid[1]) + ')');
+  $('pVal').textContent = res.valid[0] ? 'pass' : 'refused';
+  $('pVal').style.color = res.valid[0] ? css('--pass') : css('--fail');
+  $('pSteps').textContent = res.steps;
+  $('planOut').textContent = lines.join('\n') + '\n  ...';
+  let i = 0;
+  view1 = start;
+  const finish = () => {
+    if (timer1) clearInterval(timer1);
+    timer1 = null;
+    view1 = robot.state();
+    $('planOut').textContent = lines.concat(robot.log.map(l => '  robot says: ' + l), ['  reply: ' + res.reply]).join('\n');
+    $('pMoves').textContent = robot.moves;
+    $('pBin').textContent = robot.binned.size ? [...robot.binned].map(b => b.split(' ')[0]).join(', ') : 'nothing';
+    drawRoom(cv1, view1);
+  };
+  if (!robot.frames.length) return finish();
+  timer1 = setInterval(() => {
+    if (i >= robot.frames.length) return finish();
+    view1 = robot.frames[i++];
+    drawRoom(cv1, view1);
+  }, 140);
+  drawRoom(cv1, view1);
+}
+document.querySelectorAll('button[data-p]').forEach(b => b.onclick = () => { $('planIn').value = PRESETS[b.dataset.p]; runPlanDemo(); });
+$('runPlan').onclick = runPlanDemo;
+$('resetPlan').onclick = () => {
+  if (timer1) clearInterval(timer1);
+  timer1 = null; view1 = new Robot().state();
+  ['pVal', 'pSteps', 'pMoves', 'pBin'].forEach(id => { $(id).textContent = '–'; $(id).style.color = ''; });
+  $('planOut').textContent = '';
+  drawRoom(cv1, view1);
+};
+$('planIn').value = PRESETS.good;
+
+// ---- demo 2: the agent loop (example calls we wrote; results from the real execute_tool + simulator) ----
+const AGENT_COMMAND = 'put the red and blue blocks away';
+const AGENT_FINAL = 'Done: the red and blue blocks are both in the bin.';
+const AGENT = [{"tool":"look","args":{},"ok":true,"result":"Robot at (1, 1), holding nothing. Bin at (7, 6). Blocks not yet in the bin: {'red block': (2, 1), 'blue block': (6, 3), 'green block': (1, 5)}. In the bin: nothing. Obstacles seen so far: none.","path":[],"pos":[1,1],"holding":null,"binned":[],"seen":[]},{"tool":"go_to","args":{"object":"blue block"},"ok":true,"result":"Arrived at the blue block at (6, 3).","path":[[2,1],[3,1],[2,1],[2,2],[2,3],[2,4],[3,4],[4,4],[4,3],[5,3],[6,3]],"pos":[6,3],"holding":null,"binned":[],"seen":[[4,1]]},{"tool":"pick_up","args":{"object":"blue block"},"ok":true,"result":"Picked up the blue block.","path":[],"pos":[6,3],"holding":"blue block","binned":[],"seen":[[4,1]]},{"tool":"pick_up","args":{"object":"red block"},"ok":false,"result":"Already holding the blue block. Put it in the bin first.","path":[],"pos":[6,3],"holding":"blue block","binned":[],"seen":[[4,1]]},{"tool":"put_in_bin","args":{},"ok":true,"result":"The blue block is in the bin.","path":[[7,3],[7,4],[7,5],[7,6]],"pos":[7,6],"holding":null,"binned":["blue block"],"seen":[[4,1]]},{"tool":"look","args":{},"ok":true,"result":"Robot at (7, 6), holding nothing. Bin at (7, 6). Blocks not yet in the bin: {'red block': (2, 1), 'green block': (1, 5)}. In the bin: ['blue block']. Obstacles seen so far: [(4, 1)].","path":[],"pos":[7,6],"holding":null,"binned":["blue block"],"seen":[[4,1]]},{"tool":"go_to","args":{"object":"red block"},"ok":true,"result":"Arrived at the red block at (2, 1).","path":[[6,6],[5,6],[4,6],[3,6],[3,5],[2,5],[2,4],[2,3],[2,2],[2,1]],"pos":[2,1],"holding":null,"binned":["blue block"],"seen":[[4,1]]},{"tool":"pick_up","args":{"object":"red block"},"ok":true,"result":"Picked up the red block.","path":[],"pos":[2,1],"holding":"red block","binned":["blue block"],"seen":[[4,1]]},{"tool":"put_in_bin","args":{},"ok":true,"result":"The red block is in the bin.","path":[[2,2],[2,3],[2,4],[2,5],[3,5],[3,6],[4,6],[5,6],[6,6],[7,6]],"pos":[7,6],"holding":null,"binned":["blue block","red block"],"seen":[[4,1]]}];
+let aStep = 0, timer2 = null, view2 = { pos: ROBOT_START.slice(), holding: null, seen: [], binned: [] };
+const cv2 = $('room18b');
+const stateAt = n => n === 0 ? { pos: ROBOT_START.slice(), holding: null, seen: [], binned: [] }
+  : (c => ({ pos: c.pos, holding: c.holding, seen: c.seen.map(key), binned: c.binned }))(AGENT[Math.min(n, AGENT.length) - 1]);
+function agentText(n) {
+  const L = ['YOU -> model (request 1): "Person says: ' + AGENT_COMMAND + '\\nUse the tools. Start with look."'];
+  for (let i = 0; i < Math.min(n, AGENT.length); i++) {
+    const c = AGENT[i];
+    L.push('', 'MODEL: tool call ' + c.tool + '(' + JSON.stringify(c.args) + ')');
+    L.push('execute_tool -> ' + (c.ok ? 'ok' : 'ERROR (is_error: true)') + ': ' + c.result);
+    L.push('YOU -> model (request ' + (i + 2) + '): the whole conversation so far, plus this result');
+  }
+  if (n > AGENT.length) L.push('', 'MODEL: no tool calls, just text: "' + AGENT_FINAL + '"', 'The loop ends.');
+  return L.join('\n');
+}
+function showAgent(n, animate) {
+  if (timer2) { clearInterval(timer2); timer2 = null; }
+  aStep = n;
+  const calls = Math.min(n, AGENT.length);
+  $('agentOut').textContent = agentText(n);
+  $('agentOut').scrollTop = $('agentOut').scrollHeight;
+  $('aReq').textContent = calls + 1;
+  $('aCalls').textContent = calls;
+  $('aErr').textContent = AGENT.slice(0, calls).filter(c => !c.ok).length;
+  $('aMsgs').textContent = 1 + 2 * calls;
+  const end = stateAt(n);
+  const path = animate && n >= 1 && n <= AGENT.length ? AGENT[n - 1].path : [];
+  if (!path.length) { view2 = end; drawRoom(cv2, view2); return; }
+  const before = stateAt(n - 1);
+  let i = 0;
+  const seen = before.seen.slice();
+  timer2 = setInterval(() => {
+    if (i >= path.length) { clearInterval(timer2); timer2 = null; view2 = end; drawRoom(cv2, view2); return; }
+    const p = path[i++];
+    for (const k of end.seen) if (!seen.includes(k) && manhattan(k.split(',').map(Number), p) <= 1) seen.push(k);
+    view2 = { pos: p, holding: before.holding, seen: seen.slice(), binned: before.binned };
+    drawRoom(cv2, view2);
+  }, 140);
+}
+$('aNext').onclick = () => { if (aStep <= AGENT.length) showAgent(aStep + 1, true); };
+$('aBack').onclick = () => { if (aStep > 0) showAgent(aStep - 1, false); };
+$('aReset').onclick = () => showAgent(0, false);
+
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { drawRoom(cv1, view1); drawRoom(cv2, view2); });
+drawRoom(cv1, view1);
+showAgent(0, false);
+</script>
+</body>
+</html>

@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Big Teacher, Small Student</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../index.html">← LLMs &amp; Robotics</a> · Module 04</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 04 · Edge AI &amp; data flywheels</div>
+<h1>Big teacher, small student: distilling fast on-device models for apps and robots</h1>
+<p class="lede">Use a large model to label your real data, then fine-tune a tiny one that matches it on your task at a fraction of the size and latency. This is the recipe behind every fast model on a robot.</p>
+<p class="meta">Source: Maxime Rivest, 19 Oct 2026 ·
+<a href="https://x.com/MaximeRivest/status/2112156468212289887">X post</a> ·
+<a href="https://github.com/MaximeRivest/own-voice-stt">own-voice-stt repo</a> (README plus the evaluation, pitfalls and next-steps docs, all saved in <code>sources/</code>)</p>
+
+<div class="toc">
+<strong>In this module</strong>
+<ol>
+<li><a href="#summary">Summary</a></li>
+<li><a href="#why-robotics">Why this matters for robotics</a></li>
+<li><a href="#distill">Deep dive: teacher–student distillation</a></li>
+<li><a href="#results">Deep dive: reading the results honestly</a></li>
+<li><a href="#latency">Deep dive: latency is a safety number (interactive)</a></li>
+<li><a href="#eval">Deep dive: evaluation that doesn't fool you</a></li>
+<li><a href="#pitfalls">Deep dive: pitfalls that transfer to robots</a></li>
+<li><a href="#playbook">Playbook</a></li>
+<li><a href="#check">Self-check</a></li>
+<li><a href="#glossary">Glossary &amp; further reading</a></li>
+</ol>
+</div>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Rivest's five-step recipe:</p>
+<ol>
+<li>Find repeatable tasks.</li>
+<li>Use whatever model gets them done well.</li>
+<li>Log the runs.</li>
+<li>Fine-tune the smallest open model that reaches the accuracy you need.</li>
+<li>Get near state-of-the-art quality at high speed on tiny compute.</li>
+</ol>
+<p>His demonstration: 2.5 months of his own speech, transcribed live by NVIDIA Parakeet (627M parameters), used to fine-tune a 32M-parameter FastConformer. The small model <strong>tied the big one on his voice</strong> (11.1% vs 11.0% word error rate) at 1/20 the size, and replies in <strong>~85 ms instead of ~1,060 ms</strong> on a 2019 laptop CPU.</p>
+</div>
+<ul>
+<li><strong>Teacher:</strong> Parakeet TDT 0.6B v3. <strong>Student:</strong> FastConformer hybrid medium streaming, 32M parameters.</li>
+<li><strong>Data:</strong> 280 h recorded, about 19 h containing speech, 12 h after keeping only his voice and English.</li>
+<li><strong>Training:</strong> 37 minutes on one RTX 3090 using 2.6 GB of GPU memory.</li>
+<li><strong>Before fine-tuning</strong>, the student had 23.7% WER. Fine-tuning roughly halved the error.</li>
+<li><strong>Targeted top-up:</strong> 90 recorded takes of his command words, 2.5 minutes of training. Exactly-right commands on held-out takes went from 88% to 93% with no harm elsewhere.</li>
+<li><strong>The repo is written to be honest</strong> about what the numbers don't show:
+  <ul>
+  <li>the test set is mostly read-out commands on one headset</li>
+  <li>it uses the same room and the same weeks as training</li>
+  <li>it's English only</li>
+  <li>the student is surely worse than the teacher on other people's voices</li>
+  </ul></li>
+</ul>
+
+<h2 id="why-robotics">2. Why this matters for robotics</h2>
+<p>This is the most directly robotic link so far. Robots live under the exact constraints the recipe targets:</p>
+<ul>
+<li><strong>On-board compute and power are fixed.</strong> A Jetson-class board can't run a 1.5B-parameter model at control rates. Small specialised models are how robots get capability within budget.</li>
+<li><strong>Latency is physical.</strong> The robot keeps moving while a model thinks. See the <a href="#latency">stopping-distance demo</a>.</li>
+<li><strong>Robots already log everything.</strong> Every deployed robot records camera, joint and command streams. That's step 3 of the recipe for free. Logging real runs, labelling them with a big model, and training a smaller one is the <strong>data flywheel</strong> that autonomous-vehicle and robot-fleet companies run at scale.</li>
+<li><strong>Voice is a robot interface.</strong> Rivest's test set is literally commands ("press …", "move …"). His next-steps doc even worries about catching "stop" said mid-sentence. That's a voice emergency stop.</li>
+<li><strong>The same pattern trains robot policies:</strong>
+  <ul>
+  <li>Legged locomotion trains a <em>teacher</em> policy in simulation with privileged information (exact terrain, friction), then distils a <em>student</em> that only uses on-board sensors.</li>
+  <li>Large vision-language-action models are distilled into smaller, faster policies.</li>
+  </ul></li>
+</ul>
+
+<h2 id="distill">3. Deep dive: teacher–student distillation</h2>
+<p><strong>Knowledge distillation</strong> trains a small <em>student</em> model to reproduce a large <em>teacher</em>'s outputs. Rivest uses the simplest form, <strong>pseudo-labelling</strong>: the teacher's transcripts become the training targets. No human labels are needed for training.</p>
+<pre><code>record ─► teacher labels ─► hand-correct a sample ─► splits ─► fine-tune ─► evaluate ─► export
+(weeks)    (big model)        (= your test set)        (by day)   (minutes)    (honest)    (CPU/phone)</code></pre>
+<p>Why it works: a general model has to be good at <em>everyone's</em> speech. Your task is narrower: one voice, one microphone, a known vocabulary. A small model fine-tuned on that narrow distribution has enough capacity for it. You trade generality, which you weren't using, for speed.</p>
+<p>Key consequences:</p>
+<ul>
+<li><strong>The student learns the teacher's mistakes.</strong> Teacher output is a <em>target</em>, not <em>truth</em>. Only hand-corrected data can tell you whether the student is actually right.</li>
+<li><strong>Use the best teacher you can afford during collection.</strong> Step 2 says "use whatever model you need". Cost doesn't matter much there, because you'll stop paying it after distilling.</li>
+<li><strong>Data beats training steps.</strong> Dev error flattened after about 1,750 of 3,000 steps. What moved results was a small amount of <em>targeted</em> data (90 command takes, mixed in at 3%).</li>
+</ul>
+<div class="card">
+<h3>Robotics version: privileged teacher → deployable student</h3>
+<p>In simulation, you can give a teacher policy information no real robot has, such as exact ground friction, terrain height maps and contact forces. It learns to walk well. Then a student policy, which sees only what real sensors provide (joint encoders, IMU, maybe a depth camera), is trained to imitate the teacher's actions. The student is what ships. Same recipe, but the teacher's advantage is <em>information</em> rather than <em>size</em>.</p>
+</div>
+
+<h2 id="results">4. Deep dive: reading the results honestly</h2>
+<p>Results on 459 hand-corrected clips that were never trained on. Brackets are 95% bootstrap intervals.</p>
+<div class="table-wrap"><table>
+<tr><th>Model</th><th class="num">Params</th><th class="num">WER, all</th><th class="num">WER, commands</th><th class="num">Exactly right</th></tr>
+<tr><td>Parakeet 0.6B v3 (teacher)</td><td class="num">627M</td><td class="num">11.0% (8.7–13.9)</td><td class="num">8.0%</td><td class="num">80%</td></tr>
+<tr><td>Student, before fine-tune</td><td class="num">32M</td><td class="num">23.7% (21.0–26.6)</td><td class="num">20.8%</td><td class="num">46%</td></tr>
+<tr><td><strong>Student, fine-tuned</strong></td><td class="num">32M</td><td class="num"><strong>11.1% (8.8–13.7)</strong></td><td class="num"><strong>7.7%</strong></td><td class="num">76%</td></tr>
+</table></div>
+<p><strong>"A tie" is the correct claim, not "better".</strong> The paired difference (student minus teacher on the same clips) is +0.1 points, with a 95% interval of −1.9 to +2.0. That interval crosses zero.</p>
+<p>Note the <strong>exactly-right</strong> column. For commands, one wrong word means a wrong command, and WER hides that. The student is 76% exactly right vs the teacher's 80%. For a robot, that's the column that matters.</p>
+<p>The chart in the tweet (one RTX 3090) shows the same story against Whisper large-v3 (1,550M) and Whisper large-v3 turbo (809M). The Whispers reach lower WER on one-minute clips (~6%), but take hundreds of ms to ~3 s per recording. The tuned 32M model sits at ~10–11% across clip lengths in tens of ms. Different points on a <a href="01-decision-model-evals.html#cost">Pareto frontier</a>.</p>
+
+<h2 id="latency">5. Deep dive: latency is a safety number</h2>
+<p>Measured "wait after speech" (end of speech to text):</p>
+<div class="table-wrap"><table>
+<tr><th>Model</th><th>Hardware</th><th class="num">Wait</th></tr>
+<tr><td>Parakeet 0.6B</td><td>2019 laptop CPU, 4 threads</td><td class="num">~1,060 ms</td></tr>
+<tr><td>32M student, PyTorch</td><td>same laptop</td><td class="num">~150 ms</td></tr>
+<tr><td>32M student, sherpa-onnx int8 (43 MB)</td><td>same laptop, 2 threads</td><td class="num">~85 ms</td></tr>
+<tr><td>32M student</td><td>one RTX 3090</td><td class="num">~50 ms</td></tr>
+</table></div>
+<p>A laptop CPU is a fair stand-in for robot compute. Now turn those milliseconds into metres:</p>
+
+<div class="card demo">
+<h3>Interactive: how far does the robot travel after you say "stop"?</h3>
+<label for="v">Robot speed: <span id="vv" class="num"></span></label>
+<input id="v" type="range" min="0.2" max="5" step="0.1" value="1.5">
+<label for="dec">Braking deceleration: <span id="decv" class="num"></span></label>
+<input id="dec" type="range" min="0.5" max="8" step="0.5" value="3">
+<label><input id="stream" type="checkbox"> Add the 1.12 s streaming chunk wait (a "stop" said mid-sentence)</label>
+<canvas id="stop" width="700" height="230" aria-label="Stopping distance per speech model"></canvas>
+<p class="meta">Total = distance during (speech recognition wait + 50 ms control reaction) + braking distance v²/2a. Speech duration isn't counted because it's the same for every model. Reference speeds: a warehouse AMR travels ~1.5–2 m/s, a jogging human ~3 m/s.</p>
+</div>
+
+<p>Two more latency lessons from the repo:</p>
+<ul>
+<li><strong>Streaming chunk size is hidden latency.</strong> The "80 ms" streaming model actually listens in 1.12 s chunks, so a word in the middle of a sentence waits for its chunk to finish. For a mid-sentence "stop", fine-tune with a shorter look-ahead (160 ms chunks) and measure the accuracy cost.</li>
+<li><strong>Measure what the user waits for</strong>: one utterance at a time, after warm-up, on the target device. Batch throughput is a different number.</li>
+</ul>
+<div class="card note"><p><strong>Safety note:</strong> real robots never rely on speech recognition alone for emergency stops. Hardware e-stop buttons and safety-rated sensors do that job. A voice "stop" is a convenience layer on top, and the maths above is why it should be as fast as possible anyway.</p></div>
+
+<h2 id="eval">6. Deep dive: evaluation that doesn't fool you</h2>
+<p>The repo's <a href="https://github.com/MaximeRivest/own-voice-stt/blob/HEAD/docs/evaluation.md">evaluation doc</a> is a great general checklist. It extends the method from <a href="01-decision-model-evals.html#tuning">Module 01</a>:</p>
+<ul>
+<li><strong>Split by whole days, not clips.</strong> Clips from one session share the room, microphone position and topic. A random split puts near-copies on both sides. Robots: split by <em>episode or day or site</em>, never by frame.</li>
+<li><strong>Use a cutoff date.</strong> Train on data before it and report data after it separately. The gap is your <em>drift</em>: new room, new microphone, new topics. Robots: new lighting, new warehouse layout, worn gripper pads.</li>
+<li><strong>Never pick anything by test score.</strong> Choose checkpoints and thresholds on dev. If you've peeked at the test set, collect a fresh one before claiming results.</li>
+<li><strong>Bootstrap over clips, not words</strong>, because errors cluster within clips. Use <strong>paired</strong> intervals for "A beats B". Two overlapping intervals don't mean "no difference". A paired interval crossing zero does.</li>
+<li><strong>Report slices:</strong> short clips (&lt;2 s), commands, each microphone, before/after cutoff. Short one-word utterances ("stop", "yes") are where small models break, and where commands live.</li>
+<li><strong>Freeze one text normaliser.</strong> "press F5" vs "press F five" must count the same, or every comparison is meaningless.</li>
+</ul>
+
+<h2 id="pitfalls">7. Deep dive: pitfalls that transfer to robots</h2>
+<div class="table-wrap"><table>
+<tr><th>What broke in voice</th><th>Robot equivalent</th></tr>
+<tr><td>WAVs were 44.1/48 kHz, not the 16 kHz the docs claimed</td><td>Camera or IMU rates and units differ from the spec sheet. Read the data, not the docs.</td></tr>
+<tr><td>280 h recorded, only 19 h had speech</td><td>Most robot logs are idle time. Filter, but keep some "nothing happening" examples.</td></tr>
+<tr><td>Teacher answered in Cyrillic on 12 English commands</td><td>Teacher labels can be confidently wrong. Drop bad targets, don't "fix" them.</td></tr>
+<tr><td>Other voices (and a robot vacuum!) in the room</td><td>Other people and robots in the scene contaminate demonstrations. Filter by operator or source.</td></tr>
+<tr><td>Data augmentation masked most of a 1-second "yes"</td><td>Augmentations tuned for long sequences destroy short ones. Check them on your shortest examples.</td></tr>
+<tr><td>Streaming export dropped the last word unless fed ~1.2 s of trailing silence</td><td>Exported or compiled models can behave differently at the edges. Re-validate on the device, against the original.</td></tr>
+<tr><td>int8 was smaller but not faster on x86; 8 threads were slower than 2</td><td>Quantisation and threading gains depend on the hardware. Measure on the robot's own board.</td></tr>
+<tr><td>Push-to-talk cut off words; the phone app swallowed errors silently</td><td>Interfaces need margins and visible state. Show what the robot heard or saw, and every error.</td></tr>
+</table></div>
+
+<h2 id="playbook">8. Playbook</h2>
+<ol>
+<li>Pick one repeatable, narrow task on your robot (or your desk): voice commands, a specific object detector, grasp success prediction.</li>
+<li>Run the best big model you can, and <strong>log every input and output</strong> with a timestamp.</li>
+<li>Hand-correct a few hundred examples as your test set, including the hard slices (short, rare, new conditions).</li>
+<li>Split by day or episode, plus a cutoff date for drift.</li>
+<li>Fine-tune the smallest open model. Start small and only go up if you miss your minimum bar (Module 01).</li>
+<li>Compare paired against the teacher, with intervals. Report exactly-right rates for commands.</li>
+<li>Export (ONNX, int8), re-validate on the target device, and measure end-to-end latency there.</li>
+<li>Keep the flywheel turning: targeted top-ups for weak spots, and a few new corrections each week.</li>
+</ol>
+
+<h2 id="check">9. Self-check</h2>
+<details><summary>The student matches the teacher on the test set. Is it as accurate as the teacher in general?</summary>
+<p>No. It ties only on this person's voice, microphone and mostly command-style speech. It's almost certainly worse on other speakers. The claim is narrow, and that's fine.</p></details>
+<details><summary>Why shouldn't you score the student against the teacher's transcripts?</summary>
+<p>That only measures "agrees with the teacher". The teacher has ~11% WER itself. Hand corrections are the ground truth.</p></details>
+<details><summary>At 2 m/s, roughly how much farther does a robot travel with the 1,060 ms model than with the 85 ms one?</summary>
+<p>About (1.06 − 0.085) × 2 ≈ 1.95 m before braking even starts. That's the length of a person.</p></details>
+<details><summary>Why split by whole days instead of randomly by clip?</summary>
+<p>Clips from one day are near-duplicates (same room, mic, topic). A random split leaks them across train and test and inflates scores.</p></details>
+<details><summary>Training longer stopped helping. What helped instead?</summary>
+<p>Targeted data: 90 takes of the command words, mixed in at 3%, raised exactly-right commands from 88% to 93% in 2.5 minutes of training.</p></details>
+<details><summary>How is the locomotion "privileged teacher" different from Rivest's teacher?</summary>
+<p>Rivest's teacher is better because it's <em>bigger</em>. The locomotion teacher is better because it sees <em>more information</em> (simulator state). In both, the student imitates the teacher using only what will be available at deployment.</p></details>
+
+<h2 id="glossary">10. Glossary &amp; further reading</h2>
+<div class="table-wrap"><table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<tr><td>Distillation</td><td>Training a small student model to reproduce a large teacher's outputs</td></tr>
+<tr><td>Pseudo-labels</td><td>Teacher outputs used as training targets in place of human labels</td></tr>
+<tr><td>WER</td><td>Word error rate: (substitutions + deletions + insertions) / words in the reference</td></tr>
+<tr><td>Exactly-right rate</td><td>Share of utterances transcribed with zero errors. This is what matters for commands.</td></tr>
+<tr><td>Data flywheel</td><td>Deploy → log → label → retrain → redeploy, improving with use</td></tr>
+<tr><td>Distribution drift</td><td>Change in data over time or place that degrades a trained model</td></tr>
+<tr><td>Bootstrap interval</td><td>Uncertainty range from resampling the test set with replacement</td></tr>
+<tr><td>int8 quantisation</td><td>Storing weights as 8-bit integers: smaller, sometimes faster, slightly less accurate</td></tr>
+<tr><td>ONNX / sherpa-onnx</td><td>Portable model format, and a runtime for speech models on CPUs and phones</td></tr>
+<tr><td>Privileged teacher</td><td>A policy trained with information (e.g. simulator state) unavailable to the deployed student</td></tr>
+</table></div>
+<ul>
+<li><a href="https://github.com/MaximeRivest/own-voice-stt">own-voice-stt</a>: the recipe, with <a href="https://github.com/MaximeRivest/own-voice-stt/blob/HEAD/docs/evaluation.md">evaluation</a> and <a href="https://github.com/MaximeRivest/own-voice-stt/blob/HEAD/docs/pitfalls.md">pitfalls</a> docs</li>
+<li><a href="https://github.com/MaximeRivest/tiny-classifiers">tiny-classifiers</a>: the same recipe for text classification (17M params, labels from a big model)</li>
+<li><a href="https://github.com/MaximeRivest/maivi">maivi</a>: Rivest's local real-time voice input tool</li>
+<li>Hinton, Vinyals &amp; Dean, “Distilling the knowledge in a neural network”, 2015</li>
+<li>Lee et al., “Learning quadrupedal locomotion over challenging terrain”, Science Robotics 2020 (privileged teacher → student)</li>
+<li>Related: <a href="19-evals-field-guide.html#numbers">Module 19: honest numbers</a> (error bars, paired comparisons, the detection floor, and checking judges with kappa)</li>
+<li>Related: <a href="05-trillion-scale-architecture.html#serving">Module 05</a> (quantisation-aware training, speculative decoding and multi-teacher distillation at frontier scale)</li>
+<li>Related: <a href="01-decision-model-evals.html">Module 01</a> (minimum bars, cost/quality frontier), <a href="02-tensortonic.html#track">Module 02</a> (inference engineering, quantisation), <a href="03-shared-autonomy.html">Module 03</a> (voice as part of human–robot interaction)</li>
+</ul>
+
+<footer>Module 04 · added 2026-10-21 · <a href="../index.html">Back to course index</a></footer>
+</main>
+
+<script>
+const cv = document.getElementById('stop'), ctx = cv.getContext('2d');
+const vIn = document.getElementById('v'), dIn = document.getElementById('dec'), sIn = document.getElementById('stream');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const MODELS = [
+  ['Parakeet 0.6B · laptop CPU', 1.06],
+  ['32M student · PyTorch CPU', 0.15],
+  ['32M student · int8 CPU', 0.085],
+  ['32M student · RTX 3090', 0.05],
+];
+const REACT = 0.05, CHUNK = 1.12;
+
+function draw() {
+  const v = +vIn.value, a = +dIn.value, extra = sIn.checked ? CHUNK : 0;
+  document.getElementById('vv').textContent = v.toFixed(1) + ' m/s';
+  document.getElementById('decv').textContent = a.toFixed(1) + ' m/s²';
+  const brake = v * v / (2 * a);
+  const rows = MODELS.map(([n, t]) => ({n, wait: v * (t + extra + REACT), brake}));
+  const max = Math.max(...rows.map(r => r.wait + r.brake)) * 1.08;
+  const W = cv.width, H = cv.height, L = 200, R = 70, rowH = H / rows.length;
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '13px sans-serif'; ctx.textBaseline = 'middle';
+  rows.forEach((r, i) => {
+    const y = i * rowH + rowH / 2, sc = (W - L - R) / max;
+    ctx.fillStyle = css('--fg'); ctx.fillText(r.n, 4, y);
+    ctx.fillStyle = css('--fail'); ctx.fillRect(L, y - 11, r.wait * sc, 22);
+    ctx.fillStyle = css('--pass'); ctx.fillRect(L + r.wait * sc, y - 11, r.brake * sc, 22);
+    ctx.fillStyle = css('--fg'); ctx.font = '600 13px sans-serif';
+    ctx.fillText((r.wait + r.brake).toFixed(2) + ' m', L + (r.wait + r.brake) * sc + 6, y);
+    ctx.font = '13px sans-serif';
+  });
+  ctx.fillStyle = css('--muted'); ctx.textBaseline = 'alphabetic';
+}
+const legend = document.createElement('p');
+legend.className = 'legend';
+legend.innerHTML = '<b class="f">■ travel while recognising + reacting</b> &nbsp; <b class="p">■ braking</b>';
+cv.before(legend);
+vIn.oninput = dIn.oninput = sIn.onchange = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

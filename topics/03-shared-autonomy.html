@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Human–AI Help Levels</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../index.html">← LLMs &amp; Robotics</a> · Module 03</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 03 · Shared autonomy, intent &amp; ask / act / wait</div>
+<h1>How much to help: human–AI and human–robot interaction</h1>
+<p class="lede">An AI tutor for kids raises the same question every assistive robot faces: how do you help without taking over?</p>
+<p class="meta">Source: Linus Ekenstam on <a href="https://www.gakku.ai/">gakku</a>, 20 Oct 2026 ·
+<a href="https://x.com/LinusEkenstam/status/2112526605189054844">X post</a> (with a 2:45 demo video I couldn't watch, so this module is based on the post text and gakku's site)</p>
+
+<div class="toc">
+<strong>In this module</strong>
+<ol>
+<li><a href="#summary">Summary</a></li>
+<li><a href="#why-robotics">Why this matters for robotics</a></li>
+<li><a href="#autonomy">Deep dive: levels of automation</a></li>
+<li><a href="#shared">Deep dive: shared autonomy and policy blending</a></li>
+<li><a href="#intent">Deep dive: inferring intent, and when the human changes their mind</a></li>
+<li><a href="#askactwait">Deep dive: ask, act or wait</a></li>
+<li><a href="#learning">Deep dive: don't automate your own learning</a></li>
+<li><a href="#playbook">Playbook</a></li>
+<li><a href="#check">Self-check</a></li>
+<li><a href="#glossary">Glossary &amp; further reading</a></li>
+</ol>
+</div>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Linus Ekenstam argues that the biggest mistake in AI education is automating the part where the child learns: the questions, wrong turns and retries. Gakku's AI companion, Raku, coaches kids aged 6–16 in writing, speaking and thinking through live conversation. The hard design problem isn't generating good replies. It's following the learner's intent, coping when they interrupt or change their mind, keeping the conversation and screen in sync, and deciding <em>how much</em> to help.</p>
+</div>
+<ul>
+<li><strong>Core claim:</strong> the time spent thinking <em>is</em> the product's value. When AI can generate any answer, helping someone develop their own answer is what matters.</li>
+<li><strong>Interaction design:</strong> the child can interrupt, revise an idea or make a choice on screen. The system must adapt and keep conversation, visuals and mission progress consistent.</li>
+<li><strong>Agent decisions:</strong> follow intent, remember context, and choose whether to <em>ask, act or wait</em>.</li>
+<li><strong>The calibration problem:</strong> too little help and the child gets stuck. Too much and the system makes the decisions the child needs to practise.</li>
+<li><strong>About gakku:</strong> made by Algorithm of Learning Inc. Positioned as an AI writing tutor with persistent memory, a structured "missions" curriculum, and alignment to CCSS, CEFR and GCSE standards (per its site).</li>
+<li>Ekenstam is testing it with his six-year-old and plans to report back.</li>
+</ul>
+
+<h2 id="why-robotics">2. Why this matters for robotics</h2>
+<div class="card note">
+<p><strong>Track: LLM + Robotics.</strong> The source is about an LLM tutor. "How much should the AI help?" is the same question in human–robot interaction (HRI), where robotics has decades of formal work. This module uses that work to answer it for both.</p>
+</div>
+<div class="table-wrap"><table>
+<tr><th>In the tutor</th><th>In a robot</th></tr>
+<tr><td>Child is writing an essay</td><td>Person teleoperating a robotic arm, or using a wheelchair-mounted arm</td></tr>
+<tr><td>Raku guesses what the child is trying to say</td><td>Robot infers which object the user is reaching for</td></tr>
+<tr><td>Too much help: writes it for them</td><td>Robot grabs the wrong cup, and the user loses control</td></tr>
+<tr><td>Too little help: child gets stuck</td><td>User fights a twitchy 7-joint arm with a 2-axis joystick</td></tr>
+<tr><td>Child changes their mind mid-sentence</td><td>User switches target mid-reach</td></tr>
+<tr><td>Ask, act or wait</td><td>Request clarification, take over, or keep observing</td></tr>
+<tr><td>Conversation, screen and progress stay in sync</td><td>Robot's world model, the UI and the task state stay consistent</td></tr>
+</table></div>
+<p>Robotics gives these ideas maths you can implement. The rest of the module walks through them.</p>
+
+<h2 id="autonomy">3. Deep dive: levels of automation</h2>
+<p>Sheridan and Verplank (1978) described automation as a <em>scale</em>, not a switch. A simplified version:</p>
+<ol>
+<li>Human does everything. The machine offers nothing.</li>
+<li>Machine suggests options. Human picks.</li>
+<li>Machine recommends one option. Human approves.</li>
+<li>Machine acts unless the human vetoes in time.</li>
+<li>Machine acts and informs the human afterwards.</li>
+<li>Machine acts alone and ignores the human.</li>
+</ol>
+<p>Ekenstam's point maps onto this scale. A learning product should sit around levels 2–3 for the skill being learned, even if it could do level 6. A surgical robot sits low for cutting decisions but high for tremor filtering. <strong>The right level differs per sub-task</strong>, and good systems set it per sub-task rather than globally.</p>
+<p>Known automation failure modes to design against:</p>
+<ul>
+<li><strong>Complacency:</strong> humans stop monitoring a system that's usually right.</li>
+<li><strong>Skill decay:</strong> operators lose the ability to take over, as pilots can with autopilot.</li>
+<li><strong>Mode confusion:</strong> the human doesn't know which level the machine is at.</li>
+</ul>
+
+<h2 id="shared">4. Deep dive: shared autonomy and policy blending</h2>
+<p>In <strong>shared autonomy</strong>, the human's input and the robot's own policy are combined every control cycle. The classic formulation is <em>policy blending</em> (Dragan &amp; Srinivasa, 2013):</p>
+<pre><code>u = α · u_robot + (1 − α) · u_human        α ∈ [0, 1]</code></pre>
+<ul>
+<li><code>u_human</code>: what the joystick says.</li>
+<li><code>u_robot</code>: what the robot would do to reach the goal it <em>thinks</em> you want.</li>
+<li><code>α</code> (arbitration): how much the robot takes over. Usually it isn't fixed. It rises with the robot's <em>confidence</em> about your goal.</li>
+</ul>
+<p>Their key finding: "aggressive" assistance is great when the robot guesses right and frustrating when it guesses wrong. Users prefer a system that defers when uncertain. That's Ekenstam's "too much help" in engineering form. Confidence here means a <em>calibrated</em> probability, which links straight back to <a href="01-decision-model-evals.html#calibration">Module 01's calibration section</a>.</p>
+
+<div class="card demo">
+<h3>Interactive: a robot assisting a reach</h3>
+<p class="legend">The simulated user (thin line) heads for <b class="p">goal B</b>, with a noisy hand. The robot doesn't know the target. It infers it from the motion and blends in its own push toward its best guess. The thick line is the actual path.</p>
+<canvas id="sa" width="700" height="320" aria-label="Shared autonomy simulation with two goals"></canvas>
+<label for="alpha">Assistance (α max): <span id="av" class="num"></span></label>
+<input id="alpha" type="range" min="0" max="1" step="0.05" value="0.5">
+<label><input id="conf" type="checkbox" checked> Scale help by confidence (α = α max × confidence)</label><br>
+<label><input id="switch" type="checkbox"> User changes their mind late (B → A at step 45)</label><br>
+<label><input id="forget" type="checkbox" checked> Belief forgets old evidence</label>
+<div class="stats">
+  <div class="stat"><div class="k">Reached</div><div class="v" id="res">–</div></div>
+  <div class="stat"><div class="k">Steps</div><div class="v" id="steps">–</div></div>
+  <div class="stat"><div class="k">P(user wants B)</div><div class="v" id="pb">–</div></div>
+  <div class="stat"><div class="k">User in control</div><div class="v" id="ctl">–</div></div>
+</div>
+<p class="meta">Try this: tick "changes their mind" and untick "forgets". At α ≥ 0.8 the robot delivers the wrong goal. At α = 0.5 it gets there after a long tug-of-war. Confidence scaling doesn't save you, because a belief that never forgets is <em>over</em>confident. Now tick "forgets" again.</p>
+</div>
+
+<h2 id="intent">5. Deep dive: inferring intent, and when the human changes their mind</h2>
+<p>The robot keeps a belief, a probability for each possible goal, and updates it with every movement. A standard model treats the human as <em>noisily rational</em>: people mostly move toward their goal, with noise. In Bayesian form:</p>
+<pre><code>P(goal | motion) ∝ P(motion | goal) · P(goal)</code></pre>
+<p>Motions pointing toward goal <em>g</em> raise <code>P(g)</code>. The demo uses a simple version: a softmax over how well recent motion aligns with each goal's direction.</p>
+<p><strong>Changing your mind is the hard case.</strong> If the belief only accumulates evidence, it gets "stuck" on the first goal and fights the user. Two fixes:</p>
+<ul>
+<li><strong>Forgetting:</strong> decay old evidence so recent motion dominates. Toggle it in the demo above. Without it, a late change of mind leaves the robot locked on the old goal at 100% confidence.</li>
+<li><strong>Explicit goal-switch models:</strong> give a small prior probability to "the user changed goal" at every step. This is a hidden Markov model over goals, closely related to the Markov chains in <a href="02-tensortonic.html#math">Module 02</a>.</li>
+</ul>
+<p>This is the robotic version of Ekenstam's design problem: "a learner can interrupt, revise an idea or make a choice… Raku has to adapt while keeping everything in sync." In both cases the system's belief about intent has to stay revisable.</p>
+
+<h2 id="askactwait">6. Deep dive: ask, act or wait</h2>
+<p>Ekenstam names three choices. Decision theory gives a clean way to choose. Compare expected costs:</p>
+<div class="table-wrap"><table>
+<tr><th>Option</th><th>Cost</th><th>Best when</th></tr>
+<tr><td><strong>Act</strong></td><td>P(wrong) × cost of a wrong action</td><td>Confident and actions are reversible</td></tr>
+<tr><td><strong>Ask</strong></td><td>Interruption cost (annoyance, lost flow)</td><td>Uncertain and a wrong action is costly</td></tr>
+<tr><td><strong>Wait</strong></td><td>Delay cost. More observation may resolve the uncertainty for free.</td><td>Uncertain but the person is still giving signal</td></tr>
+</table></div>
+<p>Horvitz's <em>mixed-initiative</em> principles (1999) say the same thing for software assistants. Act only when expected value beats asking, and asking beats doing nothing. A robot handing over a knife should ask or wait far more readily than one passing a pillow.</p>
+<p>In a learning product there's a twist: <strong>a correct action can still be the wrong choice</strong>, because the user's struggle has value. The cost function has to include "the learner didn't get to practise this".</p>
+
+<h2 id="learning">7. Deep dive: don't automate your own learning</h2>
+<p>Ekenstam's thesis applies to <em>you</em>, learning robotics with an AI at your side. Research on learning backs it:</p>
+<ul>
+<li><strong>Desirable difficulties</strong> (Bjork): effortful retrieval, spacing and making errors produce more durable learning than smooth, easy study.</li>
+<li><strong>Scaffolding</strong> (Wood, Bruner &amp; Ross, 1976) and the <strong>zone of proximal development</strong> (Vygotsky): help should cover only what you can't yet do alone, and fade as you improve. That's α scaled by need, much like the demo.</li>
+<li><strong>Generation effect:</strong> answers you produce yourself are remembered better than answers you read.</li>
+</ul>
+<p>Practical consequence for this course: on <a href="02-tensortonic.html">TensorTonic</a>, attempt before you peek. When you ask an AI for help, ask for a hint or the next question, not the solution. Use AI to generate drills, check your reasoning and explain your mistakes, not to skip the struggle.</p>
+
+<h2 id="playbook">8. Playbook</h2>
+<p><strong>Designing an assistive robot or agent:</strong></p>
+<ol>
+<li>Split the task into sub-tasks. Pick a level of automation for each, not one global setting.</li>
+<li>Keep an explicit, revisable belief over what the human wants, with forgetting or goal-switch modelling.</li>
+<li>Scale assistance by <em>calibrated</em> confidence. Defer when unsure.</li>
+<li>Decide ask / act / wait by expected cost, weighting irreversible actions heavily.</li>
+<li>Always give the human an override that wins immediately, and show what mode the system is in.</li>
+<li>Evaluate with real users: success, time, <em>and</em> perceived control. Fast-but-frustrating is a failure.</li>
+</ol>
+<p><strong>Learning with AI:</strong> hints over answers, attempt before you peek, explain it back in your own words, and fade the help over time.</p>
+
+<h2 id="check">9. Self-check</h2>
+<details><summary>In <code>u = α·u_robot + (1−α)·u_human</code>, what goes wrong with α fixed at 0.9?</summary>
+<p>When the robot's goal guess is wrong, the human has only 10% authority and can't correct it. Users experience this as the robot fighting them. Scale α by confidence instead.</p></details>
+<details><summary>Why does an intent model need "forgetting" or a goal-switch probability?</summary>
+<p>Without it, early evidence dominates. If the user changes their mind, the belief stays locked on the old goal and the assistance pushes the wrong way.</p></details>
+<details><summary>A robot is 70% sure you want the hot coffee mug and 30% the empty glass. Ask, act or wait?</summary>
+<p>Probably wait (or ask, if the user has stopped moving). 30% wrong times "grabbed a hot drink unasked" is a high expected cost, and more motion will likely resolve it cheaply.</p></details>
+<details><summary>How does Module 01 (calibration) connect to shared autonomy?</summary>
+<p>Arbitration uses the robot's confidence. If that probability is badly calibrated, e.g. it says 90% when it's right 60% of the time, the robot takes over far too often.</p></details>
+<details><summary>Which level of automation should a learning tool use for the exact skill being learned?</summary>
+<p>Low: suggest or ask, levels 2–3. The learner has to make the decisions. Higher automation is fine for surrounding chores such as formatting or logistics.</p></details>
+
+<h2 id="glossary">10. Glossary &amp; further reading</h2>
+<div class="table-wrap"><table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<tr><td>HRI</td><td>Human–robot interaction: the field studying how people and robots work together</td></tr>
+<tr><td>Shared autonomy / shared control</td><td>Human and robot inputs combined continuously to control one system</td></tr>
+<tr><td>Arbitration (α)</td><td>How much weight the robot's command gets versus the human's</td></tr>
+<tr><td>Intent inference</td><td>Estimating the human's goal from their actions</td></tr>
+<tr><td>Noisily rational model</td><td>Assumes humans mostly act toward their goal, with random deviations</td></tr>
+<tr><td>Mixed initiative</td><td>Either party (human or machine) can take the lead at different moments</td></tr>
+<tr><td>Levels of automation</td><td>Scale from fully manual to fully autonomous (Sheridan &amp; Verplank)</td></tr>
+<tr><td>Scaffolding</td><td>Temporary support that fades as the learner gains skill</td></tr>
+<tr><td>Desirable difficulty</td><td>Effort during learning that improves long-term retention</td></tr>
+</table></div>
+<ul>
+<li>Dragan &amp; Srinivasa, “A policy-blending formalism for shared control”, IJRR 2013</li>
+<li>Javdani, Srinivasa &amp; Bagnell, “Shared autonomy via hindsight optimization”, RSS 2015</li>
+<li>Sheridan &amp; Verplank, “Human and computer control of undersea teleoperators”, 1978 (levels of automation)</li>
+<li>Horvitz, “Principles of mixed-initiative user interfaces”, CHI 1999</li>
+<li>Bjork &amp; Bjork, “Making things hard on yourself, but in a good way: creating desirable difficulties”, 2011</li>
+<li><a href="https://www.gakku.ai/">gakku.ai</a> · <a href="https://x.com/LinusEkenstam/status/2112526605189054844">Original post and demo video</a></li>
+<li>Related: <a href="01-decision-model-evals.html">Module 01</a> (calibrated confidence), <a href="02-tensortonic.html">Module 02</a> (Markov chains, practice habits), <a href="04-distill-small-models.html#latency">Module 04</a> (fast voice commands and stopping distance), <a href="05-trillion-scale-architecture.html#length">Module 05</a> (learned forgetting in KDA attention)</li>
+</ul>
+
+<footer>Module 03 · added 2026-10-21 · <a href="../index.html">Back to course index</a></footer>
+</main>
+
+<script>
+const cv = document.getElementById('sa'), ctx = cv.getContext('2d');
+const aIn = document.getElementById('alpha'), cIn = document.getElementById('conf'), sIn = document.getElementById('switch'), fIn = document.getElementById('forget');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const G = {A: [0.78, 0.2], B: [0.78, 0.8]}, START = [0.12, 0.5], SPEED = 0.012;
+
+let seed;
+const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const gauss = () => Math.sqrt(-2 * Math.log(rnd())) * Math.cos(2 * Math.PI * rnd());
+const unit = v => { const n = Math.hypot(v[0], v[1]) || 1; return [v[0] / n, v[1] / n]; };
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1];
+
+function simulate(aMax, useConf, sw, decay) {
+  seed = 11;
+  let p = [...START], ev = {A: 0, B: 0}, path = [p], human = [p], ctlSum = 0, n = 0, pB = .5, hit = null;
+  let ghost = [...START];
+  for (; n < 300 && !hit; n++) {
+    const target = sw && n > 45 ? 'A' : 'B';
+    // noisy human command toward their real goal
+    const d = unit([G[target][0] - p[0], G[target][1] - p[1]]);
+    const uh = unit([d[0] + gauss() * .55, d[1] + gauss() * .55]);
+    // belief: decayed evidence from how well motion aligns with each goal
+    for (const k of ['A', 'B']) ev[k] = decay * ev[k] + dot(uh, unit([G[k][0] - p[0], G[k][1] - p[1]]));
+    const eA = Math.exp(ev.A * 1.2), eB = Math.exp(ev.B * 1.2);
+    pB = eB / (eA + eB);
+    const best = pB >= .5 ? 'B' : 'A', conf = Math.max(pB, 1 - pB);
+    const ur = unit([G[best][0] - p[0], G[best][1] - p[1]]);
+    const a = useConf ? aMax * (conf - .5) * 2 : aMax;
+    const u = unit([a * ur[0] + (1 - a) * uh[0], a * ur[1] + (1 - a) * uh[1]]);
+    p = [p[0] + u[0] * SPEED, p[1] + u[1] * SPEED];
+    ghost = [ghost[0] + uh[0] * SPEED, ghost[1] + uh[1] * SPEED];
+    path.push(p); human.push(ghost); ctlSum += 1 - a;
+    for (const k of ['A', 'B']) if (Math.hypot(G[k][0] - p[0], G[k][1] - p[1]) < .04) hit = k;
+  }
+  const want = sw ? 'A' : 'B';
+  return {path, human, hit, n, pB, ctl: ctlSum / n, want};
+}
+
+function draw() {
+  const aMax = +aIn.value, r = simulate(aMax, cIn.checked, sIn.checked, fIn.checked ? .85 : 1);
+  document.getElementById('av').textContent = aMax.toFixed(2);
+  const W = cv.width, H = cv.height, X = p => [p[0] * W, p[1] * H];
+  ctx.clearRect(0, 0, W, H);
+  ctx.globalAlpha = .45; ctx.strokeStyle = css('--muted'); ctx.lineWidth = 1;
+  ctx.beginPath(); r.human.forEach((p, i) => i ? ctx.lineTo(...X(p)) : ctx.moveTo(...X(p))); ctx.stroke();
+  ctx.globalAlpha = 1; ctx.strokeStyle = css('--accent'); ctx.lineWidth = 3;
+  ctx.beginPath(); r.path.forEach((p, i) => i ? ctx.lineTo(...X(p)) : ctx.moveTo(...X(p))); ctx.stroke();
+  ctx.font = '600 14px sans-serif';
+  for (const [k, c] of [['A', css('--fail')], ['B', css('--pass')]]) {
+    const [x, y] = X(G[k]);
+    ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, 14, 0, 2 * Math.PI); ctx.fill();
+    ctx.fillStyle = css('--bg'); ctx.fillText(k, x - 5, y + 5);
+  }
+  ctx.fillStyle = css('--fg'); ctx.beginPath(); ctx.arc(...X(START), 6, 0, 2 * Math.PI); ctx.fill();
+  const ok = r.hit === r.want;
+  const res = document.getElementById('res');
+  res.textContent = r.hit ? `${r.hit} ${ok ? '✓' : '✗'}` : 'none';
+  res.style.color = r.hit ? (ok ? css('--accent') : css('--fail')) : css('--muted');
+  document.getElementById('steps').textContent = r.n;
+  document.getElementById('pb').textContent = (r.pB * 100).toFixed(0) + '%';
+  document.getElementById('ctl').textContent = (r.ctl * 100).toFixed(0) + '%';
+}
+aIn.oninput = cIn.onchange = sIn.onchange = fIn.onchange = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

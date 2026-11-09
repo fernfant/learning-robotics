@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 9 · Understanding commands</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 5 · Lesson 9</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 5 · Lesson 9</div>
+<h1>Understanding commands: a word-counting classifier</h1>
+<p class="lede">People say the same thing in a hundred ways. Instead of writing a rule for each one, let the robot learn from examples which words go with which request. Then look hard at where it gets things wrong.</p>
+
+<div class="facts">
+  <div><b>Time</b>2–4 hours</div>
+  <div><b>You'll need</b>Python 3, your Lesson 8 <code>tokenize</code>, a notebook, and a few patient people</div>
+  <div><b>New words</b>intent, slot, classifier, training set, test set, accuracy, smoothing, log</div>
+  <div><b>Project piece</b>Understands what you ask</div>
+</div>
+
+<section class="kid" id="start">
+<h2>Start here</h2>
+<p class="big">To understand a command, the robot answers two questions: <em>what</em> do you want (the intent), and <em>which thing</em> (the slot). It learns the first by counting words in examples.</p>
+
+<h3>The problem</h3>
+<p>Robo-Helper can move, plan routes and stop safely. But when you say "get rid of the red block", it has no idea that means the same as "put the red block in the bin". Or that "halt", "freeze" and "wait stop" all mean stop. There are endless ways to say each thing, and you can't write them all down.</p>
+
+<h3>The idea in one picture</h3>
+<p>Imagine sorting your post without opening it. Letters with "invoice" or "payment" go on the bills pile. "Party" and "birthday" go on the invitations pile. You've never seen this exact letter before, but the words give it away. You learned which words go with which pile by seeing lots of letters. Our robot sorts commands into 4 piles the same way: put, go, find, stop.</p>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Intent</dt><dd>What the person wants: <code>put</code>, <code>go</code>, <code>find</code> or <code>stop</code>.</dd>
+<dt>Slot</dt><dd>The detail that fills in the intent. Here: which object, like <code>"red block"</code>.</dd>
+<dt>Classifier</dt><dd>A program that puts things into one of a fixed set of groups.</dd>
+<dt>Training set</dt><dd>Examples with the right answer, used to learn. Ours has 34.</dd>
+<dt>Test set</dt><dd>Different examples, kept aside, used only to check. Ours has 12. (You met this idea in <a href="05-evaluation.html">Lesson 5</a>.)</dd>
+<dt>Accuracy</dt><dd>The fraction of test examples it gets right. 11 out of 12 ≈ 0.92.</dd>
+<dt>Smoothing</dt><dd>Adding 1 to every count so a word you've never seen doesn't wreck the score.</dd>
+<dt>Log</dt><dd>A maths function that turns tiny numbers like 0.000003 into friendly ones like −12.7. Bigger is still better.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full lesson: the idea built from nothing, a demo, your homework, and a challenge away from the screen.</p>
+
+<h2 id="problem">1. The problem</h2>
+<p>Here are some real commands from the training data in <code>lesson09_commands.py</code>, with the intent each one means:</p>
+<pre><code>"put the red block in the bin"   put      "go to the red block"          go
+"get rid of the red block"       put      "drive over to the blue block" go
+"can you bin the red one"        put      "where did the blue one go"    find
+"tidy up the green block"        put      "halt"                         stop</code></pre>
+<p><strong>Obvious idea: keyword rules.</strong> If the command contains "put", it's put. If it contains "go", it's go. If it contains "where", it's find.</p>
+<p>Try it on the list. "get rid of the red block" has no "put", so the rule fails. "can you bin the red one" fails too. Worse: "where did the blue one go" contains "go", so if the go rule runs first, the robot drives off when you only asked a question. Every rule you add fixes one sentence and breaks another. And you're always one new phrasing behind.</p>
+<p><strong>The better idea:</strong> collect examples with the right answers, and let the program learn which words point to which intent.</p>
+
+<h2 id="principles">2. First principles</h2>
+
+<h3>Step 1: split the job in two</h3>
+<p>"Put the <u>red</u> block in the bin" has two parts. The <strong>intent</strong> (put) is the hard bit: many words, many phrasings. The <strong>slot</strong> (red block) is easy in our room, because there are only three objects and each has a different colour. So for the slot we <em>can</em> use a simple rule: look for "red", "blue" or "green". The rest of the lesson is about the intent.</p>
+
+<h3>Step 2: count words per intent</h3>
+<p>Go through all 34 training examples. Tokenize each one with your Lesson 8 <code>tokenize</code>, and keep a tally of how often each word appears in each intent. Here's part of the real table:</p>
+<div class="table-wrap"><table>
+<tr><th>word</th><th>put</th><th>go</th><th>find</th><th>stop</th></tr>
+<tr><td>bin</td><td class="num">4</td><td class="num">0</td><td class="num">0</td><td class="num">0</td></tr>
+<tr><td>to</td><td class="num">0</td><td class="num">7</td><td class="num">0</td><td class="num">0</td></tr>
+<tr><td>where</td><td class="num">0</td><td class="num">0</td><td class="num">5</td><td class="num">0</td></tr>
+<tr><td>stop</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">6</td></tr>
+<tr><td>the</td><td class="num">14</td><td class="num">8</td><td class="num">8</td><td class="num">0</td></tr>
+<tr><td><b>all words</b></td><td class="num">61</td><td class="num">44</td><td class="num">48</td><td class="num">15</td></tr>
+<tr><td><b>examples</b></td><td class="num">10</td><td class="num">8</td><td class="num">8</td><td class="num">8</td></tr>
+</table></div>
+<p>Already you can see the clues: "bin" means put, "where" means find. And "the" is everywhere, so it tells you very little.</p>
+
+<h3>Step 3: from counts to chances</h3>
+<p>Raw counts aren't fair. Put has 61 words in total and stop has only 15, so put would win just by being longer. So we use a fraction: how often does this word appear, <em>out of all the words</em> in that intent? "the" is 14 out of 61 in put (0.23) and 8 out of 44 in go (0.18). That's the same move as Lesson 8: counts divided by a total.</p>
+<p>We also include how common each intent is overall (the <em>prior</em>). Put has 10 of the 34 examples, so before reading any words, P(put) = 10 / 34 ≈ 0.29. The others are 8 / 34 ≈ 0.24.</p>
+
+<h3>Step 4: multiply the clues</h3>
+<p>To score a whole command for one intent, multiply the prior by the chance of each word:</p>
+<pre><code>score(put) = P(put) × P(word1 in put) × P(word2 in put) × ...</code></pre>
+<p>This pretends each word is an independent clue, which isn't really true ("in" and "bin" often come together). That simplification is why it's called <strong>Naive Bayes</strong>. Naive, but it works surprisingly well.</p>
+
+<h3>Step 5: the zero problem, fixed by adding 1</h3>
+<p>Take the command "stop". In the put examples, "stop" appears 0 times. So P(stop in put) = 0 / 61 = 0, and the whole put score becomes 0. Fine here. But now take "please stop right now". If even <em>one</em> word was never seen with stop, stop's score would become 0 too, however many other clues point to it. One missing word shouldn't destroy everything.</p>
+<p>The fix is called <strong>add-one smoothing</strong>: pretend you saw every word once more than you did. To keep it fair, add the number of different words we know (the vocabulary, 52 words) to the bottom:</p>
+<pre><code>P(word in intent) = (count of word in intent + 1) / (all words in intent + 52)</code></pre>
+<p>Let's score "stop" by hand, with real numbers:</p>
+<pre><code>put:   10/34 × (0 + 1)/(61 + 52)  =  0.294 × 0.00885  =  0.0026
+stop:   8/34 × (6 + 1)/(15 + 52)  =  0.235 × 0.1045   =  0.0246    ← about 10× bigger. stop wins.</code></pre>
+
+<h3>Step 6: tiny numbers, so use logs</h3>
+<p>A 7-word command multiplies 8 small numbers. You get something like 0.0000000008. With long sentences, numbers get so small the computer rounds them to exactly 0. The fix is the <strong>log</strong> (in Python, <code>math.log</code>). You don't need to know how it works inside, just three facts:</p>
+<ul>
+<li>log of a number between 0 and 1 is negative: <code>math.log(0.0246)</code> ≈ −3.71 and <code>math.log(0.0026)</code> ≈ −5.95.</li>
+<li>smaller number → more negative log. So the biggest score (closest to 0) still wins.</li>
+<li>log(a × b) = log(a) + log(b). So instead of <em>multiplying</em> chances, we <em>add</em> logs. No more vanishing.</li>
+</ul>
+<p>The real program prints exactly these: for "stop" the scores are put −5.95, go −6.01, find −6.05, stop −3.71.</p>
+
+<h3>Step 7: test it on sentences it never saw</h3>
+<p>We keep 12 commands in <code>TEST</code> that the model never trains on. It gets 11 right: accuracy ≈ 0.92. The one it misses is <code>"locate the blue block"</code>. It says put. Why? "locate" appeared only once in training, while "the", "blue" and "block" all appear a lot in put examples. The scores are put −13.62, find −13.65: it lost by a hair.</p>
+
+<h3>Step 8: look at your mistakes (this is the real job)</h3>
+<p>The program also tries a few extra commands. Here's one:</p>
+<pre><code>"where's the green one?"</code></pre>
+<details><summary>Predict first: which intent will it pick? "where" is a strong find word…</summary>
+<p>It picks <strong>put</strong>. Wrong! And here's the detective work. Our tokenizer from Lesson 8 keeps <code>"where's"</code> as <em>one</em> token. The training data has "where" five times but never "where's". To the model, "where's" is a brand-new word that means nothing. So the only clues left are "the", "green" and "one", and those appear most in put examples:</p>
+<pre><code>             prior  where's   the    green   one     total
+put   (log)  −1.22   −4.73   −2.02   −3.34  −3.63   −14.94   ← winner
+go    (log)  −1.45   −4.56   −2.37   −3.47  −3.47   −15.31
+find  (log)  −1.45   −4.61   −2.41   −3.51  −3.51   −15.47
+stop  (log)  −1.45   −4.20   −4.20   −4.20  −4.20   −18.27</code></pre>
+<p>Type <code>where is the green one</code> instead and it correctly says find (−16.49, clearly ahead). The model wasn't stupid. It was never shown "where's".</p>
+</details>
+<p>This is how real machine-learning engineers spend much of their time: not admiring the score, but reading the failures one by one and asking <em>why</em>. Each failure points to a fix: more training examples, a better tokenizer, or a different model. You'll try one fix in the Stretch.</p>
+
+<div class="note"><strong>No "I don't know" button.</strong> Our classifier <em>always</em> picks one of its four intents. Type "what is the weather" and it confidently says find. Type "hello robot" and it says stop. It has no way to say "that's not a command I understand". Keep this in mind: in <a href="11-capstone.html">Lesson 11</a> the full robot runs into exactly this problem.</div>
+
+<h2 id="play">3. Play with it</h2>
+<div class="card demo">
+<h3>Interactive: watch the classifier think</h3>
+<p class="legend">The same TRAIN and TEST lists, tokenizer and scoring formula as <code>lesson09_commands.py</code>. Type a command and see each intent's score (higher, i.e. closer to 0, wins), the word-by-word evidence, and the parsed command. Words in <b class="f">red</b> were never seen in training.</p>
+<p><label for="cmdIn">Command: </label><input id="cmdIn" value="where's the green one?" size="36"></p>
+<p>
+<button data-c="where's the green one?">where's the green one?</button>
+<button data-c="where is the green one">where is the green one</button>
+<button data-c="locate the blue block">locate the blue block</button>
+<button data-c="STOP!">STOP!</button>
+<button data-c="what is the weather">what is the weather</button>
+</p>
+<canvas id="scoreBars" width="700" height="180" aria-label="Bar chart of the score for each intent"></canvas>
+<p><b>Parsed:</b> <code id="parsed">–</code></p>
+<div class="table-wrap" id="evidence"></div>
+<p><label><input type="checkbox" id="fixBox"> Add two training examples: <code>("where's the red block", "find")</code> and <code>("where's the blue one", "find")</code></label></p>
+<div class="stats">
+  <div class="stat"><div class="k">Test accuracy</div><div class="v" id="sAcc">–</div></div>
+  <div class="stat"><div class="k">Vocabulary</div><div class="v" id="sVocab">–</div></div>
+  <div class="stat"><div class="k">Training examples</div><div class="v" id="sTrain">–</div></div>
+</div>
+<p class="legend" id="testMistakes"></p>
+</div>
+
+<h2 id="homework">4. Homework</h2>
+<p>Open <code>homework/lesson09_commands.py</code>. <code>TRAIN</code>, <code>TEST</code> and <code>COLOURS</code> are written for you, and it imports <code>tokenize</code> from <em>your</em> Lesson 8, so finish that first. Write six functions, in order.</p>
+
+<h3>4.1 <code>train_intent_model(examples)</code></h3>
+<p>Count words per intent (Step 2). Return a dictionary with three parts: <code>"word_counts"</code> (intent → {word: count}), <code>"intent_counts"</code> (intent → number of examples), and <code>"vocab"</code> (a set of every word seen).</p>
+<p>Example: with <code>TRAIN</code>, <code>model["intent_counts"]["stop"] == 8</code>, <code>model["word_counts"]["put"]["bin"] == 4</code>, and <code>"halt" in model["vocab"]</code>.</p>
+<details><summary>Hint 1</summary><p>Make three empty containers first: two dicts and a set. Then loop over <code>for text, intent in examples</code>.</p></details>
+<details><summary>Hint 2</summary><p>For each example, add 1 to that intent's example count. Then loop over <code>tokenize(text)</code> and, for each word, add 1 to that intent's count for the word and add the word to the vocab set.</p></details>
+<details><summary>Hint 3</summary><p><code>bucket = wc.setdefault(intent, {})</code> gives you the intent's word dict (creating it if needed). Then <code>bucket[w] = bucket.get(w, 0) + 1</code> and <code>vocab.add(w)</code>. Return the three in a dict with the exact key names.</p></details>
+
+<h3>4.2 <code>intent_scores(model, text)</code></h3>
+<p>For each intent, compute the log score from Steps 3–6. Return <code>{intent: score}</code>.</p>
+<pre><code>score = log(examples of intent / all examples)
+      + for each word in text:  log((count of word in intent + 1) / (all words in intent + vocab size))</code></pre>
+<p>Example: <code>intent_scores(model, "stop")</code> gives about put −5.95, go −6.01, find −6.05, stop −3.71.</p>
+<details><summary>Hint 1</summary><p>Work out three things before the loop: the total number of examples, the vocab size <code>len(model["vocab"])</code>, and (inside the loop over intents) how many words that intent has in total.</p></details>
+<details><summary>Hint 2</summary><p>"All words in intent" is <code>sum(</code>that intent's word-count dict<code>.values())</code>. Use <code>.get(w, 0)</code> for words that intent never saw. Don't forget <code>import math</code> is already at the top.</p></details>
+<details><summary>Hint 3</summary><p>For each intent <code>n</code>: <code>s = math.log(n_examples / total)</code>. Then for each <code>w</code> in <code>tokenize(text)</code>: <code>s += math.log((count + 1) / (size + V))</code>. Store <code>scores[intent] = s</code>. Check your "stop" numbers against the ones above.</p></details>
+
+<h3>4.3 <code>predict_intent(model, text)</code></h3>
+<p>Return the intent with the highest score.</p>
+<details><summary>Hint 1</summary><p>Highest means closest to zero, since they're all negative. <code>max</code> handles that correctly.</p></details>
+<details><summary>Hint 2</summary><p><code>max(d, key=d.get)</code> returns the <em>key</em> of a dict with the biggest value.</p></details>
+<details><summary>Hint 3</summary><p>Two lines: get the scores dict, return the max key.</p></details>
+
+<h3>4.4 <code>extract_object(text)</code></h3>
+<p>The slot. Look through the tokens for a word in <code>COLOURS</code>. If you find one, return e.g. <code>"red block"</code>. Otherwise return <code>None</code>.</p>
+<p>Example: <code>extract_object("grab the Blue one")</code> → <code>"blue block"</code>. <code>extract_object("stop")</code> → <code>None</code>.</p>
+<details><summary>Hint 1</summary><p>Use <code>tokenize</code>, so "Blue" becomes "blue" for free.</p></details>
+<details><summary>Hint 2</summary><p>Return as soon as you find a colour. If the loop finishes with nothing, return None.</p></details>
+<details><summary>Hint 3</summary><p><code>for w in tokenize(text): if w in COLOURS: return f"{w} block"</code>, then <code>return None</code> after the loop.</p></details>
+
+<h3>4.5 <code>parse_command(model, text)</code></h3>
+<p>Put it together: <code>{"intent": ..., "object": ...}</code>. For <code>stop</code>, the object is always None.</p>
+<p>Example: <code>parse_command(model, "stop now")</code> → <code>{"intent": "stop", "object": None}</code>.</p>
+<details><summary>Hint 1</summary><p>Call the two functions you already wrote.</p></details>
+<details><summary>Hint 2</summary><p>"stop the red block" should still have no object: stopping is about the robot, not a block.</p></details>
+<details><summary>Hint 3</summary><p>Get the intent. Object = None if the intent is "stop", else <code>extract_object(text)</code>. Return the dict.</p></details>
+
+<h3>4.6 <code>test_accuracy(model, examples)</code></h3>
+<p>The fraction of examples where <code>predict_intent</code> matches the label.</p>
+<details><summary>Hint 1</summary><p>Count the right ones, then divide by how many there are.</p></details>
+<details><summary>Hint 2</summary><p>In Python, <code>True</code> counts as 1 when you add, so you can <code>sum</code> comparisons.</p></details>
+<details><summary>Hint 3</summary><p><code>sum(predict_intent(model, t) == y for t, y in examples) / len(examples)</code>, or the same with an ordinary loop and a counter.</p></details>
+
+<h3>Run it</h3>
+<pre><code>cd homework
+python3 lesson09_commands.py</code></pre>
+<p>What you should see (real output of the reference solution). Yes, the second line is wrong. That's on purpose: it's the mistake from Step 8.</p>
+<pre><code>test accuracy: 0.92
+'please put the red block in the bin'      -> {'intent': 'put', 'object': 'red block'}
+"where's the green one?"                   -> {'intent': 'put', 'object': 'green block'}
+'STOP!'                                    -> {'intent': 'stop', 'object': None}
+mistakes: [('locate the blue block', 'find', 'put')]</code></pre>
+
+<h3>Check it</h3>
+<pre><code>cd ..
+python3 check.py 9</code></pre>
+<p>Five checks. Green ✓ = passed, red ✗ = read the hint, yellow <code>…</code> = not written yet. Two real hints:</p>
+<ul>
+<li><code>✗ train_intent_model: there are 8 'stop' examples in TRAIN</code>. You're probably counting <em>words</em> instead of <em>examples</em> in <code>intent_counts</code>. Add 1 per example, not per word.</li>
+<li><code>✗ test accuracy: test accuracy should be at least 0.8 (got …)</code>, with your own accuracy in the brackets. Something is upside down in the scoring. A common cause is using <code>min</code> instead of <code>max</code>, or forgetting the <code>+ 1</code>.</li>
+</ul>
+
+<h3>Stretch</h3>
+<ul>
+<li><strong>Fix the "where's" bug.</strong> Add <code>("where's the red block", "find")</code> and <code>("where's the blue one", "find")</code> to <code>TRAIN</code> and run again. Does "where's the green one?" become find? What happens to test accuracy? (You can try it first in the demo checkbox.) Then think: is it honest to keep adding examples until the test score is perfect? (Lesson 5 says: careful. If you tune to the test set, it stops being a fair test. Real teams keep a <em>second</em> test set they look at rarely.)</li>
+<li>Another fix: before tokenizing, replace <code>"'s"</code> with <code>" is"</code>. Which is better, and what could go wrong ("the robot's arm")?</li>
+<li>Add an <code>"unknown"</code> answer: if the best score is below some number, return <code>"unknown"</code>. Try commands like "what is the weather". Where would you put the cut-off?</li>
+</ul>
+
+<h2 id="challenge">5. Real-world challenge: collect real commands</h2>
+<p>Your training set was written by one person. Real people talk differently. Let's find out how differently.</p>
+<ol>
+<li>Ask at least 4 people (family, friends) this, one at a time, without showing them the training data: "Imagine a robot in a room with a red, a blue and a green block and a bin. How would you tell it to: (a) put a block in the bin, (b) go to a block, (c) tell you where a block is, (d) stop?" Write down <em>exactly</em> what they say, contractions and all.</li>
+<li>That's about 16 new commands, labelled with the right intent. You've built a test set from real users.</li>
+<li>Before running anything, go through them on paper. Circle any word that isn't in the model's vocabulary (the demo's red words help). Predict which ones it will get wrong.</li>
+<li>Add them as a new list in a copy of your file, say <code>REAL_TEST</code>, and run <code>test_accuracy(model, REAL_TEST)</code>. Print the mistakes the same way the file does.</li>
+<li>For each mistake, write one line: <em>why</em> did it fail? (Unseen word? Contraction? Too polite? Two intents in one sentence?)</li>
+</ol>
+<p><strong>Record:</strong> the commands, your predictions, the real accuracy, and your "why" list. <strong>What it should teach you:</strong> a model scored on test data from the same person who wrote the training data looks better than it really is. Real users find the gaps fast. Is your real accuracy lower than 0.92? Most people's is.</p>
+
+<h2 id="project">6. Your Robo-Helper so far</h2>
+<p>Robo-Helper can now understand what you ask. <code>parse_command</code> turns "get rid of the red block" into <code>{"intent": "put", "object": "red block"}</code>, a neat little dictionary the rest of the robot can act on.</p>
+<p>It's used twice later on:</p>
+<ul>
+<li>In <a href="10-llm-safety.html">Lesson 10</a>, a real LLM tries to understand commands. When its reply is broken or unsafe, <code>safe_parse</code> falls back to <em>your</em> <code>parse_command</code>. Your simple model becomes the safety net.</li>
+<li>In <a href="11-capstone.html">Lesson 11</a>, <code>RoboHelper</code> trains your model in its <code>__init__</code> with <code>train_intent_model(TRAIN)</code>, and its <code>parse</code> method calls <code>parse_command</code> for every command you type. Then <code>astar_path</code> from Lesson 6 drives it there. Remember the missing "I don't know": the capstone has to deal with that.</li>
+</ul>
+
+<h2 id="mistakes">7. Common mistakes</h2>
+<ul>
+<li><strong>Counting words instead of examples</strong> in <code>intent_counts</code>. Checker hint: <em>"there are 8 'stop' examples in TRAIN"</em>.</li>
+<li><strong>Splitting with <code>text.split()</code> instead of <code>tokenize</code>.</strong> Then "Blue" and "blue" are different, and "STOP!" isn't "stop". Checker hint: <em>"'grab the Blue one' -&gt; 'blue block'"</em>.</li>
+<li><strong>Forgetting the +1 or the vocab size.</strong> Without +1 you'll get <code>math.log(0)</code>, which crashes with <code>ValueError: math domain error</code>.</li>
+<li><strong>Giving "stop" an object.</strong> "stop the red block" should still be <code>None</code>. Checker hint: <em>"stop has no object"</em>.</li>
+<li><strong>Using the words of all intents for the total.</strong> "All words in intent" means just that intent's words (61 for put), not all 168.</li>
+</ul>
+
+<h2 id="check">8. Check yourself</h2>
+<details><summary>What's the difference between an intent and a slot?</summary><p>The intent is what you want (put, go, find, stop). The slot is the detail that fills it in (which block).</p></details>
+<details><summary>Why add 1 to every count?</summary><p>So a word never seen with an intent doesn't make that intent's score 0 (or log of 0, which crashes). One missing word shouldn't overrule all the other clues.</p></details>
+<details><summary>Predict: what does <code>extract_object("go to the red block, not the blue one")</code> return?</summary><p><code>"red block"</code>. It returns the <em>first</em> colour it finds. It can't understand "not". Another honest limitation.</p></details>
+<details><summary>Why did "where's the green one?" go wrong?</summary><p>The tokenizer kept "where's" as one token, which never appeared in training, so the strong "where" clue was lost. The leftover words ("the", "green", "one") lean towards put.</p></details>
+<details><summary>Predict: what does <code>predict_intent(model, "hello robot")</code> return, and why is that a problem?</summary><p>It returns <code>"stop"</code> (neither word was seen, and stop's small word count makes unseen words least costly there). The problem: the classifier must always pick one of its 4 intents. It has no way to say "I don't know".</p></details>
+
+<h2 id="deeper">9. Go deeper (optional)</h2>
+<ul>
+<li><a href="../01-decision-model-evals.html">LLM evals with decision models</a>: thresholds, trade-offs and calibration. How professionals decide whether a model is good enough, beyond one accuracy number.</li>
+<li><a href="../06-30u30/13-attention.html">30u30 Day 13: Attention</a>: modern models don't treat words as independent clues. Attention lets every word look at every other word.</li>
+<li><a href="../07-post-training.html">Post-training</a>: how big LLMs are taught to follow instructions, which is the grown-up version of understanding commands.</li>
+<li><a href="../10-rlm-harness.html">Agent harnesses</a>: the code wrapped around a language model that runs it, checks it and steers it. Lesson 10 builds a tiny one.</li>
+</ul>
+
+<nav class="pager">
+  <a href="08-words-as-numbers.html"><small>Previous</small>Lesson 8 · Next-word model</a>
+  <a class="next" href="15-tiny-lm.html"><small>Next</small>Lesson 15 · A tiny language model</a>
+</nav>
+<footer>Build a Robot Brain · Week 5 · Lesson 9</footer>
+</main>
+
+<script>
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+const TRAIN = [
+  ["put the red block in the bin", "put"], ["throw the blue block away", "put"],
+  ["tidy up the green block", "put"], ["put away the blue block", "put"],
+  ["can you bin the red one", "put"], ["clean up the green block please", "put"],
+  ["drop the blue block in the bin", "put"], ["get rid of the red block", "put"],
+  ["move the green block into the bin", "put"], ["put the blue one in the trash", "put"],
+  ["go to the red block", "go"], ["drive over to the blue block", "go"],
+  ["head to the green block", "go"], ["go near the red one", "go"],
+  ["move next to the blue block", "go"], ["travel to the green one", "go"],
+  ["come to the red block", "go"], ["go over to the blue block please", "go"],
+  ["where is the red block", "find"], ["find the blue block", "find"],
+  ["can you tell me where the green block is", "find"], ["where did the blue one go", "find"],
+  ["locate the red block", "find"], ["which square is the green block on", "find"],
+  ["show me where the red one is", "find"], ["where is the blue block now", "find"],
+  ["stop", "stop"], ["stop now", "stop"], ["halt", "stop"], ["freeze", "stop"],
+  ["stop moving", "stop"], ["please stop right now", "stop"], ["emergency stop", "stop"],
+  ["wait stop", "stop"],
+];
+const TEST = [
+  ["put the green block in the bin", "put"], ["bin the blue block", "put"],
+  ["throw away the red block please", "put"], ["go to the green block", "go"],
+  ["drive to the red one", "go"], ["head over to the blue block", "go"],
+  ["where is the green one", "find"], ["find the red block for me", "find"],
+  ["locate the blue block", "find"], ["stop please", "stop"], ["halt now", "stop"],
+  ["freeze right there", "stop"],
+];
+const FIX = [["where's the red block", "find"], ["where's the blue one", "find"]];
+const COLOURS = ["red", "blue", "green"];
+
+const tokenize = text => text.toLowerCase().match(/[a-z']+|\./g) || [];
+const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+
+function trainIntentModel(examples) {
+  const wc = {}, ic = {}, vocab = new Set();
+  for (const [text, intent] of examples) {
+    ic[intent] = (ic[intent] || 0) + 1;
+    const bucket = wc[intent] = wc[intent] || Object.create(null);
+    for (const w of tokenize(text)) { bucket[w] = (bucket[w] || 0) + 1; vocab.add(w); }
+  }
+  return { word_counts: wc, intent_counts: ic, vocab };
+}
+// returns {intent: {total, parts: [[label, logp], ...]}} so the demo can show the evidence
+function intentScoreParts(model, text) {
+  const total = Object.values(model.intent_counts).reduce((a, b) => a + b, 0), V = model.vocab.size, out = {};
+  for (const [intent, n] of Object.entries(model.intent_counts)) {
+    const words = model.word_counts[intent], size = Object.values(words).reduce((a, b) => a + b, 0);
+    let s = Math.log(n / total); const parts = [['prior', s]];
+    for (const w of tokenize(text)) {
+      const lp = Math.log(((has(words, w) ? words[w] : 0) + 1) / (size + V));
+      s += lp; parts.push([w, lp]);
+    }
+    out[intent] = { total: s, parts };
+  }
+  return out;
+}
+function intentScores(model, text) {
+  const p = intentScoreParts(model, text), out = {};
+  for (const k in p) out[k] = p[k].total;
+  return out;
+}
+function predictIntent(model, text) {
+  const s = intentScores(model, text); let best = null;
+  for (const k in s) if (best === null || s[k] > s[best]) best = k;
+  return best;
+}
+function extractObject(text) {
+  for (const w of tokenize(text)) if (COLOURS.includes(w)) return w + ' block';
+  return null;
+}
+function parseCommand(model, text) {
+  const intent = predictIntent(model, text);
+  return { intent, object: intent === 'stop' ? null : extractObject(text) };
+}
+const testAccuracy = (model, ex) => ex.filter(([t, y]) => predictIntent(model, t) === y).length / ex.length;
+
+if (typeof document !== 'undefined') {
+  const $ = id => document.getElementById(id);
+  const cv = $('scoreBars'), ctx = cv.getContext('2d');
+  let model = trainIntentModel(TRAIN);
+
+  function update() {
+    const text = $('cmdIn').value, parts = intentScoreParts(model, text), intents = Object.keys(parts);
+    const best = predictIntent(model, text), p = parseCommand(model, text);
+    $('parsed').textContent = `{"intent": "${p.intent}", "object": ${p.object === null ? 'None' : '"' + p.object + '"'}}`;
+    // bars: length = how far above the worst score, so the winner is the longest
+    const W = cv.width, H = cv.height, vals = intents.map(k => parts[k].total);
+    const lo = Math.min(...vals) - 1, hi = Math.max(...vals), rowH = H / intents.length;
+    ctx.clearRect(0, 0, W, H); ctx.font = '14px sans-serif'; ctx.textBaseline = 'middle';
+    intents.forEach((k, i) => {
+      const w = (parts[k].total - lo) / (hi - lo) * (W - 220);
+      ctx.fillStyle = k === best ? css('--accent') : css('--line');
+      ctx.fillRect(70, i * rowH + 8, w, rowH - 16);
+      ctx.fillStyle = css('--fg'); ctx.textAlign = 'left';
+      ctx.fillText(k, 8, i * rowH + rowH / 2);
+      ctx.fillText(parts[k].total.toFixed(2) + (k === best ? '  ← winner' : ''), 78 + w, i * rowH + rowH / 2);
+    });
+    // evidence table
+    const words = parts[intents[0]].parts.map(x => x[0]);
+    let h = '<table><tr><th>intent</th>' + words.map(w => w === 'prior' ? '<th>prior</th>' :
+      `<th${model.vocab.has(w) ? '' : ' style="color:var(--fail)"'}>${w.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</th>`).join('') + '<th>total</th></tr>';
+    for (const k of intents)
+      h += `<tr><td>${k}</td>` + parts[k].parts.map(x => `<td class="num">${x[1].toFixed(2)}</td>`).join('') +
+        `<td class="num"><b>${parts[k].total.toFixed(2)}</b></td></tr>`;
+    $('evidence').innerHTML = h + '</table>';
+  }
+  function retrain() {
+    const data = $('fixBox').checked ? TRAIN.concat(FIX) : TRAIN;
+    model = trainIntentModel(data);
+    $('sAcc').textContent = testAccuracy(model, TEST).toFixed(2);
+    $('sVocab').textContent = model.vocab.size;
+    $('sTrain').textContent = data.length;
+    const wrong = TEST.filter(([t, y]) => predictIntent(model, t) !== y).map(([t, y]) => `"${t}" (should be ${y}, got ${predictIntent(model, t)})`);
+    $('testMistakes').textContent = 'Test-set mistakes: ' + (wrong.length ? wrong.join('; ') : 'none');
+    update();
+  }
+  $('cmdIn').oninput = update;
+  $('fixBox').onchange = retrain;
+  document.querySelectorAll('button[data-c]').forEach(b => b.onclick = () => { $('cmdIn').value = b.dataset.c; update(); });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', update);
+  retrain();
+} else {
+  module.exports = { trainIntentModel, intentScores, predictIntent, parseCommand, extractObject, testAccuracy, TRAIN, TEST, FIX };
+}
+</script>
+</body>
+</html>

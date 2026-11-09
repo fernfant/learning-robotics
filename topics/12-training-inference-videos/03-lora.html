@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video 03 · LoRA and descendants</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 12 · Training &amp; inference videos</a> › Video 03</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 12 · Video 03</div>
+<h1>LoRA and its descendants: LoRA+, QLoRA, VeRA, DoRA</h1>
+<p class="lede">LoRA freezes a pretrained model and learns a small low-rank correction to each weight matrix, so fine-tuning touches a fraction of a percent of the parameters. This guide explains LoRA from the original paper, then the four follow-ups the video covers: different learning rates for the two matrices, a 4-bit frozen backbone, shared random matrices, and separate magnitude and direction.</p>
+
+<div class="facts">
+  <div><b>Video length</b>21:26</div>
+  <div><b>Published</b>21 June 2026</div>
+  <div><b>Level</b>Intermediate: matrix multiplication and what fine-tuning is</div>
+  <div><b>Builds on</b><a href="01-zero-fsdp.html">Video 01 · ZeRO &amp; FSDP</a> (memory per parameter), <a href="../08-ai-research-engineer/05-alignment-preference.html">Module 08 · Alignment &amp; preference</a> (where LoRA is used for DPO)</div>
+</div>
+<p class="meta">Video by Jia-Bin Huang · <a href="https://www.youtube.com/watch?v=U80tjcThl9Q">Watch on YouTube</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Teaching a huge AI a new skill normally means changing all of its billions of numbers. LoRA leaves those numbers alone and adds a tiny "correction" next to them. The correction is so small that anyone with one good graphics card can teach a big model something new.</p>
+
+<h3>Think of it like this</h3>
+<p>You have a thick printed encyclopaedia, and you want it to cover your local football club. Reprinting every page would be silly. Instead, you stick a few sticky notes on the right pages. The book stays exactly as it was, the notes are cheap, and you can peel them off and stick on a different set for your cousin's chess club. LoRA's corrections are those sticky notes: small, removable and swappable, while the big book stays untouched.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>Freeze the big model: none of its numbers will change.</li>
+<li>Next to each big table of numbers, add two thin tables. Multiplied together, they make a correction the same size as the big table, but they hold far fewer numbers.</li>
+<li>Start the correction at zero, so at first the model behaves exactly as before.</li>
+<li>Train only the thin tables on your new examples.</li>
+<li>When you're done, you can add the correction into the big table, so using the model is no slower than before.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Robot "brains" built from vision-language models are big. Each new robot, gripper or kitchen needs a bit of extra teaching. With LoRA, a lab can teach one shared model many robots by keeping one small set of sticky notes per robot, and train each set on a single graphics card.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Draw a 6×6 grid and fill it using a rule: cell value = (row number) × (column number). You only need 12 numbers (6 rows and 6 columns) to make all 36. That's a "rank 1" table, the same trick LoRA uses.</li>
+<li>In the demo further down, move <b>Rank r</b> and watch the LoRA line rise while full fine-tuning stays flat. Then change <b>Model size</b> and compare the <b>Full fine-tune</b>, <b>LoRA</b> and <b>QLoRA</b> memory.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Fine-tuning</dt><dd>Training an already-trained model a little more on new examples.</dd>
+<dt>Frozen</dt><dd>Kept fixed during training; its numbers don't change.</dd>
+<dt>Rank</dt><dd>Roughly, how many independent patterns a table of numbers contains. Low rank means it can be built from a few patterns.</dd>
+<dt>Adapter</dt><dd>A small trainable add-on attached to a frozen model.</dd>
+<dt>Quantisation</dt><dd>Storing numbers with fewer bits, to save memory.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="watch">1. Watch</h2>
+<div class="card"><div style="position:relative;padding-top:56.25%"><iframe style="position:absolute;inset:0;width:100%;height:100%;border:0" src="https://www.youtube-nocookie.com/embed/U80tjcThl9Q" title="The Tiny Idea That Lets Anyone Fine-Tune AI, by Jia-Bin Huang" loading="lazy" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div></div>
+
+<h3>Chapter guide</h3>
+<p>Timestamps come from the video's description. The right-hand column is this course's reading guide, written from the chapter titles; it doesn't describe what the video shows frame by frame.</p>
+<div class="table-wrap"><table>
+<tr><th>Time</th><th>Chapter</th><th>What to look for</th></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=U80tjcThl9Q&amp;t=0s">0:00</a></td><td>Why Fine-Tuning Huge Models Is Expensive</td><td>The memory bill of full fine-tuning (weights, gradients, optimiser states) and the cost of storing one full copy per task.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=U80tjcThl9Q&amp;t=92s">1:32</a></td><td>LoRA: Low-Rank Adaptation</td><td>The update ΔW = BA, the shapes of A and B, and why the merged model has no extra inference cost. The description also mentions reading LoRA as a compact key-value memory; see section 2.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=U80tjcThl9Q&amp;t=394s">6:34</a></td><td>LoRA Initialization</td><td>Which matrix starts at zero and which starts random, and what would go wrong with the other choices.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=U80tjcThl9Q&amp;t=574s">9:34</a></td><td>LoRA+: Different Learning Rates for A and B</td><td>Why one learning rate for both matrices is a poor fit when the model is wide.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=U80tjcThl9Q&amp;t=621s">10:21</a></td><td>QLoRA: Quantizing the Frozen Backbone</td><td>NF4, blockwise quantisation and double quantisation. Count the bits per parameter at each step.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=U80tjcThl9Q&amp;t=983s">16:23</a></td><td>VeRA: Fewer Trainable Adapter Parameters</td><td>Random matrices shared by all layers, with only scaling vectors trained.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=U80tjcThl9Q&amp;t=1106s">18:26</a></td><td>DoRA: Separating Magnitude and Direction</td><td>Splitting each weight column into a length and a direction, and applying LoRA only to the direction.</td></tr>
+<tr><td><a href="https://www.youtube.com/watch?v=U80tjcThl9Q&amp;t=1283s">21:23</a></td><td>Outro</td><td>Try the self-check below.</td></tr>
+</table></div>
+
+<h2 id="ideas">2. The ideas, explained</h2>
+
+<h3 id="cost">Why full fine-tuning is expensive</h3>
+<p>Full fine-tuning with mixed-precision Adam needs about 16 bytes per parameter for weights, gradients and optimiser states (see <a href="01-zero-fsdp.html#memory">Video 01</a>), so a 7B model needs about 112 GB before activations. It also produces a full-size copy of the model for every task. The LoRA paper's motivating example is GPT-3 175B, where keeping one fine-tuned 175B copy per task is impractical.</p>
+
+<h3 id="lora">LoRA: a low-rank update</h3>
+<p>Hu et al. (2021) hypothesised that the change a model needs during adaptation has low "intrinsic rank". So for a frozen weight W₀ of shape d × k, they learn the update as a product of two thin matrices:</p>
+<pre><code>h = W₀·x + ΔW·x = W₀·x + (α / r)·B·A·x
+B: d × r,   A: r × k,   r ≪ min(d, k)
+
+trainable per matrix:  r·(d + k)       instead of  d·k
+d = k = 4096, r = 16:  131,072         instead of  16,777,216   (0.78%)
+
+after training:  W = W₀ + (α/r)·B·A   → merge, no extra inference latency</code></pre>
+<p>Only A and B get gradients and optimiser states, so the 12 bytes per parameter of Adam state apply to a tiny set. The paper applied LoRA to the attention projections and reported, against GPT-3 175B fine-tuned with Adam, about 10,000 times fewer trainable parameters and 3 times less GPU memory, with quality on par with or better than full fine-tuning on the models tested. Unlike adapter layers inserted in series, a merged LoRA adds no inference latency. Keeping adapters unmerged has its own benefit: one base model can serve many adapters, swapping them per request.</p>
+<p><strong>A key-value reading.</strong> Write A's rows as a₁…a_r and B's columns as b₁…b_r. Then <code>B·A·x = Σᵢ (aᵢ · x) bᵢ</code>: each rank-one component checks how well the input matches a "key" aᵢ and adds the matching "value" bᵢ. Seen this way, LoRA is a small learned memory of r key-value pairs added to each layer, which is a useful intuition for what rank buys: more pairs, more distinct corrections.</p>
+
+<h3 id="init">Initialisation</h3>
+<p>LoRA initialises A with random Gaussian values and B with zeros, so BA = 0 and training starts from exactly the pretrained model. Both can't be zero: with B = 0 and A = 0, the gradient of each with respect to the loss is zero (each gradient is multiplied by the other matrix), and nothing would ever train. With A random and B zero, B's gradient is non-zero from the first step, and A starts receiving gradients once B moves. The α/r scaling means that when you change r, you don't have to retune the learning rate as much.</p>
+
+<h3 id="loraplus">LoRA+: different learning rates for A and B</h3>
+<p>Hayou, Ghosh and Yu (2024) analysed LoRA as the model width grows and showed that using the same learning rate for A and B doesn't allow efficient feature learning in wide models. Their fix is one line: give B a larger learning rate than A, with a fixed ratio.</p>
+<pre><code>η_B = λ · η_A,   λ &gt; 1   (a well-chosen ratio; the paper tunes it)</code></pre>
+<p>The paper reports 1–2% better performance and up to about 2× faster fine-tuning at the same compute cost as LoRA.</p>
+
+<h3 id="qlora">QLoRA: a 4-bit frozen backbone</h3>
+<p>Since the backbone is frozen, it never needs a gradient update, only a forward and backward pass through it. Dettmers et al. (2023) store it in 4 bits and backpropagate through the dequantised weights into BF16 LoRA adapters. Three ideas make it work:</p>
+<ul>
+<li><strong>NF4 (4-bit NormalFloat).</strong> Pretrained weights are roughly normally distributed. NF4 places its 16 levels at quantiles of a normal distribution, so each level is used about equally often. The paper calls it information-theoretically optimal for normally distributed weights.</li>
+<li><strong>Blockwise quantisation.</strong> Weights are split into blocks of 64, and each block is scaled by its own absolute maximum, so one outlier only spoils its own block.</li>
+<li><strong>Double quantisation.</strong> Those per-block scales are themselves quantised (to 8 bits, in blocks of 256), cutting their overhead.</li>
+</ul>
+<pre><code>quantise a block:  c = max|w|,   q = NF4_index(w / c)
+dequantise:        w ≈ c · NF4_value[q]
+
+overhead of block scales, per parameter:
+  plain:   32 bits / 64              = 0.5   bits
+  double:  8/64 + 32/(64·256)        ≈ 0.127 bits
+
+backbone ≈ (4 + 0.127) / 8 ≈ 0.52 bytes per parameter</code></pre>
+<p>A third trick, <strong>paged optimisers</strong>, uses unified memory to move optimiser states to CPU memory during spikes so a long sequence doesn't crash the run. The paper reports fine-tuning a 65B model on a single 48 GB GPU while preserving full 16-bit fine-tuning task performance. How 4-bit and 8-bit formats behave at inference time is covered in <a href="../09-inference-engineering/06-quantization-hardware.html">Module 09 · Quantisation &amp; hardware</a>.</p>
+
+<h3 id="vera">VeRA: shared random matrices</h3>
+<p>Kopiczko, Blankevoort and Asano (2023) noticed that even LoRA adapters add up when you store one per user or task. VeRA uses a <em>single</em> pair of random low-rank matrices A and B, frozen and shared across all layers, and learns only two small scaling vectors per layer:</p>
+<pre><code>ΔW = Λ_b · B · Λ_d · A        Λ_b = diag(b), b ∈ ℝ^d     Λ_d = diag(d), d ∈ ℝ^r
+trainable per layer:  d + r    (vs r·(d + k) for LoRA)</code></pre>
+<p>Because the trainable cost grows with r only through the short vector, VeRA can afford a much higher rank than LoRA. The random matrices can be regenerated from a seed, so they don't need storing. The paper reports performance matching LoRA with far fewer trainable parameters on GLUE, E2E, image classification and instruction tuning of 7B and 13B models.</p>
+
+<h3 id="dora">DoRA: magnitude and direction</h3>
+<p>Liu et al. (2024) compared how full fine-tuning and LoRA change each weight column's length (magnitude) and direction, and found different patterns. DoRA makes the two separately trainable:</p>
+<pre><code>W = m · (W₀ + B·A) / ‖W₀ + B·A‖_c
+m ∈ ℝ^(1×k): one trainable magnitude per column, initialised to ‖W₀‖_c
+‖·‖_c: the norm of each column
+trainable per layer:  k + r·(d + k)</code></pre>
+<p>LoRA updates the direction; the magnitude vector is cheap. After training, everything can be merged back into one matrix, so there's no extra inference cost. The paper reports DoRA consistently outperforming LoRA when fine-tuning LLaMA, LLaVA and VL-BART on commonsense reasoning, visual instruction tuning and image/video-text tasks.</p>
+
+<div class="card demo">
+<h3>Interactive: trainable parameters and fine-tuning memory</h3>
+<p class="legend">Top: trainable parameters for one d × k weight matrix as the rank grows (log scales). Dashed: full fine-tuning. Solid accent: LoRA. Dotted: DoRA (LoRA plus one magnitude per column). Solid muted: VeRA (two scaling vectors). The marker is your rank. Below: model-state memory for a whole model, assuming every weight matrix has this shape ratio and gets an adapter.</p>
+<canvas id="lc" width="700" height="260" aria-label="Trainable parameters against LoRA rank for full fine-tuning, LoRA, DoRA and VeRA"></canvas>
+<label for="dd">Output dim d: <span id="ddv" class="num"></span></label>
+<input id="dd" type="range" min="9" max="14" step="1" value="12">
+<label for="kk">Input dim k: <span id="kkv" class="num"></span></label>
+<input id="kk" type="range" min="9" max="14" step="1" value="12">
+<label for="rr">Rank r: <span id="rrv" class="num"></span></label>
+<input id="rr" type="range" min="0" max="8" step="1" value="4">
+<label for="pm">Model size: <span id="pmv" class="num"></span>B parameters</label>
+<input id="pm" type="range" min="1" max="70" step="1" value="7">
+<div class="stats">
+  <div class="stat"><div class="k">LoRA trainable (this matrix)</div><div class="v" id="sl">–</div></div>
+  <div class="stat"><div class="k">Share of full</div><div class="v" id="sp">–</div></div>
+  <div class="stat"><div class="k">Full fine-tune</div><div class="v" id="sf">–</div></div>
+  <div class="stat"><div class="k">LoRA (BF16 base)</div><div class="v" id="sb">–</div></div>
+  <div class="stat"><div class="k">QLoRA (NF4 base)</div><div class="v" id="sq">–</div></div>
+</div>
+<p class="meta">Try this: the defaults are a 4096 × 4096 matrix at r = 16: LoRA trains 131,072 parameters, 0.78% of the matrix. For a 7B model that's about 112 GB of model states for full fine-tuning, 14.9 GB for LoRA on a BF16 base and 4.5 GB for QLoRA. Set Model size to 65: QLoRA needs about 42 GB, under the 48 GB GPU in the QLoRA paper's headline result (activations come on top). Memory assumes 16 bytes per trainable parameter (BF16 weight and gradient, FP32 master and Adam states), 2 bytes per frozen BF16 parameter and (4 + 0.127)/8 bytes per frozen NF4 parameter, and ignores activations.</p>
+</div>
+
+<h2 id="course">3. Where the course goes deeper</h2>
+<div class="table-wrap"><table>
+<tr><th>Topic</th><th>Course page</th></tr>
+<tr><td>LoRA in practice for preference tuning (DPO, KTO, ORPO)</td><td><a href="../08-ai-research-engineer/05-alignment-preference.html">Module 08 · Alignment &amp; preference</a></td></tr>
+<tr><td>Quantisation formats (FP8, INT8, INT4, NVFP4) and hardware</td><td><a href="../09-inference-engineering/06-quantization-hardware.html">Module 09 · Quantisation &amp; hardware</a></td></tr>
+<tr><td>Memory per parameter, ZeRO and FSDP (the alternative to LoRA when you need full fine-tuning)</td><td><a href="01-zero-fsdp.html">Video 01 · ZeRO &amp; FSDP</a>, <a href="../08-ai-research-engineer/06-distributed-training.html">Module 08 · Distributed training</a></td></tr>
+<tr><td>Post-training pipeline: SFT, preference tuning, RL</td><td><a href="../07-post-training.html">Module 07 · Post-training</a></td></tr>
+<tr><td>Making small models for deployment by distillation</td><td><a href="../04-distill-small-models.html">Module 04 · Distilling small models</a></td></tr>
+</table></div>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Adapting a VLA to a new robot.</strong> The OpenVLA paper (Kim et al., 2024) shows its model can be fine-tuned on consumer GPUs with low-rank adaptation and served with quantisation without hurting downstream success rate. That's the standard path for a lab with a new arm and a few hundred demonstrations.</li>
+<li><strong>One base model, many embodiments.</strong> Unmerged adapters let one backbone serve several robots or tasks, each with its own small adapter file, instead of a full copy each.</li>
+<li><strong>QLoRA lowers the hardware bar.</strong> A 4-bit backbone means a 7B-class VLA can be fine-tuned on a single workstation GPU, which matters for university labs and hobbyists.</li>
+<li><strong>Limits:</strong> a new robot often needs new input or output layers (a different action space, new sensors), which LoRA on existing matrices doesn't cover; those layers are usually trained in full. And when the embodiment differs a lot from the pretraining data, low rank can be too restrictive; check full fine-tuning as a baseline.</li>
+</ul>
+</div>
+
+<h2 id="check">Self-check</h2>
+<details><summary>How many trainable parameters does LoRA add to a 4096 × 11008 matrix at rank 8?</summary><p>r·(d + k) = 8 × (4096 + 11008) = 120,832, compared with 45,088,768 for the full matrix (about 0.27%).</p></details>
+<details><summary>Why is B initialised to zero and A to random values, rather than both to zero?</summary><p>B = 0 makes the update zero at the start, so training begins from the pretrained model. If both were zero, each matrix's gradient would be multiplied by the other (zero) matrix and neither would ever move.</p></details>
+<details><summary>Why does a merged LoRA model have no extra inference latency, unlike serial adapter layers?</summary><p>After training, W₀ + (α/r)BA is a single matrix of the original shape, so the forward pass is unchanged. Serial adapters add extra layers that must run in sequence.</p></details>
+<details><summary>What do NF4 and double quantisation each save in QLoRA?</summary><p>NF4 stores each frozen weight in 4 bits with levels matched to a normal distribution. Double quantisation compresses the per-block scale factors, cutting their overhead from 0.5 to about 0.127 bits per parameter.</p></details>
+<details><summary>VeRA learns only d + r parameters per layer. What makes that possible?</summary><p>The low-rank matrices A and B are random, frozen and shared across all layers (and can be regenerated from a seed). Only two scaling vectors per layer are trained.</p></details>
+<details><summary>What does DoRA's magnitude vector do that LoRA can't easily do?</summary><p>It lets each column's length change independently of its direction. LoRA ties the two together in one additive update; DoRA trains the magnitude directly and uses LoRA for the direction.</p></details>
+
+<h2 id="refs">References</h2>
+<p>The video's description lists no references. Primary papers cited in this guide:</p>
+<ul>
+<li><a href="https://arxiv.org/abs/2106.09685">LoRA: Low-Rank Adaptation of Large Language Models</a> (Hu et al., 2021)</li>
+<li><a href="https://arxiv.org/abs/2402.12354">LoRA+: Efficient Low Rank Adaptation of Large Models</a> (Hayou, Ghosh, Yu, 2024)</li>
+<li><a href="https://arxiv.org/abs/2305.14314">QLoRA: Efficient Finetuning of Quantized LLMs</a> (Dettmers et al., 2023)</li>
+<li><a href="https://arxiv.org/abs/2310.11454">VeRA: Vector-based Random Matrix Adaptation</a> (Kopiczko, Blankevoort, Asano, 2023)</li>
+<li><a href="https://arxiv.org/abs/2402.09353">DoRA: Weight-Decomposed Low-Rank Adaptation</a> (Liu et al., 2024)</li>
+<li><a href="https://arxiv.org/abs/2406.09246">OpenVLA: An Open-Source Vision-Language-Action Model</a> (Kim et al., 2024)</li>
+</ul>
+
+<nav class="pager">
+  <a href="02-5d-parallelism.html"><small>Previous</small>Video 02 · 5D parallelism</a>
+  <a class="next" href="04-speculative-decoding.html"><small>Next</small>Video 04 · Speculative decoding</a>
+</nav>
+<footer>Module 12 · Video 03 · a watch guide written for this course from the video's chapter list, its references and the original papers. Video © Jia-Bin Huang.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('lc'), ctx = cv.getContext('2d');
+const ids = ['dd', 'kk', 'rr', 'pm'];
+const el = Object.fromEntries(ids.map(k => [k, document.getElementById(k)]));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = n => Math.round(n).toLocaleString('en-US');
+const GB = 1e9, NF4 = (4 + 0.127) / 8;
+
+const params = (d, k, r) => ({ full: d * k, lora: r * (d + k), dora: k + r * (d + k), vera: d + r });
+function memory(P, d, k, r) {
+  const T = P * r * (d + k) / (d * k);          // trainable params if every matrix has this ratio
+  return { T, full: 16 * P, lora: 2 * P + 16 * T, qlora: NF4 * P + 16 * T };
+}
+const gb = b => b >= 100 * GB ? fmt(b / GB) + ' GB' : (b / GB).toFixed(1) + ' GB';
+
+function draw() {
+  const d = 2 ** +el.dd.value, k = 2 ** +el.kk.value, r = 2 ** +el.rr.value, P = +el.pm.value * 1e9;
+  const shown = { dd: fmt(d), kk: fmt(k), rr: r, pm: el.pm.value };
+  ids.forEach(id => document.getElementById(id + 'v').textContent = shown[id]);
+
+  const W = cv.width, H = cv.height, l = 60, rt = 20, t = 14, b = 30;
+  const X0 = 0, X1 = 8, Y0 = 2, Y1 = 9;          // log2 rank; log10 params
+  const px = v => l + (v - X0) / (X1 - X0) * (W - l - rt);
+  const py = v => t + (Y1 - Math.min(Math.max(v, Y0), Y1)) / (Y1 - Y0) * (H - t - b);
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = css('--line'); ctx.lineWidth = 1; ctx.font = '12px sans-serif'; ctx.fillStyle = css('--muted');
+  for (let e = Y0; e <= Y1; e++) {
+    ctx.beginPath(); ctx.moveTo(l, py(e)); ctx.lineTo(W - rt, py(e)); ctx.stroke();
+    ctx.textAlign = 'right'; ctx.fillText(e >= 9 ? `${10 ** (e - 9)}B` : e >= 6 ? `${10 ** (e - 6)}M` : e >= 3 ? `${10 ** (e - 3)}k` : `${10 ** e}`, l - 6, py(e) + 4);
+  }
+  ctx.textAlign = 'center';
+  for (let e = X0; e <= X1; e++) ctx.fillText(`r=${2 ** e}`, px(e), H - 10);
+
+  const line = (key, col, dash) => {
+    ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.setLineDash(dash); ctx.beginPath();
+    for (let e = X0; e <= X1 + 1e-9; e += 0.05) {
+      const y = Math.log10(params(d, k, 2 ** e)[key]);
+      e === X0 ? ctx.moveTo(px(e), py(y)) : ctx.lineTo(px(e), py(y));
+    }
+    ctx.stroke(); ctx.setLineDash([]);
+  };
+  line('full', css('--muted'), [6, 5]);
+  line('vera', css('--muted'), []);
+  line('dora', css('--accent'), [2, 4]);
+  line('lora', css('--accent'), []);
+  const p = params(d, k, r);
+  ctx.fillStyle = css('--accent');
+  ctx.beginPath(); ctx.arc(px(Math.log2(r)), py(Math.log10(p.lora)), 6, 0, 7); ctx.fill();
+
+  const m = memory(P, d, k, r);
+  document.getElementById('sl').textContent = fmt(p.lora);
+  document.getElementById('sp').textContent = (100 * p.lora / p.full).toPrecision(2) + '%';
+  document.getElementById('sf').textContent = gb(m.full);
+  document.getElementById('sb').textContent = gb(m.lora);
+  document.getElementById('sq').textContent = gb(m.qlora);
+}
+ids.forEach(id => el[id].oninput = draw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

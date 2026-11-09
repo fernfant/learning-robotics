@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 29 · PPO</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 29</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Unit 6 · Deep RL &amp; alignment · Day 29</div>
+<h1>Proximal Policy Optimization Algorithms</h1>
+<p class="lede">Reuse each batch of experience for several gradient steps, but clip the objective so the new policy can't drift far from the one that collected the data.</p>
+
+<div class="facts">
+  <div><b>Authors</b>John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, Oleg Klimov</div>
+  <div><b>Year / venue</b>2017 · arXiv preprint (OpenAI)</div>
+  <div><b>Core idea</b>Clipped probability ratio</div>
+  <div><b>Study time</b>4–6 h</div>
+</div>
+<p class="meta">Original: <a href="https://arxiv.org/abs/1707.06347">arXiv:1707.06347</a> · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/29_PPO">30u30 Day 29</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">PPO teaches a computer by trial and error, but only lets it change its habits a little at a time, so it doesn't undo what it already learned.</p>
+
+<h3>Think of it like this</h3>
+<p>Think of training a dog with treats. When the dog sits and gets a treat, it starts sitting more often. A good trainer doesn't expect the dog to change everything after one treat. They reward small improvements, again and again. If you got too excited after one good moment and changed your whole training plan, you might confuse the dog. PPO is the careful trainer: learn from what just happened, but only take small steps.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>The program (the "policy") tries the task many times and records what happened.</li>
+<li>For each action, it works out: was this better or worse than expected?</li>
+<li>It makes actions that went well a bit more likely, and ones that went badly a bit less likely.</li>
+<li>It sets a limit on how much any action's chance can change in one round. This is the "clip".</li>
+<li>Throw away the old records, try the task again with the improved policy, and repeat.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Many walking robots, like four-legged robot dogs, learn to walk this way. Thousands of copies practise at the same time in a computer simulation. They fall over, get up, and slowly improve. Then the learned skill is moved to the real robot.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Try learning to throw a paper ball into a bin from a new spot. After each throw, change your aim only a little. Then try changing it a lot after each throw. Which way gets you there faster without wild misses?</li>
+<li>In the demo further down, drag the <b>Ratio r</b> slider. Where the line goes flat, the program has already changed enough, and it stops pushing. Then change <b>Clip ε</b> to make the "allowed change" bigger or smaller.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Reinforcement learning</dt><dd>Learning by trying things and getting rewards or penalties.</dd>
+<dt>Policy</dt><dd>The robot's "rulebook" for what to do in each situation.</dd>
+<dt>Advantage</dt><dd>How much better (or worse) an action turned out than expected.</dd>
+<dt>Clip</dt><dd>A limit on how big a change is allowed in one step.</dd>
+<dt>Simulation</dt><dd>A computer version of the world where robots can practise safely.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Plain policy gradient uses each sample once. Optimising on the same data for many steps tends to make destructively large policy updates. TRPO fixed this with a hard KL constraint, but it needs second-order optimisation and is awkward to combine with shared policy/value networks. PPO gets most of TRPO's stability with ordinary first-order SGD. It takes the ratio between the new and old action probabilities and clips it to [1 − ε, 1 + ε], then takes the more pessimistic of the clipped and unclipped objectives. The update then has no incentive to push the ratio past the clip. Several epochs of minibatch Adam on each batch become safe. It's a few lines of change to a policy-gradient implementation, and it became the default on-policy RL algorithm.</p>
+</div>
+<ul>
+<li><strong>Loop:</strong> N parallel actors each collect T steps. Compute advantages with GAE. Run K epochs of minibatch updates on the clipped loss. Repeat.</li>
+<li><strong>Clipping beat the alternatives:</strong> on 7 MuJoCo tasks, ε = 0.2 scored best (0.82 normalised) and no clipping or penalty scored −0.39, worse than a random policy.</li>
+<li><strong>An adaptive KL penalty</strong> is the paper's second variant. It worked, but slightly worse than clipping.</li>
+<li><strong>Continuous control:</strong> PPO outperformed TRPO, CEM, A2C and others on almost all MuJoCo tasks at one million steps, and learned 3D humanoid running and steering in Roboschool.</li>
+<li><strong>Atari:</strong> mixed, honestly reported. PPO won more games than ACER on learning speed, and fewer on final score.</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<pre><code>r_t(θ)   = π_θ(a_t | s_t) / π_θold(a_t | s_t)
+
+L^CLIP(θ) = Ê_t[ min( r_t(θ)·Â_t ,  clip(r_t(θ), 1−ε, 1+ε)·Â_t ) ]
+
+L(θ) = Ê_t[ L^CLIP_t(θ) − c1·(V_θ(s_t) − V_t^targ)² + c2·S[π_θ](s_t) ]
+
+Â_t = δ_t + (γλ)·δ_{t+1} + … + (γλ)^(T−t−1)·δ_{T−1}
+δ_t = r_t + γ·V(s_{t+1}) − V(s_t)</code></pre>
+<ul>
+<li><code>r_t(θ)</code> is the probability ratio. It equals 1 before any update. Above 1 means the new policy likes action a<sub>t</sub> more than the policy that took it.</li>
+<li><code>Â_t</code> is the advantage estimate: how much better the action was than the critic expected.</li>
+<li><code>clip(…)</code> caps the ratio at 1 ± ε. The paper uses ε = 0.2.</li>
+<li><code>min(…)</code> makes the objective a pessimistic lower bound. Changes that would improve the objective beyond the clip get no credit. Changes that make it worse always count.</li>
+<li><code>c1</code> weights the value-function (critic) loss when policy and value share a network. <code>c2</code> weights an entropy bonus <code>S</code> that keeps exploration alive.</li>
+<li><code>δ_t</code> is the one-step TD error. <strong>GAE</strong> sums them with decay γλ. λ trades bias (small λ) against variance (λ = 1 gives the full Monte Carlo return minus the baseline). Note that r<sub>t</sub> in δ<sub>t</sub> is the reward, not the ratio. The paper reuses the letter.</li>
+</ul>
+<p>MuJoCo settings from the paper: horizon T = 2048, Adam step size 3 × 10<sup>−4</sup>, 10 epochs, minibatch 64, γ = 0.99, λ = 0.95.</p>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>What the clip does, case by case</h3>
+<p>Look at one timestep. If the advantage is positive, the update wants to raise the action's probability, so r grows. Once r passes 1 + ε, the objective goes flat and the gradient for that sample is zero. If the advantage is negative, the update lowers the probability. Once r drops below 1 − ε, it's flat again. But if r has moved the <em>wrong</em> way (say the ratio went up on a bad action), the unclipped term is smaller and the min keeps it, so the gradient still pulls it back. Clipping only removes the incentive to overshoot. It's not a hard wall.</p>
+<div class="card demo">
+<h3>Interactive: the clipped objective for one sample</h3>
+<p class="legend">Left: advantage Â = +1. Right: Â = −1. Dashed: unclipped r·Â. Solid: L<sup>CLIP</sup>. The marker shows the ratio r you pick. Flat stretches mean zero gradient.</p>
+<canvas id="pc" width="700" height="220" aria-label="PPO clipped objective against probability ratio for positive and negative advantage"></canvas>
+<label for="eps">Clip ε: <span id="ev" class="num"></span></label>
+<input id="eps" type="range" min="0.05" max="0.5" step="0.01" value="0.2">
+<label for="rr">Ratio r: <span id="rv" class="num"></span></label>
+<input id="rr" type="range" min="0" max="2" step="0.01" value="1.3">
+<div class="stats">
+  <div class="stat"><div class="k">L, Â = +1</div><div class="v" id="lp">–</div></div>
+  <div class="stat"><div class="k">Gradient, Â = +1</div><div class="v" id="gp">–</div></div>
+  <div class="stat"><div class="k">L, Â = −1</div><div class="v" id="ln">–</div></div>
+  <div class="stat"><div class="k">Gradient, Â = −1</div><div class="v" id="gn">–</div></div>
+</div>
+<p class="meta">Try this: at r = 1.3 and ε = 0.2, the positive-advantage sample has zero gradient: the policy already moved enough. The negative-advantage sample still has full gradient, pulling r back down. Now drag r below 0.8.</p>
+</div>
+
+<h3>Where PPO sits on the RL ladder</h3>
+<p><a href="../02-tensortonic.html#rl">Module 02's RL ladder</a> climbs Bellman → REINFORCE → A2C → GAE → PPO. Each step fixes the previous one's main weakness. REINFORCE is unbiased but noisy. A baseline and a critic (A2C) cut variance. GAE tunes the bias-variance trade-off. PPO's contribution is sample reuse: K epochs on each batch instead of one step. TRPO had the same goal with a KL constraint solved by conjugate gradient. PPO swaps that for a clip and plain Adam, which also makes it easy to share layers between policy and critic or add auxiliary losses.</p>
+<p>It's still <strong>on-policy</strong>. Once θ has moved, old data no longer represents the current policy, so each batch is discarded after its K epochs. That's why PPO pairs naturally with fast, massively parallel simulators. Off-policy methods (SAC, DQN) reuse data longer and are usually more sample-efficient on real hardware.</p>
+
+<h3>From MuJoCo to language models</h3>
+<p>PPO later became the RL step in RLHF for language models: InstructGPT optimised a learned reward model with PPO plus a KL penalty to the starting model. That's the direct line to <a href="30-rlhf.html">Day 30</a>, whose 2017 experiments actually used TRPO and A2C. Newer LLM recipes often replace PPO's critic with group-relative baselines (GRPO) or skip RL for DPO. The clipped-ratio idea survives in most of them. Compare the multi-teacher on-policy distillation in <a href="../05-trillion-scale-architecture.html#serving">Module 05</a>, another way to train a model on its own samples.</p>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>PPO is the workhorse of sim-trained legged locomotion.</strong> Quadruped and humanoid walking policies are commonly trained with PPO + GAE across thousands of parallel simulated robots, then transferred to hardware. For example, Rudin et al. (2021) trained ANYmal walking policies in minutes on one GPU with massively parallel PPO.</li>
+<li><strong>Continuous actions are native.</strong> The policy outputs the mean (and a learned standard deviation) of a Gaussian over joint targets or torques, exactly as in the paper's MuJoCo setup with a 2×64 tanh MLP.</li>
+<li><strong>Stability matters more than peak sample efficiency in sim.</strong> Sim data is cheap. A method that rarely diverges and needs little tuning across tasks is worth more than a few times better sample efficiency.</li>
+<li><strong>Dexterous manipulation too:</strong> OpenAI's in-hand cube rotation with a Shadow hand trained with PPO under heavy domain randomization.</li>
+<li><strong>Limits:</strong> on-policy data hunger makes PPO a poor fit for learning directly on a physical robot. There, off-policy RL, imitation learning or fine-tuning a sim-trained policy are more common.</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Read the paper (it's 12 pages). Focus on sections 3 (clipping), 5 (algorithm) and 6.1 (the ablation table). About 1.5 h.</li>
+<li>Re-derive the four cases of the clip (positive or negative advantage, ratio above or below the clip) with the demo above.</li>
+<li>In the 30u30 Day 29 folder, read <code>implementation.py</code>: actor-critic network, rollout buffer with GAE, the PPO loss and the training loop. Run <code>train_minimal.py</code> on a small gym task.</li>
+<li>Work through <code>notebook.ipynb</code>, then the exercises in order: clipped loss, GAE, actor-critic, ε ablation, PPO versus vanilla policy gradient.</li>
+<li>Stretch: train a MuJoCo or Isaac locomotion task with an existing PPO implementation and watch how the clip fraction and KL behave during training.</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>Why not just run many gradient steps on the plain policy-gradient loss?</summary><p>The loss is only valid near the policy that collected the data. Repeated steps on it push the policy far away, often making destructively large updates. The paper's no-clipping baseline scored below a random policy on average.</p></details>
+<details><summary>With Â &gt; 0 and r = 1.5, ε = 0.2, what's the gradient of L<sup>CLIP</sup> for that sample?</summary><p>Zero. The clipped term 1.2·Â is smaller than 1.5·Â, so the min selects the clipped term, which doesn't depend on θ.</p></details>
+<details><summary>With Â &lt; 0 and r = 1.5, is the gradient zero?</summary><p>No. Because Â is negative, r·Â = 1.5Â is lower than the clipped 1.2Â, so min picks the unclipped term and the gradient pushes r back down. Clipping only blocks overshooting in the helpful direction.</p></details>
+<details><summary>What does λ in GAE control?</summary><p>The bias-variance trade-off of the advantage estimate. λ = 0 uses only the one-step TD error (low variance, more bias). λ = 1 uses the full return (unbiased given the baseline, high variance).</p></details>
+<details><summary>Why is PPO a good match for GPU physics simulators?</summary><p>It's on-policy and stable, so it benefits from huge, fresh batches of parallel experience and doesn't need a replay buffer. Simulators can supply that data cheaply.</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/1707.06347">The original paper</a> (Schulman et al., 2017) and the <a href="https://arxiv.org/abs/1506.02438">GAE paper</a> (Schulman et al., 2015)</li>
+<li><a href="https://arxiv.org/abs/2109.11978">Learning to Walk in Minutes Using Massively Parallel Deep RL</a> (Rudin et al.), PPO for legged robots</li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/29_PPO">30u30 Day 29</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Next: <a href="30-rlhf.html">Day 30, Deep Reinforcement Learning from Human Preferences</a></li>
+<li>Course link: <a href="../07-post-training.html">Module 07, After pre-training</a>: where PPO and RLHF sit in today's post-training pipeline, plus a KL-leash / reward-hacking demo</li>
+</ul>
+
+<nav class="pager">
+  <a href="28-cs231n.html"><small>Previous</small>Day 28 · CS231n</a>
+  <a class="next" href="30-rlhf.html"><small>Next</small>Day 30 · RL from Human Preferences</a>
+</nav>
+<footer>Module 06 · Day 29 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('pc'), ctx = cv.getContext('2d');
+const eIn = document.getElementById('eps'), rIn = document.getElementById('rr');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const clip = (x, lo, hi) => Math.min(Math.max(x, lo), hi);
+const lclip = (r, A, e) => Math.min(r * A, clip(r, 1 - e, 1 + e) * A);
+// derivative of lclip with respect to r: A if the unclipped term is active, else 0
+const grad = (r, A, e) => (r * A <= clip(r, 1 - e, 1 + e) * A && (A > 0 ? r <= 1 + e : r >= 1 - e)) ? A : 0;
+
+function panel(x0, w, A, e, r) {
+  const H = cv.height, T = 14, B = 24, R0 = 0, R1 = 2, Y0 = -2.2, Y1 = 2.2;
+  const px = v => x0 + (v - R0) / (R1 - R0) * w, py = v => T + (Y1 - v) / (Y1 - Y0) * (H - T - B);
+  ctx.strokeStyle = css('--line'); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(x0, py(0)); ctx.lineTo(x0 + w, py(0)); ctx.stroke();
+  [1 - e, 1, 1 + e].forEach(v => { ctx.beginPath(); ctx.moveTo(px(v), T); ctx.lineTo(px(v), H - B); ctx.stroke(); });
+  ctx.font = '12px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = css('--muted');
+  ctx.fillText('1−ε', px(1 - e), H - 8); ctx.fillText('1+ε', px(1 + e), H - 8);
+  ctx.fillText(A > 0 ? 'Â = +1' : 'Â = −1', x0 + w / 2, T + 2);
+  const line = (f, col, dash) => {
+    ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.setLineDash(dash); ctx.beginPath();
+    for (let i = 0; i <= 200; i++) { const v = R0 + (R1 - R0) * i / 200; i ? ctx.lineTo(px(v), py(f(v))) : ctx.moveTo(px(v), py(f(v))); }
+    ctx.stroke(); ctx.setLineDash([]);
+  };
+  line(v => v * A, css('--muted'), [6, 5]);
+  line(v => lclip(v, A, e), css('--accent'), []);
+  ctx.fillStyle = grad(r, A, e) ? css('--pass') : css('--fail');
+  ctx.beginPath(); ctx.arc(px(r), py(lclip(r, A, e)), 6, 0, 7); ctx.fill();
+}
+
+function draw() {
+  const e = +eIn.value, r = +rIn.value, W = cv.width, gap = 30, w = (W - 3 * gap) / 2;
+  document.getElementById('ev').textContent = e.toFixed(2);
+  document.getElementById('rv').textContent = r.toFixed(2);
+  ctx.clearRect(0, 0, W, cv.height);
+  panel(gap, w, 1, e, r);
+  panel(2 * gap + w, w, -1, e, r);
+  document.getElementById('lp').textContent = lclip(r, 1, e).toFixed(2);
+  document.getElementById('ln').textContent = lclip(r, -1, e).toFixed(2);
+  document.getElementById('gp').textContent = grad(r, 1, e) ? 'active' : 'zero';
+  document.getElementById('gn').textContent = grad(r, -1, e) ? 'active' : 'zero';
+}
+eIn.oninput = rIn.oninput = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

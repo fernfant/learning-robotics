@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inference · Prefix caching and disaggregation</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 09 · Inference engineering</a> › Page 04</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 09 · Problems 8, 22</div>
+<h1>Prefix caching, cache-aware routing and prefill/decode disaggregation</h1>
+<p class="lede">Most prompts repeat: the same system prompt, the same document, the same conversation plus one new message. Prefix caching stops the GPU from reading the same text twice, and routing decides whether the right GPU still has it. Disaggregation goes further and splits reading and writing onto different GPUs. Both save a lot of compute. Both move or keep large amounts of KV cache, and that has a price.</p>
+
+<div class="facts">
+  <div><b>Problems covered</b>8 (prefix caching and cache-aware routing across replicas), 22 (disaggregating prefill and decode: why, how KV moves, what it costs)</div>
+  <div><b>Interview level</b>Mid (8) to senior (22)</div>
+  <div><b>Key ideas</b>Block hashing and radix trees, LRU eviction, locality vs load balance, KV bytes per token, interconnect bandwidth, P:D ratio</div>
+  <div><b>Time to prep</b>3 h: 1 h reading, 30 min with the demo, 1–2 h for the exercise</div>
+</div>
+<p class="meta">Source: <a href="https://x.com/vishalsingh2972/status/2113830444722741637">Vishal Singh's 25 inference-engineering interview problems</a> · saved in <code>sources/09-vishal-inference-25.md</code></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Before a model can answer, it has to read the whole question, and reading a long question takes real work. If the start of the question is the same as last time, the model can reuse its notes instead of reading it again, but only if the question goes back to the computer that kept those notes.</p>
+
+<h3>Think of it like this</h3>
+<p>Think of a delivery app with eight kitchens across town. You order from the same restaurant every week, and each kitchen keeps a card with your usual order and allergies. If the app sends you to the kitchen that has your card, they start cooking straight away. If it sends you to a random kitchen, they have to ask all the questions again. That's prefix caching and cache-aware routing. Now imagine some kitchens only do the prep (chopping, marinating) and others only cook and plate. Each kitchen gets very good at its job, but the prepped food has to be driven across town between them. That's disaggregation, and the drive is the cost.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>When the model reads a prompt, it writes notes (the KV cache) for every token.</li>
+<li>The notes for the start of a prompt only depend on that start, so identical starts give identical notes.</li>
+<li>The server keeps recent notes and looks them up by the text they came from.</li>
+<li>A router sends each request to the server most likely to have its notes, without overloading any one server.</li>
+<li>Disaggregated serving reads the prompt on one group of GPUs, then ships the notes to another group that writes the answer.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot asks its model nearly the same thing many times a second: the same instructions and safety rules, plus a new camera frame. Reusing the notes for the unchanged part means only the new part is read, which cuts the reaction time. On a robot with one onboard computer that's all prefix caching; splitting prefill and decode onto separate machines is a data-centre idea.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Ask a friend to tell you the way to school. Next day, ask again but add "and then to the shop". Notice they don't re-explain the first part, they just add the end. That's a prefix hit.</li>
+<li>In the demo below, compare <b>Routing</b> = Random with Cache-aware and watch <b>Token hit rate</b>. Then raise <b>Popularity skew</b> and compare Sticky hash with Cache-aware on <b>Load imbalance</b>. Shrink <b>Cache per replica</b> to see hits collapse.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Prefix</dt><dd>The beginning part of a prompt, shared with earlier prompts.</dd>
+<dt>Cache hit</dt><dd>When the notes you need are already stored, so no work is redone.</dd>
+<dt>Replica</dt><dd>One copy of the model running on its own GPUs; a fleet has many.</dd>
+<dt>Router</dt><dd>The part that decides which replica gets each request.</dd>
+<dt>Disaggregation</dt><dd>Splitting prompt reading (prefill) and answer writing (decode) onto different GPUs.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings, the interview cards and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="model">0. Shared assumptions</h2>
+<p>Same model and cost model as <a href="03-batching-scheduling.html#model">Page 03</a>, so the numbers line up:</p>
+<pre><code>Model: Llama-style 70B, 80 layers, 8 KV heads, head dim 128
+KV per token (fp16) = 2 × 80 × 8 × 128 × 2 B = 327,680 B = 320 KiB
+KV per token (fp8)  = 160 KiB
+
+Assumed cost model (round numbers for practice, not measurements):
+  prefill ≈ 0.1 ms per prompt token  (10,000 prompt tokens/s per 8-GPU replica)
+  decode step ≈ 20 ms + 0.2 ms per running request</code></pre>
+<p>GPU facts used below are from NVIDIA's <a href="https://www.nvidia.com/en-us/data-center/h100/">H100 product page</a>: H100 SXM has 80 GB of HBM at 3.35 TB/s, NVLink at 900 GB/s and PCIe Gen5 at 128 GB/s. The H100 NVL (PCIe card) differs: 94 GB, 3.9 TB/s, NVLink 600 GB/s. The NVLink and PCIe figures are totals for both directions, so plan on about half per direction.</p>
+
+<h2 id="p8">Problem 8 · Design prefix caching and cache-aware routing across GPU replicas</h2>
+<p><strong>What the interviewer is testing:</strong> that you know why prefixes can be shared, how a cache is keyed and evicted, and that routing is a tension between locality (hit rate) and load balance.</p>
+
+<h3>The concepts</h3>
+<p><strong>Why it works.</strong> In a causal decoder, the keys and values at position i depend only on tokens 1…i. So two prompts that share their first P tokens have identical KV for those P tokens. Store it once, reuse it. The first token that differs ends the shared part; nothing after it can be reused, even if later text matches.</p>
+<p><strong>Keying the cache: block hashes.</strong> vLLM's automatic prefix caching splits the KV cache into fixed-size blocks (16 tokens by default) and identifies each full block by a hash of its own tokens <em>and</em> its parent block's hash. A chain of hashes identifies a prefix exactly.</p>
+<pre><code>h_0 = H(seed, tokens[0:16], extra)
+h_i = H(h_(i−1), tokens[16i : 16i+16], extra)       extra = LoRA id, image hashes, cache salt…
+
+lookup: walk h_0, h_1, … until a hash is missing → hit length = 16 × (blocks found)</code></pre>
+<p><strong>Keying the cache: a radix tree.</strong> SGLang's RadixAttention (Zheng et al., 2024) keeps a radix tree over token sequences, where each edge holds a run of tokens and its KV. Lookup is a longest-prefix match. SGLang also orders the waiting queue so requests that share a cached prefix run together, raising hits within one server.</p>
+<p><strong>Eviction.</strong> Blocks in use by a running request are pinned (reference count above zero). Unused blocks stay cached and are evicted least-recently-used when memory is needed for new work. Evict leaves first: dropping a parent block makes every child unreachable.</p>
+<p><strong>Correctness details people forget.</strong> The cache key must include everything that changes the KV: the exact tokens (tokenizer quirks around whitespace matter), the model and adapter version, image or audio inputs. For multi-tenant safety, timing can leak whether someone else sent the same prefix, so isolate caches per tenant or add a per-tenant salt to the hash when that matters.</p>
+
+<p><strong>Routing across replicas.</strong> Each replica has its own cache. Round-robin or random routing spreads a conversation over all N replicas, so its history is on the chosen replica only about 1/N of the time. Options:</p>
+<ul>
+<li><strong>Sticky (session or prefix hashing):</strong> hash the session id or the first few blocks to a replica, ideally with consistent hashing so adding a replica moves only about 1/N of keys. High hit rate, but popular prefixes or heavy users overload their replica.</li>
+<li><strong>Cache-aware with a load guard:</strong> the router keeps an approximate view of what each replica holds (its own radix tree of routed prompts, or events reported by replicas) and sends each request to the replica with the longest match, unless that replica is overloaded; then it picks the least-loaded one. SGLang's router and NVIDIA Dynamo's KV-aware router take this approach.</li>
+<li><strong>Replicate hot prefixes:</strong> a system prompt used by every request should simply live on every replica; it's cheap and removes the hotspot.</li>
+</ul>
+<pre><code>route(r) = argmax_k  [ matched_tokens(k, r) − λ × load(k) ]   among replicas with load(k) ≤ (1 + ε) × mean load</code></pre>
+
+<h3>Worked answer with numbers</h3>
+<p>Assumptions: 8 replicas; 20 requests/s; each prompt has a 2,000-token system prompt shared by everyone, 3,000 tokens of conversation history, and 1,000 new tokens.</p>
+<pre><code>Size of what we're caching
+  system prompt: 2,000 × 320 KiB = 655 MB  (once per replica: fine)
+  one history  : 3,000 × 320 KiB = 983 MB
+
+Expected cached tokens per request
+  random routing     : 2,000 (system, everywhere) + 3,000 × 1/8 = 2,375 of 6,000 → 40 %
+  cache-aware routing: 2,000 + 3,000 (if not evicted)             = 5,000 of 6,000 → 83 %
+
+Prefill work per second (prompt tokens that must be computed)
+  random     : 20 × (6,000 − 2,375) = 72,500 tokens/s
+  cache-aware: 20 × (6,000 − 5,000) = 20,000 tokens/s
+Fleet prefill capacity (assumed): 8 × 10,000 = 80,000 tokens/s
+  random      uses 91 % of it, leaving almost nothing for decode
+  cache-aware uses 25 %
+
+Mean prefill time per request (TTFT contribution)
+  random     : 3,625 × 0.1 ms = 0.36 s
+  cache-aware: 1,000 × 0.1 ms = 0.10 s</code></pre>
+<p><strong>Effective cache size.</strong> Random routing tends to store the same conversation on several replicas over time. Cache-aware routing stores each conversation once, so the fleet's useful cache is close to N times one replica's. With, say, 400,000 cacheable tokens per replica (131 GB at fp16 for this model), 8 replicas hold about 3.2 million tokens, roughly 1,000 three-thousand-token histories. The demo shows hits collapsing once active conversations no longer fit.</p>
+
+<div class="card demo">
+<h3>Interactive: prefix-cache hit rate against routing policy</h3>
+<p class="legend">Simulated chat traffic: each request is one of 4 shared 2,000-token system prompts, plus a conversation history (starting at 500 tokens, growing 500 per turn, reset after 20,000), plus 300 new tokens. Conversation popularity follows a Zipf law with the skew you set. Each replica keeps an LRU cache of the size you set. 20,000 requests with a fixed seed; the first 5,000 warm the caches. Left: token hit rate for all four policies, with yours highlighted. Right: prefill tokens computed per replica under your policy (dashed line = mean).</p>
+<canvas id="pc" width="700" height="260" aria-label="Bar charts of prefix-cache hit rate by routing policy and prefill work per replica"></canvas>
+<label for="po">Routing: <span id="pov" class="num"></span></label>
+<input id="po" type="range" min="0" max="3" step="1" value="3">
+<label for="nr">Replicas: <span id="nrv" class="num"></span></label>
+<input id="nr" type="range" min="2" max="16" step="2" value="8">
+<label for="cp">Cache per replica: <span id="cpv" class="num"></span> tokens</label>
+<input id="cp" type="range" min="0" max="5" step="1" value="3">
+<label for="nc">Active conversations: <span id="ncv" class="num"></span></label>
+<input id="nc" type="range" min="100" max="3000" step="100" value="500">
+<label for="sk">Popularity skew: <span id="skv" class="num"></span></label>
+<input id="sk" type="range" min="0" max="1.5" step="0.1" value="1">
+<div class="stats">
+  <div class="stat"><div class="k">Token hit rate</div><div class="v" id="shit">–</div></div>
+  <div class="stat"><div class="k">Prefill tokens per request</div><div class="v" id="scomp">–</div></div>
+  <div class="stat"><div class="k">Mean prefill time</div><div class="v" id="stime">–</div></div>
+  <div class="stat"><div class="k">Load imbalance (max/mean)</div><div class="v" id="simb">–</div></div>
+</div>
+<p class="meta">Try this: at the defaults, compare Random with Cache-aware: hit rate goes from about 55% to 94%, and prefill tokens per request drop from about 5,100 to 670. Then pick Sticky hash and note the red replica on the right: load imbalance about 1.7×. Set Popularity skew to 0 and the imbalance almost vanishes. Prefill time uses the assumed 0.1 ms per prompt token and ignores queueing.</p>
+</div>
+<p>At the defaults (8 replicas, 400,000-token caches, 500 conversations, skew 1.0) the demo gives a token hit rate of about 55% for random and round-robin (the shared system prompts hit almost everywhere; histories rarely do), about 97% for sticky hashing and about 94% for cache-aware routing. Sticky hashing pays for its extra 3 points with a load imbalance of about 1.7×: the replica that popular conversations hash to does 74% more prefill than average. Cache-aware stays near 1.05×. At skew 0 (all conversations equally popular) sticky hashing is balanced (about 1.1×), but hit rates fall to about 59% for both: 500 histories averaging around 10,000 tokens no longer fit in the fleet's 3.2 million cached tokens. Drop the cache to 50,000 tokens per replica and even cache-aware routing falls to about 56%, because histories are evicted before their next turn.</p>
+
+<h3>Trade-offs</h3>
+<div class="table-wrap"><table>
+<tr><th>Choice</th><th>Gain</th><th>Cost</th></tr>
+<tr><td>Prefix caching on</td><td>Lower TTFT and prefill compute on repeated prefixes</td><td>Hashing and bookkeeping overhead; cached blocks compete with running requests for HBM (evicted first, so small)</td></tr>
+<tr><td>Random / round-robin routing</td><td>Simple, perfectly balanced</td><td>Hit rate falls toward 1/N for per-conversation prefixes</td></tr>
+<tr><td>Sticky hashing</td><td>High hit rate, stateless router</td><td>Hotspots under skewed popularity; resizing moves keys</td></tr>
+<tr><td>Cache-aware with load guard</td><td>Near-sticky hit rate, balanced load</td><td>Router must track cache state; stale views cause misses</td></tr>
+<tr><td>Bigger cache tier (CPU DRAM, SSD)</td><td>More history survives</td><td>Loading KV over PCIe costs time; only worth it when faster than recomputing</td></tr>
+</table></div>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>KV for a prefix depends only on that prefix, so identical prefixes can share it. Inside each replica I'd use block-level hashing chained to the parent block, or a radix tree, with reference counts so in-use blocks are pinned and LRU eviction of unused leaves; the key includes model, adapter and multimodal inputs. Across replicas, random routing gives each conversation's history roughly a 1-in-N chance of being there, so with 8 replicas and a 2,000-token shared system prompt plus 3,000 tokens of history, the hit rate drops from about 83% to 40% and prefill work more than triples. I'd route to the replica with the longest cached match unless it's overloaded, replicate hot system prompts everywhere, and watch hit rate and per-replica load together, because pure stickiness creates hotspots.</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Assuming reuse works for any matching text. Only an exact shared prefix is reusable; one changed token early (a timestamp in the system prompt) kills every hit after it.</li>
+<li>Putting dynamic content (date, user name) at the start of the system prompt. Put stable text first.</li>
+<li>Optimising hit rate alone and ignoring load imbalance.</li>
+<li>Forgetting adapter or image inputs in the cache key, which returns wrong answers.</li>
+</ul>
+
+<h2 id="p22">Problem 22 · Disaggregate prefill and decode: why, how the KV cache moves, and what it costs</h2>
+<p><strong>What the interviewer is testing:</strong> that you know the two phases want different hardware treatment, that you can compute KV transfer size and time from first principles, and that you know when disaggregation isn't worth it.</p>
+
+<h3>The concepts</h3>
+<p><strong>Why split them.</strong> Prefill processes thousands of tokens per forward pass: it's compute-bound and sets TTFT. Decode processes one token per request per step: it's memory-bandwidth-bound and sets TPOT. Running both on the same GPUs has two problems:</p>
+<ul>
+<li><strong>Interference.</strong> Prefill steps slow down decode steps (Page 03, Problem 7). Chunked prefill reduces this but doesn't remove it.</li>
+<li><strong>Coupled tuning.</strong> One pool must use one parallelism layout and one batching policy for both phases. Prefill might prefer more tensor parallelism to cut TTFT; decode might prefer large batches across many replicas.</li>
+</ul>
+<p>DistServe (Zhong et al., OSDI 2024) puts the phases on separate GPUs and optimises each for its own SLO, measuring <em>goodput</em>: requests per second that meet both the TTFT and TPOT targets. Splitwise (Patel et al., ISCA 2024) splits the phases across machines and studies using different hardware for each. Mooncake (Qin et al., 2024), Kimi's serving platform, builds the whole system around a disaggregated KV cache pool spread over GPU, CPU memory and SSD.</p>
+
+<p><strong>How the KV cache moves.</strong></p>
+<ol>
+<li>The router sends the request to a prefill worker (often after checking which decode worker will take it, so memory is reserved there first).</li>
+<li>The prefill worker computes the prompt's KV, either all at once or layer by layer.</li>
+<li>KV blocks are copied GPU-to-GPU: over NVLink inside a node, or over RDMA (InfiniBand or RoCE with GPUDirect RDMA) across nodes, so the CPU isn't in the data path. Layer-by-layer sending overlaps the transfer with the remaining prefill.</li>
+<li>The decode worker receives the blocks into its own paged KV memory and starts generating from the first token.</li>
+</ol>
+<p>Software that does this: vLLM's disaggregated prefilling with pluggable KV connectors (its docs mark the feature experimental), NVIDIA Dynamo with its NIXL transfer library, SGLang's prefill/decode disaggregation mode, and Mooncake's transfer engine. One practical snag: if the two pools use different tensor-parallel sizes, KV heads are split differently on each side, so blocks must be re-sharded during transfer.</p>
+<pre><code>transfer bytes = KV per token × prompt tokens
+transfer time  ≈ transfer bytes / (per-GPU link bandwidth × GPUs sending in parallel) + setup latency</code></pre>
+
+<h3>Worked answer with numbers</h3>
+<p><strong>Transfer cost for one request.</strong> 8,000-token prompt on the 70B model, tensor parallel 8 on both sides (so each GPU holds one of the 8 KV heads and sends 1/8 of the cache).</p>
+<pre><code>KV size (fp16): 8,000 × 327,680 B = 2.62 GB      (fp8: 1.31 GB)
+per GPU (TP 8): 2.62 GB / 8 = 328 MB
+
+Within a node, NVLink (H100 SXM: 900 GB/s total → assume ~450 GB/s one way):
+  328 MB / 450 GB/s ≈ 0.7 ms per GPU, in parallel
+
+Across nodes (assumption: one 400 Gb/s = 50 GB/s NIC per GPU, a common NDR InfiniBand setup):
+  328 MB / 50 GB/s ≈ 6.6 ms      (all 8 NICs in parallel)
+  2.62 GB / 50 GB/s ≈ 52 ms      (if everything went through a single NIC)
+
+Compare with the work around it:
+  prefill of 8,000 tokens ≈ 8,000 × 0.1 ms = 0.8 s
+  one decode step         ≈ 20–50 ms
+  → cross-node transfer adds ~1 % to TTFT with all NICs, ~7 % through one NIC,
+    and close to 0 if sent layer by layer during prefill.
+  100,000-token prompt: 32.8 GB fp16 → ~82 ms across 8 NICs, against a ~10–19 s prefill.</code></pre>
+
+<p><strong>Sizing the two pools (the P:D ratio).</strong> Traffic: 20 requests/s, 3,000 prompt tokens and 300 output tokens each, TPOT target 40 ms.</p>
+<pre><code>Prefill demand = 20 × 3,000 = 60,000 prompt tokens/s
+  ÷ 10,000 per replica (assumed)                    → 6 prefill replicas
+
+Decode concurrency (Little's law) = arrival rate × time in decode
+  = 20/s × (300 tokens × 0.040 s) = 20 × 12 s       = 240 running requests
+  max batch at 40 ms TPOT: (40 − 20) / 0.2 = 100    → 3 decode replicas
+
+P:D ≈ 6 : 3 = 2 : 1
+With 83 % prefix hits (Problem 8): 60,000 × 0.17 ≈ 10,200 tokens/s → 1–2 prefill replicas, P:D ≈ 1 : 2.</code></pre>
+<p>The lesson: the right ratio depends on prompt length, output length and cache hit rate, all of which drift. A fixed split goes stale, so production systems rebalance workers between the pools, or keep the ability to fall back to colocated serving.</p>
+
+<p><strong>What it costs, in full:</strong></p>
+<ul>
+<li><strong>Transfer time and bandwidth</strong>: small per request with RDMA, as above, but it needs a fast network on every GPU and it competes with other traffic.</li>
+<li><strong>Memory</strong>: the KV briefly exists on both sides; prefill workers need buffers for outbound KV.</li>
+<li><strong>Utilisation</strong>: two pools can each be partly idle when the traffic mix shifts; colocated serving soaks up imbalance automatically.</li>
+<li><strong>Complexity</strong>: a router that coordinates both pools, transfer failures and retries, re-sharding across layouts, and more to monitor.</li>
+<li><strong>Interaction with prefix caching</strong>: hits must be found on the prefill side, and the reused KV must still be shipped to decode, unless the decode worker already has it.</li>
+</ul>
+
+<h3>Trade-offs</h3>
+<div class="table-wrap"><table>
+<tr><th></th><th>Colocated (with chunked prefill)</th><th>Disaggregated</th></tr>
+<tr><td>TPOT stability</td><td>Good with small chunks, still some interference</td><td>Best: decode never shares a step with prefill</td></tr>
+<tr><td>TTFT</td><td>Competes with decode for each step</td><td>Prefill pool can be tuned purely for TTFT; adds transfer time</td></tr>
+<tr><td>Hardware and parallelism</td><td>One layout for both</td><td>Separate layouts, possibly different GPU types</td></tr>
+<tr><td>Network</td><td>Normal</td><td>Needs fast GPU-to-GPU links (NVLink, RDMA)</td></tr>
+<tr><td>Best for</td><td>Small fleets, short prompts, variable mix</td><td>Large fleets, long prompts, strict TTFT and TPOT SLOs together</td></tr>
+</table></div>
+
+<div class="card">
+<h3>How to say it in the interview</h3>
+<p>Prefill is compute-bound and sets TTFT; decode is bandwidth-bound and sets TPOT. Colocating them means prefill steps slow decode and one parallelism layout has to serve both, so disaggregation puts them on separate pools and tunes each to its own SLO. The KV cache moves GPU-to-GPU over NVLink or RDMA, ideally layer by layer during prefill. The size is easy to compute: for a 70B model with 8 KV heads, an 8,000-token prompt is 2.6 GB at fp16, about 7 ms across eight 400 Gb/s NICs in parallel, which is around 1% of a 0.8 s prefill. The real costs are a fast network on every GPU, keeping the prefill-to-decode ratio right as traffic changes, and complexity, so I'd only do it at scale with long prompts and strict latency targets.</p>
+</div>
+
+<h3>Common mistakes</h3>
+<ul>
+<li>Claiming the transfer is free, or that it's prohibitive, without computing bytes and bandwidth.</li>
+<li>Forgetting GQA and precision when sizing the transfer: an MHA model with the same shape would move 8× more.</li>
+<li>Treating NVLink or PCIe headline figures as one-way bandwidth.</li>
+<li>Fixing the P:D ratio once; prompt length and prefix hit rate change it a lot.</li>
+</ul>
+
+<h2 id="practise">Practise it</h2>
+<ol>
+<li><strong>Prefix caching on a free Colab GPU.</strong> Serve a small instruct model with vLLM (prefix caching is on by default in recent versions; check <code>--enable-prefix-caching</code> for yours). Send 100 requests that share a 2,000-token system prompt and differ in a short question. Measure TTFT for the first request against the rest, then put a timestamp at the very start of the system prompt and measure again.</li>
+<li><strong>Read the metrics.</strong> Scrape vLLM's Prometheus <code>/metrics</code> endpoint and find the prefix-cache query and hit counters. Compute hit rate and check it against what you expect from your prompts.</li>
+<li><strong>Build a router simulator.</strong> Extend this page's demo script in Python: give each replica a queue and service time from the cost model, and measure TTFT p50/p95 per policy, not just hit rate. Try a consistent-hash ring and add a replica halfway through the run.</li>
+<li><strong>Transfer maths, measured.</strong> On any machine with two GPUs, time <code>torch.Tensor.to()</code> copies of a tensor the size of one request's KV (from the formula) between devices, for prompt lengths from 1K to 64K tokens. Compare with your prefill time for the same lengths and find where transfer becomes a meaningful share.</li>
+</ol>
+
+<h2 id="course">In this course</h2>
+<ul>
+<li><a href="03-batching-scheduling.html">Page 03 · Batching and scheduling</a>: chunked prefill, the colocated alternative to disaggregation.</li>
+<li><a href="02-kv-cache-attention.html">Page 02 · KV cache, PagedAttention and FlashAttention</a>: KV sizing and the paged blocks that prefix caching shares.</li>
+<li><a href="../05-trillion-scale-architecture.html#serving">Module 05 · Serving</a>: prefix caching with KDA checkpoints and fleet scheduling for a trillion-parameter model.</li>
+<li><a href="../08-ai-research-engineer/08-inference-aware-design.html">Module 08 · Inference-aware design</a>: why GQA and KV quantisation shrink both the cache and the transfer.</li>
+<li><a href="../08-ai-research-engineer/06-distributed-training.html">Module 08 · Distributed training</a>: tensor parallelism, which decides how KV is sharded across GPUs.</li>
+<li><a href="../04-distill-small-models.html#latency">Module 04 · Latency is a safety number</a>: why reaction time matters on a device.</li>
+</ul>
+
+<h2 id="robotics">Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Prefix caching helps on the robot.</strong> The system prompt, task instruction and safety rules stay the same across control steps. Keeping their KV and only prefilling the new observation tokens cuts reaction time on an onboard GPU, where prefill is slow. π0's action expert reuses the VLM prefix's keys and values across its steps in a similar spirit.</li>
+<li><strong>Put stable text first.</strong> If the robot's prompt starts with a timestamp or sensor reading, nothing after it can be reused. Order prompts from most stable to least stable.</li>
+<li><strong>Cache-aware routing matters for robot fleets in the cloud.</strong> Each robot's running context is a conversation; sticky routing per robot keeps its history warm, with a load guard so a busy robot doesn't overload one replica.</li>
+<li><strong>Disaggregation is a data-centre technique.</strong> A single robot computer can't split prefill and decode across GPU pools. The nearest robot analogue is an edge/cloud split, and there the network is far slower than NVLink, so shipping a KV cache is usually worse than sending the raw prompt.</li>
+</ul>
+</div>
+
+<h2 id="check">Self-check</h2>
+<details><summary>Why can two prompts share KV for their common start but not for matching text later on?</summary><p>KV at position i depends on all tokens 1…i. After the first differing token, every later position has different context, so its keys and values differ even if the text is the same.</p></details>
+<details><summary>Why does vLLM hash each block together with its parent's hash?</summary><p>So the hash identifies the whole prefix up to that block, not just the block's own 16 tokens. The same 16 tokens after a different prefix have different KV.</p></details>
+<details><summary>8 replicas, random routing, 2,000 shared system tokens everywhere, 3,000 history tokens, 1,000 new. Expected cached fraction?</summary><p>(2,000 + 3,000/8) / 6,000 = 2,375 / 6,000 ≈ 40%. Cache-aware routing can reach 5,000 / 6,000 ≈ 83%.</p></details>
+<details><summary>What goes wrong with pure sticky hashing, and what fixes it?</summary><p>Popular sessions or prefixes overload the replica they hash to. Fix it with a load guard (fall back to the least-loaded replica past a threshold) and by replicating hot prefixes such as the system prompt everywhere.</p></details>
+<details><summary>How big is the fp16 KV transfer for a 16,000-token prompt on a 70B model with 80 layers, 8 KV heads and head dim 128?</summary><p>16,000 × 327,680 B ≈ 5.24 GB at fp16, 2.62 GB at fp8. Across 8 GPUs each with a 50 GB/s NIC, about 13 ms at fp16.</p></details>
+<details><summary>When would you not disaggregate?</summary><p>Small fleets, short prompts, or a traffic mix that shifts a lot. Colocated serving with chunked prefill absorbs imbalance automatically and needs no fast inter-GPU network or P:D tuning.</p></details>
+
+<h2 id="resources">Resources</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/2312.07104">SGLang: Efficient Execution of Structured Language Model Programs</a> (Zheng et al., 2024): RadixAttention</li>
+<li><a href="https://arxiv.org/abs/2309.06180">Efficient Memory Management for LLM Serving with PagedAttention</a> (Kwon et al., 2023)</li>
+<li><a href="https://arxiv.org/abs/2401.09670">DistServe: Disaggregating Prefill and Decoding for Goodput-optimized LLM Serving</a> (Zhong et al., OSDI 2024)</li>
+<li><a href="https://arxiv.org/abs/2311.18677">Splitwise: Efficient Generative LLM Inference Using Phase Splitting</a> (Patel et al., ISCA 2024)</li>
+<li><a href="https://arxiv.org/abs/2407.00079">Mooncake: A KVCache-centric Disaggregated Architecture for LLM Serving</a> (Qin et al., 2024)</li>
+<li>Docs: <a href="https://docs.vllm.ai/en/latest/design/prefix_caching.html">vLLM · Automatic prefix caching (design)</a></li>
+<li>Docs: <a href="https://docs.vllm.ai/en/latest/features/disagg_prefill.html">vLLM · Disaggregated prefilling</a></li>
+<li>Docs: <a href="https://docs.nvidia.com/dynamo/latest/">NVIDIA Dynamo documentation</a> (KV-aware routing, disaggregated serving, NIXL)</li>
+<li>Specs: <a href="https://www.nvidia.com/en-us/data-center/h100/">NVIDIA H100 product page</a> (memory, bandwidth, NVLink and PCIe figures)</li>
+</ul>
+
+<nav class="pager">
+  <a href="03-batching-scheduling.html"><small>Previous</small>Page 03 · Batching and scheduling</a>
+  <a class="next" href="05-latency.html"><small>Next</small>Page 05 · Latency</a>
+</nav>
+<footer>Module 09 · Page 04 · written for this course from the source post, official docs and papers.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('pc'), ctx = cv.getContext('2d');
+const ids = ['po', 'nr', 'cp', 'nc', 'sk'];
+const el = Object.fromEntries(ids.map(k => [k, document.getElementById(k)]));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const POL = ['Random', 'Round-robin', 'Sticky hash', 'Cache-aware'], CAPS = [50e3, 100e3, 200e3, 400e3, 800e3, 1.6e6];
+const SYS = 2000, NSYS = 4, START = 500, TURN = 300, REPLY = 200, NREQ = 20000, WARM = 5000, CP_MS = 0.1;
+const fmt = n => Math.round(n).toLocaleString('en-US');
+
+function rng(s) { return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 2 ** 32; }; }
+
+// policy 0 random, 1 round-robin, 2 sticky hash on session, 3 longest cached match with a load guard
+function sim(pol, N, cap, C, skew) {
+  const r = rng(11), cum = [];
+  let acc = 0;
+  for (let i = 0; i < C; i++) cum.push(acc += 1 / (i + 1) ** skew);
+  const pick = () => {
+    const u = r() * acc;
+    let lo = 0, hi = C - 1;
+    while (lo < hi) { const m = (lo + hi) >> 1; cum[m] < u ? lo = m + 1 : hi = m; }
+    return lo;
+  };
+  const hist = new Array(C).fill(START), caches = Array.from({ length: N }, () => ({ m: new Map(), tot: 0 }));
+  const load = new Array(N).fill(0), work = new Array(N).fill(0);
+  let rr = 0, hitT = 0, allT = 0, comp = 0, n = 0;
+  // a history is only reusable if its system prompt is cached too (it sits after it in the prefix)
+  const hitOn = (k, s, h) => {
+    const c = caches[k].m, sys = c.has('s' + (s % NSYS));
+    return (sys ? SYS : 0) + (sys && c.has('c' + s) ? Math.min(c.get('c' + s), h) : 0);
+  };
+  const touch = (k, key, tok) => {
+    const c = caches[k];
+    if (c.m.has(key)) { c.tot -= c.m.get(key); c.m.delete(key); }
+    c.m.set(key, tok); c.tot += tok;
+    while (c.tot > cap && c.m.size > 1) {
+      const [k0, v0] = c.m.entries().next().value;
+      if (k0 === key) break;
+      c.m.delete(k0); c.tot -= v0;
+    }
+  };
+  for (let q = 0; q < NREQ; q++) {
+    const s = pick(), h = hist[s], total = SYS + h + TURN;
+    let k;
+    if (pol === 0) k = Math.floor(r() * N);
+    else if (pol === 1) k = rr++ % N;
+    else if (pol === 2) k = ((s * 2654435761) >>> 0) % N;
+    else {
+      const mean = load.reduce((a, b) => a + b, 0) / N;
+      let best = -1, bs = -Infinity;
+      for (let j = 0; j < N; j++) {
+        if (load[j] > 1.2 * mean + 1000) continue;
+        const sc = hitOn(j, s, h) - load[j] * 1e-3;
+        if (sc > bs) { bs = sc; best = j; }
+      }
+      k = best < 0 ? load.indexOf(Math.min(...load)) : best;
+    }
+    const hit = hitOn(k, s, h), c = total - hit;
+    for (let j = 0; j < N; j++) load[j] *= 0.995;
+    load[k] += c;
+    touch(k, 's' + (s % NSYS), SYS);
+    touch(k, 'c' + s, h + TURN + REPLY);
+    hist[s] = h + TURN + REPLY > 20000 ? START : h + TURN + REPLY;
+    if (q >= WARM) { hitT += hit; allT += total; comp += c; work[k] += c; n++; }
+  }
+  const mw = work.reduce((a, b) => a + b, 0) / N;
+  return { hit: hitT / allT, comp: comp / n, imb: Math.max(...work) / mw, work, mw };
+}
+
+function draw() {
+  const pol = +el.po.value, N = +el.nr.value, cap = CAPS[+el.cp.value], C = +el.nc.value, skew = +el.sk.value;
+  const shown = { po: POL[pol], nr: N, cp: fmt(cap), nc: fmt(C), sk: skew.toFixed(1) };
+  ids.forEach(k => document.getElementById(k + 'v').textContent = shown[k]);
+  const all = [0, 1, 2, 3].map(p => sim(p, N, cap, C, skew)), res = all[pol];
+
+  const W = cv.width, H = cv.height, t = 16, b = 34, split = 300;
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '12px sans-serif'; ctx.strokeStyle = css('--line'); ctx.fillStyle = css('--muted'); ctx.lineWidth = 1;
+  // left: hit rate by policy
+  const l1 = 40, w1 = split - l1 - 10, py = v => t + (1 - v) * (H - t - b);
+  ctx.textAlign = 'right';
+  for (let v = 0; v <= 1; v += 0.25) {
+    ctx.beginPath(); ctx.moveTo(l1, py(v)); ctx.lineTo(l1 + w1, py(v)); ctx.stroke();
+    ctx.fillText(Math.round(v * 100) + '%', l1 - 6, py(v) + 4);
+  }
+  ctx.textAlign = 'center';
+  const bw = w1 / 4;
+  all.forEach((x, p) => {
+    ctx.fillStyle = p === pol ? css('--accent') : css('--line');
+    ctx.fillRect(l1 + p * bw + 8, py(x.hit), bw - 16, py(0) - py(x.hit));
+    ctx.fillStyle = css('--muted');
+    ctx.fillText(['Random', 'RR', 'Sticky', 'Aware'][p], l1 + p * bw + bw / 2, H - 18);
+    ctx.fillStyle = css('--fg');
+    ctx.fillText(Math.round(x.hit * 100) + '%', l1 + p * bw + bw / 2, py(x.hit) - 4);
+  });
+  ctx.fillStyle = css('--muted'); ctx.fillText('token hit rate', l1 + w1 / 2, H - 4);
+  // right: prefill work per replica
+  const l2 = split + 20, w2 = W - l2 - 10, mx = Math.max(...all.flatMap(x => x.work)) || 1;
+  const py2 = v => t + (1 - v / mx) * (H - t - b), bw2 = w2 / N;
+  ctx.beginPath(); ctx.moveTo(l2, py2(0)); ctx.lineTo(l2 + w2, py2(0)); ctx.stroke();
+  res.work.forEach((v, j) => {
+    ctx.fillStyle = v > 1.2 * res.mw ? css('--fail') : css('--pass');
+    ctx.fillRect(l2 + j * bw2 + 2, py2(v), Math.max(1, bw2 - 4), py2(0) - py2(v));
+  });
+  ctx.strokeStyle = css('--fg'); ctx.setLineDash([5, 4]);
+  ctx.beginPath(); ctx.moveTo(l2, py2(res.mw)); ctx.lineTo(l2 + w2, py2(res.mw)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = css('--muted'); ctx.fillText('prefill tokens computed per replica', l2 + w2 / 2, H - 4);
+
+  document.getElementById('shit').textContent = (res.hit * 100).toFixed(1) + '%';
+  document.getElementById('scomp').textContent = fmt(res.comp);
+  document.getElementById('stime').textContent = fmt(res.comp * CP_MS) + ' ms';
+  document.getElementById('simb').textContent = res.imb.toFixed(2) + '×';
+}
+ids.forEach(k => el[k].oninput = draw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

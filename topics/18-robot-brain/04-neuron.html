@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 4 · The artificial neuron</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 3 · Lesson 4</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 3 · Lesson 4</div>
+<h1>The artificial neuron: should the robot stop?</h1>
+<p class="lede">Two sensor numbers go in, one "how sure am I that I must stop?" comes out. You'll build the neuron from a simple weighted vote, find out why it needs a squash, and then let it learn its own weights with the same trick you used in Lesson 3.</p>
+
+<div class="facts">
+  <div><b>Time</b>2–3 hours, plus the challenge</div>
+  <div><b>You'll need</b>Python 3, pen and paper, a calculator, Lesson 3 done</div>
+  <div><b>New words</b>neuron, weight, bias, sigmoid, probability, epoch, decision boundary</div>
+  <div><b>Project piece</b>An obstacle detector</div>
+</div>
+
+<section class="kid" id="start">
+<h2>Start here</h2>
+<p class="big">A neuron is a vote: multiply each clue by how much it matters, add them up, squash the total into a number between 0 and 1, and learn the "how much it matters" numbers from examples.</p>
+
+<h3>The problem</h3>
+<p>Robo-Helper is rolling across the room. Its sensor says: "something is 1.5 metres ahead, and it's getting closer at 1 metre per second." Should it brake? A cardboard box 6 metres away is no problem. A cat 0.5 metres away is. Nobody wants to write a thousand <code>if</code> statements for every distance and speed. We want the robot to <em>learn</em> where the line between "go" and "stop" is, from examples.</p>
+
+<h3>The idea in one picture</h3>
+<p>Think about deciding whether to grab a coat. You look at two clues: how cold it is, and how likely rain is. Rain matters a lot to you, cold matters a bit. In your head you give each clue a score, weigh them, and add them up. If the total is high enough, you take the coat. That's a neuron. The only new part is that the computer finds the weights by itself, by getting examples wrong and nudging.</p>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Neuron</dt><dd>A tiny decision-maker: weighted sum of inputs, then a squash. Brains have biological neurons. Ours is a few lines of Python.</dd>
+<dt>Weight</dt><dd>A number that says how much one input matters, and in which direction (positive pushes toward "stop", negative pushes toward "go").</dd>
+<dt>Bias</dt><dd>A number added at the end. It sets how easily the neuron says yes when the inputs are all zero.</dd>
+<dt>Sigmoid</dt><dd>An S-shaped function that squashes any number into the range 0 to 1.</dd>
+<dt>Probability</dt><dd>A number from 0 (definitely not) to 1 (definitely yes). 0.9 means "90% sure".</dd>
+<dt>Epoch</dt><dd>One full pass through all the training examples.</dd>
+<dt>Decision boundary</dt><dd>The line on a graph where the neuron is exactly 50/50. One side means stop, the other means go.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>The rest is the full lesson:</strong> the problem in detail, the idea built from nothing, a demo to play with, then the homework and a challenge away from the screen.</p>
+
+<h2 id="problem">1. The problem</h2>
+<p>The robot's front sensor gives two numbers every moment:</p>
+<ul>
+<li><code>x1</code> = <strong>distance</strong> to the thing ahead, in metres;</li>
+<li><code>x2</code> = <strong>closing speed</strong>: how fast that distance is shrinking, in metres per second.</li>
+</ul>
+<p>We want one answer: the <strong>probability that the robot must stop</strong>. In the simulated world, the true rule is "stop if <code>distance − closing speed &lt; 1</code>", which means: if in one second you'd be closer than 1 metre, brake. But the robot doesn't know this rule. And, as you saw in Lesson 2, its sensor is noisy, so near the line the readings are genuinely confusing.</p>
+<p>The obvious approach is to hand-write rules: <code>if distance &lt; 1: stop</code>. Try it on a few examples:</p>
+<pre><code>distance  speed   true answer   "distance &lt; 1" says
+  0.5      0.0       stop           stop   ✓
+  4.0      0.2       go             go     ✓
+  1.5      1.0       stop           go     ✗  (it'll be 0.5 m away in one second!)
+  1.8      1.9       stop           go     ✗</code></pre>
+<p>One clue is not enough. We need to combine both clues, and we want the computer to work out how.</p>
+
+<h2 id="principles">2. First principles</h2>
+
+<h3>Step 1: a weighted vote</h3>
+<p>Give each input a <strong>weight</strong>, multiply, add, and add a <strong>bias</strong>. Call the total <code>z</code>:</p>
+<pre><code>z = w1 * distance + w2 * speed + bias</code></pre>
+<p>Rule: if <code>z</code> is above 0, stop. Let's choose weights by thinking. Far away should push toward "go", so <code>w1</code> is negative. Closing fast should push toward "stop", so <code>w2</code> is positive. Try <code>w1 = −1</code>, <code>w2 = +1</code>, <code>bias = 1</code>:</p>
+<pre><code>(0.5, 0.0):  z = −1×0.5 + 1×0.0 + 1 =  0.5   → above 0 → stop ✓
+(4.0, 0.2):  z = −1×4.0 + 1×0.2 + 1 = −2.8   → below 0 → go   ✓
+(1.5, 1.0):  z = −1×1.5 + 1×1.0 + 1 =  0.5   → above 0 → stop ✓
+(1.8, 1.9):  z = −1×1.8 + 1×1.9 + 1 =  1.1   → above 0 → stop ✓</code></pre>
+<p>All four right. Look closely: <code>−distance + speed + 1 &gt; 0</code> is the same as <code>distance − speed &lt; 1</code>. We've rebuilt the true rule as a weighted vote. A neuron with the right weights <em>is</em> the rule.</p>
+
+<details><summary>Predict first: on the 450 noisy training examples, how often is this perfect hand-made rule right? 100%?</summary>
+<p>No: <strong>96.7%</strong>. The rule is perfect, but the examples are what the <em>noisy sensor</em> saw. Something truly 0.9 m away might be read as 1.3 m. No rule can fix data that's wrong at the boundary. Remember this: even a perfect model won't score 100% on noisy data.</p>
+</details>
+
+<h3>Step 2: why squash?</h3>
+<p><code>z</code> can be any number: −2.8, 0.5, 47. That's awkward. Is 47 "very sure" or just "sure"? And "above 0 → stop" is a hard switch: change a weight a tiny bit and the answer either flips completely or doesn't change at all. You can't learn by nudging something that never moves smoothly. (In Lesson 3 you nudged downhill on a smooth error curve. A switch has no slope to follow.)</p>
+<p>So we squash <code>z</code> through the <strong>sigmoid</strong>:</p>
+<pre><code>sigmoid(z) = 1 / (1 + e^(−z))          e ≈ 2.718
+
+   z     sigmoid(z)
+  −4       0.018      almost certainly "go"
+  −2       0.119
+  −1       0.269
+   0       0.5        exactly unsure
+   1       0.731
+   2       0.881
+   4       0.982      almost certainly "stop"</code></pre>
+<p>Big negative → close to 0. Big positive → close to 1. Zero → 0.5. It's smooth, so a tiny change to a weight makes a tiny change to the answer, and we can learn. And the output is a probability, which Lesson 5 will turn into a careful stop decision.</p>
+<p class="note"><strong>Computer gotcha:</strong> for <code>z = −1000</code>, <code>e^(−z) = e^1000</code>, which is too big for Python: <code>math.exp(1000)</code> raises <code>OverflowError</code>. The fix is the same maths written differently: when <code>z &lt; 0</code>, use <code>e^z / (1 + e^z)</code>. Multiply top and bottom of the original by <code>e^z</code> to see they're equal.</p>
+
+<p>So a neuron is just:</p>
+<pre><code>probability of stop = sigmoid(w1 * x1 + w2 * x2 + bias)</code></pre>
+
+<h3>Step 3: learning by nudging</h3>
+<p>We guessed the weights. Real robots have dozens of inputs, so we can't guess. We want the weights to come from examples. Start with every weight at 0 and look at one example at a time:</p>
+<ol>
+<li>Ask the neuron: <code>p = neuron(weights, bias, x)</code>.</li>
+<li>Compare with the truth: <code>error = p − label</code>. (Label is 1 for stop, 0 for go.)</li>
+<li>Nudge each weight: <code>w_i = w_i − lr × error × x_i</code>, and the bias: <code>bias = bias − lr × error</code>.</li>
+</ol>
+<p>Why <strong>error × input</strong>? If the neuron said 0.9 but the answer was 0 (go), the error is +0.9, so we pull weights down. If an input was big, it was more to blame, so its weight moves more. If an input was 0, it didn't contribute, so its weight doesn't move at all. That's fair blame.</p>
+<p><strong>This is Lesson 3 again.</strong> There your line's gradient was <code>dw = average of 2 × (predict − y) × x</code>. Same shape: error times input. The differences: we update after <em>every</em> example instead of averaging all of them first, and the "2" is gone because for probabilities we measure error in a slightly different way that makes the maths cancel neatly. It is still gradient descent: walk downhill on the error.</p>
+
+<h3>Worked example, by hand</h3>
+<p>The first two training examples the Python file generates are <code>(7.81, 1.93)</code> label 0, and <code>(6.52, 1.28)</code> label 0. Learning rate <code>lr = 0.05</code>. Start: <code>w = [0, 0]</code>, <code>bias = 0</code>.</p>
+<pre><code>Example 1: x = (7.81, 1.93), label 0
+  z = 0×7.81 + 0×1.93 + 0 = 0       p = sigmoid(0) = 0.5
+  error = 0.5 − 0 = 0.5
+  w1 = 0 − 0.05 × 0.5 × 7.81 = −0.195
+  w2 = 0 − 0.05 × 0.5 × 1.93 = −0.048
+  bias = 0 − 0.05 × 0.5      = −0.025
+
+Example 2: x = (6.52, 1.28), label 0
+  z = −0.195×6.52 + −0.048×1.28 − 0.025 = −1.36   p = sigmoid(−1.36) = 0.204
+  error = 0.204 − 0 = 0.204
+  w1 = −0.195 − 0.05 × 0.204 × 6.52 = −0.262
+  w2 = −0.048 − 0.05 × 0.204 × 1.28 = −0.061
+  bias = −0.025 − 0.05 × 0.204       = −0.035</code></pre>
+<p>Notice the second error is smaller (0.204 instead of 0.5): the neuron already learned "far away means go".</p>
+
+<details><summary>Predict first: <code>w2</code> (the speed weight) just went negative. At the end of training, will it be negative or positive?</summary>
+<p><strong>Positive.</strong> The first examples were all "go", so every weight got pushed toward "go". Later, the stop examples (close, or closing fast) push <code>w2</code> up. After one epoch the weights are <code>[−1.46, 1.27]</code>, bias <code>1.02</code>. After 200 epochs: <code>[−4.31, 3.53]</code>, bias <code>5.13</code>. Early nudges can point the wrong way; it's the total over many examples that counts.</p>
+</details>
+
+<h3>What did it learn?</h3>
+<p>The neuron is exactly 50/50 when <code>z = 0</code>. With the learned weights:</p>
+<pre><code>−4.31 × distance + 3.53 × speed + 5.13 = 0
+→ distance = 1.19 + 0.82 × speed       (learned boundary)
+  distance = 1.00 + 1.00 × speed       (true rule)</code></pre>
+<p>Close, and it found this from nothing but labelled examples. It also leans toward stopping a bit early (1.19 m instead of 1.00 m). The bigger weights also make it more <em>confident</em>: the hand-made weights give 0.62 for (0.5, 0.0); the learned ones give 0.95.</p>
+
+<h2 id="play">3. Play with it</h2>
+<div class="card demo">
+<h3>Interactive: a neuron deciding stop or go</h3>
+<p class="legend">These are the same 450 noisy examples the Python file makes. Filled red dots = should stop, hollow green dots = fine to go. The shading is the neuron's stop-probability, and the line is where it's exactly 0.5. Drag the weights, or press the training buttons (they run the exact <code>train_neuron</code> rule). Click anywhere on the chart to probe a point.</p>
+<canvas id="ncv" width="700" height="320" aria-label="Scatter of distance against closing speed, with the neuron's decision boundary"></canvas>
+<label for="w1">w1 (distance weight): <span id="w1v" class="num"></span></label>
+<input id="w1" type="range" min="-6" max="2" step="0.01" value="-1">
+<label for="w2">w2 (speed weight): <span id="w2v" class="num"></span></label>
+<input id="w2" type="range" min="-2" max="6" step="0.01" value="1">
+<label for="bs">bias: <span id="bsv" class="num"></span></label>
+<input id="bs" type="range" min="-3" max="8" step="0.01" value="1">
+<p>
+<button id="zero">Weights to 0</button>
+<button id="ep1">Train 1 epoch</button>
+<button id="ep200">Train 200 epochs from 0 (like the Python)</button>
+</p>
+<div class="stats">
+  <div class="stat"><div class="k">Accuracy</div><div class="v" id="acc">–</div></div>
+  <div class="stat"><div class="k">Missed stops</div><div class="v" id="miss">–</div></div>
+  <div class="stat"><div class="k">False alarms</div><div class="v" id="falarm">–</div></div>
+  <div class="stat"><div class="k">Epochs run</div><div class="v" id="eps">0</div></div>
+</div>
+<p class="legend" id="probe">Click the chart to probe a point.</p>
+</div>
+<p>Things to try: set all weights to 0 (everything is 0.5, the line disappears). Press "Train 1 epoch" a few times and watch the line swing into place. Then make <code>w2</code> negative: what happens to fast-approaching obstacles?</p>
+
+<h2 id="homework">4. Homework</h2>
+<p>Open <code>project/homework/lesson04_neuron.py</code>. <code>make_obstacle_data</code> is written for you. Write these four functions, in order:</p>
+
+<h3>4.1 <code>sigmoid(z)</code></h3>
+<p>Return <code>1 / (1 + e^(−z))</code>, without crashing for huge negative <code>z</code>. Example: <code>sigmoid(0)</code> is <code>0.5</code>; <code>sigmoid(2)</code> is about <code>0.881</code>; <code>sigmoid(-1000)</code> is <code>0.0</code> (not a crash).</p>
+<details><summary>Hint 1</summary><p>Python's <code>math</code> module (already imported) has <code>math.exp(x)</code>, which computes e<sup>x</sup>.</p></details>
+<details><summary>Hint 2</summary><p>The crash only happens for very negative <code>z</code>. So use an <code>if</code>: one formula when <code>z &gt;= 0</code>, the other one from the "Computer gotcha" box when <code>z &lt; 0</code>.</p></details>
+<details><summary>Hint 3</summary><p>If z is at least 0: return 1 divided by (1 plus exp of minus z). Otherwise: let e be exp of z, and return e divided by (1 plus e).</p></details>
+
+<h3>4.2 <code>neuron(weights, bias, x)</code></h3>
+<p>Weighted sum plus bias, then sigmoid. <code>weights</code> and <code>x</code> are the same length (2 here, but don't hard-code 2). Example: <code>neuron([-1, 1], 1, (1.5, 1.0))</code> → <code>z = 0.5</code> → about <code>0.622</code>.</p>
+<details><summary>Hint 1</summary><p>Pair each weight with its input. <code>zip(weights, x)</code> gives you pairs like <code>(-1, 1.5)</code>, <code>(1, 1.0)</code>.</p></details>
+<details><summary>Hint 2</summary><p>Start a total at the bias, then loop over the pairs and add weight × input each time. Pass the total to your <code>sigmoid</code>.</p></details>
+<details><summary>Hint 3</summary><p>z = bias; for each (w, xi) in zip(weights, x): z = z + w * xi; return sigmoid(z). Or do it in one line with <code>sum(...)</code>.</p></details>
+
+<h3>4.3 <code>train_neuron(data, lr=0.05, epochs=200)</code></h3>
+<p>Start at <code>weights = [0.0, 0.0]</code>, <code>bias = 0.0</code>. For each epoch, for each <code>(x, label)</code> in <code>data</code>: compute <code>p</code>, the <code>error</code>, and nudge every weight and the bias as in Step 3. Return <code>(weights, bias)</code>. Check your first two updates against the worked example above.</p>
+<details><summary>Hint 1</summary><p>Two loops, one inside the other: the outer one counts epochs, the inner one walks through the examples.</p></details>
+<details><summary>Hint 2</summary><p>Each item of <code>data</code> looks like <code>((7.81, 1.93), 0)</code>, so unpack it with <code>for x, label in data:</code>. Compute the error once, then use it for every weight and the bias.</p></details>
+<details><summary>Hint 3</summary><p>Inside the inner loop: err = neuron(weights, bias, x) − label. Build the new weights list: for each pair (w, xi), the new value is w − lr × err × xi. Then bias = bias − lr × err. After both loops, return weights and bias.</p></details>
+
+<h3>4.4 <code>should_stop(weights, bias, x, threshold=0.5)</code></h3>
+<p>Return <code>True</code> if the stop-probability is at least the threshold. Example: with all-zero weights the probability is exactly 0.5, so <code>should_stop([0, 0], 0, (1, 1), 0.5)</code> is <code>True</code>, but with threshold 0.6 it's <code>False</code>.</p>
+<details><summary>Hint 1</summary><p>One line. Use your <code>neuron</code> function.</p></details>
+<details><summary>Hint 2</summary><p>"At least" means <code>&gt;=</code>, not <code>&gt;</code>. The checker tests exactly 0.5 against 0.5.</p></details>
+<details><summary>Hint 3</summary><p>return (neuron of weights, bias, x) &gt;= threshold.</p></details>
+
+<h3>Run it</h3>
+<pre><code>cd homework
+python3 lesson04_neuron.py</code></pre>
+<p>What you should see (this is the real output of the reference solution):</p>
+<pre><code>weights [-4.31, 3.53] bias 5.13
+(4.0, 0.2) stop prob 0.0
+(1.5, 1.0) stop prob 0.9
+(0.5, 0.0) stop prob 0.95</code></pre>
+<p>Read it: far and slow → 0.0 (go). 1.5 m away but closing at 1 m/s → 0.9 (stop!). Half a metre away, even standing still → 0.95 (stop).</p>
+
+<h3>Check it</h3>
+<pre><code>cd ..
+python3 check.py 4</code></pre>
+<p>Each ✓ is a passed test. A ✗ tells you what went wrong, for example:</p>
+<pre><code>  ✗ sigmoid: sigmoid(-1000) crashed or went negative: handle big negative z
+  ✗ should_stop: should_stop compares the probability with the threshold (&gt;=)</code></pre>
+<p>A yellow … means that function still raises <code>NotImplementedError</code>: you haven't written it yet. When you see <code>4/4 passed  🎉 lesson complete!</code>, you're done.</p>
+
+<h3>Stretch</h3>
+<ul>
+<li>Print the weights after epochs 1, 5, 20 and 200. Does the boundary <code>distance = −(w2 × speed + bias) / w1</code> move toward <code>1 + speed</code>?</li>
+<li>Try <code>lr=0.5</code> and <code>lr=0.001</code>. Which one gets to good weights faster? Does either misbehave?</li>
+<li>Add a third input, the robot's own speed, set to random noise. Does training learn to give it a weight near 0? (It should: useless clues get ignored.)</li>
+</ul>
+
+<h2 id="challenge">5. Real-world challenge: be a neuron for a week</h2>
+<p>Train a neuron on your own decisions, by hand, with paper.</p>
+<ol>
+<li><strong>Pick a yes/no decision</strong> you make every day with two number clues. Good one: "do I take a coat?" with <code>x1</code> = the chance of rain from a weather app (as 0 to 1, so 40% → 0.4) and <code>x2</code> = the temperature in tens of degrees (14°C → 1.4).</li>
+<li><strong>Collect 10 examples.</strong> For 10 days (or 10 hours from an hourly forecast, or ask your family about the last 10 days), write <code>x1</code>, <code>x2</code> and your honest answer: 1 = took a coat, 0 = didn't.</li>
+<li><strong>Train by hand.</strong> Start at <code>w1 = w2 = bias = 0</code>, <code>lr = 0.5</code>. For each row: compute <code>z</code>, look up <code>sigmoid(z)</code> from the table in Step 2 (round <code>z</code> to the nearest one listed, or use a calculator), compute the error, nudge. Do two passes.</li>
+<li><strong>Record:</strong> your final weights, and how many of your 10 decisions the neuron now gets right (probability ≥ 0.5 means "coat").</li>
+<li><strong>Explain the weights.</strong> Is the rain weight positive? Is the temperature weight negative? Which clue matters more to you, according to your own neuron?</li>
+</ol>
+<p><strong>What this teaches:</strong> a neuron's weights are a summary of a person's (or a robot's) habits, and you can read them. You'll also feel why computers do this part: two passes over 10 rows by hand is already a lot of arithmetic. The robot did 200 passes over 450 rows.</p>
+
+<h2 id="project">6. Your Robo-Helper so far</h2>
+<p>Robo-Helper can move (Lesson 1), sense distance (Lesson 2) and knows its braking distance (Lesson 3). Now it has an <strong>obstacle detector</strong>: <code>train_neuron</code> learns the weights, <code>should_stop</code> turns a sensor reading into a decision.</p>
+<ul>
+<li><strong>Lesson 5</strong> asks "is it any good?": it tests this neuron on examples it never saw, and <code>safest_threshold</code> picks a threshold lower than 0.5 so it almost never misses a needed stop.</li>
+<li><strong>Lesson 11</strong> (the capstone) calls <code>train_neuron</code> when Robo-Helper starts up, and in <code>drive_to</code> calls <code>should_stop(..., (0.5, speed), threshold)</code> whenever something unexpected appears one square ahead. If it says stop, the robot brakes and plans a new route.</li>
+</ul>
+
+<h2 id="mistakes">7. Common mistakes</h2>
+<ul>
+<li><strong>Crash on big negative numbers.</strong> <code>math.exp(1000)</code> overflows. The checker says: <em>"sigmoid(-1000) crashed or went negative: handle big negative z"</em>. Use the two-branch formula.</li>
+<li><strong>Using <code>&gt;</code> instead of <code>&gt;=</code></strong> in <code>should_stop</code>. At exactly 0.5 the answer must be True.</li>
+<li><strong>Forgetting the bias update</strong>, or updating the bias with <code>error × x</code>. The bias acts like a weight on an input that is always 1, so its nudge is just <code>lr × error</code>.</li>
+<li><strong>Getting the sign backwards:</strong> <code>error = label − p</code> with <code>w −= ...</code> makes the weights run uphill. Then "an obstacle 0.5 m away should give stop-probability &gt; 0.8" fails. Use <code>p − label</code> and subtract.</li>
+<li><strong>Resetting weights inside the epoch loop.</strong> Set them to zero once, before both loops.</li>
+</ul>
+
+<h2 id="check">8. Check yourself</h2>
+<details><summary>What does <code>neuron([2, -1], 0, (1, 2))</code> return?</summary><p><code>z = 2×1 + (−1)×2 + 0 = 0</code>, so <code>sigmoid(0) = 0.5</code>. Exactly unsure.</p></details>
+<details><summary>Why can't we learn with a hard "z &gt; 0 → 1, else 0" switch?</summary><p>A tiny nudge to a weight usually doesn't change the output at all, so there's no signal saying which way to move. The sigmoid is smooth, so every nudge shows up as a small change in the probability.</p></details>
+<details><summary>An input is 0 for one example. How much does its weight change on that example?</summary><p>Not at all: the nudge is <code>lr × error × 0 = 0</code>. That input played no part in the mistake, so it gets no blame.</p></details>
+<details><summary>Predict: if you trained with <code>epochs=0</code>, what would <code>should_stop(w, b, (0.5, 0.0))</code> return?</summary><p>The weights stay <code>[0, 0]</code> and bias 0, so the probability is 0.5 for every input. <code>0.5 &gt;= 0.5</code> is True. The untrained robot says "stop" to everything, which is safe but useless.</p></details>
+<details><summary>How is this the same as Lesson 3?</summary><p>Both start from zero and repeatedly move each parameter a little in the direction that shrinks the error, with a step size <code>lr</code>. The nudge is "error × input" in both. Lesson 3 averaged over all examples per step. Here we nudge after each example.</p></details>
+
+<h2 id="more">9. Go deeper (optional)</h2>
+<ul>
+<li><a href="../06-30u30/28-cs231n.html">Day 28 · CS231n</a>: stack many neurons into layers and you get a neural network that can see images.</li>
+<li><a href="../02-tensortonic.html">TensorTonic</a>: practice problems that drill the same maths (sums, sigmoids, gradients) one step further.</li>
+<li><a href="../06-30u30/08-alexnet.html">Day 08 · AlexNet</a>: the 2012 network, made of millions of these neurons, that started the deep-learning boom.</li>
+<li><a href="../17-free-ai-curriculum.html#robotics">Free robotics courses</a> if you want to see how real robots combine sensors and learned detectors.</li>
+</ul>
+
+<nav class="pager">
+  <a href="03-learning-from-data.html"><small>Previous</small>Lesson 3 · Learning from data</a>
+  <a class="next" href="05-evaluation.html"><small>Next</small>Lesson 5 · Is it any good?</a>
+</nav>
+<footer>Build a Robot Brain · Week 3 · Lesson 4</footer>
+</main>
+
+<script>
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+// The 450 examples from make_obstacle_data(450, random.Random(2)): [distance, speed, label]
+const DATA = [[7.81,1.93,0],[6.52,1.28,0],[4.64,1.14,0],[3.23,0.0,0],[7.3,1.16,0],[0.0,0.1,1],[2.53,1.73,0],[1.79,0.17,0],[3.97,1.86,0],[7.06,1.05,0],[5.42,2.14,0],[7.71,0.0,0],[2.78,1.1,0],[3.5,2.07,0],[6.38,0.69,0],[5.85,1.19,0],[5.86,0.22,0],[7.89,0.52,0],[3.72,0.76,0],[1.56,0.37,0],[5.26,0.0,0],[7.26,0.3,0],[5.34,1.05,0],[1.03,0.9,1],[1.12,1.95,1],[0.54,1.05,1],[1.3,1.97,1],[0.26,0.38,1],[1.38,1.43,1],[8.28,0.35,0],[5.2,1.63,0],[0.31,0.49,1],[7.62,1.21,0],[3.6,0.27,0],[0.96,0.8,1],[4.46,0.77,0],[7.35,0.36,0],[0.23,1.18,1],[0.74,0.52,1],[5.25,1.64,0],[1.86,1.22,1],[4.92,1.41,0],[3.49,1.05,0],[3.22,0.04,0],[0.83,0.54,1],[3.96,1.26,0],[2.33,1.72,1],[3.36,0.98,0],[3.42,1.15,0],[5.53,0.66,0],[5.27,0.55,0],[0.43,1.5,1],[7.16,1.37,0],[3.42,1.29,0],[0.0,0.99,1],[0.8,1.81,1],[3.14,0.68,0],[1.66,0.48,1],[5.1,1.87,0],[5.2,1.26,0],[2.96,0.73,0],[4.9,0.83,0],[7.37,1.85,0],[3.37,0.68,0],[7.42,1.07,0],[3.1,2.2,1],[1.48,0.0,1],[5.1,0.43,0],[4.91,1.48,0],[1.54,0.95,1],[0.7,0.84,1],[7.04,0.68,0],[7.76,1.5,0],[2.85,0.0,0],[1.04,1.05,1],[5.56,1.6,0],[7.68,0.3,0],[6.18,2.05,0],[3.78,1.28,0],[0.0,0.43,1],[6.15,1.7,0],[6.52,0.92,0],[0.83,1.47,1],[6.21,1.59,0],[0.82,1.3,1],[4.82,1.56,0],[0.0,0.05,1],[4.67,1.54,0],[2.58,0.53,0],[0.95,1.88,1],[5.96,0.42,0],[7.12,0.48,0],[4.23,0.61,0],[7.35,0.67,0],[3.33,2.08,0],[4.01,1.03,0],[6.16,0.25,0],[5.32,0.69,0],[4.3,0.69,0],[6.28,1.43,0],[3.49,1.08,0],[0.62,1.8,1],[2.31,0.19,0],[4.25,0.24,0],[3.86,1.18,0],[1.02,0.83,1],[3.07,0.54,0],[5.86,1.54,0],[3.16,1.62,1],[5.49,1.48,0],[6.98,1.18,0],[2.15,1.03,0],[3.52,0.29,0],[4.21,2.37,0],[0.79,0.25,1],[7.37,1.5,0],[4.54,0.26,0],[2.48,1.45,0],[7.58,0.32,0],[2.01,1.07,0],[1.69,0.34,0],[3.19,1.59,0],[6.85,0.73,0],[3.82,2.05,0],[5.28,0.78,0],[3.48,1.67,0],[3.66,1.0,0],[7.52,1.75,0],[5.22,0.61,0],[0.65,1.37,1],[0.63,0.58,1],[0.95,0.83,1],[5.93,0.12,0],[0.42,2.08,1],[4.33,0.28,0],[1.81,1.56,1],[5.75,1.98,0],[1.27,0.34,1],[0.02,0.67,1],[6.77,1.52,0],[7.92,0.61,0],[4.78,0.57,0],[2.87,1.12,0],[6.17,1.16,0],[6.2,2.36,0],[6.09,1.38,0],[1.11,0.22,0],[4.87,1.21,0],[0.72,1.12,1],[4.85,0.19,0],[5.47,1.66,0],[7.5,1.85,0],[1.57,1.46,1],[6.87,1.27,0],[5.65,0.8,0],[5.85,0.45,0],[2.28,1.27,0],[7.48,0.02,0],[5.94,0.96,0],[3.95,0.77,0],[1.23,0.84,1],[1.54,1.07,1],[5.38,1.07,0],[2.64,0.23,0],[0.21,1.95,1],[2.49,0.29,0],[3.56,0.8,0],[4.96,0.54,0],[2.25,0.0,0],[5.44,0.46,0],[2.1,0.47,1],[2.0,1.17,1],[5.64,1.22,0],[0.85,1.6,1],[3.52,0.83,0],[3.86,0.93,0],[5.07,1.96,0],[5.29,0.0,0],[3.63,0.18,0],[6.08,0.77,0],[1.56,0.07,0],[0.6,0.56,1],[5.58,2.08,0],[0.49,1.39,1],[1.54,1.42,0],[3.32,0.52,0],[0.22,2.03,1],[5.47,1.43,0],[7.33,0.45,0],[0.7,1.34,1],[6.37,0.07,0],[3.54,0.69,0],[1.09,1.09,1],[5.48,0.55,0],[2.29,1.42,1],[7.15,0.17,0],[2.27,0.39,0],[3.93,0.5,0],[3.41,1.37,0],[0.64,0.91,1],[7.36,1.12,0],[3.68,1.56,0],[1.56,1.36,1],[0.75,1.36,1],[4.14,0.6,0],[3.51,0.95,0],[7.55,1.6,0],[2.91,1.63,1],[4.56,1.77,0],[2.35,1.78,0],[3.49,1.22,0],[5.18,0.82,0],[6.17,1.27,0],[3.8,1.43,0],[7.23,0.5,0],[5.68,0.5,0],[0.93,1.12,1],[4.14,1.74,0],[6.82,1.34,0],[5.98,1.47,0],[3.02,0.12,0],[7.02,0.48,0],[1.35,1.76,1],[5.18,0.67,0],[1.21,0.09,1],[5.49,0.35,0],[7.58,1.69,0],[4.42,0.35,0],[1.84,1.49,1],[3.2,0.55,0],[2.19,1.67,1],[1.89,1.45,1],[5.03,0.22,0],[3.71,0.48,0],[3.09,0.73,0],[6.87,1.39,0],[1.06,0.41,1],[0.76,1.71,1],[3.98,1.71,0],[2.24,1.16,0],[7.94,0.0,0],[3.84,1.97,0],[4.04,0.0,0],[7.22,0.66,0],[2.04,1.07,1],[4.06,0.45,0],[6.34,0.65,0],[4.6,1.22,0],[1.44,1.87,1],[0.0,1.53,1],[7.52,1.75,0],[7.83,1.76,0],[0.0,0.0,1],[7.32,1.82,0],[7.52,1.38,0],[0.7,1.22,1],[6.1,2.18,0],[0.49,0.39,1],[4.76,0.04,0],[6.14,0.55,0],[1.0,1.07,1],[7.19,0.5,0],[3.32,0.27,0],[0.04,1.55,1],[6.07,0.76,0],[7.56,0.0,0],[0.96,1.05,1],[4.0,0.62,0],[3.87,0.93,0],[2.14,0.63,0],[1.92,1.26,1],[1.81,1.73,1],[1.64,0.43,0],[2.87,0.19,0],[7.38,0.38,0],[3.22,0.79,0],[2.18,0.81,0],[6.11,0.76,0],[6.98,1.52,0],[6.01,0.45,0],[4.64,0.66,0],[7.25,1.8,0],[6.14,1.07,0],[1.52,0.06,1],[8.7,0.77,0],[4.14,1.87,0],[5.86,0.24,0],[5.46,0.37,0],[4.17,1.73,0],[8.2,0.94,0],[7.69,0.88,0],[2.03,0.61,0],[5.07,0.76,0],[6.12,0.58,0],[7.41,1.32,0],[0.81,0.69,1],[5.74,1.83,0],[2.89,0.71,0],[0.91,1.74,1],[0.73,1.81,1],[8.12,1.19,0],[7.83,1.02,0],[7.12,1.6,0],[1.0,0.4,1],[6.85,1.5,0],[0.76,0.55,1],[7.9,2.03,0],[5.12,1.41,0],[6.98,1.5,0],[0.28,0.74,1],[1.62,1.2,1],[7.72,0.0,0],[4.87,0.09,0],[1.71,0.08,0],[0.95,1.14,1],[2.49,0.0,0],[5.39,0.0,0],[7.93,0.19,0],[3.51,1.17,0],[8.13,1.24,0],[4.6,0.12,0],[2.16,1.45,1],[5.01,1.09,0],[2.76,1.37,0],[3.05,0.87,0],[4.65,0.66,0],[0.17,0.65,1],[7.7,1.98,0],[0.65,0.43,1],[5.38,1.12,0],[6.71,0.05,0],[6.52,0.0,0],[4.4,0.09,0],[6.14,0.5,0],[5.63,0.07,0],[4.66,2.04,0],[5.41,1.6,0],[2.91,0.02,0],[6.2,1.87,0],[4.13,1.06,0],[2.46,1.07,1],[4.96,0.24,0],[3.58,1.73,0],[3.58,0.49,0],[5.83,1.51,0],[5.7,1.85,0],[4.46,0.95,0],[6.67,1.73,0],[7.35,1.98,0],[6.85,1.89,0],[3.05,0.49,0],[1.34,1.34,1],[6.58,2.25,0],[1.36,1.08,1],[3.58,1.01,0],[2.38,0.2,0],[6.66,2.16,0],[5.14,0.83,0],[0.0,0.75,1],[4.6,1.8,0],[6.9,0.65,0],[1.34,1.2,1],[2.25,1.35,0],[5.55,0.74,0],[5.03,0.47,0],[8.33,1.56,0],[1.75,1.27,1],[5.69,0.73,0],[4.54,1.11,0],[2.1,0.31,0],[5.08,1.45,0],[3.03,0.0,0],[5.55,1.98,0],[4.77,2.16,0],[7.89,0.52,0],[5.33,0.4,0],[7.48,0.6,0],[0.6,1.92,1],[6.08,0.53,0],[5.74,0.41,0],[4.34,1.21,0],[2.97,1.97,0],[3.08,1.44,0],[3.48,0.74,0],[7.8,1.66,0],[4.47,1.15,0],[6.78,0.0,0],[0.79,1.56,1],[6.23,1.16,0],[6.24,0.68,0],[2.2,1.73,1],[0.86,1.39,1],[5.49,1.75,0],[1.07,0.97,1],[2.78,1.88,1],[3.77,0.94,0],[1.31,0.83,1],[6.01,1.49,0],[1.58,1.78,1],[5.85,1.7,0],[2.04,0.67,0],[7.53,1.3,0],[1.08,2.32,1],[1.95,0.36,0],[3.65,1.42,0],[6.69,0.73,0],[3.89,1.04,0],[7.94,0.96,0],[4.63,0.13,0],[4.38,0.72,0],[5.09,1.31,0],[6.02,1.11,0],[6.46,1.79,0],[4.02,1.21,0],[2.52,1.53,0],[0.0,0.52,1],[3.9,1.78,0],[4.0,0.89,0],[5.81,2.02,0],[4.65,1.23,0],[6.53,0.0,0],[1.11,1.41,1],[0.61,0.21,1],[5.27,0.58,0],[5.45,1.5,0],[0.67,1.42,1],[1.52,1.54,1],[0.94,1.5,1],[6.32,0.0,0],[1.97,1.91,1],[3.46,0.3,0],[5.01,1.25,0],[2.84,2.01,1],[4.15,1.33,0],[2.75,1.26,0],[5.35,0.26,0],[6.96,1.27,0],[2.74,1.45,0],[4.64,1.24,0],[6.25,0.29,0],[4.47,0.2,0],[1.33,0.21,0],[6.05,0.64,0],[0.6,1.17,1],[2.6,0.39,0],[5.91,0.28,0],[0.36,1.15,1],[2.61,0.0,0],[4.43,2.36,0],[2.99,1.29,0]];
+
+function sigmoid(z) {
+  if (z >= 0) return 1 / (1 + Math.exp(-z));
+  const ez = Math.exp(z);
+  return ez / (1 + ez);
+}
+function neuron(w, b, x) {
+  let z = b;
+  for (let i = 0; i < w.length; i++) z += w[i] * x[i];
+  return sigmoid(z);
+}
+function trainEpoch(w, b, lr) {
+  for (const [d, v, y] of DATA) {
+    const err = neuron(w, b, [d, v]) - y;
+    w = [w[0] - lr * err * d, w[1] - lr * err * v];
+    b -= lr * err;
+  }
+  return [w, b];
+}
+function score(w, b) {
+  let ok = 0, miss = 0, fa = 0;
+  for (const [d, v, y] of DATA) {
+    const s = neuron(w, b, [d, v]) >= 0.5 ? 1 : 0;
+    if (s === y) ok++; else if (y === 1) miss++; else fa++;
+  }
+  return { acc: ok / DATA.length, miss, fa };
+}
+
+const D_MAX = 9, V_MAX = 2.8;
+let W = [-1, 1], B = 1, epochs = 0, probe = null;
+const cv = document.getElementById('ncv'), ctx = cv.getContext('2d');
+const sl = { w1: document.getElementById('w1'), w2: document.getElementById('w2'), bs: document.getElementById('bs') };
+const pad = { l: 44, r: 12, t: 12, b: 34 };
+const px = d => pad.l + d / D_MAX * (cv.width - pad.l - pad.r);
+const py = v => cv.height - pad.b - v / V_MAX * (cv.height - pad.t - pad.b);
+
+function draw() {
+  const pw = cv.width - pad.l - pad.r, ph = cv.height - pad.t - pad.b;
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const step = 10;
+  ctx.fillStyle = css('--fail');
+  for (let i = 0; i < pw; i += step) for (let j = 0; j < ph; j += step) {
+    const d = (i + step / 2) / pw * D_MAX, v = (ph - j - step / 2) / ph * V_MAX;
+    ctx.globalAlpha = 0.28 * neuron(W, B, [d, v]);
+    ctx.fillRect(pad.l + i, pad.t + j, step, step);
+  }
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = css('--line'); ctx.strokeRect(pad.l, pad.t, pw, ph);
+  ctx.fillStyle = css('--muted'); ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+  for (let d = 0; d <= D_MAX; d++) ctx.fillText(d, px(d), cv.height - pad.b + 14);
+  ctx.fillText('distance ahead (m)', pad.l + pw / 2, cv.height - 4);
+  ctx.textAlign = 'right';
+  for (let v = 0; v <= 2.5; v += 0.5) ctx.fillText(v.toFixed(1), pad.l - 6, py(v) + 4);
+  ctx.save(); ctx.translate(12, pad.t + ph / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center';
+  ctx.fillText('closing speed (m/s)', 0, 0); ctx.restore();
+  for (const [d, v, y] of DATA) {
+    ctx.beginPath(); ctx.arc(px(Math.min(d, D_MAX)), py(Math.min(v, V_MAX)), 3, 0, 2 * Math.PI);
+    if (y) { ctx.fillStyle = css('--fail'); ctx.fill(); } else { ctx.strokeStyle = css('--pass'); ctx.stroke(); }
+  }
+  // decision boundary: w1*d + w2*v + b = 0
+  ctx.save(); ctx.beginPath(); ctx.rect(pad.l, pad.t, pw, ph); ctx.clip();
+  ctx.strokeStyle = css('--fg'); ctx.lineWidth = 2; ctx.beginPath();
+  if (Math.abs(W[0]) > 1e-9) {
+    for (let k = 0; k <= 1; k++) { const v = k * V_MAX, d = -(W[1] * v + B) / W[0]; k ? ctx.lineTo(px(d), py(v)) : ctx.moveTo(px(d), py(v)); }
+  } else if (Math.abs(W[1]) > 1e-9) {
+    const v = -B / W[1]; ctx.moveTo(px(0), py(v)); ctx.lineTo(px(D_MAX), py(v));
+  }
+  ctx.stroke(); ctx.restore();
+  if (probe) {
+    ctx.strokeStyle = css('--accent'); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(px(probe[0]), py(probe[1]), 7, 0, 2 * Math.PI); ctx.stroke(); ctx.lineWidth = 1;
+  }
+}
+
+function update() {
+  sl.w1.value = W[0]; sl.w2.value = W[1]; sl.bs.value = B;
+  document.getElementById('w1v').textContent = W[0].toFixed(2);
+  document.getElementById('w2v').textContent = W[1].toFixed(2);
+  document.getElementById('bsv').textContent = B.toFixed(2);
+  const s = score(W, B);
+  document.getElementById('acc').textContent = (s.acc * 100).toFixed(1) + '%';
+  document.getElementById('miss').textContent = s.miss;
+  document.getElementById('falarm').textContent = s.fa;
+  document.getElementById('eps').textContent = epochs;
+  if (probe) {
+    const z = W[0] * probe[0] + W[1] * probe[1] + B, p = neuron(W, B, probe);
+    document.getElementById('probe').textContent = `Probe (${probe[0].toFixed(2)} m, ${probe[1].toFixed(2)} m/s): z = ${z.toFixed(2)}, stop probability = ${p.toFixed(2)} → ${p >= 0.5 ? 'STOP' : 'go'}`;
+  }
+  draw();
+}
+
+for (const k of ['w1', 'w2', 'bs']) sl[k].oninput = () => {
+  W = [+sl.w1.value, +sl.w2.value]; B = +sl.bs.value; epochs = 0; update();
+};
+document.getElementById('zero').onclick = () => { W = [0, 0]; B = 0; epochs = 0; update(); };
+document.getElementById('ep1').onclick = () => { [W, B] = trainEpoch(W, B, 0.05); epochs++; update(); };
+document.getElementById('ep200').onclick = () => {
+  W = [0, 0]; B = 0;
+  for (let e = 0; e < 200; e++) [W, B] = trainEpoch(W, B, 0.05);
+  epochs = 200; update();
+};
+cv.onclick = e => {
+  const r = cv.getBoundingClientRect(), sx = cv.width / r.width, sy = cv.height / r.height;
+  const x = (e.clientX - r.left) * sx, y = (e.clientY - r.top) * sy;
+  const d = (x - pad.l) / (cv.width - pad.l - pad.r) * D_MAX, v = (cv.height - pad.b - y) / (cv.height - pad.t - pad.b) * V_MAX;
+  if (d < 0 || d > D_MAX || v < 0 || v > V_MAX) return;
+  probe = [d, v]; update();
+};
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+update();
+</script>
+</body>
+</html>

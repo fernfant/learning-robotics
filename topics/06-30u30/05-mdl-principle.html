@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 05 · The MDL Principle</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 05</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Unit 1 · The foundations · Day 05</div>
+<h1>A Tutorial Introduction to the Minimum Description Length Principle</h1>
+<p class="lede">Learning is compression. The model that lets you describe the data in the fewest bits, counting the bits for the model itself, is the one to trust.</p>
+
+<div class="facts">
+  <div><b>Author</b>Peter Grünwald</div>
+  <div><b>Year / venue</b>2004 · arXiv (math/0406077); chapters 1–2 of <em>Advances in MDL</em>, MIT Press</div>
+  <div><b>Core idea</b>Model selection by shortest code length</div>
+  <div><b>Study time</b>5–8 h</div>
+</div>
+<p class="meta">Original: <a href="https://arxiv.org/abs/math/0406077">arXiv:math/0406077</a> · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/05_MDL_Principle">30u30 Day 5</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">The best explanation of some data is the one that lets you write the data down in the fewest bits, counting the explanation itself.</p>
+
+<h3>Think of it like this</h3>
+<p>Think of zipping files on a computer. A file that says "ABABABAB…" a thousand times zips down to almost nothing, because the zip program spots the pattern. A file of random letters hardly shrinks at all. So how much a file shrinks tells you how much pattern is in it. MDL says: finding patterns <em>is</em> learning. But you must also count the size of the rule you used, or you could cheat with a giant rule that just lists every answer.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>You have some data, like dots on a graph, and several possible explanations, like a straight line or a wiggly curve.</li>
+<li>For each explanation, count the bits needed to describe the explanation itself.</li>
+<li>Then count the bits needed to describe the data's mistakes, given that explanation.</li>
+<li>Add the two numbers together.</li>
+<li>Pick the explanation with the smallest total. A wiggly curve fits better, but it costs more bits to describe.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot learning how its own arm moves has to pick a model: a simple one, or a complicated one with lots of extra terms. Too simple, and it misses real effects like friction. Too complicated, and it learns the random wobble in its sensors. MDL gives a fair way to choose.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Write down the sequence 2, 4, 6, 8, … up to 100. Now describe it to a friend in as few words as possible ("even numbers up to 100"). Then try the same with 10 dice rolls. You can't shrink the dice rolls, because there is no pattern.</li>
+<li>In the demo further down, move the <b>Noise level</b> slider right and the <b>Data points n</b> slider left. Watch the highlighted bar: with noisy, small data, MDL picks a simpler curve. Training error alone always picks the most wiggly one.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Compress</dt><dd>Make data take up fewer bits by using its patterns, like a zip file.</dd>
+<dt>Model</dt><dd>An explanation or rule for the data.</dd>
+<dt>Overfitting</dt><dd>Choosing an over-complicated explanation that fits random noise.</dd>
+<dt>Code length</dt><dd>The number of bits used to write something down.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Grünwald's tutorial is the standard introduction to Rissanen's Minimum Description Length principle. Any regularity in data can be used to compress it, so the more you can compress, the more you have learned. Chapter 1 is a non-technical tour. Chapter 2 makes it precise: code lengths are log-probabilities, crude MDL adds model bits to data bits, and refined MDL replaces hand-made model codes with a single, provably good code per model family (normalised maximum likelihood). It ties MDL to Bayes, to cross-validation-like prediction, and to Kolmogorov complexity.</p>
+</div>
+<ul>
+<li><strong>Codes = probabilities.</strong> The Kraft inequality means every prefix code corresponds to a distribution, with length <code>−log₂ P(x)</code>.</li>
+<li><strong>Crude MDL:</strong> pick the hypothesis H minimising <code>L(H) + L(D|H)</code>. Overfitting is penalised automatically.</li>
+<li><strong>Refined MDL:</strong> pick the model with the shortest NML code length. Model cost becomes "parametric complexity": roughly, how many distinguishable distributions the model contains.</li>
+<li><strong>Four readings</strong> of refined MDL: compression, counting, Bayesian, and prequential (sequential prediction).</li>
+<li><strong>No true model needed.</strong> MDL makes sense even when every candidate model is wrong, which in practice they all are.</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<p>Crude, two-part MDL for a set of hypotheses:</p>
+<pre><code>H* = argmin_H  [ L(H) + L(D | H) ]
+
+L(D | H) = −log₂ P(D | H)                # bits to code the data with H's help
+L(H)     ≈ (k/2) · log₂ n                # k parameters at optimal precision, n data points</code></pre>
+<ul>
+<li><code>L(D | H)</code> is the misfit. A better fit means fewer bits for the data.</li>
+<li><code>L(H)</code> is the cost of stating the hypothesis. Each parameter only needs about <code>½ log₂ n</code> bits, because with n points you can't pin it down finer than about <code>1/√n</code>. This is where the BIC-style penalty comes from.</li>
+</ul>
+<p>The trouble is that <code>L(H)</code> depends on an arbitrary choice of code. Refined MDL fixes that with one code per model family <code>M</code>:</p>
+<pre><code>P_nml(D | M) = P(D | θ̂(D)) / Σ_{D'} P(D' | θ̂(D'))
+
+−log P_nml(D | M) = −log P(D | θ̂(D))  +  COMP_n(M)
+COMP_n(M) ≈ (k/2) log(n / 2π) + log ∫ √det I(θ) dθ</code></pre>
+<ul>
+<li><code>θ̂(D)</code> is the maximum-likelihood fit to the data you actually saw.</li>
+<li>The denominator sums the best-fit likelihood over <em>every</em> data set the model could have seen. A flexible model fits everything well, so its denominator is large and it pays more.</li>
+<li><code>COMP_n</code>, the parametric complexity, is the log of that sum. It grows with the number of parameters k, but the second term, with the Fisher information <code>I(θ)</code>, also captures how the model's <em>functional form</em> shapes its flexibility. Two models with the same k can have different complexity.</li>
+</ul>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>Watching MDL choose a polynomial</h3>
+<p>Grünwald's running example is choosing the degree of a polynomial. Training error alone always prefers the highest degree. Add the cost of the parameters and the minimum lands near the truth.</p>
+<div class="card demo">
+<h3>Interactive: crude two-part MDL for polynomial degree</h3>
+<p class="legend">Data from a cubic plus Gaussian noise (seeded). Right: bits per degree, <b class="p">model L(H)</b> stacked on <b class="f">data L(D|H)</b> (relative to the best fit). The <b style="color:var(--accent)">chosen degree</b> has the shortest total. Left: the data and the chosen fit.</p>
+<canvas id="mdl" width="700" height="220" aria-label="Scatter of data with fitted polynomial, and bar chart of description lengths by degree"></canvas>
+<label for="n">Data points n: <span id="nv" class="num"></span></label>
+<input id="n" type="range" min="15" max="400" step="5" value="40">
+<label for="z">Noise level: <span id="zv" class="num"></span></label>
+<input id="z" type="range" min="0.05" max="1.2" step="0.05" value="0.3">
+<div class="stats">
+  <div class="stat"><div class="k">MDL picks degree</div><div class="v" id="dm">–</div></div>
+  <div class="stat"><div class="k">Training error picks</div><div class="v" id="dt">–</div></div>
+  <div class="stat"><div class="k">True degree</div><div class="v">3</div></div>
+</div>
+</div>
+<p>Two things to notice. With heavy noise and few points, MDL settles for a simpler model than the truth: the data don't justify the extra parameters, and that's the right call. Training error, meanwhile, always picks degree 8. One caution: the <code>(k/2) log n</code> penalty is an approximation that is only reliable for large n, and it treats every parameter as equally costly. Those small-sample and same-k weaknesses are Grünwald's reasons for refined MDL.</p>
+
+<h3>Four ways to read the same number</h3>
+<ul>
+<li><strong>Compression:</strong> NML gives every distribution in the model equal treatment. Its regret (extra bits over the best fit in hindsight) is the same for every data set.</li>
+<li><strong>Counting:</strong> <code>COMP_n</code> is roughly the log of the number of distributions in the model that data of size n can tell apart.</li>
+<li><strong>Bayesian:</strong> with Jeffreys' prior, the Bayesian marginal likelihood matches the NML code length to leading order. MDL and Bayes often agree, for different reasons.</li>
+<li><strong>Prequential:</strong> predict each point from the ones before, and add up <code>−log P(x_i | x_1…x_{i−1})</code>. That sum is a valid code length. It is model selection by honest out-of-sample prediction, a close cousin of cross-validation.</li>
+</ul>
+
+<h3>Links across the course</h3>
+<ul>
+<li>A language model's cross-entropy is literally the code length of the text in bits. Training on next-token loss, as in <a href="01-rnn-effectiveness.html">Day 01</a>, is compression.</li>
+<li><a href="04-mdl-noisy-weights.html">Day 04</a> applied MDL to the weights of a network. <a href="26-kolmogorov-complexity.html">Day 26</a> covers the ideal, uncomputable version: Kolmogorov complexity.</li>
+<li>The prequential view is also how you should evaluate a model that learns online: score each prediction before it trains on that point. Compare <a href="../01-decision-model-evals.html#tuning">Module 01's tuning without fooling yourself</a>.</li>
+</ul>
+
+<h3>Limits Grünwald admits</h3>
+<p>For many models <code>COMP_n</code> is infinite (the Gaussian with unbounded mean, for example) and needs patching. NML is often hard to compute, so practice falls back on approximations. And MDL's Occam's razor is a claim about codes, not about the world: a short description is a good bet for prediction, not proof that nature is simple.</p>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>System identification.</strong> Choosing the order of a dynamics model, the number of friction terms, or how many modes a contact model needs is model selection. MDL gives a principled stopping rule when you can't afford a big held-out set.</li>
+<li><strong>World models are compressors.</strong> A model that predicts the next sensor reading well can encode the sensor log in fewer bits. Prequential log-loss is a clean, single number for comparing learned dynamics models.</li>
+<li><strong>Segmenting demonstrations.</strong> Splitting a long demonstration into skills is a trade-off between describing many short primitives and one long messy one. Two-part code lengths give a natural way to frame that choice.</li>
+<li><strong>Honest scale note:</strong> modern deep robot policies are not chosen by computing NML. The value here is the mindset: always count the cost of the model, not just the fit.</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Read Chapter 1 in one sitting (about 20 pages, no maths). Then read Chapter 2 Sections 2.2–2.6 slowly, with paper.</li>
+<li>Prove the easy direction of the Kraft inequality yourself for a small code like {0, 10, 110, 111}.</li>
+<li>In the 30u30 Day 5 folder, run <code>train_minimal.py</code> and read <code>implementation.py</code> to see two-part, prequential and NML code lengths computed side by side.</li>
+<li>Do the exercises in order: two-part code, prequential coding, model selection, NML complexity, and MDL vs AIC/BIC.</li>
+<li>Stretch: compute the NML complexity of the Bernoulli model exactly for n = 10, 100, 1000 and compare it with <code>½ log₂ n</code>.</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>Why can code lengths be treated as probabilities?</summary><p>By the Kraft inequality, the lengths of any prefix code satisfy <code>Σ 2^(−L(x)) ≤ 1</code>, so <code>2^(−L(x))</code> behaves like a probability. Conversely, any distribution gives a code with lengths of about <code>−log₂ P(x)</code>.</p></details>
+<details><summary>Why does crude MDL charge about ½ log₂ n bits per parameter?</summary><p>With n data points a parameter can only be estimated to a precision of about <code>1/√n</code>. Stating it more precisely buys nothing, and stating it to that precision costs about <code>½ log₂ n</code> bits.</p></details>
+<details><summary>What does the NML denominator measure?</summary><p>How well the model can fit all possible data sets of size n. Flexible models fit many data sets well, so they get a large denominator and pay a higher complexity.</p></details>
+<details><summary>What is the prequential interpretation?</summary><p>Code each point using a model fitted only to earlier points. The total log-loss is a code length, so model selection becomes "which model predicted the sequence best, step by step".</p></details>
+<details><summary>Does MDL assume one of the models is true?</summary><p>No. It picks the model that compresses the data best, which is meaningful even when all candidates are wrong.</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/math/0406077">The original tutorial</a>, and Grünwald's book <em>The Minimum Description Length Principle</em> (MIT Press, 2007) for the full treatment</li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/05_MDL_Principle">30u30 Day 5</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Next: <a href="06-complexodynamics.html">Day 06, The First Law of Complexodynamics</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="04-mdl-noisy-weights.html"><small>Previous</small>Day 04 · Noisy weights and MDL</a>
+  <a class="next" href="06-complexodynamics.html"><small>Next</small>Day 06 · Complexodynamics</a>
+</nav>
+<footer>Module 06 · Day 05 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('mdl'), ctx = cv.getContext('2d');
+const nIn = document.getElementById('n'), zIn = document.getElementById('z');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const MAXD = 8, truth = x => 1.5 * x ** 3 - x + 0.3;
+
+function rng(s) { return () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+function fit(X, Y, k) {   // least squares via normal equations, Gauss-Jordan with partial pivoting
+  const m = k + 1, A = Array.from({ length: m }, () => new Array(m + 1).fill(0));
+  X.forEach((x, i) => {
+    const p = []; for (let a = 0; a < m; a++) p.push(x ** a);
+    for (let a = 0; a < m; a++) { for (let b = 0; b < m; b++) A[a][b] += p[a] * p[b]; A[a][m] += p[a] * Y[i]; }
+  });
+  for (let c = 0; c < m; c++) {
+    let pv = c; for (let r = c + 1; r < m; r++) if (Math.abs(A[r][c]) > Math.abs(A[pv][c])) pv = r;
+    [A[c], A[pv]] = [A[pv], A[c]];
+    for (let r = 0; r < m; r++) { if (r === c) continue; const f = A[r][c] / A[c][c]; for (let q = c; q <= m; q++) A[r][q] -= f * A[c][q]; }
+  }
+  return A.map((row, i) => row[m] / row[i]);
+}
+const evalP = (c, x) => c.reduce((s, v, a) => s + v * x ** a, 0);
+
+function analyse(n, sig) {
+  const r = rng(5), X = [], Y = [];
+  for (let i = 0; i < n; i++) {
+    const x = 2 * r() - 1, z = Math.sqrt(-2 * Math.log(r() + 1e-12)) * Math.cos(2 * Math.PI * r());
+    X.push(x); Y.push(truth(x) + sig * z);
+  }
+  const res = [];
+  for (let k = 0; k <= MAXD; k++) {
+    const c = fit(X, Y, k);
+    const rss = Math.max(1e-12, X.reduce((s, x, i) => s + (Y[i] - evalP(c, x)) ** 2, 0));
+    res.push({ k, c, LH: (k + 1) / 2 * Math.log2(n), LD: n / 2 * Math.log2(rss / n) });
+  }
+  const base = Math.min(...res.map(o => o.LD));
+  res.forEach(o => { o.LDr = o.LD - base; o.tot = o.LH + o.LDr; });
+  const best = res.reduce((a, b) => b.tot < a.tot ? b : a), train = res.reduce((a, b) => b.LD < a.LD ? b : a);
+  return { X, Y, res, best, train };
+}
+
+function draw() {
+  const n = +nIn.value, sig = +zIn.value;
+  document.getElementById('nv').textContent = n;
+  document.getElementById('zv').textContent = sig.toFixed(2);
+  const { X, Y, res, best, train } = analyse(n, sig);
+  const W = cv.width, H = cv.height, SPLIT = 290;
+  ctx.clearRect(0, 0, W, H); ctx.font = '12px sans-serif';
+  // left: scatter and chosen fit
+  const sx = x => 10 + (SPLIT - 30) * (x + 1) / 2, sy = v => H / 2 - v * (H - 30) / 6;
+  ctx.fillStyle = css('--muted');
+  X.forEach((x, i) => { ctx.beginPath(); ctx.arc(sx(x), sy(Y[i]), 2.2, 0, 7); ctx.fill(); });
+  ctx.strokeStyle = css('--accent'); ctx.lineWidth = 2.5; ctx.beginPath();
+  for (let x = -1; x <= 1.0001; x += 0.01) { const v = Math.max(-3, Math.min(3, evalP(best.c, x))); x === -1 ? ctx.moveTo(sx(x), sy(v)) : ctx.lineTo(sx(x), sy(v)); }
+  ctx.stroke();
+  // right: stacked bars
+  const L = SPLIT + 20, R = 10, T = 10, B = 22, bw = (W - L - R) / (MAXD + 1);
+  const ymax = Math.max(...res.map(o => o.tot)) * 1.05 || 1, y = v => T + (H - T - B) * (1 - v / ymax);
+  res.forEach((o, i) => {
+    const x0 = L + i * bw + 4, w = bw - 8;
+    ctx.fillStyle = css('--fail'); ctx.fillRect(x0, y(o.LDr), w, y(0) - y(o.LDr));
+    ctx.fillStyle = css('--pass'); ctx.fillRect(x0, y(o.tot), w, y(o.LDr) - y(o.tot));
+    if (o === best) { ctx.strokeStyle = css('--accent'); ctx.lineWidth = 3; ctx.strokeRect(x0 - 2, y(o.tot) - 2, w + 4, y(0) - y(o.tot) + 4); }
+    ctx.fillStyle = css('--fg'); ctx.textAlign = 'center'; ctx.fillText(o.k, x0 + w / 2, H - 6);
+  });
+  document.getElementById('dm').textContent = best.k;
+  document.getElementById('dt').textContent = train.k;
+}
+nIn.oninput = zIn.oninput = draw;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

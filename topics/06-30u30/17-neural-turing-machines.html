@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 17 · Neural Turing Machines</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 17</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Unit 4 · Specialised architectures · Day 17</div>
+<h1>Neural Turing Machines</h1>
+<p class="lede">Give a neural network a memory matrix it can read and write with soft, differentiable pointers, and it can learn simple algorithms like copy and sort from examples.</p>
+
+<div class="facts">
+  <div><b>Authors</b>Alex Graves, Greg Wayne, Ivo Danihelka</div>
+  <div><b>Year / venue</b>2014 · arXiv preprint (Google DeepMind)</div>
+  <div><b>Core idea</b>Differentiable external memory</div>
+  <div><b>Study time</b>3–5 h</div>
+</div>
+<p class="meta">Original: <a href="https://arxiv.org/abs/1410.5401">arXiv:1410.5401</a> · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/17_neural_turing_machines">30u30 Day 17</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">A Neural Turing Machine is a neural network with its own notebook: it learns where to write things down and where to read them back.</p>
+
+<h3>Think of it like this</h3>
+<p>Try to remember a long list in your head and you'll soon lose bits. With a notebook, it's easy. You can find a page by what's on it ("the page with the map") or by where it is ("the next page"). You can rub out a line and write over it. This network gets a notebook like that. The twist is that its pencil is a bit blurry: it mostly writes on one line, with a little on the lines nearby. That blur is what lets it learn by trial and error.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>A small network called the controller is the "brain". It decides what to do at each step.</li>
+<li>The memory is a grid of rows, like lines in a notebook.</li>
+<li>To choose a row, it can search by content ("find the row that looks like this") or by location ("stay where I was" or "move one row down").</li>
+<li>To read, it takes a blend that is mostly the chosen row. To write, it first rubs out part of the row, then adds new information.</li>
+<li>By training on examples, it learned a real step-by-step method for copying lists, and it mostly worked on lists much longer than any it had practised on.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>A robot tidying a house might need to answer "where did I put the screwdriver ten minutes ago?" That's too long ago to keep in its short-term view. A notebook-style memory lets it write down where things are and look them up later, by what they are ("the screwdriver") or by place ("the shelf next to me").</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Have a friend read out ten words. Write each one on a new line as you hear it. Then go back to the top and read them out in order. You just used the same copy method the network learned: write and move down, jump back to the start, read and move down.</li>
+<li>In the demo further down, set <b>Gate g</b> to 0 and <b>Shift</b> to +1. The focus moves from row 10 to row 11, like turning to the next line. Then set <b>Gate g</b> back to 1 and raise <b>Key strength β</b> to lock onto row 5 by content. Try <b>Sharpen γ</b> to make a blurry focus crisp.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Memory</dt><dd>A grid of rows the network can read from and write to.</dd>
+<dt>Controller</dt><dd>The part of the network that decides what to read and write.</dd>
+<dt>Head</dt><dd>The network's "pencil": where it is currently reading or writing.</dd>
+<dt>Content addressing</dt><dd>Finding a row by what is written in it.</dd>
+<dt>Location addressing</dt><dd>Finding a row by where it is, such as the next one down.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>An LSTM's memory is its hidden state, so more memory means more weights. The Neural Turing Machine (NTM) separates the two. A controller network (feed-forward or LSTM) talks to an N×M memory matrix through read and write <em>heads</em>. Each head holds a weighting over memory rows: a soft pointer. Because every operation is a weighted sum, the whole machine trains by gradient descent. On copy, repeat copy, associative recall, n-gram prediction and priority sort, NTMs learned faster than LSTMs and generalised to longer inputs than they were trained on.</p>
+</div>
+<ul>
+<li><strong>Read:</strong> a weighted average of memory rows.</li>
+<li><strong>Write:</strong> erase then add, both scaled by the head's weighting, like LSTM forget and input gates applied to memory.</li>
+<li><strong>Addressing:</strong> four stages. Content lookup by cosine similarity, a gate to keep the old focus, a circular shift, and a sharpening step.</li>
+<li><strong>Copy result:</strong> trained on sequences of 8-bit vectors of length 1–20, the NTM copied much longer ones (the paper shows length 120, with a few local errors). LSTM degraded quickly past the training range.</li>
+<li>The experiments used a 128×20 memory. A feed-forward NTM for copy had about 17k parameters.</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<p>Memory <code>M_t</code> has N rows of width M. A head's weighting <code>w_t</code> has N entries, each in [0, 1], summing to 1.</p>
+<pre><code>Read:   r_t = Σ_i w_t(i) · M_t(i)
+Erase:  M̃_t(i) = M_{t−1}(i) ⊙ (1 − w_t(i) · e_t)      # e_t ∈ (0,1)^M
+Add:    M_t(i) = M̃_t(i) + w_t(i) · a_t
+
+1 Content:  w^c(i) = softmax_i( β_t · cos(k_t, M_t(i)) )
+2 Gate:     w^g    = g_t · w^c + (1 − g_t) · w_{t−1}
+3 Shift:    w̃(i)  = Σ_j w^g(j) · s_t(i − j)              # indices mod N
+4 Sharpen:  w(i)   = w̃(i)^γ_t / Σ_j w̃(j)^γ_t            # γ_t ≥ 1</code></pre>
+<ul>
+<li><code>k_t</code> is a key the controller emits, <code>β_t</code> its strength. High β makes the content match nearly one-hot.</li>
+<li><code>g_t</code> ∈ (0, 1) chooses between "find by content" (g = 1) and "stay where I was" (g = 0).</li>
+<li><code>s_t</code> is a distribution over allowed shifts, for example −1, 0, +1. Convolution moves the focus, which lets the head iterate through memory like a pointer increment.</li>
+<li>A blurry shift spreads the focus a little more each step. <code>γ_t</code> sharpens it back.</li>
+<li><code>e_t</code> and <code>a_t</code> are erase and add vectors. A cell is fully cleared only when both the weighting and the erase entry are 1.</li>
+</ul>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>Content vs location addressing</h3>
+<p>Content addressing finds memory by what's in it: "the row that looks like this key". It's good for lookup and recall. Location addressing finds memory by where it is: "the row after the last one". It's needed when values are arbitrary, like variables in a program. The pipeline gives three modes: pure content lookup, content lookup then shift (jump to a neighbour of a found item), and pure iteration from the previous position. Try them:</p>
+<div class="card demo">
+<h3>Interactive: the four addressing stages</h3>
+<p class="legend">16 memory rows with random contents. The key is a noisy copy of row 5. The previous focus w<sub>t−1</sub> is on row 10. Each strip is one stage; darker means more weight. Set g = 0 and shift = +1 to watch a pointer increment. The shift slider mixes the two nearest integer shifts, as in the paper's fractional-shift variant.</p>
+<canvas id="ntm" width="700" height="220" aria-label="Weightings after content, gate, shift and sharpen stages"></canvas>
+<label for="be">Key strength β: <span id="bev" class="num"></span></label>
+<input id="be" type="range" min="0" max="30" step="0.5" value="8">
+<label for="ga">Gate g: <span id="gav" class="num"></span></label>
+<input id="ga" type="range" min="0" max="1" step="0.05" value="1">
+<label for="sf">Shift: <span id="sfv" class="num"></span></label>
+<input id="sf" type="range" min="-1" max="1" step="0.05" value="0">
+<label for="gm">Sharpen γ: <span id="gmv" class="num"></span></label>
+<input id="gm" type="range" min="1" max="10" step="0.1" value="1">
+<div class="stats">
+  <div class="stat"><div class="k">Focus row</div><div class="v" id="fr">–</div></div>
+  <div class="stat"><div class="k">Max weight</div><div class="v" id="mw">–</div></div>
+  <div class="stat"><div class="k">Sum of weights</div><div class="v" id="sw">–</div></div>
+</div>
+</div>
+
+<h3>What the NTM actually learned</h3>
+<p>On copy, the authors inspected the heads. The learned procedure matches what a programmer would write: during input, write each vector and move the write head one row forward. At the delimiter, jump the read head back to the start by content, then read and move forward one row at a time. That combination of a content jump and location shifts is why it generalises: the loop doesn't care how long the sequence is. The paper notes that past 128 vectors the shifts wrap around the 128-row memory and start overwriting earlier rows, a limit of memory size rather than of the learned procedure.</p>
+
+<h3>The line from NTMs to today</h3>
+<ul>
+<li><strong>Attention is soft addressing.</strong> The content step is softmax over similarities, the same shape as attention in <a href="15-bahdanau-attention.html">Day 15</a> and <a href="13-attention.html">Day 13</a>. A Transformer's KV cache is a growing memory that is read by content but never overwritten.</li>
+<li><strong>Erase-and-add came back as fast-weight and linear-attention updates.</strong> Kimi K3's KDA layers keep a fixed-size state matrix and update it with decay, erase and write steps (<a href="../05-trillion-scale-architecture.html#length">Module 05</a>). The trade-off is the same one the NTM framed: fixed memory size, learned control over what to overwrite.</li>
+<li><strong>Successor:</strong> the Differentiable Neural Computer (Graves et al., 2016) added memory allocation and links between writes to fix NTM issues like overlapping writes.</li>
+<li>NTMs were notoriously hard to train stably, which is part of why simpler attention won in practice.</li>
+</ul>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Long-horizon tasks need memory beyond the context window.</strong> "Where did I put the screwdriver ten minutes ago?" doesn't fit in a few seconds of frames. External memory, written selectively and read by content, is one design for that, and the same idea underlies episodic memory modules in embodied agents.</li>
+<li><strong>Content vs location maps onto spatial memory.</strong> Look up "the object that looks like a mug" (content) versus "the cell next to where I am" (location). Neural maps and learned SLAM-like memories for navigation use both kinds of addressing.</li>
+<li><strong>Fixed memory size matters on hardware.</strong> An onboard policy can't let a KV cache grow forever. A bounded memory with learned erase and write keeps compute and RAM constant over an hour-long task.</li>
+<li><strong>Learning procedures, not just mappings.</strong> Copy and sort are toy versions of step-by-step behaviour such as following a recorded route back. The generalisation-to-longer-inputs test is a good one for any robot policy that should work on longer tasks than it was trained on.</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Read section 3 of the paper (reading, writing, addressing), then the copy task in section 4.1. Skim the other tasks.</li>
+<li>Work through equations 5–9 by hand on a memory of 4 rows. Confirm the weighting still sums to 1 after every stage.</li>
+<li>In the 30u30 Day 17 folder, read <code>implementation.py</code>, then run <code>train_minimal.py</code> on the copy task. Use <code>visualization.py</code> to plot read and write weightings over time: you should see two diagonal lines.</li>
+<li>Do the exercises: addressing, shift, memory, controller, sharpening.</li>
+<li>Test generalisation: train on short sequences, evaluate on lengths 2–5× longer, and compare with a plain LSTM.</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>What problem does the NTM's separation of controller and memory solve?</summary><p>In an LSTM, more memory means a bigger hidden state and quadratically more weights. In an NTM the memory matrix can grow without adding controller parameters.</p></details>
+<details><summary>Why are reads and writes "blurry"?</summary><p>To keep them differentiable. A hard pointer to one row has no gradient with respect to the address. A weighting over all rows does.</p></details>
+<details><summary>What do g = 0 and shift = +1 do together?</summary><p>They ignore content, take the previous focus, and move it one row forward: a pointer increment.</p></details>
+<details><summary>Why is a sharpening step needed?</summary><p>Convolving with a soft shift distribution spreads the focus a bit every step. Over many steps the pointer would dissolve. Raising weights to γ ≥ 1 and renormalising refocuses it.</p></details>
+<details><summary>When does a write fully clear a memory cell?</summary><p>Only when both the head's weight on that row and the erase vector's entry are 1. Otherwise the old value is only partly removed.</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/1410.5401">The original paper</a> (arXiv)</li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/17_neural_turing_machines">30u30 Day 17</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Next: <a href="18-pointer-networks.html">Day 18, Pointer Networks</a></li>
+<li>Course link: <a href="../10-rlm-harness.html">Module 10, RLM harnesses</a>: external, addressable memory again, with a Python REPL as the controller</li>
+</ul>
+
+<nav class="pager">
+  <a href="16-order-matters.html"><small>Previous</small>Day 16 · Order Matters</a>
+  <a class="next" href="18-pointer-networks.html"><small>Next</small>Day 18 · Pointer Networks</a>
+</nav>
+<footer>Module 06 · Day 17 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('ntm'), ctx = cv.getContext('2d');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const rng = s => () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+const N = 16, M = 6, r = rng(17);
+const MEM = Array.from({ length: N }, () => Array.from({ length: M }, () => r() * 2 - 1));
+const KEY = MEM[5].map(v => v + (r() - 0.5) * 0.4);
+const PREV = Array.from({ length: N }, (_, i) => i === 10 ? 0.9 : (i === 9 || i === 11 ? 0.05 : 0));
+const el = id => document.getElementById(id);
+
+const cos = (u, v) => u.reduce((a, x, i) => a + x * v[i], 0) / (Math.hypot(...u) * Math.hypot(...v) + 1e-12);
+function address(beta, g, shift, gamma) {
+  const z = MEM.map(m => beta * cos(KEY, m)), mx = Math.max(...z), e = z.map(v => Math.exp(v - mx)), se = e.reduce((a, b) => a + b);
+  const wc = e.map(v => v / se);
+  const wg = wc.map((v, i) => g * v + (1 - g) * PREV[i]);
+  const lo = Math.floor(shift), f = shift - lo, s = { [lo]: 1 - f, [lo + 1]: f };
+  const ws = wg.map((_, i) => Object.keys(s).reduce((a, k) => a + wg[((i - +k) % N + N) % N] * s[k], 0));
+  const p = ws.map(v => v ** gamma), sp = p.reduce((a, b) => a + b);
+  return [wc, wg, ws, p.map(v => v / sp)];
+}
+
+function draw() {
+  const beta = +el('be').value, g = +el('ga').value, sh = +el('sf').value, gm = +el('gm').value;
+  el('bev').textContent = beta.toFixed(1); el('gav').textContent = g.toFixed(2);
+  el('sfv').textContent = (sh > 0 ? '+' : '') + sh.toFixed(2); el('gmv').textContent = gm.toFixed(1);
+  const rows = address(beta, g, sh, gm), names = ['1 content', '2 gated', '3 shifted', '4 sharpened'];
+  const W = cv.width, H = cv.height, L = 90, T = 16, cw = (W - L - 6) / N, ch = (H - T - 6) / 4;
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '12px sans-serif'; ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center'; ctx.fillStyle = css('--muted');
+  for (let i = 0; i < N; i++) ctx.fillText(i, L + i * cw + cw / 2, 8);
+  rows.forEach((w, k) => {
+    ctx.textAlign = 'right'; ctx.fillStyle = css('--fg'); ctx.fillText(names[k], L - 8, T + k * ch + ch / 2);
+    w.forEach((v, i) => {
+      ctx.fillStyle = css('--line'); ctx.fillRect(L + i * cw + 1, T + k * ch + 3, cw - 2, ch - 6);
+      ctx.globalAlpha = Math.min(1, v); ctx.fillStyle = css('--accent');
+      ctx.fillRect(L + i * cw + 1, T + k * ch + 3, cw - 2, ch - 6);
+      ctx.globalAlpha = 1;
+    });
+  });
+  const w = rows[3], mx = Math.max(...w);
+  el('fr').textContent = w.indexOf(mx);
+  el('mw').textContent = (mx * 100).toFixed(0) + '%';
+  el('sw').textContent = w.reduce((a, b) => a + b).toFixed(3);
+}
+['be', 'ga', 'sf', 'gm'].forEach(id => el(id).oninput = draw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+draw();
+</script>
+</body>
+</html>

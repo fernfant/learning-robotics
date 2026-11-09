@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 20 · Relational RNNs</title>
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Module 06 · 30u30</a> › Day 20</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Unit 4 · Specialised architectures · Day 20</div>
+<h1>Relational Recurrent Neural Networks</h1>
+<p class="lede">Split an LSTM's memory into slots and let the slots attend to each other at every step. The network gets much better at comparing things it saw at different times.</p>
+
+<div class="facts">
+  <div><b>Authors</b>Adam Santoro, Ryan Faulkner, David Raposo, Jack Rae, Mike Chrzanowski, Théophane Weber, Daan Wierstra, Oriol Vinyals, Razvan Pascanu, Timothy Lillicrap (DeepMind, UCL)</div>
+  <div><b>Year / venue</b>2018 · NeurIPS</div>
+  <div><b>Core idea</b>Self-attention between memory slots inside a recurrent core</div>
+  <div><b>Study time</b>3–4 h</div>
+</div>
+<p class="meta">Original: <a href="https://arxiv.org/abs/1806.01822">arXiv:1806.01822</a> · Code, notebook and exercises: <a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/20_Relational_RNNs">30u30 Day 20</a></p>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">A computer that keeps its memories in separate boxes, and lets those boxes talk to each other, gets much better at comparing things it saw at different times.</p>
+
+<h3>Think of it like this</h3>
+<p>Think of a detective's notebook. Each clue gets its own page. When a new clue arrives, the detective flips back through the other pages and asks, "Does this connect to anything I already know?" A normal memory program stuffs all clues onto one messy page. This program keeps a few separate pages, and at every step each page checks the others and the newest clue.</p>
+
+<h3>How it works</h3>
+<ol>
+<li>The program has a few memory slots, like pages in a notebook.</li>
+<li>Something new arrives, for example a point on a map.</li>
+<li>Each slot looks at the other slots and the new thing, and pays most attention to the ones that matter.</li>
+<li>Each slot decides how much old memory to keep and how much new information to write.</li>
+<li>This repeats at every step, so the program can later answer questions that need comparing things from different times.</li>
+</ol>
+
+<h3>Why robots care</h3>
+<p>Objects leave a robot's camera view and come back. A robot tidying a room might see a toy, turn away, then see a box. To decide which toy is furthest from the box, it has to remember things it can no longer see and compare them.</p>
+
+<h3>Try it</h3>
+<ul>
+<li>Have a friend read out 6 places in your town, one at a time. Then they ask: "Which one is second furthest from school?" Notice how you have to remember them all and compare.</li>
+<li>In the demo further down, move the <b>Reference vector m</b> slider to pick the starting point, and the <b>Rank n</b> slider to choose "1st furthest", "2nd furthest" and so on. The highlighted line is the answer. Press <b>New sequence</b> for a fresh set of points.</li>
+</ul>
+
+<h3>Words to know</h3>
+<dl>
+<dt>Memory slot</dt><dd>One separate box where the program stores part of what it has seen.</dd>
+<dt>Attention</dt><dd>A way for each slot to choose which other slots to listen to most.</dd>
+<dt>Recurrent</dt><dd>Working step by step and carrying memory forward from one step to the next.</dd>
+<dt>Gate</dt><dd>A dial that decides how much old memory to keep and how much new to add.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> everything below is the full version, with some maths. On a first read, skim the headings and the "Why it matters for robotics" box, and come back for the rest later.</p>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Memory networks are good at storing and retrieving. This paper asks whether they can also <em>relate</em> what they've stored. It builds the Relational Memory Core (RMC): a matrix of memory slots that runs multi-head self-attention over itself plus the new input at each time step, then updates through LSTM-style gates. On a toy task built to need comparisons across time, LSTM and DNC baselines stayed under 30% accuracy while the RMC reached 91%. It also improved program evaluation, a partially observed Pac-Man game, and word-level language modelling.</p>
+</div>
+<ul>
+<li><strong>Memory:</strong> <code>N</code> slots, each a vector. Weights are shared across slots, so adding slots adds no parameters.</li>
+<li><strong>Interaction:</strong> each slot queries every slot and the new input with dot-product attention. Information moves between slots based on content.</li>
+<li><strong>Recurrence:</strong> the attended result goes through a row-wise MLP and then input and forget gates, like an LSTM cell state per slot.</li>
+<li><strong>Language modelling:</strong> test perplexity 31.6 on WikiText-103 vs 34.3 for their tuned LSTM. Also better on Project Gutenberg and GigaWord.</li>
+<li><strong>Honest caveat:</strong> the authors say they can't prove the gains come from "relational reasoning" as such. They treat it as better function, not a proven mechanism.</li>
+</ul>
+
+<h2 id="core">2. The core idea</h2>
+<p>Let <code>M</code> be the memory matrix (one row per slot) and <code>x</code> the new input. One attention step:</p>
+<pre><code>Q = M·W_q
+K = [M; x]·W_k
+V = [M; x]·W_v
+M̃ = softmax(Q·Kᵀ / √d_k) · V        # same shape as M</code></pre>
+<ul>
+<li><code>[M; x]</code>: the memory with the input stacked on as one extra row. Keys and values come from both, queries only from memory, so the output keeps <code>M</code>'s shape.</li>
+<li><code>softmax(Q·Kᵀ/√d_k)</code>: how strongly each slot reads from each slot and from the input. This is the attention from <a href="13-attention.html">Day 13</a>.</li>
+<li>Several heads run in parallel with their own projections, and their outputs are concatenated.</li>
+</ul>
+<p><code>M̃</code> is a <em>proposed</em> update. It's passed through a row-wise MLP <code>g_ψ</code> (with residual connections) and then gated into memory:</p>
+<pre><code>m_{i,t} = σ(f_{i,t} + b̃_f) ∘ m_{i,t−1}  +  σ(i_{i,t}) ∘ g_ψ(m̃_{i,t})
+h_{i,t} = σ(o_{i,t}) ∘ tanh(m_{i,t})</code></pre>
+<p><code>f</code>, <code>i</code>, <code>o</code> are the usual forget, input and output gate pre-activations computed from <code>x_t</code> and the previous output. So each slot behaves like an LSTM cell state from <a href="02-lstm.html">Day 2</a>, but its candidate update comes from attention over all slots. The authors note that in practice they didn't need the output gate.</p>
+
+<h2 id="deep">3. Deep dive</h2>
+<h3>Three ways to hold memory</h3>
+<ul>
+<li><strong>LSTM:</strong> one vector holds everything. Easy to train, but it's hard to keep separate facts apart.</li>
+<li><strong>Slot memories</strong> like the NTM (<a href="17-neural-turing-machines.html">Day 17</a>) and DNC: separate rows, read and written by addressing. Facts stay apart, but rows don't interact once written.</li>
+<li><strong>RMC:</strong> separate rows <em>and</em> they talk to each other every step. It's the Relation Network idea from <a href="19-relational-reasoning.html">Day 19</a>, with attention in place of a pairwise MLP, inside a recurrent loop.</li>
+</ul>
+
+<h3>Attention within a step, not over the whole past</h3>
+<p>A Transformer attends over every past token, so its memory and cost grow with the sequence. The RMC attends only over its <code>N</code> slots and the current input. Cost per step stays fixed, whatever the sequence length. The paper's discussion points out that growing buffers are a problem for online RL, where the stream never ends. <a href="../05-trillion-scale-architecture.html#length">Module 05</a> covers the same trade-off at modern scale: fixed-size recurrent state vs a full attention cache.</p>
+
+<h3>Slots versus slot size</h3>
+<p>Because weights are shared across rows, you can trade many small slots against a few big ones without changing the parameter count. The paper found the best ratio depends on the task. The N-th farthest task wanted many slots. Language modelling used a single large slot. Program evaluation did well with 4 slots and 4 heads.</p>
+
+<h3>The N-th farthest task</h3>
+<p>The model sees eight random 16-dimensional vectors, one per step, each with a label. Then it must answer: "which vector is the <em>n</em>-th farthest from vector <em>m</em>?" It has to remember all eight, compute every distance to <em>m</em> (which may arrive last), and sort those distances. The demo is the same task in 2D.</p>
+<div class="card demo">
+<h3>Interactive: the N-th farthest question</h3>
+<p class="legend">Eight labelled vectors. Pick the reference <em>m</em> and the rank <em>n</em>. Lines show distances to <em>m</em>; the answer is highlighted.</p>
+<canvas id="nth" width="700" height="280" aria-label="Eight points with distance lines to a reference point; the n-th farthest is highlighted"></canvas>
+<label for="m">Reference vector m: <span id="mv" class="num"></span></label>
+<input id="m" type="range" min="1" max="8" step="1" value="3">
+<label for="k">Rank n: <span id="kv" class="num"></span></label>
+<input id="k" type="range" min="1" max="7" step="1" value="2">
+<p><button id="new" type="button">New sequence</button></p>
+<div class="stats">
+  <div class="stat"><div class="k">Answer (label)</div><div class="v" id="ans">–</div></div>
+  <div class="stat"><div class="k">Distances to compare</div><div class="v" id="cmp">–</div></div>
+</div>
+</div>
+
+<h2 id="robotics">4. Why it matters for robotics</h2>
+<div class="robot">
+<ul>
+<li><strong>Robots rarely see everything at once.</strong> Objects leave the camera view and come back. The Pac-Man task with a 5×5 viewport is a toy version: the RMC scored about 677 vs an LSTM's 550, because it had to remember ghosts and eaten food outside its view.</li>
+<li><strong>Fixed cost per step suits control loops.</strong> A recurrent core with a bounded memory runs at the same speed at minute one and hour two. That's useful for long-running agents where a growing attention cache isn't affordable.</li>
+<li><strong>Slot memories are a step toward per-object memory.</strong> Tracking several objects and comparing them over time is the shape of many manipulation and navigation problems. Note the RMC doesn't guarantee one slot per object. Later object-centric models push harder on that.</li>
+<li><strong>Keep expectations calibrated.</strong> Language-modelling gains were modest (5–12% relative perplexity), and large Transformers later took over most of these tasks. The lasting lesson is the design pattern, not this exact cell.</li>
+</ul>
+</div>
+
+<h2 id="practice">5. How to study it</h2>
+<ol>
+<li>Read sections 3 and 4 of the paper, and appendix A.1 for the N-th farthest setup (about 1.5 h). Sketch Figure 1 from memory.</li>
+<li>In the 30u30 Day 20 folder, read <code>implementation.py</code> and trace one step: input stacked onto memory, attention, MLP, gates.</li>
+<li>Do the exercises in order: dot-product attention, gating, one RMC step, the N-th farthest data generator, then training.</li>
+<li>Run <code>train_minimal.py</code> and compare against an LSTM baseline on N-th farthest.</li>
+<li>Stretch: sweep the number of slots and heads at a fixed total memory size, and see how accuracy changes.</li>
+</ol>
+
+<h2 id="check">6. Self-check</h2>
+<details><summary>Why are queries computed from <code>M</code> only, but keys and values from <code>[M; x]</code>?</summary><p>So the output has exactly one row per memory slot. Each slot can read from other slots and the new input, but the input doesn't get a row of its own in the next memory.</p></details>
+<details><summary>Why doesn't adding memory slots add parameters?</summary><p>The projection, MLP and gate weights are shared across rows. More rows means more storage and more compute, not more weights.</p></details>
+<details><summary>How does the RMC differ from a Transformer layer over the sequence?</summary><p>A Transformer attends over all past positions, so cost grows with length. The RMC attends only over its fixed set of slots and the current input, then carries the slots forward recurrently.</p></details>
+<details><summary>Why is N-th farthest hard for a plain LSTM?</summary><p>It must keep eight vectors separately, then compare distances to one of them, possibly seen last. Packing all of that into one vector and sorting implicitly is hard. The LSTM stayed under 30%.</p></details>
+<details><summary>What does the RMC borrow from the LSTM?</summary><p>The gating: a forget gate on the old slot value and an input gate on the new candidate, applied per slot. That keeps training stable over long sequences.</p></details>
+
+<h2 id="reading">7. Further reading</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/1806.01822">The original paper</a>, with appendices on BoxWorld and per-task settings</li>
+<li><a href="https://github.com/Ojhaharsh/30u30/tree/main/papers/20_Relational_RNNs">30u30 Day 20</a>: implementation, notebook, cheatsheet, exercises</li>
+<li>Next: <a href="21-message-passing.html">Day 21, Neural Message Passing for Quantum Chemistry</a></li>
+</ul>
+
+<nav class="pager">
+  <a href="19-relational-reasoning.html"><small>Previous</small>Day 19 · Relation Networks</a>
+  <a class="next" href="21-message-passing.html"><small>Next</small>Day 21 · Message Passing</a>
+</nav>
+<footer>Module 06 · Day 20 · written for this course from the original source. The 30u30 repo is CC BY-NC-ND, so its materials are linked, not copied.</footer>
+</main>
+
+<script>
+const cv = document.getElementById('nth'), ctx = cv.getContext('2d');
+const mIn = document.getElementById('m'), kIn = document.getElementById('k');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function rng(s) { return () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+let seed = 20, P = [];
+
+function sample() {
+  const r = rng(seed);
+  P = Array.from({length: 8}, () => [r() * 2 - 1, r() * 2 - 1]);  // uniform in [-1, 1]^2
+}
+
+// returns labels (1-based) sorted from farthest to nearest, excluding m itself
+function ranking(p, m) {
+  return p.map((v, i) => ({i, d: Math.hypot(v[0] - p[m][0], v[1] - p[m][1])}))
+    .filter(o => o.i !== m).sort((a, b) => b.d - a.d);
+}
+
+function draw() {
+  const m = +mIn.value - 1, n = +kIn.value, rank = ranking(P, m), ans = rank[n - 1].i;
+  document.getElementById('mv').textContent = m + 1;
+  document.getElementById('kv').textContent = n;
+  const W = cv.width, H = cv.height, sx = x => W / 2 + x * (H / 2 - 24), sy = y => H / 2 - y * (H / 2 - 24);
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = css('--line'); ctx.strokeRect(sx(-1), sy(1), sx(1) - sx(-1), sy(-1) - sy(1));
+  P.forEach((v, i) => {
+    if (i === m) return;
+    ctx.strokeStyle = i === ans ? css('--accent') : css('--line'); ctx.lineWidth = i === ans ? 3 : 1;
+    ctx.beginPath(); ctx.moveTo(sx(P[m][0]), sy(P[m][1])); ctx.lineTo(sx(v[0]), sy(v[1])); ctx.stroke();
+  });
+  ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+  P.forEach((v, i) => {
+    ctx.fillStyle = i === m ? css('--pass') : i === ans ? css('--accent') : css('--fg');
+    ctx.beginPath(); ctx.arc(sx(v[0]), sy(v[1]), i === m ? 9 : 7, 0, 2 * Math.PI); ctx.fill();
+    ctx.fillStyle = css('--muted'); ctx.fillText(i === m ? `m=${i + 1}` : i + 1, sx(v[0]), sy(v[1]) - 13);
+  });
+  document.getElementById('ans').textContent = ans + 1;
+  document.getElementById('cmp').textContent = rank.length;
+}
+mIn.oninput = kIn.oninput = draw;
+document.getElementById('new').onclick = () => { seed++; sample(); draw(); };
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+sample(); draw();
+</script>
+</body>
+</html>
