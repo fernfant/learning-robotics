@@ -17,9 +17,9 @@ the robot is happy . the room is tidy .
 
 
 def tokenize(text):
-    """Lowercase the text and split it into tokens: words, plus "." as its own token.
+    r"""Lowercase the text and split it into tokens: words, plus "." as its own token.
     tokenize("The cat. Sat") -> ["the", "cat", ".", "sat"]
-    Tip: re.findall(r"[a-z']+|\\.", text.lower())"""
+    Tip: re.findall(r"[a-z']+|\.", text.lower())"""
     # BEGIN SOLUTION
     return re.findall(r"[a-z']+|\.", text.lower())
     # END SOLUTION

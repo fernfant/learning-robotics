@@ -83,7 +83,11 @@ def run_bakeoff(brain_names, tasks=TASKS):
     from brains import get_brain
     traces, cards = {}, {}
     for name in brain_names:
-        brain = get_brain(name)
+        try:
+            brain = get_brain(name)
+        except NotImplementedError:
+            print(f"  ({name}: not built yet: it comes with the week 6 stretch or week 9, so it sits this one out)")
+            continue
         rows, runs = [], []
         for task in tasks:
             robot, result = run_brain(brain, task["command"], surprises=task.get("surprises", (CAT,)))
