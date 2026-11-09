@@ -13,7 +13,7 @@
 <div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 12 · Lesson 14</div>
 <h1>Going real: hardware, showing your work, what's next</h1>
 <p class="lede">Your robot brain works, on your laptop, in a perfect pretend room. This last lesson is about the two steps that turn a school project into something real: showing it to other people honestly, and (if you want) putting it on wheels.</p>
-<div class="card note" id="journey"><strong>Step 21 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed ✓ learns from a teacher ✓ fixes a wonky sensor ✓ can use Claude ✓ MCP (bonus) ✓ has a scorecard ✓ picks routes people like. <strong>Today</strong> it learns to go real: show it off, or build it for real. This is the last lesson. Look back at <a href="index.html#report-card">everything it can do</a>. <a href="index.html#report-card">See the report card</a>.<br><strong>Ask an adult today:</strong> buying or building hardware, if you go that far.</div>
+<div class="card note" id="journey"><strong>Step 21 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed ✓ learns from a teacher ✓ fixes a wonky sensor ✓ can use Claude ✓ MCP (bonus) ✓ has a scorecard ✓ picks routes people like. <strong>Today</strong> it learns to go real: show it off, or build it for real. This is the last lesson. Look back at <a href="index.html#report-card">everything it can do</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, run <code>python3 my_robot.py</code> and try <code>python3 my_robot.py --show</code>, your showcase.<br><strong>Ask an adult today:</strong> buying or building hardware, if you go that far.</div>
 
 <div class="facts">
   <div><b>Time</b>2–4 hours (a hardware build: a few weekends)</div>
@@ -150,9 +150,34 @@ distance    = 343 × 0.0029 ÷ 2
 </ol>
 <p><b>What it teaches:</b> other people's questions show you what's unclear, and often what's genuinely missing. Questions like "what happens if the cat moves?" or "can it learn new words?" are real research questions.</p>
 
-<h2 id="so-far">6. Your Robo-Helper so far</h2>
+<h2 id="so-far">6. Your Robo-Helper so far: the capstone show</h2>
+<p>Twelve weeks ago your robot was an empty file. Now it's finished, and every part of it is code you wrote. Time for its show.</p>
+<ol>
+<li><b>Write its final exam.</b> Copy <code>my_tasks_example.txt</code> to <code>my_tasks.txt</code>. Write your own tests, one per line: what you'd say, then which blocks should end up in the bin. Include at least two you think it will <em>fail</em>. Good engineers test their robot's weak spots, not just its tricks.</li>
+<li><b>Run the show:</b> <code>python3 my_robot.py --show</code>. It demos every ability you built, sits the 12-task bake-off exam, then your exam.</li>
+<li><b>Record it</b> (a screen recording is fine) and use it in your presentation (section 5) and your README.</li>
+</ol>
+<p>Real output from the finished robot, with the example tests (the end of it):</p>
+<pre><code>&gt; exam   [the 12 tasks from the bake-off]
+  ✓ 'put the red block in the bin'
+  ...
+  ✗ 'tidy up the room'                             binned ['green block'], wanted ['blue block', 'green block', 'red block']
+  ✗ "put away the block that's closest to the bin" binned nothing, wanted ['blue block']
+  ...
+  I passed 10 of 12.
+
+YOUR EXAM (my_tasks.txt):
+  ✓ 'put the red block in the bin'           binned: red block                      wanted: red block
+  ✓ 'get rid of the blue and green blocks'   binned: blue block, green block        wanted: blue block, green block
+  ✓ 'clean up everything'                    binned: blue block, green block, red block wanted: blue block, green block, red block
+  ✓ 'where is the red block'                 binned: nothing                        wanted: nothing
+  ✓ 'put teh green blok away'                binned: green block                    wanted: green block
+  ✓ 'make me a cup of tea'                   binned: nothing                        wanted: nothing
+
+Robo-Helper passed 6 of 6 of your tests.</code></pre>
+<p>6 of 6 means the example tests were too easy. Write harder ones!</p>
 <p>Robo-Helper is finished: it understands commands (L8–L9), refuses unsafe ones (L10), plans (L6), senses and brakes (L2–L5), replans around surprises, and grades itself (L11). Lessons 12 and 13 showed how bigger models learn what people prefer and adapt cheaply. Now it also has the two things every real project needs: <strong>a README that tells the truth</strong> and <strong>a demo</strong>.</p>
-<p>Nothing later in this course uses it, because this is the end of the course. But it lives on as the first project you can show off, and, if you build the kit, as the brain of a robot you can actually watch drive across your floor.</p>
+<p>This is the end of the course. Your robot lives on as the first project you can show off, and, if you build the kit, as the brain of a robot you can actually watch drive across your floor.</p>
 
 <h2 id="mistakes">7. Common mistakes</h2>
 <ul>

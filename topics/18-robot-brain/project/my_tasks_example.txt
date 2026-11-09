@@ -1,0 +1,8 @@
+# YOUR robot's final exam. Copy this file to my_tasks.txt and write your own tests.
+# One test per line:   what you say | which blocks should be in the bin afterwards (or: nothing)
+put the red block in the bin | red block
+get rid of the blue and green blocks | blue block, green block
+clean up everything | red block, blue block, green block
+where is the red block | nothing
+put teh green blok away | green block
+make me a cup of tea | nothing

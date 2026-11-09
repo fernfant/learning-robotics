@@ -13,7 +13,7 @@
 <div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 7 · Lesson 11</div>
 <h1>Capstone: Robo-Helper</h1>
 <p class="lede">This is the end of part 1: today the robot works! It's not the end of the course. Weeks 8–12 make its brain faster, smarter and better tested. Ten lessons of pieces: moving, sensing, braking, a stop-neuron, honest testing, route planning, a word model, a command reader and a safety layer. Today they click together into one robot that understands you, drives around a surprise, and tells you honestly how good it is.</p>
-<div class="card note" id="journey"><strong>Step 13 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers. <strong>Today</strong> it learns to work as one whole robot, tested end to end. Next: <a href="16-speed.html">Week 8 · How fast is a brain?</a>. <a href="index.html#report-card">See the report card</a>.</div>
+<div class="card note" id="journey"><strong>Step 13 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers. <strong>Today</strong> it learns to work as one whole robot, tested end to end. Next: <a href="16-speed.html">Week 8 · How fast is a brain?</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, run <code>python3 my_robot.py</code> and try it now shows the test score of the robot <em>you</em> assembled.</div>
 
 <div class="facts">
   <div><b>Time</b>3–4 hours (plus the stretch)</div>
@@ -242,6 +242,7 @@ python3 check.py 11</code></pre>
 <p><b>What it teaches:</b> each part is easy alone. Doing them in order, under surprises, while keeping honest score, is the actual skill. And humans also find it hard to say "I don't know" instead of guessing.</p>
 
 <h2 id="so-far">6. Your Robo-Helper so far</h2>
+<p><strong>Run <code>python3 my_robot.py</code>:</strong> the start screen now says your robot "is a whole robot YOU assembled (your RoboHelper), tested end to end: it passes 83% of its final test" (or whatever <em>your</em> score is). That's the end of part 1: you've built a whole robot from scratch.</p>
 <p>This is it: <strong>the full robot, tested</strong>. <code>RoboHelper</code> understands, checks, plans, senses, brakes, replans, and reports a score with a list of failures. Every earlier lesson (except the Q-learning side quest) is inside it.</p>
 <p>Next comes inference engineering: <a href="16-speed.html">week 8</a> measures how fast and expensive each brain is, week 9 makes brains faster and cheaper, week 10 plugs in a world-class model, and <a href="19-bakeoff.html">week 11</a> races every brain on the same tasks with <code>sim.py</code>, which runs <em>this</em> robot. In week 12, <a href="12-preferences.html">Lesson 12</a> learns from people's preferences, and <a href="14-go-real.html">Lesson 14</a> takes <code>run_command</code>, your <code>evaluate()</code> score and your failure list, and turn them into a project README, a demo recording, and (if you like) a real wheeled robot.</p>
 
