@@ -12,7 +12,8 @@
 
 <div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 10 · Lesson 18</div>
 <h1>A world-class brain over the internet: planners and agents</h1>
-<p class="lede">Your word counter and your tiny language model live on your own computer and answer in a fraction of a millisecond. But they can't handle "put the red and blue blocks away". Today Robo-Helper borrows a huge model (Claude) over the internet, in two different ways. And you write the code that makes sure it never gets to drive the robot unchecked.</p>
+<p class="lede">Your word counter and your tiny language model live on your own computer and answer in a fraction of a millisecond. Since week 6 the tiny LM writes whole plans: it puts two blocks away, understands "except", and asks when you're vague. But it can't see the room, so it can't do "put away the block that's closest to the bin". And it has never heard of "tidy up the room". Today Robo-Helper borrows a huge model (Claude) over the internet, in two different ways. And you write the code that makes sure it never gets to drive the robot unchecked.</p>
+<div class="card note" id="journey"><strong>Step 17 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed ✓ learns from a teacher ✓ fixes a wonky sensor. <strong>Today</strong> it learns to use a world-class AI over the internet, with you in charge. Next: <a href="20-mcp.html">Bonus · Any AI app can drive it (MCP)</a>. <a href="index.html#report-card">See the report card</a>.<br><strong>Ask an adult today:</strong> an API key, which costs a little money: ask an adult to set it up with a spending limit. Without one, you replay recorded runs for free.</div>
 
 <div class="facts">
   <div><b>Time</b>3–4 hours (plus the stretch)</div>
@@ -23,25 +24,33 @@
 
 <section class="kid" id="start">
 <h2>Start here</h2>
-<p class="big">A big model over the internet can understand almost anything you say, but it is a guest in your robot: you tell it the rules, you describe the room, and you check every single thing it asks the robot to do.</p>
+<p class="big">A big model over the internet can understand almost anything you say. But it is a guest in your robot. You tell it the rules. You describe the room. And you check every single thing it asks the robot to do.</p>
+<p><b>Grown-up help today:</b> an adult sets up the API key, with a spending limit. No key? You can replay recorded runs for free.</p>
 <h3>The problem</h3>
-<p>Your little sister types "put the red and blue blocks away". The word counter from Lesson 9 picks <em>one</em> intent and <em>one</em> colour, bins the red block, and stops. Your tiny LM from Lesson 15 bins the blue one. Neither of them can do two things, neither can say "which block do you mean?", and neither has ever heard of "except" or "closest". Teaching them all that would take thousands of examples. Somebody has already trained a model on a huge chunk of the internet. Can Robo-Helper use it?</p>
+<p>Your small brains have come a long way. The tiny LM from Lesson 15 puts two blocks away. It understands "except". It asks "which block?" when you're vague. After week 9 it gets 10 of the 12 test tasks right.</p>
+<p>Now your little sister types "put away the block that's closest to the bin". The tiny LM only reads words. It has never seen the room, so it can't know which block is closest. It also fails "tidy up the room", because it never learned the word "room". More training on words can't make it see.</p>
+<p>Somebody has already trained a huge model on a big chunk of the internet. If we tell it what's in the room, can Robo-Helper use it?</p>
 <h3>The idea in one picture</h3>
 <p>Imagine you're working in a kitchen and you can phone a world-famous chef. Two ways to use them. <b>Planner:</b> you describe your kitchen, they read you the whole recipe in one call, you hang up and cook it. Quick and cheap, but if the oven turns out to be broken, the recipe doesn't know. <b>Agent:</b> you stay on the phone. They say "open the fridge", you say "done, there's no milk", they say "then use water". Slower, more phone time, but they react to what actually happens. Either way, if the chef says "put your hand on the hot tray", <em>you</em> say no. You're the one standing in the kitchen.</p>
 <h3>Words to know</h3>
 <dl>
-<dt>API</dt><dd>"Application programming interface": a menu of requests one program can send to another. Here, your Python sends text to Anthropic's computers and gets the model's answer back.</dd>
-<dt>API key</dt><dd>A long secret password that proves a request is yours. Every request is charged to the account the key belongs to, so it's as precious as a bank card.</dd>
-<dt>Environment variable</dt><dd>A named value your terminal hands to every program it starts, like <code>ANTHROPIC_API_KEY</code>. It keeps the secret out of your code files.</dd>
-<dt>System prompt</dt><dd>The standing instructions sent with every request: who the model is, what it may do, the rules. The person's command goes separately.</dd>
-<dt>Structured output</dt><dd>Asking the API for a reply in an exact JSON shape instead of free chat, so a program can read it.</dd>
-<dt>JSON schema</dt><dd>A description of that shape: which keys, what type each value is, which values are allowed.</dd>
+<dt>API</dt><dd>A way for one program to send requests to another. Your Python sends words to Anthropic's computers and gets the answer back.</dd>
+<dt>API key</dt><dd>A long secret password that proves a request is yours. Each request costs a little money, so keep it as safe as a bank card.</dd>
+<dt>System prompt</dt><dd>The rules you send with every request: who the model is and what it may do.</dd>
 <dt>Planner</dt><dd>One request in, one whole plan out. Then the robot runs the plan.</dd>
-<dt>Agent</dt><dd>The model gets the robot's <em>tools</em> and uses them one at a time, seeing each result before choosing the next step. That back-and-forth is called the <em>agent loop</em>.</dd>
-<dt>Tool call</dt><dd>The model asking your program to run one tool, such as <code>go_to({"object": "blue block"})</code>. Your program decides whether to actually do it.</dd>
+<dt>Agent</dt><dd>The model uses the robot's tools one at a time. It sees each result before it picks the next step.</dd>
+<dt>Tool call</dt><dd>The model asking your program to run one tool, like "go to the blue block". Your program decides if it really happens.</dd>
 </dl>
 </section>
 <p class="deeper"><strong>The full lesson:</strong> everything below builds a request from nothing, compares the two ways of using a big model, and then you write the two safety gates that every request has to pass.</p>
+<h3 id="more-words">More words you'll meet below</h3>
+<dl>
+<dt>API</dt><dd>Short for "application programming interface": a menu of requests one program can send to another.</dd>
+<dt>Environment variable</dt><dd>A named value your terminal hands to every program it starts, like <code>ANTHROPIC_API_KEY</code>. It keeps the secret out of your code files.</dd>
+<dt>Structured output</dt><dd>Asking the API for a reply in an exact JSON shape instead of free chat, so a program can read it.</dd>
+<dt>JSON schema</dt><dd>A description of that shape: which keys, what type each value is, which values are allowed.</dd>
+<dt>Agent loop</dt><dd>The back-and-forth of an agent: the model asks for a tool call, such as <code>go_to({"object": "blue block"})</code>, your program runs it (or refuses), and the result goes back to the model.</dd>
+</dl>
 
 <h2 id="problem">1. The problem</h2>
 <p>Here are four commands from the bake-off you'll run next week. Read them as Robo-Helper's word counter would:</p>
@@ -51,7 +60,7 @@
 <li><em>"put away the block that's closest to the bin"</em>: it has no idea where anything is. It only counts words.</li>
 <li><em>"put the block away"</em>: there are three blocks. The right answer is a question: <em>"Which one?"</em></li>
 </ul>
-<p>These need a brain that understands language properly, knows what's in the room, can make a plan of several steps, and knows when to ask. That's what large language models are good at. The catch: the good ones are far too big for your laptop. They run in data centres, and you reach them over the internet.</p>
+<p>Your tiny LM already handles the first, second and fourth (Lesson 15). The third needs the room, which no word-only brain ever sees. These need a brain that understands language properly, knows what's in the room, can make a plan of several steps, and knows when to ask. That's what large language models are good at. The catch: the good ones are far too big for your laptop. They run in data centres, and you reach them over the internet.</p>
 <p>So today's questions are practical ones. How do you send a request? How do you keep your key safe? How do you tell the model about the room? How do you get an answer a program can check? And should the model write the whole plan at once, or work step by step?</p>
 
 <h2 id="principles">2. First principles</h2>
@@ -316,8 +325,8 @@ python3 check.py 18</code></pre>
 </ul>
 
 <nav class="pager">
-  <a href="13-lora.html"><small>Previous</small>Lesson 13 · Teaching an old model a new trick</a>
-  <a class="next" href="20-mcp.html"><small>Next</small>Lesson 20 · Give any AI app your robot (bonus)</a>
+  <a href="13-lora.html"><small>Previous</small>Week 9 · Fine-tuning and LoRA</a>
+  <a class="next" href="20-mcp.html"><small>Next</small>Bonus · Any AI app can drive it (MCP)</a>
 </nav>
 <footer>Build a Robot Brain · Week 10 · Lesson 18</footer>
 </main>

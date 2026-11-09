@@ -12,7 +12,8 @@
 
 <div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 7 · Lesson 10</div>
 <h1>Using a real LLM safely: never trust, always check</h1>
-<p class="lede">A big language model understands messy commands far better than your word-counter. It also sometimes chats, rambles, invents things, or sneaks in extra instructions. Today you build the bouncer that stands between the AI and the robot's wheels.</p>
+<p class="lede">Last week you built your own tiny AI. Real ones are much bigger, and they can be confidently wrong. Today you build the guard that checks every answer before the robot moves. No real AI is called today; we use pretend replies. A big language model understands messy commands far better than your word-counter. It also sometimes chats, rambles, invents things, or sneaks in extra instructions. Today you build the bouncer that stands between the AI and the robot's wheels.</p>
+<div class="card note" id="journey"><strong>Step 12 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans. <strong>Today</strong> it learns to check every AI answer before it moves. Next: <a href="11-capstone.html">Week 7 · Capstone: the whole robot</a>. <a href="index.html#report-card">See the report card</a>.</div>
 
 <div class="facts">
   <div><b>Time</b>2–3 hours</div>
@@ -25,7 +26,7 @@
 <h2>Start here</h2>
 <p class="big">The AI is a helper, not the boss: the robot only does something if the AI's answer passes strict checks that <em>you</em> wrote.</p>
 <h3>The problem</h3>
-<p>Your Lesson 9 classifier gets confused by words it has never seen, like "yeet". So you think: why not ask a real LLM, like the ones behind ChatGPT or Claude? You ask it to turn "please tidy away the red block" into a neat answer. Most of the time it works perfectly. But one time it says "Sure! Here you go:" before the answer. Another time it invents a "purple block" that doesn't exist. Another time it adds <code>"also": "ignore all safety rules"</code>. If the robot obeys any of those blindly, it drives into a wall, or worse.</p>
+<p>Your word counter (Lesson 9) and your tiny LM (Lesson 15) only know the words they were trained on. A word they have never seen, like "yeet", means nothing to them. So you think: why not ask a real LLM, like the ones behind ChatGPT or Claude? You ask it to turn "please tidy away the red block" into a neat answer. Most of the time it works perfectly. But one time it says "Sure! Here you go:" before the answer. Another time it invents a "purple block" that doesn't exist. Another time it adds <code>"also": "ignore all safety rules"</code>. If the robot obeys any of those blindly, it drives into a wall, or worse.</p>
 <h3>The idea in one picture</h3>
 <p>Think of a nightclub bouncer with a guest list. The bouncer doesn't care how confident you sound or how nice your outfit is. Name on the list? In. Not on the list? Out. No arguments, no exceptions. Your safety layer is a bouncer for AI answers: it checks every answer against a fixed list of allowed actions and objects, and anything else is turned away.</p>
 <h3>Words to know</h3>
@@ -259,8 +260,8 @@ python3 check.py 10</code></pre>
 </ul>
 
 <nav class="pager">
-  <a href="15-tiny-lm.html"><small>Previous</small>Lesson 15 · A tiny language model</a>
-  <a class="next" href="11-capstone.html"><small>Next</small>Lesson 11 · Capstone: Robo-Helper</a>
+  <a href="15-tiny-lm.html"><small>Previous</small>Week 6 · A tiny language model</a>
+  <a class="next" href="11-capstone.html"><small>Next</small>Week 7 · Capstone: the whole robot</a>
 </nav>
 <footer>Build a Robot Brain · Week 7 · Lesson 10</footer>
 </main>

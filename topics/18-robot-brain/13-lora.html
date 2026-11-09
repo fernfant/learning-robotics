@@ -12,7 +12,8 @@
 
 <div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 9 · Lesson 13</div>
 <h1>Teaching an old model a new trick: fine-tuning and LoRA</h1>
-<p class="lede">A factory trained a model for robots like yours. But your robot is a little bit different, and the model gets things wrong. You could retrain every number in it. Or you could notice that the fix is simple, and train a tiny add-on instead.</p>
+<p class="lede">Last lesson made brains smaller and taught them from a teacher. This one fixes a model you didn't train yourself: a factory model for a sensor that's mounted a bit wonky. A factory trained a model for robots like yours. But your robot is a little bit different, and the model gets things wrong. You could retrain every number in it. Or you could notice that the fix is simple, and train a tiny add-on instead.</p>
+<div class="card note" id="journey"><strong>Step 16 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed ✓ learns from a teacher. <strong>Today</strong> it learns to fix a model it didn't train, cheaply. Next: <a href="18-world-class.html">Week 10 · A world-class brain (Claude)</a>. <a href="index.html#report-card">See the report card</a>.</div>
 
 <div class="facts">
   <div><b>Time</b>2–3 hours</div>
@@ -23,7 +24,7 @@
 
 <section class="kid" id="start">
 <h2>Start here</h2>
-<p class="big">When a big model needs a small, simple change, don't rewrite the whole model: freeze it and train a thin add-on that holds only the change.</p>
+<p class="big">Sometimes a big model needs only a small change. Don't rewrite the whole model. Freeze it, and train a thin add-on that holds just the change.</p>
 
 <h3>The problem</h3>
 <p>Robo-Helper has six distance sensors, one for each direction it cares about. The factory shipped a model that turns those six readings into six "danger levels", and it works perfectly on the factory's robots. But on your robot, sensor 2 got bolted on at a slight angle. Now it picks up things that are really in front of the <em>other</em> sensors, and its readings leak into all the danger levels. The factory model is confused. Measured on 200 tests, its error is 0.0673. For a robot about to bump into things, that's too much.</p>
@@ -33,17 +34,21 @@
 
 <h3>Words to know</h3>
 <dl>
-<dt>Matrix</dt><dd>A table of numbers in rows and columns. A model's "knowledge" is stored in matrices. Ours, W, is 6 × 6: 36 numbers.</dd>
-<dt>Matrix × vector</dt><dd>How a matrix turns inputs into outputs: each output is one row of the table multiplied number-by-number with the inputs, then added up.</dd>
+<dt>Matrix</dt><dd>A table of numbers in rows and columns. A model keeps what it knows in tables like this. Ours, W, has 6 rows and 6 columns: 36 numbers.</dd>
 <dt>Parameters</dt><dd>The numbers a model learns. "Trained 12 numbers" means 12 parameters.</dd>
-<dt>Fine-tuning</dt><dd>Taking a model that's already trained and nudging its numbers a bit more on new data, so it fits a new situation.</dd>
-<dt>Frozen</dt><dd>Not allowed to change during training. In LoRA the original W is frozen.</dd>
-<dt>LoRA</dt><dd>Low-Rank Adaptation. Keep W frozen and learn a small correction written as a thin column of numbers times a thin row: A @ B.</dd>
-<dt>Adapter</dt><dd>The small A and B you trained. You can save it, swap it, or have one per robot.</dd>
-<dt>Rank</dt><dd>How many independent changes the add-on can express. Rank 1 = one pattern of change. Rank 2 = two.</dd>
+<dt>Fine-tuning</dt><dd>Taking a model that's already trained and teaching it a bit more, so it fits a new job.</dd>
+<dt>Frozen</dt><dd>Not allowed to change while you train. The factory model stays frozen.</dd>
+<dt>LoRA</dt><dd>A way to fix a frozen model by training a small add-on, like a clip-on lens.</dd>
+<dt>Adapter</dt><dd>The small add-on you trained. You can save it, swap it, or have one per robot.</dd>
 </dl>
 </section>
 <p class="deeper"><strong>Going deeper:</strong> everything below is the full lesson: the idea built from nothing, a demo with live heatmaps, your homework, and a challenge away from the screen.</p>
+<h3 id="more-words">More words you'll meet below</h3>
+<dl>
+<dt>Matrix × vector</dt><dd>How a matrix turns inputs into outputs: each output is one row of the table multiplied number-by-number with the inputs, then added up.</dd>
+<dt>LoRA, exactly</dt><dd>Low-Rank Adaptation. Keep W frozen and learn a small correction written as a thin column of numbers times a thin row: <code>A @ B</code>. The adapter is the pair A and B.</dd>
+<dt>Rank</dt><dd>How many independent changes the add-on can express. Rank 1 = one pattern of change. Rank 2 = two.</dd>
+</dl>
 
 <h2 id="problem">1. The problem</h2>
 <p>The factory model W gets six sensor readings <code>x</code> (each from 0 to 1) and gives six danger levels. On a perfect robot, sensor 0 should drive danger 0, sensor 1 drive danger 1, and so on. So W looks almost like this, with 1s down the diagonal and tiny "cross-talk" numbers everywhere else:</p>
@@ -287,8 +292,8 @@ python3 check.py 13</code></pre>
 </ul>
 
 <nav class="pager">
-  <a href="17-faster.html"><small>Previous</small>Lesson 17 · Faster and cheaper</a>
-  <a class="next" href="18-world-class.html"><small>Next</small>Lesson 18 · A world-class brain</a>
+  <a href="17-faster.html"><small>Previous</small>Week 9 · Faster and cheaper</a>
+  <a class="next" href="18-world-class.html"><small>Next</small>Week 10 · A world-class brain (Claude)</a>
 </nav>
 <footer>Build a Robot Brain · Week 9 · Lesson 13</footer>
 </main>

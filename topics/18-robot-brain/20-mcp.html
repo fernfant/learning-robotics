@@ -13,6 +13,7 @@
 <div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Bonus · Lesson 20</div>
 <h1>Give any AI app your robot: MCP</h1>
 <p class="lede">In Lesson 18, Claude could drive Robo-Helper, but only through the agent loop <em>you</em> wrote. Today you turn the robot's tools into an <b>MCP server</b>: a standard plug that Claude Code, Claude Desktop and many other AI apps already know how to use. And because you can't know which AI will plug in, or what it was told, you write the rules that no AI can talk its way past.</p>
+<div class="card note" id="journey"><strong>Step 18 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed ✓ learns from a teacher ✓ fixes a wonky sensor ✓ can use Claude. <strong>Today</strong> it learns to let any AI app drive it, with rules it can't break. Next: <a href="19-bakeoff.html">Week 11 · The bake-off</a>. <a href="index.html#report-card">See the report card</a>.<br><strong>Ask an adult today:</strong> installing a package with pip, and an AI app that needs an account.</div>
 
 <div class="facts">
   <div><b>Time</b>2–3 hours (plus the stretch)</div>
@@ -23,24 +24,29 @@
 
 <section class="kid" id="start">
 <h2>Start here</h2>
-<p class="big">Write your robot's tools once, behind a standard plug, and any AI app can discover and use them. But the plug is also a door, so the rules that must never break live on <em>your</em> side of it.</p>
+<p class="big">Write your robot's tools once, behind a standard plug. Then any AI app can find them and use them. But the plug is also a door. So the rules that must never break live on <em>your</em> side of it.</p>
+<p><b>Grown-up help today:</b> an adult helps install one package with pip, and with any AI app that needs an account.</p>
 <h3>The problem</h3>
 <p>Your Lesson 18 agent works. Then your friend says: "Cool, can I drive it from Claude Desktop?" And your cousin uses a different AI app. And next year there'll be apps nobody has invented yet. Right now, the tools <code>look</code>, <code>go_to</code>, <code>pick_up</code> and <code>put_in_bin</code> only exist inside <em>your</em> <code>run_agent</code> loop. Every new app would need its own custom glue code. And every one of those apps would be talking to a robot whose only rule, "never pick up the green block, it's Mum's favourite", is written in a prompt the app may not even send.</p>
 <h3>The idea in one picture</h3>
 <p>Think of USB. Before USB, every printer, mouse and keyboard had its own special cable and its own special socket. Now there's one plug. A keyboard maker doesn't need to know which laptop you own, and the laptop doesn't need to know which keyboard you bought: both follow the same standard. MCP is a USB plug for AI tools. And here's the important bit: a USB charger has its own fuse inside. It doesn't trust the laptop to never ask for too much current. Your server is the fuse.</p>
 <h3>Words to know</h3>
 <dl>
-<dt>Protocol</dt><dd>An agreed set of rules for how two programs talk: who speaks first, what each message looks like, what the answers mean.</dd>
-<dt>MCP</dt><dd>The <b>Model Context Protocol</b>: an open standard for connecting AI apps to tools and data. Anthropic published it, and many companies' apps now use it.</dd>
-<dt>Server</dt><dd>The program that <em>has</em> the tools: yours, <code>lesson20_mcp_server.py</code>. It waits for requests and answers them.</dd>
-<dt>Client</dt><dd>The AI app side (Claude Code, Claude Desktop, and others). It connects to servers, finds out what tools they have, and calls them when the model asks.</dd>
-<dt>Tool discovery</dt><dd>The client asking "what tools do you have?" and getting back each tool's name, description and inputs. No hard-coding needed.</dd>
-<dt>JSON-RPC</dt><dd>"Remote procedure call" written in JSON: a tiny message format for "please run this, here's an id; here's the answer for that id".</dd>
-<dt>Transport</dt><dd>How the messages actually travel. Here: <b>stdio</b>, meaning the app starts your server and they pass lines of text through its standard input and standard output.</dd>
+<dt>Protocol</dt><dd>Agreed rules for how two programs talk: who speaks first, and what each message looks like.</dd>
+<dt>MCP</dt><dd>Short for <b>Model Context Protocol</b>: a standard plug for joining AI apps to tools. Anthropic made it, and many apps now use it.</dd>
+<dt>Server</dt><dd>The program that <em>has</em> the tools. Yours is the robot. It waits for requests and answers them.</dd>
+<dt>Client</dt><dd>The AI app, like Claude Desktop. It connects to servers and uses their tools when the AI asks.</dd>
+<dt>Tool discovery</dt><dd>The app asking "what tools do you have?" and getting a list back.</dd>
 <dt>Last line of defence</dt><dd>The final check before something happens in the real world. If everything else fails, this one must not.</dd>
 </dl>
 </section>
 <p class="deeper"><strong>The full lesson:</strong> everything below builds the protocol from nothing, shows the real messages, explains why your server must never <code>print()</code>, and then you write <code>guard()</code>, the server's own rules, and plug your robot into a real AI app.</p>
+<h3 id="more-words">More words you'll meet below</h3>
+<dl>
+<dt>Server file</dt><dd>Your server is <code>lesson20_mcp_server.py</code>. Clients include Claude Code, Claude Desktop and others. Tool discovery returns each tool's name, description and inputs, so nothing is hard-coded.</dd>
+<dt>JSON-RPC</dt><dd>"Remote procedure call" written in JSON: a tiny message format for "please run this, here's an id; here's the answer for that id".</dd>
+<dt>Transport</dt><dd>How the messages actually travel. Here: <b>stdio</b>, meaning the app starts your server and they pass lines of text through its standard input and standard output.</dd>
+</dl>
 
 <h2 id="problem">1. The problem</h2>
 <p>Look at where your Lesson 18 tools actually live. They're a Python list called <code>TOOLS</code>, sent by <em>your</em> <code>run_agent</code> to <em>one</em> API, and executed by <em>your</em> <code>execute_tool</code>. That's fine for one program. Now imagine the world outside your laptop:</p>
@@ -269,8 +275,8 @@ python3 lesson20_watch.py</code></pre>
 </ul>
 
 <nav class="pager">
-  <a href="18-world-class.html"><small>Previous</small>Lesson 18 · A world-class brain</a>
-  <a class="next" href="19-bakeoff.html"><small>Next</small>Lesson 19 · The bake-off</a>
+  <a href="18-world-class.html"><small>Previous</small>Week 10 · A world-class brain (Claude)</a>
+  <a class="next" href="19-bakeoff.html"><small>Next</small>Week 11 · The bake-off</a>
 </nav>
 <footer>Build a Robot Brain · Bonus · Lesson 20</footer>
 </main>

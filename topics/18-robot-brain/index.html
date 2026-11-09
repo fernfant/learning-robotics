@@ -10,7 +10,7 @@
 <main>
 <nav class="crumbs"><a href="../../index.html">← LLMs &amp; Robotics</a> · Module 18</nav>
 
-<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 18 · Our own course, for ages 15+</div>
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 18 · Our own course, for ages 12+</div>
 <h1>Build a Robot Brain: 12 weeks, from zero to a robot that understands you</h1>
 <p class="lede">You'll build <strong>Robo-Helper</strong>, a robot in a simulated room that understands <em>"put the red block in the bin"</em>, plans a route, notices a cat in the way, and reports honestly how well it works. Every idea starts from first principles, and every lesson ends with real code you write and real-world practice away from the screen.</p>
 
@@ -29,7 +29,7 @@
 <h3>What you need to know already</h3>
 <p>Very basic Python: variables, <code>if</code>, <code>for</code> loops, and functions. If you can write a loop that prints 1 to 10, you're ready. Lesson 0 helps you set up.</p>
 <h3>Time</h3>
-<p>12 weeks, one session a week of about 2–4 hours. Weeks 1–7 build the robot and its first brains from zero. Weeks 8–11 are <b>inference engineering</b>: measuring how fast and expensive a brain is, making it faster and cheaper, plugging in a world-class model (Claude) over the internet, and racing every brain on the same tasks. Week 12 teaches the robot what people prefer, and you show off your work.</p>
+<p>12 weeks. Most weeks are one lesson of 2–4 hours; weeks 2, 3, 5, 7, 9 and 12 have two lessons, so plan 4–7 hours (or take two weeks). Ages 12+ is fine: weeks 1–7 are the core, weeks 8–12 are harder, and an adult helps with setup in week 1 and the API key in week 10. Weeks 1–7 build the robot and its first brains from zero. Weeks 8–11 are <b>inference engineering</b> (inference means a brain answering, not learning): measuring how fast and expensive a brain is, making it faster and cheaper, plugging in a world-class model (Claude) over the internet, and racing every brain on the same tasks. Week 12 teaches the robot what people prefer, and you show off your work.</p>
 </section>
 
 <h2>What you'll have built at the end</h2>
@@ -50,7 +50,7 @@
 </div>
 
 <h2>The 12 weeks</h2>
-<p class="meta">One week, one session of 2–4 hours (two short lessons count as one week). Badges show which side of AI each lesson builds. Lesson numbers are just names: follow the weeks.</p>
+<p class="meta">Follow the weeks, top to bottom; the Next button on every lesson does it for you. Lesson numbers are just names (Lesson 15 comes in week 6, because we added it later). Each lesson starts with a strip saying what your robot can do so far and what it learns today. Badges show which side of AI each lesson builds.</p>
 <h3 id="week-1">Week 1 · Moving</h3>
 <p class="meta">Set up, then make the robot move on a grid.</p>
 <div class="paper-row"><span class="d">00</span><div><label><input type="checkbox" data-d="00"><a href="00-setup.html">Setup, and your first algorithm</a><span class="track both">LLM + Robotics</span></label><p>Install Python, run the robot world, write two tiny functions. <b>Adds:</b> your first robot script.</p></div></div>
@@ -69,7 +69,7 @@
 <h3 id="week-5">Week 5 · Words</h3>
 <p class="meta">Turn words into numbers; understand commands.</p>
 <div class="paper-row"><span class="d">08</span><div><label><input type="checkbox" data-d="08"><a href="08-words-as-numbers.html">Words as numbers</a><span class="track llm">LLM</span></label><p>Tokens and next-word prediction, the core idea behind ChatGPT, put straight to work fixing typos the way a phone keyboard does. <b>Adds:</b> typo-proof commands (typo commands handled right: 6/9 → 9/9).</p></div></div>
-<div class="paper-row"><span class="d">09</span><div><label><input type="checkbox" data-d="09"><a href="09-understanding-commands.html">Understanding commands</a><span class="track llm">LLM</span></label><p>A classifier that counts words, plus "slots" for which object. <b>Adds:</b> understands one action per command (bake-off 5/12).</p></div></div>
+<div class="paper-row"><span class="d">09</span><div><label><input type="checkbox" data-d="09"><a href="09-understanding-commands.html">Understanding commands</a><span class="track llm">LLM</span></label><p>A classifier that counts words, plus "slots" for which object. <b>Adds:</b> understands one action per command (5 of 12 on the bake-off, a test of 12 tasks you'll run in week 11).</p></div></div>
 <h3 id="week-6">Week 6 · A neural language model</h3>
 <p class="meta">Build a tiny LLM from zero.</p>
 <div class="paper-row"><span class="d">15</span><div><label><input type="checkbox" data-d="15"><a href="15-tiny-lm.html">A tiny language model, from zero</a><span class="track llm">LLM</span></label><p>Embeddings, softmax and next-word prediction in a real (tiny) neural network that writes whole <b>plans</b> word by word ("put red blue"), asks when you're vague, and learns from 343 examples you generate from templates (never from the bake-off's commands). Stretch: add <b>attention</b>, the idea inside Transformers. <b>Adds:</b> multi-step plans (bake-off 5 → 8/12).</p></div></div>
@@ -78,7 +78,7 @@
 <div class="paper-row"><span class="d">10</span><div><label><input type="checkbox" data-d="10"><a href="10-llm-safety.html">Using a real LLM safely</a><span class="track llm">LLM</span></label><p>Structured output, strict checks, and a fallback. <b>Adds:</b> a safety layer so AI output can't break the robot.</p></div></div>
 <div class="paper-row"><span class="d">11</span><div><label><input type="checkbox" data-d="11"><a href="11-capstone.html">Capstone: Robo-Helper</a><span class="track both">LLM + Robotics</span></label><p>Put it all together and measure it honestly. <b>Adds:</b> the full robot.</p></div></div>
 <h3 id="week-8">Week 8 · Inference I: measure</h3>
-<p class="meta">Latency, tokens and cost.</p>
+<p class="meta">Inference means a brain answering, not learning. This week: latency, tokens and cost.</p>
 <div class="paper-row"><span class="d">16</span><div><label><input type="checkbox" data-d="16"><a href="16-speed.html">How fast is a brain?</a><span class="track llm">LLM</span></label><p>Latency, p50 vs p95, time to first token, tokens per second, and cost per command. How far does the robot roll while it thinks? <b>Adds:</b> a time budget for every brain.</p></div></div>
 <h3 id="week-9">Week 9 · Inference II: speed up</h3>
 <p class="meta">Caching, quantising, distilling, and LoRA fine-tuning.</p>
@@ -96,7 +96,7 @@
 <h3 id="week-12">Week 12 · Teach it, show it</h3>
 <p class="meta">Learn from people's preferences; share your project.</p>
 <div class="paper-row"><span class="d">12</span><div><label><input type="checkbox" data-d="12"><a href="12-preferences.html">Learning what people prefer (RLHF, by hand)</a><span class="track both">LLM + Robotics</span></label><p>Show two routes, ask which is better, learn a reward from the answers, pick what people like. The same recipe that trains chat assistants. <b>Adds:</b> picks the route you'd choose.</p></div></div>
-<div class="paper-row"><span class="d">14</span><div><label><input type="checkbox" data-d="14"><a href="14-go-real.html">Going real</a><span class="track both">LLM + Robotics</span></label><p>Show your work, then (optionally) put it on real hardware. <b>Adds:</b> your portfolio piece.</p></div></div>
+<div class="paper-row"><span class="d">14</span><div><label><input type="checkbox" data-d="14"><a href="14-go-real.html">Going real</a><span class="track both">LLM + Robotics</span></label><p>Show your work, then (optionally) put it on real hardware. <b>Adds:</b> a project you can show your teacher, your friends or a science fair.</p></div></div>
 <h3 id="bonus">Bonus, any time after week 4</h3>
 <div class="paper-row"><span class="d">07</span><div><label><input type="checkbox" data-d="07"><a href="07-trial-and-error.html">Learning by trial and error</a><span class="track robo">Robotics</span></label><p>Rewards and Q-learning: no map, just practice. <b>Adds:</b> learns a maze by itself.</p></div></div>
 
@@ -138,7 +138,7 @@ bonus 20          MCP                 any AI app can drive it over MCP, and the 
 <p>The brain you build climbs the bake-off week by week, on the same 12 tasks it never trained on: word counter <b>5/12</b> (week 5), plan-writing tiny LM <b>8/12</b> (week 6), plus a teacher's labels <b>10/12</b> (week 9), and still 10/12 squeezed into 1.4 KB. The two tasks every small brain still fails need the robot to <em>see the room</em> ("the block that's closest to the bin") or to know that "the room" means every block. That's the job for Claude in week 10.</p>
 <p class="meta">Honest caveat: 12 tasks is few. The jump from 5/12 to 8/12 is "too close to call" with error bars; 5/12 to 10/12 is a real difference (week 11 shows how to tell).</p>
 
-<p class="meta">Bonus: <a href="../21-robot-math.html">Module 21</a> pairs ten interactive maths explainers (Kalman, Bayes, A*, Fourier…) with <code>bonus_robot_math.py</code>, which uses each one on Robo-Helper and measures the difference.</p>
+<p class="meta">Bonus, any time after week 4: <a href="../22-vector-fields.html">Module 22</a> steers the robot with a field of arrows (gradient, divergence, curl). Bonus: <a href="../21-robot-math.html">Module 21</a> pairs ten interactive maths explainers (Kalman, Bayes, A*, Fourier…) with <code>bonus_robot_math.py</code>, which uses each one on Robo-Helper and measures the difference.</p>
 
 <h2>Getting the code</h2>
 <ol>
@@ -150,9 +150,9 @@ bonus 20          MCP                 any AI app can drive it over MCP, and the 
 
 <h2>For parents and teachers</h2>
 <ul>
-<li><strong>No installs beyond Python.</strong> Everything uses the standard library. Weeks 10–11 can use a real world-class model (Claude), which needs an API key and costs a little per request (the whole bake-off is about a dollar). Without a key, students replay recorded real runs, so nothing is blocked.</li>
+<li><strong>Installs:</strong> weeks 1–9 need only Python (standard library). Week 10 and the MCP bonus install one package each with pip, in a private folder; an adult should help. Weeks 10–11 can use a real world-class model (Claude), which needs an API key and costs a little per request (the whole bake-off is about a dollar). Without a key, students replay recorded real runs, so nothing is blocked.</li>
 <li><strong>Self-marking:</strong> <code>check.py</code> gives specific hints. <code>python3 check.py all --solutions</code> verifies the reference solutions (all 100 checks pass). <code>python3 progress.py</code> shows what each finished lesson added to the robot.</li>
-<li><strong>Honest by design:</strong> the finished robot scores 83% on its test set, not 100%, and the small brains fail most of the bake-off. Finding and explaining failures is part of the course.</li>
+<li><strong>Honest by design:</strong> the finished robot scores 83% on its test set, not 100%, and the small brains it builds climb from 5/12 to 10/12 on the bake-off but never reach 12/12. Finding and explaining failures is part of the course.</li>
 <li>Want more depth? Each lesson links to the matching part of this course: <a href="../06-30u30/index.html">the 30 papers</a>, <a href="../09-inference-engineering/index.html">inference engineering</a>, <a href="../17-free-ai-curriculum.html#robotics">free robotics courses</a>.</li>
 </ul>
 

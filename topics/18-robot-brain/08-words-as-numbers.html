@@ -13,6 +13,7 @@
 <div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 5 · Lesson 8</div>
 <h1>Words as numbers: a tiny next-word model</h1>
 <p class="lede">Count which word follows which, turn the counts into chances, and roll a die. That's a language model. It's tiny and a bit silly, and it's the great-great-grandparent of ChatGPT. Then you'll give it a real job on the robot: fixing typos in your commands, the way your phone keyboard does.</p>
+<div class="card note" id="journey"><strong>Step 9 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus). <strong>Today</strong> it learns to turn words into numbers, and fix typos in what you type. Next: <a href="09-understanding-commands.html">Week 5 · Understanding commands</a>. <a href="index.html#report-card">See the report card</a>.</div>
 
 <div class="facts">
   <div><b>Time</b>3–4 hours</div>
@@ -45,7 +46,7 @@
 </section>
 <p class="deeper"><strong>Going deeper:</strong> everything below is the full lesson: the idea built from nothing, two demos, your homework, and a challenge away from the screen.</p>
 
-<div class="card note"><strong>What this adds to your robot:</strong> a typo fixer that runs in front of the robot's small brains. On 9 commands with real typos, Lesson 9's word counter does exactly what it does for the correct spelling <strong>6 of 9</strong> times without the fixer, and <strong>9 of 9</strong> with it (measured by <code>python3 progress.py --solutions</code>: <code>typo commands handled like the correct spelling: 6/9 -&gt; 9/9 with the typo fixer</code>).</div>
+<div class="card note"><strong>What this adds to your robot:</strong> a typo fixer that runs in front of the robot's small brains. You build the word counter in Lesson 9, later this week. On 9 commands with real typos, that word counter does exactly what it does for the correct spelling <strong>6 of 9</strong> times without the fixer, and <strong>9 of 9</strong> with it (measured by <code>python3 progress.py --solutions</code>: <code>typo commands handled like the correct spelling: 6/9 -&gt; 9/9 with the typo fixer</code>).</div>
 
 <h2 id="problem">1. The problem</h2>
 <p>Here's the only text our model will ever read. It's the <code>STORY</code> in <code>lesson08_words.py</code>:</p>
@@ -342,12 +343,12 @@ python3 check.py 8</code></pre>
 <li><a href="../06-30u30/01-rnn-effectiveness.html">30u30 Day 01: The Unreasonable Effectiveness of RNNs</a>: the next step up from counting. A neural network that predicts the next <em>character</em> learns spelling and grammar by itself. Has a temperature demo.</li>
 <li><a href="../06-30u30/13-attention.html">30u30 Day 13: Attention Is All You Need</a>: the paper behind the "T" in GPT. How a model looks back at all earlier tokens, not just the last one.</li>
 <li><a href="../07-post-training.html">Post-training</a>: how a raw next-word predictor is turned into a helpful assistant.</li>
-<li><a href="../09-inference-engineering/index.html">Inference engineering</a>: how the generate loop is run fast for millions of people.</li>
+<li><a href="../09-inference-engineering/index.html">Inference engineering</a> (inference means a brain answering, not learning; you'll meet it in week 8): how the generate loop is run fast for millions of people.</li>
 </ul>
 
 <nav class="pager">
-  <a href="07-trial-and-error.html"><small>Previous</small>Lesson 7 · Q-learning</a>
-  <a class="next" href="09-understanding-commands.html"><small>Next</small>Lesson 9 · Understanding commands</a>
+  <a href="07-trial-and-error.html"><small>Previous</small>Bonus · Trial and error</a>
+  <a class="next" href="09-understanding-commands.html"><small>Next</small>Week 5 · Understanding commands</a>
 </nav>
 <footer>Build a Robot Brain · Week 5 · Lesson 8</footer>
 </main>

@@ -12,7 +12,8 @@
 
 <div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 12 · Lesson 12</div>
 <h1>Learning what people prefer: reinforcement learning from human feedback, by hand</h1>
-<p class="lede">Nobody can write down the rule for "the best route". But anyone can look at two routes and say "that one". This lesson turns those quick answers into a reward the robot can learn from. It's the same recipe that turned raw language models into helpful chat assistants.</p>
+<p class="lede">Why does this come last? Every brain you built can now do the job. The last question is how to do it the way <em>people</em> like. That's also how chatbots are taught their manners. Nobody can write down the rule for "the best route". But anyone can look at two routes and say "that one". This lesson turns those quick answers into a reward the robot can learn from. It's the same recipe that turned raw language models into helpful chat assistants.</p>
+<div class="card note" id="journey"><strong>Step 20 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed ✓ learns from a teacher ✓ fixes a wonky sensor ✓ can use Claude ✓ MCP (bonus) ✓ has a scorecard. <strong>Today</strong> it learns to pick the routes people like best. Next: <a href="14-go-real.html">Week 12 · Going real</a>. <a href="index.html#report-card">See the report card</a>.</div>
 
 <div class="facts">
   <div><b>Time</b>2–3 hours</div>
@@ -23,7 +24,7 @@
 
 <section class="kid" id="start">
 <h2>Start here</h2>
-<p class="big">If you can't write down what "good" means, ask people to compare pairs, learn a score that agrees with their choices, then pick whatever scores highest.</p>
+<p class="big">Can't write down what "good" means? Ask people to compare two options. Learn a score that agrees with their choices. Then pick whatever scores highest.</p>
 
 <h3>The problem</h3>
 <p>Robo-Helper can now carry the red block to the bin along the shortest route (Lesson 11). Your little brother watches and says "it keeps scraping the wall, and it wiggles too much". Your mum says "I don't care, just be quick". You try to write a rule: "shortest, unless it's near a wall, unless the other route has more turns, unless…". It never ends. Every rule you write has an exception. Yet everyone in the room can instantly point at a route on the screen and say "I like that one better".</p>
@@ -33,17 +34,22 @@
 
 <h3>Words to know</h3>
 <dl>
-<dt>Preference</dt><dd>One answer to "which of these two do you like more?". Here, a pair of routes and which one the person chose.</dd>
-<dt>Feature</dt><dd>A number that describes something about an option. Each route gets three: its <em>length</em> (steps), <em>near_wall</em> (how many squares brush a wall) and <em>turns</em> (how often it changes direction).</dd>
-<dt>Reward model</dt><dd>A function that gives every option a score, so that the options people prefer get higher scores. Ours is a weighted sum of the three features.</dd>
-<dt>Taste (weights)</dt><dd>The three numbers in the reward model. They say how much a person minds each feature. Negative means "I dislike this".</dd>
-<dt>Bradley-Terry</dt><dd>The rule that turns a score <em>gap</em> into a <em>chance</em> of choosing: chance A wins = sigmoid(reward(A) − reward(B)). Named after two statisticians from the 1950s.</dd>
-<dt>Best-of-n</dt><dd>Score all n options with the reward model and pick the top one.</dd>
-<dt>Policy</dt><dd>Whatever decides what the robot (or a chatbot) does. Your A* planner is a policy. So is a language model choosing its next word.</dd>
-<dt>RLHF</dt><dd>Reinforcement Learning from Human Feedback: learn a reward from people's comparisons, then use reinforcement learning to make the policy earn high reward.</dd>
+<dt>Preference</dt><dd>One answer to "which of these two do you like more?". Here, two routes and the one the person chose.</dd>
+<dt>Feature</dt><dd>A number that describes an option. Each route gets three: how long it is, how often it brushes a wall, and how often it turns.</dd>
+<dt>Reward model</dt><dd>A scorer. It gives every option a score, so the ones people like get higher scores.</dd>
+<dt>Taste (weights)</dt><dd>Three numbers that say how much a person minds each feature. Negative means "I dislike this".</dd>
+<dt>Best-of-n</dt><dd>Score all the options and pick the top one.</dd>
+<dt>RLHF</dt><dd>Short for "reinforcement learning from human feedback": learning from people's choices. It's how chatbots learn to be helpful.</dd>
 </dl>
 </section>
 <p class="deeper"><strong>Going deeper:</strong> everything below is the full lesson: the idea built from nothing, a demo where <em>you</em> are the person, your homework, and a challenge away from the screen.</p>
+<h3 id="more-words">More words you'll meet below</h3>
+<dl>
+<dt>Feature names</dt><dd>In the code the three features are <em>length</em> (steps), <em>near_wall</em> (how many squares brush a wall) and <em>turns</em> (how often it changes direction). The reward model is a weighted sum of them.</dd>
+<dt>Bradley-Terry</dt><dd>The rule that turns a score <em>gap</em> into a <em>chance</em> of choosing: chance A wins = sigmoid(reward(A) − reward(B)). Named after two statisticians from the 1950s.</dd>
+<dt>Policy</dt><dd>Whatever decides what the robot (or a chatbot) does. Your A* planner is a policy. So is a language model choosing its next word.</dd>
+<dt>RLHF, exactly</dt><dd>Learn a reward from people's comparisons, then use reinforcement learning to make the policy earn high reward.</dd>
+</dl>
 
 <h2 id="problem">1. The problem</h2>
 <p>Here is the room from <code>world.py</code>. The robot starts at <code>(1, 1)</code> and the bin <code>B</code> is at <code>(7, 6)</code>.</p>
@@ -313,8 +319,8 @@ python3 check.py 12</code></pre>
 </ul>
 
 <nav class="pager">
-  <a href="19-bakeoff.html"><small>Previous</small>Lesson 19 · The bake-off</a>
-  <a class="next" href="14-go-real.html"><small>Next</small>Lesson 14 · Going real</a>
+  <a href="19-bakeoff.html"><small>Previous</small>Week 11 · The bake-off</a>
+  <a class="next" href="14-go-real.html"><small>Next</small>Week 12 · Going real</a>
 </nav>
 <footer>Build a Robot Brain · Week 12 · Lesson 12</footer>
 </main>

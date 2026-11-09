@@ -13,11 +13,12 @@
 <div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 12 · Lesson 14</div>
 <h1>Going real: hardware, showing your work, what's next</h1>
 <p class="lede">Your robot brain works, on your laptop, in a perfect pretend room. This last lesson is about the two steps that turn a school project into something real: showing it to other people honestly, and (if you want) putting it on wheels.</p>
+<div class="card note" id="journey"><strong>Step 21 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed ✓ learns from a teacher ✓ fixes a wonky sensor ✓ can use Claude ✓ MCP (bonus) ✓ has a scorecard ✓ picks routes people like. <strong>Today</strong> it learns to go real: show it off, or build it for real. This is the last lesson. Look back at <a href="index.html#report-card">everything it can do</a>. <a href="index.html#report-card">See the report card</a>.<br><strong>Ask an adult today:</strong> buying or building hardware, if you go that far.</div>
 
 <div class="facts">
   <div><b>Time</b>2–4 hours (a hardware build: a few weekends)</div>
   <div><b>You'll need</b>Your finished project, a way to record your screen. Optional: a small robot kit.</div>
-  <div><b>New words</b>README, demo, portfolio, ultrasonic sensor, motor, drift, kill switch</div>
+  <div><b>New words</b>README, demo, showcase, ultrasonic sensor, motor, drift, kill switch</div>
   <div><b>Project piece</b>Share it, or put it on a real robot</div>
 </div>
 
@@ -25,14 +26,14 @@
 <h2>Start here</h2>
 <p class="big">A project nobody can understand might as well not exist, and a simulation is only a rehearsal for the real, messy world.</p>
 <h3>The problem</h3>
-<p>You've built something genuinely impressive: a robot that understands commands, plans routes, brakes safely, dodges a cat and grades itself. Right now it lives in a folder only you know about. If you showed it to a teacher, a friend or a future employer, could they run it in five minutes? Would they know what it gets wrong? And the room it drives around is made of text characters. A real floor has slippery tiles, socks and an actual cat.</p>
+<p>You've built something genuinely impressive: a robot that understands commands, plans routes, brakes safely, dodges a cat and grades itself. Right now it lives in a folder only you know about. If you showed it to your teacher, your friends or the judges at a science fair, could they run it in five minutes? Would they know what it gets wrong? And the room it drives around is made of text characters. A real floor has slippery tiles, socks and an actual cat.</p>
 <h3>The idea in one picture</h3>
 <p>Think of a science fair. The best stands aren't the ones that claim "it works perfectly". They're the ones with a clear poster, a working demo, a graph of results, and a corner that says "what went wrong and what we learned". The judges trust those stands, because they're honest. A README is your science-fair poster. A real robot is taking your experiment out of the lab.</p>
 <h3>Words to know</h3>
 <dl>
 <dt>README</dt><dd>The front-page text file of a project. It says what it is, how to run it, and how well it works.</dd>
 <dt>Demo</dt><dd>A short recording or live show of the project doing its thing, failures included.</dd>
-<dt>Portfolio</dt><dd>A collection of your projects that shows what you can do.</dd>
+<dt>Showcase</dt><dd>A place where you show off your projects, like a science-fair table or a web page.</dd>
 <dt>Ultrasonic sensor</dt><dd>A sensor that measures distance by sending a sound too high to hear and timing the echo, like a bat.</dd>
 <dt>Drift</dt><dd>When a real robot slowly ends up somewhere other than where it thinks it is, because wheels slip.</dd>
 <dt>Kill switch</dt><dd>A physical switch that cuts the power instantly, whatever the code is doing.</dd>
@@ -60,7 +61,7 @@
 <p>That list <em>is</em> your README's outline. You have every piece already. For the results, use your own <code>evaluate()</code> output: <code>Test set: 83% passed</code>, with <code>FAILED: ('find the green block', 'The green block is in the bin.')</code> and <code>FAILED: ('make me a sandwich', 'Stopping.')</code>. Add your Lesson 19 bake-off table: which brain passed what, how long it thought, and what it cost. If you did the Lesson 11 stretch, show the before and after.</p>
 <details><summary>Predict first: two READMEs. A says "My robot understands commands perfectly!". B says "83% on a 12-command test set. It thinks 'make me a sandwich' means stop, because the classifier can't say 'I don't know'." Which one would an engineer trust more?</summary>
 <p>B, by a mile. "Perfectly" makes an engineer suspicious straight away, because nothing is perfect, so either you didn't test it or you're hiding something. B shows that you <em>tested</em>, you <em>measured</em>, you <em>understood</em> the failure, and you can explain it. That's exactly what people who hire engineers look for. Honest failures are a strength, not a weakness.</p></details>
-<p>See how grown-up AI work reports results: the <a href="../04-distill-small-models.html#results">"reading the results honestly"</a> section of the distillation module is a good model, with numbers next to what they do and don't prove. And <a href="../08-ai-research-engineer/12-open-source-portfolio.html">the open-source portfolio stage</a> shows how professionals use public projects like yours to get noticed.</p>
+<p>See how grown-up AI work reports results: the <a href="../04-distill-small-models.html#results">"reading the results honestly"</a> section of the distillation module is a good model, with numbers next to what they do and don't prove. And <a href="../08-ai-research-engineer/12-open-source-portfolio.html">the open-source portfolio stage</a> shows how grown-up engineers share projects like yours.</p>
 <p><b>The demo recording.</b> 30 to 60 seconds is plenty. Most computers have a built-in screen recorder. Show: one command working, the cat replan (the log line), the test-set score, and <em>one failure on purpose</em>. Talk over it, or add captions. Then put the recording file (or a GIF) next to your README and link to it.</p>
 
 <h3 id="physical">Part B: going physical (optional)</h3>
@@ -151,7 +152,7 @@ distance    = 343 × 0.0029 ÷ 2
 
 <h2 id="so-far">6. Your Robo-Helper so far</h2>
 <p>Robo-Helper is finished: it understands commands (L8–L9), refuses unsafe ones (L10), plans (L6), senses and brakes (L2–L5), replans around surprises, and grades itself (L11). Lessons 12 and 13 showed how bigger models learn what people prefer and adapt cheaply. Now it also has the two things every real project needs: <strong>a README that tells the truth</strong> and <strong>a demo</strong>.</p>
-<p>Nothing later in this course uses it, because this is the end of the course. But it lives on as the first piece in your portfolio, and, if you build the kit, as the brain of a robot you can actually watch drive across your floor.</p>
+<p>Nothing later in this course uses it, because this is the end of the course. But it lives on as the first project you can show off, and, if you build the kit, as the brain of a robot you can actually watch drive across your floor.</p>
 
 <h2 id="mistakes">7. Common mistakes</h2>
 <ul>
@@ -179,7 +180,7 @@ distance    = 343 × 0.0029 ÷ 2
 </ul>
 
 <nav class="pager">
-  <a href="12-preferences.html"><small>Previous</small>Lesson 12 · Learning preferences</a>
+  <a href="12-preferences.html"><small>Previous</small>Week 12 · What people prefer</a>
   <a class="next" href="index.html"><small>Next</small>Course hub</a>
 </nav>
 <footer>Build a Robot Brain · Week 12 · Lesson 14</footer>

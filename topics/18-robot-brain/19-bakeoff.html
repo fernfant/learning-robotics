@@ -13,6 +13,7 @@
 <div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 11 · Lesson 19</div>
 <h1>The bake-off: every brain, the same 12 tasks</h1>
 <p class="lede">You now have a whole family of brains for Robo-Helper: a word counter, a tiny language model, its attention version, a distilled one and a 4-bit one, plus Claude as a planner or an agent. Which one is best? Today you find out properly: the same room, the same cat, the same 12 tasks, scored on what the robot actually <em>did</em>. Then you weigh up correctness against speed and cost, the way real engineers do.</p>
+<div class="card note" id="journey"><strong>Step 19 of 21.</strong> So far your robot: ✓ runs code ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ learns mazes (bonus) ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed ✓ learns from a teacher ✓ fixes a wonky sensor ✓ can use Claude ✓ MCP (bonus). <strong>Today</strong> it learns to race every brain on the same 12 tasks. Next: <a href="12-preferences.html">Week 12 · What people prefer</a>. <a href="index.html#report-card">See the report card</a>.</div>
 
 <div class="facts">
   <div><b>Time</b>3–4 hours (plus the stretch)</div>
@@ -23,7 +24,7 @@
 
 <section class="kid" id="start">
 <h2>Start here</h2>
-<p class="big">To compare brains fairly, give every one the exact same tasks, then judge the room afterwards, not what the brain says it did.</p>
+<p class="big">To compare brains fairly, give every one the exact same tasks. Then look at the room afterwards. Don't trust what the brain says it did.</p>
 <h3>The problem</h3>
 <p>Your friend says their brain is "way smarter" than yours. They show you one command where it worked. You show them one where yours worked. Nobody learns anything. And here's a sneaky one: ask the word counter "where's the green one?" and it replies, politely, <em>"The green block is in the bin."</em> That sounds like an answer. But it's true because the robot just drove over and binned it. Nobody asked for that.</p>
 <h3>The idea in one picture</h3>
@@ -31,15 +32,19 @@
 <h3>Words to know</h3>
 <dl>
 <dt>Benchmark</dt><dd>A fixed set of tasks used to compare different systems fairly. Ours is the 12 tasks in <code>TASKS</code>.</dd>
-<dt>Behaviour-level check</dt><dd>Judging a task by what changed in the world (what's in the bin, where the robot is, whether it asked) instead of by the words it said.</dd>
-<dt>Scorecard</dt><dd>One summary per brain: how many tasks passed, how long it thought (p50 and p95, from Lesson 16), and what it cost.</dd>
+<dt>Behaviour-level check</dt><dd>Judging a task by what really happened: what's in the bin, where the robot is, and if it asked a question. Not by the words it said.</dd>
+<dt>Scorecard</dt><dd>One summary per brain: how many tasks it passed, how long it thought, and what it cost.</dd>
 <dt>Failure category</dt><dd>A group of failures with the same cause, such as "can only do one block at a time".</dd>
-<dt>Trade-off</dt><dd>When getting more of one good thing means giving up some of another, like accuracy versus speed.</dd>
-<dt>Hybrid system</dt><dd>A design that uses different brains for different jobs, such as a fast local one for reflexes and a big one for hard thinking.</dd>
+<dt>Trade-off</dt><dd>When getting more of one good thing means giving up some of another. Like being right versus being fast.</dd>
 <dt>Replay</dt><dd>A recording of everything the robot did, frame by frame, that you can watch again later.</dd>
 </dl>
 </section>
 <p class="deeper"><strong>The full lesson:</strong> everything below builds a fair test from scratch, reads the real results, then turns them into a design decision. You write the judge and the scorecard.</p>
+<h3 id="more-words">More words you'll meet below</h3>
+<dl>
+<dt>Hybrid system</dt><dd>A design that uses different brains for different jobs, such as a fast local one for reflexes and a big one for hard thinking.</dd>
+<dt>Scorecard numbers</dt><dd>Each scorecard holds p50 and p95 (from <a href="16-speed.html">Lesson 16</a>) and the cost in dollars.</dd>
+</dl>
 
 <h2 id="problem">1. The problem</h2>
 <p>In Lesson 11 you tested one brain on 12 commands and checked whether <code>result["ok"]</code> was true and which blocks were binned. Now there are several brains, built in completely different ways. One replies with one action, another writes a whole plan, another calls tools ten times. Some ask questions. They don't even produce the same kind of output.</p>
@@ -281,7 +286,7 @@ python3 check.py 19</code></pre>
 <p>A judge is just another model that can be wrong. Before you trust it, run it on tasks where you already <em>know</em> the right verdict, and count how often it agrees. Here we're lucky: our exact checks are the trusted answers. The judge's <strong>agreement</strong> is the fraction of tasks where its pass/fail matches the exact check. The tasks where they disagree are the interesting ones.</p>
 
 <h4>A judge that only reads the reply</h4>
-<p>Start with the cheapest judge possible, <code>rule_judge</code> (provided). It reads only the reply and says "pass" unless the reply sounds like a refusal ("sorry", "can't", …). Real output of <code>python3 lesson19_judge.py</code> (offline, no key needed). It judges three of your brains: words, the tiny LM and the distilled one:</p>
+<p>Start with the cheapest judge possible, <code>rule_judge</code> (provided). It reads only the reply and says "pass" unless the reply sounds like a refusal ("sorry", "can't", …). Real output of <code>python3 lesson19_judge.py</code> (offline, no key needed). It judges three of your brains: words, the tiny LM and the distilled one. One word first: <strong>kappa</strong> is a score for how much better a judge is than lucky guessing; 0 means no better, 1 means perfect (Rule 2 below explains it).</p>
 <pre><code>words (Lesson 9): exact checks pass 5/12
   rule judge, reply only       agrees  58%  kappa  0.21  caught 3/7 failures   disagrees on tasks [2, 4, 6, 11, 12]
   (lazy judge: always pass)    agrees  42%  kappa  0.00
@@ -397,7 +402,7 @@ Did the robot do the right thing? A correct robot does exactly what was asked, r
 
 <h2 id="so-far">6. Your Robo-Helper so far</h2>
 <div class="card note">
-<p><strong>What this adds to your robot.</strong> Proof, not opinions. Row 19 of <code>python3 progress.py --solutions</code> measured: <em>"the same 12 tasks for every brain: words 5/12, tinylm 8/12, distilled 10/12"</em>. And the paired bootstrap says the jump from the word counter to the distilled brain (+42%, between +17% and +67%) is a real difference, not luck.</p>
+<p><strong>What this adds to your robot.</strong> Proof, not opinions. Row 19 of <code>python3 progress.py --solutions</code> measured: <em>"the same 12 tasks for every brain: words 5/12, tinylm 8/12, distilled 10/12"</em>. The word counter gets 5 tasks right, the tiny LM 8 and the distilled brain 10. But is a new brain really better, or just lucky? With only 12 tasks you can't always tell. The error-bar check above says: the distilled brain beats the word counter on 5 tasks and loses on none, so that win is real. The tiny LM's win over the word counter is too close to call.</p>
 </div>
 <p>Robo-Helper now has <strong>a scorecard and replays of every brain</strong>. <code>score_task</code> judges any brain by its behaviour, <code>scorecard</code> adds speed and cost, and <code>run_bakeoff</code> saves every frame to <code>traces/bakeoff.json</code> for the replay viewer.</p>
 <p>Next week, <a href="12-preferences.html">Lesson 12</a> asks a harder question that the bake-off can't: when several answers are all "correct", which one do people actually <em>prefer</em>? Then in <a href="14-go-real.html">Lesson 14</a> your bake-off table and a replay become the centrepiece of your project README and demo.</p>
@@ -429,8 +434,8 @@ Did the robot do the right thing? A correct robot does exactly what was asked, r
 </ul>
 
 <nav class="pager">
-  <a href="20-mcp.html"><small>Previous</small>Lesson 20 · Give any AI app your robot (bonus)</a>
-  <a class="next" href="12-preferences.html"><small>Next</small>Lesson 12 · Learning what people prefer</a>
+  <a href="20-mcp.html"><small>Previous</small>Bonus · Any AI app can drive it (MCP)</a>
+  <a class="next" href="12-preferences.html"><small>Next</small>Week 12 · What people prefer</a>
 </nav>
 <footer>Build a Robot Brain · Week 11 · Lesson 19</footer>
 </main>
