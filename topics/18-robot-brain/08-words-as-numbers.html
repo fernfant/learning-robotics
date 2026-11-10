@@ -39,24 +39,24 @@
 <h2 id="idea">1. The idea</h2>
 <div class="box idea"><span class="tag">💡 The idea</span>
 <p>Our model reads one short story, the <code>STORY</code> in your homework file ("the robot picks up the red block . the robot puts the red block in the bin . …", 66 tokens). Then it keeps a tally: <strong>after this word, which word came next?</strong> Here's every word that ever came after "robot":</p>
-<svg class="diagram" viewBox="0 0 520 250" role="img" aria-label="Arrows from the word robot to the six words that followed it, thicker for more often">
-  <rect x="14" y="103" width="108" height="44" rx="10" style="fill:var(--idea-soft);stroke:var(--idea);stroke-width:2"/>
-  <text x="68" y="131" text-anchor="middle" style="fill:var(--fg);font:700 20px sans-serif">robot</text>
+<svg class="diagram" viewBox="0 0 430 250" role="img" aria-label="Arrows from the word robot to the six words that followed it, thicker for more often">
+  <rect x="4" y="103" width="96" height="44" rx="10" style="fill:var(--idea-soft);stroke:var(--idea);stroke-width:2"/>
+  <text x="52" y="131" text-anchor="middle" style="fill:var(--fg);font:700 20px sans-serif">robot</text>
   <g style="stroke:var(--idea);fill:none" stroke-linecap="round">
-    <path d="M122 125 C 200 125, 220 26, 300 26" stroke-width="8"/>
-    <path d="M122 125 C 200 125, 220 66, 300 66" stroke-width="8"/>
-    <path d="M122 125 C 200 125, 220 106, 300 106" stroke-width="4"/>
-    <path d="M122 125 C 200 125, 220 146, 300 146" stroke-width="4"/>
-    <path d="M122 125 C 200 125, 220 186, 300 186" stroke-width="4"/>
-    <path d="M122 125 C 200 125, 220 226, 300 226" stroke-width="4"/>
+    <path d="M100 125 C 160 125, 170 26, 220 26" stroke-width="8"/>
+    <path d="M100 125 C 160 125, 170 66, 220 66" stroke-width="8"/>
+    <path d="M100 125 C 160 125, 170 106, 220 106" stroke-width="4"/>
+    <path d="M100 125 C 160 125, 170 146, 220 146" stroke-width="4"/>
+    <path d="M100 125 C 160 125, 170 186, 220 186" stroke-width="4"/>
+    <path d="M100 125 C 160 125, 170 226, 220 226" stroke-width="4"/>
   </g>
   <g style="fill:var(--fg);font:18px sans-serif">
-    <text x="310" y="31">picks <tspan style="fill:var(--muted)">2 of 8 = 0.25</tspan></text>
-    <text x="310" y="71">puts <tspan style="fill:var(--muted)">2 of 8 = 0.25</tspan></text>
-    <text x="310" y="111">sees <tspan style="fill:var(--muted)">1 of 8 = 0.125</tspan></text>
-    <text x="310" y="151">stops <tspan style="fill:var(--muted)">1 of 8 = 0.125</tspan></text>
-    <text x="310" y="191">moves <tspan style="fill:var(--muted)">1 of 8 = 0.125</tspan></text>
-    <text x="310" y="231">is <tspan style="fill:var(--muted)">1 of 8 = 0.125</tspan></text>
+    <text x="228" y="31">picks <tspan style="fill:var(--muted)">2 of 8 = 0.25</tspan></text>
+    <text x="228" y="71">puts <tspan style="fill:var(--muted)">2 of 8 = 0.25</tspan></text>
+    <text x="228" y="111">sees <tspan style="fill:var(--muted)">1 of 8 = 0.125</tspan></text>
+    <text x="228" y="151">stops <tspan style="fill:var(--muted)">1 of 8 = 0.125</tspan></text>
+    <text x="228" y="191">moves <tspan style="fill:var(--muted)">1 of 8 = 0.125</tspan></text>
+    <text x="228" y="231">is <tspan style="fill:var(--muted)">1 of 8 = 0.125</tspan></text>
   </g>
 </svg>
 <p>Thicker arrow = seen more often. Divide each count by the total (8) and you get <strong>probabilities</strong> that add up to 1. To write, roll a weighted die: "picks" comes up 1 time in 4. Add the word, then look at <em>its</em> arrows, and repeat. That's the whole model.</p>
@@ -85,22 +85,18 @@
 
 <div class="box idea" id="typos"><span class="tag">💡 The idea: fixing typos</span>
 <p>Step 1: list every string <strong>one typo</strong> away and keep only real words the model knows. Step 2: let <strong>the word before</strong> choose. The known words come from the robot's 34 example commands (from Part B). The same typo, "te", gets two different fixes:</p>
-<svg class="diagram" viewBox="0 0 520 170" role="img" aria-label="te after go becomes to; te after put becomes the">
-  <g style="font:18px sans-serif">
-    <text x="10" y="22" style="fill:var(--muted)">one typo from "te":  me · the · to</text>
-    <rect x="10" y="44" width="150" height="40" rx="8" style="fill:var(--card);stroke:var(--line)"/>
-    <text x="85" y="70" text-anchor="middle" style="fill:var(--fg)">go <tspan style="fill:var(--fail);font-weight:700">te</tspan> …</text>
-    <path d="M165 64 H 245" style="stroke:var(--idea);stroke-width:3"/><path d="M245 58 L257 64 L245 70 Z" style="fill:var(--idea)"/>
-    <text x="268" y="60" style="fill:var(--muted)">after "go": to 0.25</text>
-    <text x="268" y="80" style="fill:var(--muted)">(me, the: never)</text>
-    <text x="440" y="70" style="fill:var(--ok);font-weight:700">→ to</text>
-    <rect x="10" y="110" width="150" height="40" rx="8" style="fill:var(--card);stroke:var(--line)"/>
-    <text x="85" y="136" text-anchor="middle" style="fill:var(--fg)">put <tspan style="fill:var(--fail);font-weight:700">te</tspan> …</text>
-    <path d="M165 130 H 245" style="stroke:var(--idea);stroke-width:3"/><path d="M245 124 L257 130 L245 136 Z" style="fill:var(--idea)"/>
-    <text x="268" y="126" style="fill:var(--muted)">after "put": the 0.67</text>
-    <text x="268" y="146" style="fill:var(--muted)">(me, to: never)</text>
-    <text x="440" y="136" style="fill:var(--ok);font-weight:700">→ the</text>
-  </g>
+<svg class="diagram" viewBox="0 0 360 186" role="img" aria-label="te after go becomes to; te after put becomes the">
+  <text x="0" y="18" font-size="15" style="fill:var(--muted)">one typo from "te":  me · the · to</text>
+  <rect x="0" y="30" width="110" height="40" rx="8" style="fill:var(--card);stroke:var(--line)"/>
+  <text x="55" y="56" text-anchor="middle" font-size="16" style="fill:var(--fg)">go <tspan style="fill:var(--fail);font-weight:700">te</tspan> …</text>
+  <path d="M116 50 H 144" style="stroke:var(--idea);stroke-width:3"/><path d="M144 44 L156 50 L144 56 Z" style="fill:var(--idea)"/>
+  <text x="166" y="57" font-size="18" font-weight="700" style="fill:var(--ok)">to</text>
+  <text x="0" y="92" font-size="15" style="fill:var(--muted)">after "go": to 0.25 (me, the: never)</text>
+  <rect x="0" y="110" width="110" height="40" rx="8" style="fill:var(--card);stroke:var(--line)"/>
+  <text x="55" y="136" text-anchor="middle" font-size="16" style="fill:var(--fg)">put <tspan style="fill:var(--fail);font-weight:700">te</tspan> …</text>
+  <path d="M116 130 H 144" style="stroke:var(--idea);stroke-width:3"/><path d="M144 124 L156 130 L144 136 Z" style="fill:var(--idea)"/>
+  <text x="166" y="137" font-size="18" font-weight="700" style="fill:var(--ok)">the</text>
+  <text x="0" y="172" font-size="15" style="fill:var(--muted)">after "put": the 0.67 (me, to: never)</text>
 </svg>
 <p>If no candidate was ever seen after the word before, pick the most common one. If there are no candidates at all, leave the word alone.</p>
 </div>
@@ -265,16 +261,16 @@ return " ".join(out)</code></pre></details>
 <ol class="steps" style="counter-reset: step 4">
 <li><strong><code>edits1(word)</code></strong>: a <code>set</code> of every string one typo away. Cut the word at every place, then make one change at the cut:
 <svg class="diagram" style="max-width:420px" viewBox="0 0 340 236" role="img" aria-label="The word cat cut at every place: empty and cat, c and at, ca and t, cat and empty. One typo at a cut: delete gives at, swap gives act, replace gives bat, insert gives cart.">
-  <text x="0" y="18" font-size="15" font-weight="700" style="fill:var(--fg)">Cut "cat" at every place ✂</text>
-  <rect x="0" y="28" width="78" height="34" rx="6" style="fill:var(--card);stroke:var(--line)" stroke-width="2"/><text x="39" y="51" text-anchor="middle" font-size="15" style="fill:var(--fg)">| cat</text>
-  <rect x="87" y="28" width="78" height="34" rx="6" style="fill:var(--card);stroke:var(--line)" stroke-width="2"/><text x="126" y="51" text-anchor="middle" font-size="15" style="fill:var(--fg)">c | at</text>
-  <rect x="174" y="28" width="78" height="34" rx="6" style="fill:var(--card);stroke:var(--line)" stroke-width="2"/><text x="213" y="51" text-anchor="middle" font-size="15" style="fill:var(--fg)">ca | t</text>
-  <rect x="261" y="28" width="78" height="34" rx="6" style="fill:var(--card);stroke:var(--line)" stroke-width="2"/><text x="300" y="51" text-anchor="middle" font-size="15" style="fill:var(--fg)">cat |</text>
-  <text x="0" y="92" font-size="15" font-weight="700" style="fill:var(--fg)">One typo at a cut</text>
-  <rect x="0" y="102" width="166" height="56" rx="8" style="fill:var(--build-soft);stroke:var(--build)" stroke-width="2"/><text x="10" y="124" font-size="15" font-weight="700" style="fill:var(--build)">delete</text><text x="10" y="147" font-size="15" style="fill:var(--fg)">| cat → at</text>
-  <rect x="174" y="102" width="166" height="56" rx="8" style="fill:var(--play-soft);stroke:var(--play)" stroke-width="2"/><text x="184" y="124" font-size="15" font-weight="700" style="fill:var(--play)">swap</text><text x="184" y="147" font-size="15" style="fill:var(--fg)">| cat → act</text>
-  <rect x="0" y="166" width="166" height="56" rx="8" style="fill:var(--ok-soft);stroke:var(--ok)" stroke-width="2"/><text x="10" y="188" font-size="15" font-weight="700" style="fill:var(--ok)">replace</text><text x="10" y="211" font-size="15" style="fill:var(--fg)">| cat → bat</text>
-  <rect x="174" y="166" width="166" height="56" rx="8" style="fill:var(--bot-soft);stroke:var(--bot)" stroke-width="2"/><text x="184" y="188" font-size="15" font-weight="700" style="fill:var(--bot)">insert</text><text x="184" y="211" font-size="15" style="fill:var(--fg)">ca | t → cart</text>
+  <text x="0" y="18" font-size="16" font-weight="700" style="fill:var(--fg)">Cut "cat" at every place ✂</text>
+  <rect x="0" y="28" width="78" height="34" rx="6" style="fill:var(--card);stroke:var(--line)" stroke-width="2"/><text x="39" y="51" text-anchor="middle" font-size="16" style="fill:var(--fg)">| cat</text>
+  <rect x="87" y="28" width="78" height="34" rx="6" style="fill:var(--card);stroke:var(--line)" stroke-width="2"/><text x="126" y="51" text-anchor="middle" font-size="16" style="fill:var(--fg)">c | at</text>
+  <rect x="174" y="28" width="78" height="34" rx="6" style="fill:var(--card);stroke:var(--line)" stroke-width="2"/><text x="213" y="51" text-anchor="middle" font-size="16" style="fill:var(--fg)">ca | t</text>
+  <rect x="261" y="28" width="78" height="34" rx="6" style="fill:var(--card);stroke:var(--line)" stroke-width="2"/><text x="300" y="51" text-anchor="middle" font-size="16" style="fill:var(--fg)">cat |</text>
+  <text x="0" y="92" font-size="16" font-weight="700" style="fill:var(--fg)">One typo at a cut</text>
+  <rect x="0" y="102" width="166" height="56" rx="8" style="fill:var(--build-soft);stroke:var(--build)" stroke-width="2"/><text x="10" y="124" font-size="16" font-weight="700" style="fill:var(--build)">delete</text><text x="10" y="147" font-size="16" style="fill:var(--fg)">| cat → at</text>
+  <rect x="174" y="102" width="166" height="56" rx="8" style="fill:var(--play-soft);stroke:var(--play)" stroke-width="2"/><text x="184" y="124" font-size="16" font-weight="700" style="fill:var(--play)">swap</text><text x="184" y="147" font-size="16" style="fill:var(--fg)">| cat → act</text>
+  <rect x="0" y="166" width="166" height="56" rx="8" style="fill:var(--ok-soft);stroke:var(--ok)" stroke-width="2"/><text x="10" y="188" font-size="16" font-weight="700" style="fill:var(--ok)">replace</text><text x="10" y="211" font-size="16" style="fill:var(--fg)">| cat → bat</text>
+  <rect x="174" y="166" width="166" height="56" rx="8" style="fill:var(--bot-soft);stroke:var(--bot)" stroke-width="2"/><text x="184" y="188" font-size="16" font-weight="700" style="fill:var(--bot)">insert</text><text x="184" y="211" font-size="16" style="fill:var(--fg)">ca | t → cart</text>
 </svg>
 <p class="room-caption">Do all four at every cut, with every letter in <code>LETTERS</code>, and put the results in a set (no repeats).</p></li>
 </ol>

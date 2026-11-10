@@ -14,7 +14,6 @@
 <h1>Capstone: Robo-Helper</h1>
 <p class="lede">Your pieces click together into one robot that understands you, drives around a surprise cat, and tells you honestly how good it is.</p>
 <div class="card note" id="journey"><strong>Week 10 of 16 · Part B.</strong> So far your robot: ✓ moves ✓ looks ✓ reads real phone data ✓ stops for the cat ✓ plans routes ✓ fuses sensors ✓ fixes typos ✓ understands sentences ✓ writes plans ✓ drives on real wheels ✓ checks AI answers. <strong>Today</strong> it learns to work as one whole robot, tested end to end. Next: <a href="24-map.html">Week 11 · Scan the room and make a map</a>.</div>
-<div class="card note"><strong>Two robots? Yes, on purpose.</strong> Today you finish <code>RoboHelper</code>, a <em>simpler twin</em> of your robot. It only uses week 7's word counter, and it's one tidy class so it can be tested and scored fairly. Its 83% score is the twin's. Your own <code>my_robot.py</code> already gets the twin's two failures right, and sits its own exam in week 15.</div>
 
 <div class="facts">
   <div><b>Time</b>2–3 hours (plus the stretch)</div>
@@ -27,6 +26,7 @@
 <h2>Start here</h2>
 <p class="big">A robot is lots of small ideas passing messages to each other. The hard part is making the hand-offs work, then measuring the whole thing honestly.</p>
 <p>Think of a restaurant: the waiter writes the order, the chef checks it's on the menu, the cooks plan and cook, and a critic tastes ten dishes and writes "9 out of 10, the soup was cold". No single person is the restaurant.</p>
+<p>🤖🤖 <b>Two robots, on purpose:</b> today you finish <code>RoboHelper</code>, a simpler twin of your robot that only uses week 7's word counter, so it can be scored fairly. Your own <code>my_robot.py</code> sits its exam in week 15.</p>
 <dl>
 <dt>Pipeline</dt><dd>A chain of steps where each one's output is the next one's input.</dd>
 <dt>Test set</dt><dd>A fixed list of tasks, with the right answers, to score the whole robot.</dd>
@@ -37,35 +37,36 @@
 <h2 id="idea">1. The pipeline</h2>
 <div class="box idea"><span class="tag">💡 The idea</span>
 <p>Someone types <em>"put the blue block in the bin"</em>. The message flows through your earlier weeks, one hand-off at a time. Each piece agreed on the <b>shape</b> of what it passes on, so they snap together.</p>
-<svg class="diagram" viewBox="0 0 520 330" role="img" aria-label="The pipeline: words go to the word counter, then the safety check, then the A star route planner, then driving with sensors and the stop neuron, then the result; a test set of 12 commands scores the whole thing at 83 percent">
-<defs><marker id="pa" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
-<g font-size="13" text-anchor="middle">
-<rect x="10" y="10" width="150" height="56" rx="10" fill="var(--card)" stroke="var(--muted)"/>
-<text x="85" y="34" fill="var(--fg)">"put the blue</text><text x="85" y="52" fill="var(--fg)">block in the bin"</text>
-<rect x="185" y="10" width="150" height="56" rx="10" fill="var(--idea-soft)" stroke="var(--idea)" stroke-width="2"/>
-<text x="260" y="32" font-size="15" font-weight="700" fill="var(--idea)">understand</text><text x="260" y="52" fill="var(--fg)">word counter · wk 7</text>
-<rect x="360" y="10" width="150" height="56" rx="10" fill="var(--ok-soft)" stroke="var(--ok)" stroke-width="2"/>
-<text x="435" y="32" font-size="15" font-weight="700" fill="var(--ok)">check</text><text x="435" y="52" fill="var(--fg)">the bouncer · wk 10</text>
-<rect x="360" y="110" width="150" height="56" rx="10" fill="var(--play-soft)" stroke="var(--play)" stroke-width="2"/>
-<text x="435" y="132" font-size="15" font-weight="700" fill="var(--play)">plan</text><text x="435" y="152" fill="var(--fg)">A* route · wk 5</text>
-<rect x="185" y="110" width="150" height="56" rx="10" fill="var(--build-soft)" stroke="var(--build)" stroke-width="2"/>
-<text x="260" y="132" font-size="15" font-weight="700" fill="var(--build)">drive</text><text x="260" y="152" fill="var(--fg)">sense, brake · wk 1, 2, 4</text>
-<rect x="10" y="110" width="150" height="56" rx="10" fill="var(--bot-soft)" stroke="var(--bot)" stroke-width="2"/>
-<text x="85" y="132" font-size="15" font-weight="700" fill="var(--bot)">report</text><text x="85" y="152" fill="var(--fg)">"in the bin"</text>
-<rect x="10" y="220" width="500" height="96" rx="12" fill="var(--card)" stroke="var(--fail)" stroke-width="2" stroke-dasharray="6 4"/>
-<text x="260" y="248" font-weight="700" fill="var(--fail)">test it: 12 commands, a fresh robot each time</text>
-<text x="260" y="274" fill="var(--fg)">10 pass → 83%</text>
-<text x="260" y="298" fill="var(--muted)">failures: "find the green block", "make me a sandwich"</text>
-</g>
-<g font-size="11" fill="var(--muted)" text-anchor="middle">
-<line x1="160" y1="38" x2="183" y2="38" stroke="var(--muted)" stroke-width="2" marker-end="url(#pa)"/>
-<line x1="335" y1="38" x2="358" y2="38" stroke="var(--muted)" stroke-width="2" marker-end="url(#pa)"/>
-<line x1="435" y1="66" x2="435" y2="108" stroke="var(--muted)" stroke-width="2" marker-end="url(#pa)"/><text x="480" y="92">action</text>
-<line x1="360" y1="138" x2="337" y2="138" stroke="var(--muted)" stroke-width="2" marker-end="url(#pa)"/><text x="348" y="182">route</text>
-<line x1="185" y1="138" x2="162" y2="138" stroke="var(--muted)" stroke-width="2" marker-end="url(#pa)"/>
-<line x1="260" y1="166" x2="260" y2="218" stroke="var(--fail)" stroke-width="2" stroke-dasharray="4 3" marker-end="url(#pa)"/>
-</g>
-<text x="140" y="90" font-size="11" fill="var(--muted)">{"intent": "put", "object": "blue block"}</text>
+<svg class="diagram" style="max-width:420px" viewBox="0 0 340 500" role="img" aria-label="The pipeline: words go to the word counter, then the safety check, then the A star route planner, then driving with sensors and the stop neuron, then the report; a test set of 12 commands scores the whole thing at 83 percent">
+<defs><marker id="pa" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker></defs>
+<rect x="4" y="4" width="332" height="38" rx="9" style="fill:var(--card);stroke:var(--muted);stroke-width:2"/>
+<text x="170" y="29" text-anchor="middle" style="font:14px sans-serif;fill:var(--fg)">"put the blue block in the bin"</text>
+<line x1="30" y1="42" x2="30" y2="64" style="stroke:var(--muted);stroke-width:2" marker-end="url(#pa)"/>
+<rect x="4" y="66" width="332" height="38" rx="9" style="fill:var(--idea-soft);stroke:var(--idea);stroke-width:2"/>
+<text x="14" y="91" style="font:700 15px sans-serif;fill:var(--idea)">understand</text><text x="326" y="91" text-anchor="end" style="font:14px sans-serif;fill:var(--fg)">word counter · wk 7</text>
+<line x1="30" y1="104" x2="30" y2="146" style="stroke:var(--muted);stroke-width:2" marker-end="url(#pa)"/>
+<text x="44" y="120" style="font:13.5px ui-monospace,Menlo,monospace;fill:var(--muted)" xml:space="preserve">{"intent": "put",</text>
+<text x="44" y="138" style="font:13.5px ui-monospace,Menlo,monospace;fill:var(--muted)" xml:space="preserve"> "object": "blue block"}</text>
+<rect x="4" y="148" width="332" height="38" rx="9" style="fill:var(--ok-soft);stroke:var(--ok);stroke-width:2"/>
+<text x="14" y="173" style="font:700 15px sans-serif;fill:var(--ok)">check</text><text x="326" y="173" text-anchor="end" style="font:14px sans-serif;fill:var(--fg)">the bouncer · wk 10</text>
+<line x1="30" y1="186" x2="30" y2="208" style="stroke:var(--muted);stroke-width:2" marker-end="url(#pa)"/>
+<text x="44" y="202" style="font:14px sans-serif;fill:var(--muted)" xml:space="preserve">action (passed)</text>
+<rect x="4" y="210" width="332" height="38" rx="9" style="fill:var(--play-soft);stroke:var(--play);stroke-width:2"/>
+<text x="14" y="235" style="font:700 15px sans-serif;fill:var(--play)">plan</text><text x="326" y="235" text-anchor="end" style="font:14px sans-serif;fill:var(--fg)">A* route · wk 5</text>
+<line x1="30" y1="248" x2="30" y2="270" style="stroke:var(--muted);stroke-width:2" marker-end="url(#pa)"/>
+<text x="44" y="264" style="font:14px sans-serif;fill:var(--muted)" xml:space="preserve">route: a list of squares</text>
+<rect x="4" y="272" width="332" height="38" rx="9" style="fill:var(--build-soft);stroke:var(--build);stroke-width:2"/>
+<text x="14" y="297" style="font:700 15px sans-serif;fill:var(--build)">drive</text><text x="326" y="297" text-anchor="end" style="font:14px sans-serif;fill:var(--fg)">sense, brake · wk 1, 2, 4</text>
+<line x1="30" y1="310" x2="30" y2="332" style="stroke:var(--muted);stroke-width:2" marker-end="url(#pa)"/>
+<text x="44" y="326" style="font:14px sans-serif;fill:var(--muted)" xml:space="preserve">what happened</text>
+<rect x="4" y="334" width="332" height="38" rx="9" style="fill:var(--bot-soft);stroke:var(--bot);stroke-width:2"/>
+<text x="14" y="359" style="font:700 15px sans-serif;fill:var(--bot)">report</text><text x="326" y="359" text-anchor="end" style="font:14px sans-serif;fill:var(--fg)">“The blue block is in the bin.”</text>
+<line x1="170" y1="372" x2="170" y2="394" style="stroke:var(--fail);stroke-width:2;stroke-dasharray:4 3" marker-end="url(#pa)"/>
+<rect x="4" y="396" width="332" height="100" rx="12" style="fill:var(--card);stroke:var(--fail);stroke-width:2;stroke-dasharray:6 4"/>
+<text x="170" y="420" text-anchor="middle" style="font:700 15px sans-serif;fill:var(--fail)">test it: 12 commands, fresh robot each</text>
+<text x="170" y="444" text-anchor="middle" style="font:700 15px sans-serif;fill:var(--fg)">10 pass → 83%</text>
+<text x="170" y="466" text-anchor="middle" style="font:14px sans-serif;fill:var(--muted)">failures: “find the green block”,</text>
+<text x="170" y="485" text-anchor="middle" style="font:14px sans-serif;fill:var(--muted)">“make me a sandwich”</text>
 </svg>
 </div>
 
@@ -77,7 +78,7 @@
 
 <h2 id="play">2. Play: run Robo-Helper</h2>
 <div class="box play"><span class="tag">🎮 Play</span>
-<p>The same pipeline as the Python, step for step. Click a floor square to add or remove a surprise (orange). The robot remembers what it did until you reset.</p>
+<p>The same pipeline as the Python, step for step. Click a floor square to add or remove a surprise 🐱 (a red ring means the robot has bumped into it and remembers it). The robot remembers what it did until you reset.</p>
 <div class="card demo">
 <canvas id="room" width="500" height="400" style="height:auto" aria-label="The room: walls, blocks, the bin, surprises and the robot"></canvas>
 <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
@@ -137,15 +138,31 @@ return {"ok": True, "action": action, "message": f"The {obj} is in the bin."}</c
 </ol>
 </div>
 <div class="box checkpoint"><span class="tag">✅ Checkpoint 2</span>
-<p><code>python3 lesson11_robohelper.py</code> in <code>homework</code> prints the room twice (start, then parked on the bin), then:</p>
-<pre><code>&gt; where is the blue block
+<p><code>python3 lesson11_robohelper.py</code> in <code>homework</code>. Real output (in this text room <code>R</code> is the robot, <code>r</code> <code>b</code> <code>g</code> the blocks and <code>B</code> the bin; the cat isn't on its map, so it isn't drawn). Start, then parked on the bin::</p>
+<pre><code>##########
+#Rr......#
+#..##....#
+#..#..b..#
+#....##..#
+#g.......#
+#.#....B.#
+##########
+&gt; where is the blue block
   The blue block is at (6, 3).
 &gt; put the blue block in the bin
   The blue block is in the bin.
 &gt; where is the blue block
   The blue block is in the bin.
   log: ['Something is in the way at (4, 1)! Stopping and finding another route.']
-…
+##########
+#.r......#
+#..##....#
+#..#.....#
+#....##..#
+#g.......#
+#.#....R.#
+##########
+
 Test set: 83% passed
   FAILED: ('find the green block', 'The green block is in the bin.')
   FAILED: ('make me a sandwich', 'Stopping.')</code></pre>
@@ -170,8 +187,40 @@ return passed / len(commands), failures</code></pre></details>
 </div>
 
 <div class="box idea"><span class="tag">💡 Why it fails (the honest part)</span>
-<p><b>"find the green block" binned it.</b> Week 7's word counter scored "put" just above "find" (a gap of only 0.09), because "the green block" appears in lots of "put" examples. Checking that nothing <em>else</em> changed is what caught it.</p>
-<p><b>"make me a sandwich" became "stop".</b> The "stop" examples are short (15 words in total), so "stop" gives the biggest share to words it has never seen: 1 in 67, against 1 in 113 for "put". Four strange words and "stop" wins. The word counter always picks a winner; it can't say <b>"I don't know"</b>. That's the stretch below.</p>
+<p>Here are the real week 7 word-counter scores for the two failures. Longer bar = closer to 0 = winning:</p>
+<svg class="diagram" style="max-width:420px" viewBox="0 0 340 270" role="img" aria-label="Real word-counter scores. find the green block: put minus 13.84 just beats find minus 13.93, a gap of 0.09. make me a sandwich: stop minus 18.27 wins, but the right answer is I don't know.">
+<text x="4" y="20" style="font:700 15px sans-serif;fill:var(--fg)">“find the green block”</text>
+<text x="336" y="20" text-anchor="end" style="font:14px sans-serif;fill:var(--ok)">should be: find</text>
+<text x="4" y="47" style="font:14px sans-serif;fill:var(--fg)">put</text>
+<rect x="44" y="34" width="190.0" height="16" rx="3" style="fill:var(--fail)"/>
+<text x="240.0" y="47" style="font:700 14px sans-serif;fill:var(--fg)">-13.84 ← wins</text>
+<text x="4" y="71" style="font:14px sans-serif;fill:var(--fg)">go</text>
+<rect x="44" y="58" width="168.3" height="16" rx="3" style="fill:var(--muted)"/>
+<text x="218.3" y="71" style="font:14px sans-serif;fill:var(--fg)">-14.46</text>
+<text x="4" y="95" style="font:14px sans-serif;fill:var(--fg)">find</text>
+<rect x="44" y="82" width="186.9" height="16" rx="3" style="fill:var(--ok)"/>
+<text x="236.9" y="95" style="font:14px sans-serif;fill:var(--fg)">-13.93</text>
+<text x="4" y="119" style="font:14px sans-serif;fill:var(--fg)">stop</text>
+<rect x="44" y="106" width="35.0" height="16" rx="3" style="fill:var(--muted)"/>
+<text x="85.0" y="119" style="font:14px sans-serif;fill:var(--fg)">-18.27</text>
+<text x="4" y="156" style="font:700 15px sans-serif;fill:var(--fg)">“make me a sandwich”</text>
+<text x="336" y="156" text-anchor="end" style="font:14px sans-serif;fill:var(--ok)">should be: “I don't know”</text>
+<text x="4" y="183" style="font:14px sans-serif;fill:var(--fg)">put</text>
+<rect x="44" y="170" width="66.4" height="16" rx="3" style="fill:var(--muted)"/>
+<text x="116.4" y="183" style="font:14px sans-serif;fill:var(--fg)">-20.13</text>
+<text x="4" y="207" style="font:14px sans-serif;fill:var(--fg)">go</text>
+<rect x="44" y="194" width="95.0" height="16" rx="3" style="fill:var(--muted)"/>
+<text x="145.0" y="207" style="font:14px sans-serif;fill:var(--fg)">-19.70</text>
+<text x="4" y="231" style="font:14px sans-serif;fill:var(--fg)">find</text>
+<rect x="44" y="218" width="156.8" height="16" rx="3" style="fill:var(--muted)"/>
+<text x="206.8" y="231" style="font:14px sans-serif;fill:var(--fg)">-18.77</text>
+<text x="4" y="255" style="font:14px sans-serif;fill:var(--fg)">stop</text>
+<rect x="44" y="242" width="190.0" height="16" rx="3" style="fill:var(--fail)"/>
+<text x="240.0" y="255" style="font:700 14px sans-serif;fill:var(--fg)">-18.27 ← wins</text>
+</svg>
+<p><b>"find the green block" binned it.</b> "put" beat "find" by only 0.09, because "the green block" appears in lots of "put" examples. Checking that nothing <em>else</em> changed is what caught it.</p>
+<p><b>"make me a sandwich" became "stop".</b> The word counter always picks a winner; it can't say <b>"I don't know"</b>. That's the stretch below.</p>
+<details><summary>Why does "stop" win for words it has never seen?</summary><p>The "stop" examples are short (15 words in total), so "stop" gives the biggest share to words it has never seen: 1 in 67, against 1 in 113 for "put". Four strange words and "stop" wins.</p></details>
 </div>
 
 <h2 id="add-to-robot">4. Add it to your robot</h2>
@@ -191,7 +240,7 @@ Zippy&gt; make me a sandwich
 </div>
 
 <h2 id="real-world">5. Real-world challenge: be Robo-Helper</h2>
-<div class="box build"><span class="tag">🌍 Real-world challenge</span>
+<div class="box world"><span class="tag">🌍 Real-world challenge</span>
 <p><b>With a family member:</b> draw a room of your home on squared paper with a box as the bin and three small objects as blocks. They write 10 commands on slips, including two impossible ones. For each one: check it against the rules (put / go / find / stop, only your three objects), plan the route on paper, then walk it. They may quietly drop a cushion on your route (the cat): stop, mark it, replan. Score yourself, and write one line on <em>why</em> for each failure.</p>
 <p><b>On your own:</b> write the 10 slips and leave them in a jar overnight. For the cat, roll a die before each walk: on a 1 or 2, drop the cushion two steps ahead of you halfway along.</p>
 </div>
@@ -465,29 +514,30 @@ const cv = document.getElementById('room'), ctx = cv.getContext('2d'), $ = id =>
 let userSurprises = [[4, 1]], robot = new RoboHelper(userSurprises), view = null, timer = null;
 const CELL = 50;
 function draw() {
-  const st = view || robot.state();
+  // same look as room.js: grey walls, emoji robot, cat and bin, red/blue/green blocks
+  const st = view || robot.state(), emoji = (e, x, y) => ctx.fillText(e, x * CELL + CELL / 2, y * CELL + CELL / 2 + 2);
   ctx.clearRect(0, 0, cv.width, cv.height);
-  ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '32px sans-serif';
   for (let y = 0; y < ROOM.length; y++) for (let x = 0; x < ROOM[0].length; x++) {
     const c = ROOM[y][x];
-    ctx.fillStyle = c === '#' ? css('--muted') : css('--card');
-    ctx.fillRect(x * CELL + 1, y * CELL + 1, CELL - 2, CELL - 2);
-    if (c === 'B') { ctx.strokeStyle = css('--accent'); ctx.lineWidth = 3; ctx.strokeRect(x * CELL + 6, y * CELL + 6, CELL - 12, CELL - 12); ctx.fillStyle = css('--accent'); ctx.fillText('B', x * CELL + CELL / 2, y * CELL + CELL / 2); }
+    ctx.fillStyle = c === '#' ? css('--wall') : css('--floor');
+    ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
+    ctx.strokeStyle = css('--line'); ctx.lineWidth = 1; ctx.strokeRect(x * CELL, y * CELL, CELL, CELL);
+    if (c === 'B') emoji('🪣', x, y);
   }
   for (const k of userSurprises.map(key)) {
     const [x, y] = k.split(',').map(Number);
-    ctx.fillStyle = css('--warn'); ctx.beginPath(); ctx.arc(x * CELL + CELL / 2, y * CELL + CELL / 2, 16, 0, 7); ctx.fill();
-    if (st.blocked.includes(k)) { ctx.strokeStyle = css('--fail'); ctx.lineWidth = 3; ctx.strokeRect(x * CELL + 4, y * CELL + 4, CELL - 8, CELL - 8); }
+    emoji('🐱', x, y);
+    if (st.blocked.includes(k)) { ctx.strokeStyle = '#e5484d'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x * CELL + CELL / 2, y * CELL + CELL / 2, CELL * 0.46, 0, 7); ctx.stroke(); }
   }
-  const colour = { red: css('--fail'), blue: css('--pass'), green: css('--accent') };
+  const colour = { red: '#e5484d', blue: '#3e7bfa', green: '#30a46c' };
   for (const [name, p] of Object.entries(st.objects)) {
     if (st.binned.includes(name) || st.holding === name) continue;
     ctx.fillStyle = colour[name.split(' ')[0]];
-    ctx.fillRect(p[0] * CELL + 14, p[1] * CELL + 14, CELL - 28, CELL - 28);
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(p[0] * CELL + 11, p[1] * CELL + 11, CELL - 22, CELL - 22, 5) : ctx.rect(p[0] * CELL + 11, p[1] * CELL + 11, CELL - 22, CELL - 22); ctx.fill();
   }
-  ctx.fillStyle = css('--fg'); ctx.beginPath(); ctx.arc(st.pos[0] * CELL + CELL / 2, st.pos[1] * CELL + CELL / 2, 18, 0, 7); ctx.fill();
-  ctx.fillStyle = css('--bg'); ctx.fillText('R', st.pos[0] * CELL + CELL / 2, st.pos[1] * CELL + CELL / 2);
-  if (st.holding) { ctx.fillStyle = colour[st.holding.split(' ')[0]]; ctx.fillRect(st.pos[0] * CELL + 32, st.pos[1] * CELL + 4, 14, 14); }
+  emoji('🤖', st.pos[0], st.pos[1]);
+  if (st.holding) { ctx.fillStyle = colour[st.holding.split(' ')[0]]; ctx.fillRect(st.pos[0] * CELL + 34, st.pos[1] * CELL + 2, 14, 14); }
 }
 function run() {
   if (timer) { clearInterval(timer); timer = null; view = null; }

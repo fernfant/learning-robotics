@@ -294,3 +294,30 @@ Set up the folder structure, schema (CLAUDE.md), shared styles and the index.
   - L14: the boss section, plus a finale around the learner's own `--show` reaching 12/12.
   - Quick wins all applied.
 - Not done (needs the user's API key): recorded Claude runs. The pages say Claude's rows appear after a grown-up records them.
+
+## [2026-11-10] review | Visual, intuition-first pass on Robot Brain
+- Asked for: every concept explained with an everyday idea and a picture before any code, code only as clear practical steps, readable room pictures (not character drawings), colour, concise pages, and a checkpoint after every step.
+- Four reviewers read all 28 Module 18 pages as a 12-year-old (most at phone width in the browser). Verdict: "mostly", with about 20 ranked fixes.
+- A builder did weeks 3, 6, 9, 11 and 12 for real. Every checkpoint matched except two:
+  - week 6: an invented closing line;
+  - week 11: the cat swap was missing from the robot snippet.
+  Both are fixed.
+- Fixes:
+  - Old letter-sprite canvases (weeks 1–2) redrawn in the room.js style.
+  - New pictures:
+    - moving average, magnitude triangle and three-phone real tilts (21);
+    - gradient tilt/lift and MSE squares (03);
+    - train/test drawer (05);
+    - BFS vs A* shaded rooms (06);
+    - sampling strip, nested-dictionary boxes and the "cat" edits (08);
+    - safe_parse flow (10);
+    - failure score bars (11);
+    - route-Q room and S-curve (12);
+    - compass short/long way and x/y split (23);
+    - failure-to-week chips (19).
+  - Formulas moved out of the 💡 boxes and into the 🛠 steps.
+  - New checkpoints on 08 (one per function), 12, 14 (README) and 19.
+  - New `box world` (🌍) and `box safety` (⚠️) styles.
+  - Transcripts wrap on phones.
+  - SVG labels are at least 12px at 375px.
+- Checks: validator 120 pages, 0 problems. `check.py`: 147/147 on the solutions, robot 21/21. `_kit-test.html` deleted.
