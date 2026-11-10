@@ -36,7 +36,7 @@ svg.big-lbl .lbl { font-size: 19px; } svg.big-lbl .lbl.vt { font-size: 18px; }
 <div class="eyebrow"><span class="track robo">Robotics</span>Build a Robot Brain · Week 11 of 16</div>
 <h1>Making a map: frames and a laser scanner</h1>
 <p class="lede">Your robot drives around and turns its laser readings into its own map. When it knows where it is, the map is 100% right, and it even finds the cat the official map doesn't know about.</p>
-<div class="card note" id="journey"><strong>Week 11 of 16.</strong> <strong>Today</strong> it learns to scan the room and draw its own map. Next: <a href="25-localise.html">Week 12 · Where am I?</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<details><summary>So far your robot: 11 skills ✓</summary>✓ moves ✓ looks around ✓ reads real phone data ✓ stops for the cat ✓ plans routes ✓ holds a steady angle ✓ fixes typos ✓ understands sentences ✓ writes plans ✓ drives on real wheels ✓ checks every action.</details></div>
+<div class="card note" id="journey"><strong>Week 11 of 16.</strong> <strong>Today</strong> it learns to scan the room and draw its own map. Next: <a href="25-localise.html">Week 12 · Where am I?</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<details><summary>So far your robot: 11 skills</summary>✓ moves ✓ looks around ✓ reads real phone data ✓ stops for the cat ✓ plans routes ✓ holds a steady angle ✓ fixes typos ✓ understands sentences ✓ writes plans ✓ drives on real wheels ✓ checks every action.</details></div>
 
 <div class="facts">
   <div><b>Time</b>2–3 hours</div>
@@ -264,6 +264,17 @@ return out</code></pre></details>
 <li><b><code>to_map(votes, width, height)</code></b>: one string per row. <code>"#"</code> if more wall votes than free, <code>"?"</code> if no votes at all, otherwise <code>"."</code>.</li>
 </ol>
 </div>
+<div class="box stuck"><span class="tag">🆘 Stuck on to_map?</span>
+<details><summary>Hint 1</summary><p><code>w, f = votes.get((x, y), [0, 0])</code> gives the wall and free votes for square <code>(x, y)</code>, or <code>0, 0</code> if no beam reached it.</p></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code>rows = []
+for y in range(height):
+    row = ""
+    for x in range(width):
+        w, f = votes.get((x, y), [0, 0])
+        row += "?" if w + f == ____ else "#" if w ____ f else "."
+    rows.append(row)
+return rows</code></pre></details>
+</div>
 <div class="box checkpoint"><span class="tag">✅ Checkpoint 4</span>
 <p><code>python3 check.py 24</code>:</p>
 <pre><code>Lesson 24: lesson24_map.py
@@ -322,9 +333,11 @@ return votes</code></pre></details>
 
 <h2 id="add-to-robot">4. Add it to your robot</h2>
 <div class="box bot"><span class="tag">🤖 Add it to your robot · <code>map</code></span>
-<p>Fill in <code>make_map(self)</code> in <code>my_robot.py</code>. The docstring has the whole recipe. You need one import at the top of the method: <code>from lesson24_map import explore, score</code>.</p>
+<p>Fill in <code>make_map(self)</code> in <code>my_robot.py</code>. The docstring has the whole recipe. You need one import at the top of the method: <code>from lesson24_map import explore, score</code>. The middle two lines mark the cat: if row 1, square 4 is a wall, make it a <code>c</code>.</p>
 <pre><code>rows, _ = explore(True)
 right, total = score(rows)
+if rows[1][4] == "#":
+    rows[1] = rows[1][:4] + "c" + rows[1][5:]
 return rows + [f"{right:.0%} of {total} squares right (the 'c' square is the cat the official map doesn't know)"]</code></pre>
 </div>
 <div class="box checkpoint"><span class="tag">✅ Checkpoint · your robot</span>
@@ -338,12 +351,12 @@ return rows + [f"{right:.0%} of {total} squares right (the 'c' square is the cat
   #.#......#
   ##########
   100% of 79 squares right (the 'c' square is the cat the official map doesn't know)</code></pre>
-<p>Row 1, column 4 is the cat's square. The map has a <code>#</code> there (the laser found the cat), and the worked robot swaps it for a <code>c</code>. <b>Bonus:</b> write that swap yourself, so your <code>map</code> shows the <code>c</code> too.</p>
+<p>Row 1, column 4 is the cat's square. The map has a <code>#</code> there (the laser found the cat), and your swap turns it into a <code>c</code>. If you see <code>#...#....#</code> in row 1, you left out the cat swap.</p>
 <p>Then <code>cd ..</code> and run <code>python3 check.py robot</code>. You should see <code>✓ week 11: makes a map</code>, and if every earlier week is done, <code>14/21 passed</code>.</p>
 </div>
 
 <h2 id="challenge">5. Real-world challenge</h2>
-<div class="box build"><span class="tag">🌍 Perfect wheels, still smeared?</span>
+<div class="box world"><span class="tag">🌍 Perfect wheels, still smeared?</span>
 <p>Was the 55% all the big wheel's fault? Map with odometry but <b>equal</b> wheels. From <code>project/homework</code>:</p>
 <pre><code>python3 -c "from lesson24_map import explore, score; m, _ = explore(False, mismatch=0.0); print(score(m))"</code></pre>
 <p>Real output: <code>(0.8026315789473685, 76)</code>. That's 80%: much better than 55%, but still short of 100%. The wheels slip a little on every move, and those small errors add up. Odometry alone is never enough.</p>
