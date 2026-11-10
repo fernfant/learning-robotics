@@ -60,6 +60,21 @@
   </g>
 </svg>
 <p>Thicker arrow = seen more often. Divide each count by the total (8) and you get <strong>probabilities</strong> that add up to 1. To write, roll a weighted die: "picks" comes up 1 time in 4. Add the word, then look at <em>its</em> arrows, and repeat. That's the whole model.</p>
+<p>How do you roll a weighted die? Cut a strip from 0 to 1 into pieces as long as each chance, and drop a random number on it. Here are the chances after "the":</p>
+<svg class="diagram" style="max-width:420px" viewBox="0 0 340 116" role="img" aria-label="A strip from 0 to 1 cut into the chances after the: robot 0.5, red 0.125, bin 0.125, cat 0.0625, blue 0.125, room 0.0625. The random number 0.236 lands on robot.">
+  <defs><marker id="sp" viewBox="0 0 10 10" refX="5" refY="8" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--fg)"/></marker></defs>
+  <text x="10" y="38" font-size="14" style="fill:var(--muted)">0</text><text x="330" y="38" text-anchor="end" font-size="14" style="fill:var(--muted)">1</text>
+  <text x="86" y="16" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--fg)">roll: 0.236</text>
+  <line x1="86" y1="22" x2="86" y2="40" style="stroke:var(--fg)" stroke-width="3" marker-end="url(#sp)"/>
+  <rect x="10" y="46" width="160" height="40" style="fill:var(--idea-soft);stroke:var(--idea)" stroke-width="2"/><text x="90" y="72" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--fg)">robot 0.5</text>
+  <rect x="170" y="46" width="40" height="40" style="fill:var(--build-soft);stroke:var(--fail)" stroke-width="2"/><text x="190" y="71" text-anchor="middle" font-size="14" style="fill:var(--fg)">red</text>
+  <rect x="210" y="46" width="40" height="40" style="fill:var(--card);stroke:var(--muted)" stroke-width="2"/><text x="230" y="71" text-anchor="middle" font-size="14" style="fill:var(--fg)">bin</text>
+  <rect x="250" y="46" width="20" height="40" style="fill:var(--warn-soft);stroke:var(--warn)" stroke-width="2"/>
+  <rect x="270" y="46" width="40" height="40" style="fill:var(--play-soft);stroke:var(--play)" stroke-width="2"/><text x="290" y="71" text-anchor="middle" font-size="14" style="fill:var(--fg)">blue</text>
+  <rect x="310" y="46" width="20" height="40" style="fill:var(--ok-soft);stroke:var(--ok)" stroke-width="2"/>
+  <text x="260" y="106" text-anchor="middle" font-size="14" style="fill:var(--fg)">cat</text><text x="320" y="106" text-anchor="middle" font-size="14" style="fill:var(--fg)">room</text>
+</svg>
+<p class="room-caption"><code>random.Random(4)</code> gives 0.236 first. It lands in the "robot" piece, so the next word is "robot". Bigger piece, more likely. <code>rng.choices</code> does this for you.</p>
 </div>
 
 <p>Real output from the solution (seed 4, 12 new words each):</p>
@@ -358,13 +373,10 @@ return " ".join(out)</code></pre></details>
 <p>Fill in <code>clean(self, text)</code> in <code>my_robot.py</code>. It runs every command through your typo fixer before the robot reads it. The word counts come from <code>TRAIN</code> in <code>lesson09_commands.py</code> (already written for you). <code>TRAIN</code> is a list of pairs like <code>("halt", "stop")</code>, and you only want the command half:</p>
 <pre><code>pairs = [("halt", "stop"), ("go to red", "go")]
 words = [command for command, intent in pairs]     # ["halt", "go to red"]</code></pre>
-<details class="box stuck"><summary>🆘 Stuck?</summary>
-<p><b>Hint 1.</b> Start with these imports:</p>
-<pre><code>from lesson08_words import tokenize, count_bigrams, fix_typos
-from lesson09_commands import TRAIN</code></pre>
-<p><b>Hint 2.</b> Build the counts only once, inside <code>if "counts" not in CACHE:</code>, then return <code>fix_typos(text, CACHE["counts"])</code>.</p>
-<p><b>Hint 3.</b> Fill in:</p>
-<pre><code>from lesson08_words import tokenize, count_bigrams, fix_typos
+<details><summary>Hint 1: the imports</summary><pre><code>from lesson08_words import tokenize, count_bigrams, fix_typos
+from lesson09_commands import TRAIN</code></pre></details>
+<details><summary>Hint 2</summary><p>Build the counts only once, inside <code>if "counts" not in CACHE:</code>, then return <code>fix_typos(text, CACHE["counts"])</code>.</p></details>
+<details><summary>Hint 3 (fill in the blanks)</summary><pre><code>from lesson08_words import tokenize, count_bigrams, fix_typos
 from lesson09_commands import TRAIN
 if "counts" not in CACHE:
     words = [____ for command, intent in TRAIN]
@@ -403,11 +415,6 @@ return fix_typos(____, CACHE["counts"])</code></pre></details>
 <details><summary>Why does "te" become "to" after "go" but "the" after "put"?</summary><p>Both are one typo away. The fixer keeps the one most likely after the word before.</p></details>
 
 <h2 id="deeper">7. Want to know more?</h2>
-<details><summary>Sampling: how to roll a weighted die</summary>
-<p>Picture a ruler from 0 to 1, cut into pieces as long as each probability. After "the" (robot 0.5, red 0.125, bin 0.125, cat 0.0625, blue 0.125, room 0.0625):</p>
-<pre><code>0             0.5    0.625  0.75  0.8125 0.9375  1
-|    robot     | red  | bin  | cat |  blue | room |</code></pre>
-<p>Pick a random number and see where it lands. <code>random.Random(4)</code> gives 0.236 first, so "robot". <code>rng.choices</code> does this for you.</p></details>
 <details><summary>How is ChatGPT different?</summary>
 <ul>
 <li><strong>Longer memory:</strong> thousands of earlier tokens, not one word.</li>

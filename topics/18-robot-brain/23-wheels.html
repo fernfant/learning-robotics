@@ -232,23 +232,25 @@ return x + d * math.cos(h + dtheta / 2), y + d * math.sin(____), h + ____</code>
 <div class="box build"><span class="tag">🛠 Build</span>
 <ol class="steps" start="3" style="counter-reset: step 2">
 <li><b><code>errors_to(pose, target)</code></b>: how far to the target, and how much to turn. A target 35° to your left is <em>also</em> 325° to your right. Always pick the short way:
-<svg class="diagram" style="max-width:420px" viewBox="0 0 340 290" role="img" aria-label="Seen from above: the robot faces left and slightly up; the target is left and down. Turning 35 degrees anticlockwise is the short way; turning 325 degrees clockwise is the long way round">
-<defs><marker id="aok" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
-<marker id="afl" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--fail)"/></marker>
-<marker id="afg" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--fg)"/></marker>
-<marker id="abt" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--build)"/></marker></defs>
-<circle cx="200" cy="118" r="88" style="fill:none;stroke:var(--line);stroke-width:2"/>
-<path d="M130.7 108.1 A70 70 0 1 1 137.4 149.3" style="fill:none;stroke:var(--fail);stroke-width:3;stroke-dasharray:7 5" marker-end="url(#afl)"/>
-<path d="M148.5 110.7 A52 52 0 0 0 153.5 141.3" style="fill:none;stroke:var(--ok);stroke-width:5" marker-end="url(#aok)"/>
-<line x1="200" y1="118" x2="112.9" y2="105.6" style="stroke:var(--fg);stroke-width:3" marker-end="url(#afg)"/>
-<line x1="200" y1="118" x2="121.3" y2="157.4" style="stroke:var(--build);stroke-width:3;stroke-dasharray:2 4" marker-end="url(#abt)"/>
-<circle cx="200" cy="118" r="12" style="fill:var(--bot-soft);stroke:var(--bot);stroke-width:2"/>
-<text x="108.9" y="95.6" text-anchor="middle" style="font:700 16px sans-serif;fill:var(--fg)">facing</text>
-<text x="115.3" y="179.4" text-anchor="middle" style="font:700 16px sans-serif;fill:var(--build)">target</text>
-<text x="4" y="250" style="font:700 17px sans-serif;fill:var(--ok)">━ −35°: the short way ✓</text>
-<text x="4" y="276" style="font:700 17px sans-serif;fill:var(--fail)">╍ 325°: the long way round ✗</text>
+<svg class="diagram" style="max-width:420px" viewBox="0 0 340 300" role="img" aria-label="Seen from above: the robot faces left and slightly up; the target is left and down. Turning 35 degrees anticlockwise is the short way; turning 325 degrees clockwise is the long way round">
+<defs><marker id="aok" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="3" markerHeight="3" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+<marker id="afl" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--fail)"/></marker>
+<marker id="afg" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--fg)"/></marker>
+<marker id="abt" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--build)"/></marker></defs>
+<circle cx="200" cy="125" r="108" style="fill:none;stroke:var(--line);stroke-width:2"/>
+<path d="M108.9 112.0 A92 92 0 1 1 117.7 166.1" style="fill:none;stroke:var(--fail);stroke-width:3;stroke-dasharray:7 5" marker-end="url(#afl)"/>
+<path d="M130.7 115.1 A70 70 0 0 0 137.4 156.3" style="fill:none;stroke:var(--ok);stroke-width:5" marker-end="url(#aok)"/>
+<line x1="200" y1="125" x2="93.1" y2="109.8" style="stroke:var(--fg);stroke-width:3" marker-end="url(#afg)"/>
+<line x1="200" y1="125" x2="103.4" y2="173.3" style="stroke:var(--build);stroke-width:3;stroke-dasharray:3 4" marker-end="url(#abt)"/>
+<circle cx="200" cy="125" r="13" style="fill:var(--bot-soft);stroke:var(--bot);stroke-width:2"/>
+<text x="95.1" y="97.8" text-anchor="middle" style="font:700 16px sans-serif;fill:var(--fg)">facing</text>
+<text x="99.4" y="197.3" text-anchor="middle" style="font:700 16px sans-serif;fill:var(--build)">target</text>
+<text x="4" y="266" style="font:700 17px sans-serif;fill:var(--ok)">━ −35°: the short way ✓</text>
+<text x="4" y="292" style="font:700 17px sans-serif;fill:var(--fail)">╍ 325°: the long way round ✗</text>
 </svg>
-The direction to the target is <code>math.atan2(ty - y, tx - x)</code>. Subtract the heading, then <b>wrap</b> it into −π…π so the robot always turns the short way: <code>(a + math.pi) % (2 * math.pi) - math.pi</code>. Return <code>(distance, heading_error)</code>.</li>
+The direction to the target is <code>math.atan2(ty - y, tx - x)</code>. Subtract the heading to get the turn <code>a</code>, then <b>wrap</b> it into −π…π (the short way) with this line:
+<pre><code>(a + math.pi) % (2 * math.pi) - math.pi</code></pre>
+Return <code>(distance, heading_error)</code>.</li>
 </ol>
 </div>
 <div class="box checkpoint"><span class="tag">✅ Checkpoint 3</span>
