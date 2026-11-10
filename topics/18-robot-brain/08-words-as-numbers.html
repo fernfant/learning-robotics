@@ -133,85 +133,172 @@ the robot is happy . the room is tidy .</textarea>
 
 <h2 id="homework">3. Build it</h2>
 <div class="box build"><span class="tag">🛠 Build</span>
-<p>Open <code>project/homework/lesson08_words.py</code>. <code>STORY</code>, <code>LETTERS</code>, <code>TYPO_COMMANDS</code> and <code>known_words</code> are written for you. You write seven functions, in order. Test each one from the <code>homework</code> folder before moving on.</p>
+<p>Open <code>project/homework/lesson08_words.py</code>. <code>STORY</code>, <code>LETTERS</code>, <code>TYPO_COMMANDS</code> and <code>known_words</code> are written for you. Fill in seven functions, in order. After each one, run <code>python3 check.py 8</code> from the <code>project</code> folder.</p>
+<ol class="steps">
+<li><strong><code>tokenize(text)</code></strong>: lowercase the text and return the words (letters and apostrophes) plus <code>"."</code> as its own token. <code>tokenize("The cat. Sat")</code> → <code>['the', 'cat', '.', 'sat']</code>.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p>Run <code>python3 check.py 8</code>:</p>
+<pre><code>Lesson 8: lesson08_words.py
+  ✓ tokenize
+  … count_bigrams: not written yet (Lesson 8: write this function)
+  … next_word_probs: not written yet (Lesson 8: write this function)
+  … generate: not written yet (Lesson 8: write this function)
+  … edits1: not written yet (Lesson 8: write this function)
+  … fix_typos: not written yet (Lesson 8: write this function)
+  1/6 passed</code></pre>
+<p>If you see <code>✗ tokenize: tokenize("The cat. Sat") -&gt; ["the", "cat", ".", "sat"]</code>, you probably forgot to lowercase first, so the capital T and S were thrown away.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>Use <code>re.findall(pattern, text.lower())</code>. The pattern is in the docstring: <code>r"[a-z']+|\."</code> means "letters and apostrophes, or a full stop".</p></details>
+<details><summary>Hint 2 (fill in the blank)</summary><pre><code>return re.findall(r"[a-z']+|\.", ____.lower())</code></pre></details>
 </div>
 
-<ol class="steps">
-<li><p><strong><code>tokenize(text)</code></strong>: lowercase the text and return the words (letters and apostrophes) plus <code>"."</code> as its own token.</p>
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" style="counter-reset: step 1">
+<li><strong><code>count_bigrams(tokens)</code></strong>: the tally from the arrow picture, as a dictionary of dictionaries. Each word gets its own box of "what came next" counts:
+<svg class="diagram" style="max-width:360px" viewBox="0 0 300 200" role="img" aria-label="A dictionary of dictionaries. The outer key robot holds an inner dictionary: picks 2, puts 2, sees 1, stops 1, moves 1, is 1. So counts robot picks is 2.">
+  <rect x="2" y="2" width="296" height="196" rx="10" style="fill:var(--idea-soft);stroke:var(--idea)" stroke-width="2"/>
+  <text x="16" y="28" font-size="16" font-weight="700" style="fill:var(--idea)">counts["robot"]</text>
+  <rect x="16" y="40" width="126" height="40" rx="8" style="fill:var(--card);stroke:var(--line)" stroke-width="2"/><text x="79" y="66" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">"picks": 2</text>
+  <rect x="158" y="40" width="126" height="40" rx="8" style="fill:var(--card);stroke:var(--line)" stroke-width="2"/><text x="221" y="66" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">"puts": 2</text>
+  <rect x="16" y="90" width="126" height="40" rx="8" style="fill:var(--card);stroke:var(--line)" stroke-width="2"/><text x="79" y="116" text-anchor="middle" font-size="16" style="fill:var(--fg)">"sees": 1</text>
+  <rect x="158" y="90" width="126" height="40" rx="8" style="fill:var(--card);stroke:var(--line)" stroke-width="2"/><text x="221" y="116" text-anchor="middle" font-size="16" style="fill:var(--fg)">"stops": 1</text>
+  <rect x="16" y="140" width="126" height="40" rx="8" style="fill:var(--card);stroke:var(--line)" stroke-width="2"/><text x="79" y="166" text-anchor="middle" font-size="16" style="fill:var(--fg)">"moves": 1</text>
+  <rect x="158" y="140" width="126" height="40" rx="8" style="fill:var(--card);stroke:var(--line)" stroke-width="2"/><text x="221" y="166" text-anchor="middle" font-size="16" style="fill:var(--fg)">"is": 1</text>
+</svg>
+<p class="room-caption">The outer box is the word before. The small boxes inside are the words after it, with their counts. So <code>counts["robot"]["picks"]</code> is 2.</p></li>
+</ol>
+</div>
 <div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
-<pre><code>python3 -c "from lesson08_words import tokenize; print(tokenize('The cat. Sat'))"</code></pre>
-<pre><code>['the', 'cat', '.', 'sat']</code></pre>
-<p>If you see <code>['he', 'cat', '.', 'at']</code>, you forgot to lowercase first: the capital T and S were thrown away.</p></div>
-<details class="box stuck"><summary>🆘 Stuck?</summary>
-<p><b>Hint 1.</b> Use <code>re.findall(pattern, text.lower())</code>. The pattern is in the docstring: <code>r"[a-z']+|\."</code> means "letters and apostrophes, or a full stop".</p>
-<p><b>Hint 2.</b> Fill in: <code>return re.findall(r"[a-z']+|\.", ____.lower())</code></p></details></li>
-
-<li><p><strong><code>count_bigrams(tokens)</code></strong>: a dictionary of dictionaries. <code>counts[word][next_word]</code> = how often <code>next_word</code> came right after <code>word</code>.</p>
-<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
-<pre><code>python3 -c "from lesson08_words import count_bigrams; print(count_bigrams(['a','b','a','b','c']))"</code></pre>
-<pre><code>{'a': {'b': 2}, 'b': {'a': 1, 'c': 1}}</code></pre>
-<p>If you see <code>IndexError: list index out of range</code>, your loop went one too far. 5 tokens make only 4 pairs.</p></div>
-<details class="box stuck"><summary>🆘 Stuck?</summary>
-<p><b>Hint 1.</b> <code>zip(tokens, tokens[1:])</code> gives every pair <code>(a, b)</code>.</p>
-<p><b>Hint 2.</b> <code>setdefault(a, {})</code> makes an empty inner dict if needed; <code>.get(b, 0) + 1</code> adds one.</p>
-<p><b>Hint 3.</b> Fill in:</p>
-<pre><code>counts = {}
+<pre><code>  ✓ tokenize
+  ✓ count_bigrams
+  … next_word_probs: not written yet (Lesson 8: write this function)
+  … generate: not written yet (Lesson 8: write this function)
+  … edits1: not written yet (Lesson 8: write this function)
+  … fix_typos: not written yet (Lesson 8: write this function)
+  2/6 passed</code></pre>
+<p>If you see <code>✗ count_bigrams: crashed with IndexError: list index out of range</code>, your loop went one too far. 5 tokens make only 4 pairs.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p><code>zip(tokens, tokens[1:])</code> gives every neighbouring pair <code>(a, b)</code>. <code>counts.setdefault(a, {})</code> makes an empty inner box if needed, and <code>.get(b, 0) + 1</code> adds one.</p></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code>counts = {}
 for a, b in zip(tokens, ____):
     inner = counts.setdefault(a, {})
     inner[b] = inner.get(b, 0) + ____
-return counts</code></pre></details></li>
+return counts</code></pre></details>
+</div>
 
-<li><p><strong><code>next_word_probs(counts, word)</code></strong>: each count after <code>word</code>, divided by the total. Unknown word → <code>{}</code>.</p>
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" style="counter-reset: step 2">
+<li><strong><code>next_word_probs(counts, word)</code></strong>: each count in <code>word</code>'s box, divided by the box's total. Unknown word → <code>{}</code>. For "robot": 2 of 8 → 0.25.</li>
+</ol>
+</div>
 <div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
-<pre><code>python3 -c "from lesson08_words import next_word_probs; print(next_word_probs({'b': {'a': 1, 'c': 3}}, 'b'))"</code></pre>
-<pre><code>{'a': 0.25, 'c': 0.75}</code></pre>
-<p>If you see <code>{'a': 0.5, 'c': 1.5}</code>, you divided by how many <em>different</em> words there are (2), not by the total count (4).</p></div>
-<details class="box stuck"><summary>🆘 Stuck?</summary>
-<p><b>Hint 1.</b> <code>nxt = counts.get(word, {})</code> and <code>total = sum(nxt.values())</code>.</p>
-<p><b>Hint 2.</b> Fill in: <code>if total == 0: return {}</code> then <code>return {w: c / ____ for w, c in nxt.items()}</code></p></details></li>
+<pre><code>  ✓ tokenize
+  ✓ count_bigrams
+  ✓ next_word_probs
+  … generate: not written yet (Lesson 8: write this function)
+  … edits1: not written yet (Lesson 8: write this function)
+  … fix_typos: not written yet (Lesson 8: write this function)
+  3/6 passed</code></pre>
+<p>If you see <code>✗ next_word_probs: 1 and 3 -&gt; 0.25 and 0.75</code>, you probably divided by how many <em>different</em> words there are, not by the total count.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p><code>nxt = counts.get(word, {})</code> and <code>total = sum(nxt.values())</code>.</p></details>
+<details><summary>Hint 2 (fill in the blank)</summary><pre><code>nxt = counts.get(word, {})
+total = sum(nxt.values())
+if total == 0:
+    return {}
+return {w: c / ____ for w, c in nxt.items()}</code></pre></details>
+</div>
 
-<li><p><strong><code>generate(counts, start, n, rng)</code></strong>: start with <code>[start]</code>. Up to <code>n</code> times: get the chances after the <em>last</em> word, sample one with <code>rng.choices</code>, add it. Stop early if there are no options. Return the words joined with spaces.</p>
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" style="counter-reset: step 3">
+<li><strong><code>generate(counts, start, n, rng)</code></strong>: start with <code>[start]</code>. Up to <code>n</code> times: get the chances after the <em>last</em> word, roll the weighted die with <code>rng.choices</code>, add the word. Stop early if there are no options. Return the words joined with spaces.</li>
+</ol>
+</div>
 <div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
-<pre><code>python3 -c "import random; from lesson08_words import *; c = count_bigrams(tokenize(STORY)); print(generate(c, 'the', 5, random.Random(4))); print(generate(c, 'zzz', 5, random.Random(4)))"</code></pre>
-<pre><code>the robot picks up the robot
-zzz</code></pre>
-<p>If you see <code>the robot robot robot robot robot</code>, you looked at the <em>first</em> word (<code>out[0]</code>) instead of the last (<code>out[-1]</code>).</p></div>
-<details class="box stuck"><summary>🆘 Stuck?</summary>
-<p><b>Hint 1.</b> <code>rng.choices(words, weights=...)</code> returns a <em>list</em> with one item: take <code>[0]</code>.</p>
-<p><b>Hint 2.</b> Fill in:</p>
-<pre><code>out = [start]
+<pre><code>  ✓ tokenize
+  ✓ count_bigrams
+  ✓ next_word_probs
+  ✓ generate
+  … edits1: not written yet (Lesson 8: write this function)
+  … fix_typos: not written yet (Lesson 8: write this function)
+  4/6 passed</code></pre>
+<p>The checker can't spot one common slip, so look for yourself. From <code>homework</code>, type <code>python3</code>, then:</p>
+<pre><code>import random
+from lesson08_words import *
+c = count_bigrams(tokenize(STORY))
+generate(c, "the", 5, random.Random(4))</code></pre>
+<p>You should see <code>'the robot picks up the robot'</code>. If you see <code>'the robot robot robot robot robot'</code>, you looked at the <em>first</em> word (<code>out[0]</code>) instead of the last (<code>out[-1]</code>). Type <code>exit()</code> to leave.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p><code>rng.choices(words, weights=...)</code> returns a <em>list</em> with one item: take <code>[0]</code>. <code>out[-1]</code> is the last item of a list.</p></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code>out = [start]
 for _ in range(n):
     probs = next_word_probs(counts, out[____])
     if not probs:
         break
     words = list(probs)
     out.append(rng.choices(words, weights=[probs[w] for w in words])[____])
-return " ".join(out)</code></pre></details></li>
+return " ".join(out)</code></pre></details>
+</div>
 
-<li><p><strong><code>edits1(word)</code></strong>: a <code>set</code> of every string one typo away: delete one letter, swap two neighbours, replace one letter (with any of <code>LETTERS</code>), or insert one letter anywhere.</p>
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" style="counter-reset: step 4">
+<li><strong><code>edits1(word)</code></strong>: a <code>set</code> of every string one typo away. Cut the word at every place, then make one change at the cut:
+<svg class="diagram" style="max-width:420px" viewBox="0 0 340 236" role="img" aria-label="The word cat cut at every place: empty and cat, c and at, ca and t, cat and empty. One typo at a cut: delete gives at, swap gives act, replace gives bat, insert gives cart.">
+  <text x="0" y="18" font-size="15" font-weight="700" style="fill:var(--fg)">Cut "cat" at every place ✂</text>
+  <rect x="0" y="28" width="78" height="34" rx="6" style="fill:var(--card);stroke:var(--line)" stroke-width="2"/><text x="39" y="51" text-anchor="middle" font-size="15" style="fill:var(--fg)">| cat</text>
+  <rect x="87" y="28" width="78" height="34" rx="6" style="fill:var(--card);stroke:var(--line)" stroke-width="2"/><text x="126" y="51" text-anchor="middle" font-size="15" style="fill:var(--fg)">c | at</text>
+  <rect x="174" y="28" width="78" height="34" rx="6" style="fill:var(--card);stroke:var(--line)" stroke-width="2"/><text x="213" y="51" text-anchor="middle" font-size="15" style="fill:var(--fg)">ca | t</text>
+  <rect x="261" y="28" width="78" height="34" rx="6" style="fill:var(--card);stroke:var(--line)" stroke-width="2"/><text x="300" y="51" text-anchor="middle" font-size="15" style="fill:var(--fg)">cat |</text>
+  <text x="0" y="92" font-size="15" font-weight="700" style="fill:var(--fg)">One typo at a cut</text>
+  <rect x="0" y="102" width="166" height="56" rx="8" style="fill:var(--build-soft);stroke:var(--build)" stroke-width="2"/><text x="10" y="124" font-size="15" font-weight="700" style="fill:var(--build)">delete</text><text x="10" y="147" font-size="15" style="fill:var(--fg)">| cat → at</text>
+  <rect x="174" y="102" width="166" height="56" rx="8" style="fill:var(--play-soft);stroke:var(--play)" stroke-width="2"/><text x="184" y="124" font-size="15" font-weight="700" style="fill:var(--play)">swap</text><text x="184" y="147" font-size="15" style="fill:var(--fg)">| cat → act</text>
+  <rect x="0" y="166" width="166" height="56" rx="8" style="fill:var(--ok-soft);stroke:var(--ok)" stroke-width="2"/><text x="10" y="188" font-size="15" font-weight="700" style="fill:var(--ok)">replace</text><text x="10" y="211" font-size="15" style="fill:var(--fg)">| cat → bat</text>
+  <rect x="174" y="166" width="166" height="56" rx="8" style="fill:var(--bot-soft);stroke:var(--bot)" stroke-width="2"/><text x="184" y="188" font-size="15" font-weight="700" style="fill:var(--bot)">insert</text><text x="184" y="211" font-size="15" style="fill:var(--fg)">ca | t → cart</text>
+</svg>
+<p class="room-caption">Do all four at every cut, with every letter in <code>LETTERS</code>, and put the results in a set (no repeats).</p></li>
+</ol>
+</div>
 <div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
-<pre><code>python3 -c "from lesson08_words import edits1; e = edits1('cat'); print(len(edits1('ab')), sorted(w for w in e if w in ('at','act','bat','cart')))"</code></pre>
-<pre><code>130 ['act', 'at', 'bat', 'cart']</code></pre>
-<p>If you see <code>133</code>, you returned a list with repeats. Wrap it in <code>set(...)</code>.</p></div>
-<details class="box stuck"><summary>🆘 Stuck?</summary>
-<p><b>Hint 1.</b> Cut the word at every position: <code>splits = [(word[:i], word[i:]) for i in range(len(word) + 1)]</code>. For "cat": ("", "cat"), ("c", "at"), ("ca", "t"), ("cat", "").</p>
-<p><b>Hint 2.</b> For a split <code>(a, b)</code>: delete <code>a + b[1:]</code> (if <code>b</code>), swap <code>a + b[1] + b[0] + b[2:]</code> (if <code>len(b) &gt; 1</code>), replace <code>a + c + b[1:]</code> (if <code>b</code>), insert <code>a + c + b</code>.</p>
-<p><b>Hint 3.</b> Fill in:</p>
-<pre><code>deletes  = [a + b[1:] for a, b in splits if b]
+<pre><code>  ✓ tokenize
+  ✓ count_bigrams
+  ✓ next_word_probs
+  ✓ generate
+  ✓ edits1
+  … fix_typos: not written yet (Lesson 8: write this function)
+  5/6 passed</code></pre>
+<p>If you see <code>✗ edits1: 'ab' has exactly 130 different one-typo versions, got 133</code>, you returned a list with repeats. Wrap it in <code>set(...)</code>.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>The cuts: <code>splits = [(word[:i], word[i:]) for i in range(len(word) + 1)]</code>. For "cat": <code>("", "cat")</code>, <code>("c", "at")</code>, <code>("ca", "t")</code>, <code>("cat", "")</code>.</p></details>
+<details><summary>Hint 2</summary><p>For a cut <code>(a, b)</code>: delete <code>a + b[1:]</code> (if <code>b</code>), swap <code>a + b[1] + b[0] + b[2:]</code> (if <code>len(b) &gt; 1</code>), replace <code>a + c + b[1:]</code> (if <code>b</code>), insert <code>a + c + b</code>.</p></details>
+<details><summary>Hint 3 (fill in the blanks)</summary><pre><code>splits = [(word[:i], word[i:]) for i in range(len(word) + 1)]
+deletes  = [a + b[1:] for a, b in splits if b]
 swaps    = [a + b[1] + b[0] + b[2:] for a, b in splits if len(b) &gt; 1]
 replaces = [a + c + b[1:] for a, b in splits if b for c in LETTERS]
 inserts  = [a + c + b for a, b in splits for c in ____]
-return ____(deletes + swaps + replaces + inserts)</code></pre></details></li>
+return ____(deletes + swaps + replaces + inserts)</code></pre></details>
+</div>
 
-<li><p><strong><code>fix_word(word, prev, counts, known)</code></strong>: known word → keep it. Otherwise take the known words in <code>edits1(word)</code>: pick the one most likely after <code>prev</code>; if none was seen after <code>prev</code>, the one that starts the most pairs (ties: alphabetical); if there are none, keep <code>word</code>.</p>
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" style="counter-reset: step 5">
+<li><strong><code>fix_word(word, prev, counts, known)</code></strong>: the "te" picture in code. Known word → keep it. Otherwise take the known words in <code>edits1(word)</code>: pick the one most likely after <code>prev</code>; if none was seen after <code>prev</code>, the one that starts the most pairs (ties: alphabetical); if there are none, keep <code>word</code>.</li>
+</ol>
+</div>
 <div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
-<pre><code>python3 -c "from lesson08_words import fix_word; print(fix_word('bok', 'red', {'red': {'box': 1, 'block': 3}}, {'red', 'box', 'block'}))"</code></pre>
-<pre><code>box</code></pre>
-<p>If you see <code>block</code>, you picked from every word seen after "red". "block" is two typos from "bok", so it isn't a candidate.</p></div>
-<details class="box stuck"><summary>🆘 Stuck?</summary>
-<p><b>Hint 1.</b> <code>candidates = sorted(edits1(word) &amp; known)</code>. <code>&amp;</code> keeps what is in both sets.</p>
-<p><b>Hint 2.</b> Fill in:</p>
-<pre><code>if word in known:
+<p>The checker tests <code>fix_word</code> inside <code>fix_typos</code>, so no new tick yet. Try it by hand. From <code>homework</code>, type <code>python3</code>, then:</p>
+<pre><code>from lesson08_words import fix_word
+fix_word("bok", "red", {"red": {"box": 1, "block": 3}}, {"red", "box", "block"})</code></pre>
+<p>You should see <code>'box'</code>. If you see <code>'block'</code>, you picked from every word seen after "red". "block" is two typos from "bok", so it isn't a candidate.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p><code>candidates = sorted(edits1(word) &amp; known)</code>. <code>&amp;</code> keeps what is in both sets.</p></details>
+<details><summary>Hint 2 (fill in the blank)</summary><pre><code>if word in known:
     return word
 candidates = sorted(edits1(word) &amp; known)
 if not candidates:
@@ -220,11 +307,24 @@ probs = next_word_probs(counts, prev)
 after = [w for w in candidates if w in probs]
 if after:
     return max(after, key=lambda w: probs[w])
-return max(candidates, key=lambda w: sum(counts.get(w, {}).values()))</code></pre></details></li>
+return max(candidates, key=lambda w: sum(counts.get(w, {}).values()))</code></pre></details>
+</div>
 
-<li><p><strong><code>fix_typos(text, counts)</code></strong>: fix each token with <code>fix_word</code>, using the previous <em>fixed</em> word as <code>prev</code>. Start with <code>prev = "."</code>.</p>
-<div class="box checkpoint"><span class="tag">✅ Checkpoint: run the whole file</span>
-<pre><code>python3 lesson08_words.py</code></pre>
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" style="counter-reset: step 6">
+<li><strong><code>fix_typos(text, counts)</code></strong>: fix each token with <code>fix_word</code>, using the previous <em>fixed</em> word as <code>prev</code>. Start with <code>prev = "."</code>.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>  ✓ tokenize
+  ✓ count_bigrams
+  ✓ next_word_probs
+  ✓ generate
+  ✓ edits1
+  ✓ fix_typos
+  6/6 passed  🎉 lesson complete!</code></pre>
+<p>If you see <code>✗ fix_typos: known words and hopeless words stay as they are</code>, your <code>fix_word</code> changed "purple", which has no known word one typo away. It must come back unchanged.</p>
+<p>Now <code>cd homework</code> and run <code>python3 lesson08_words.py</code>:</p>
 <pre><code>after 'robot': {'picks': 0.25, 'puts': 0.25, 'sees': 0.12, 'stops': 0.12, 'moves': 0.12, 'is': 0.12}
 -> the robot picks up the robot puts the cat walks away . the
 -> the robot picks up the blue block in the robot stops . the
@@ -241,28 +341,17 @@ Fixing typos with the robot's command words (from week 7's command examples):
   'head to the red blokc'          -&gt; 'head to the red block'
   'put the red bclok away'         -&gt; 'put the red bclok away'   (wanted 'put the red block away')
 fixed 8 of 9</code></pre>
-<p>The last miss is on purpose: "bclok" is <em>two</em> typos from "block". Then go up to <code>project</code> and run the checker:</p>
-<pre><code>cd ..
-python3 check.py 8</code></pre>
-<pre><code>Lesson 8: lesson08_words.py
-  ✓ tokenize
-  ✓ count_bigrams
-  ✓ next_word_probs
-  ✓ generate
-  ✓ edits1
-  ✓ fix_typos
-  6/6 passed  🎉 lesson complete!</code></pre>
-<p>If you see <code>✗ fix_typos: known words and hopeless words stay as they are</code>, your <code>fix_word</code> changed "purple", which has no known word one typo away. It must come back unchanged.</p></div>
-<details class="box stuck"><summary>🆘 Stuck?</summary>
-<p><b>Hint 1.</b> Work out <code>known = known_words(counts)</code> once, before the loop.</p>
-<p><b>Hint 2.</b> Fill in:</p>
-<pre><code>known = known_words(counts)
+<p>The last miss is on purpose: "bclok" is <em>two</em> typos from "block".</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>Work out <code>known = known_words(counts)</code> once, before the loop.</p></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code>known = known_words(counts)
 out, prev = [], "."
 for w in tokenize(text):
     prev = fix_word(w, ____, counts, known)
     out.append(____)
-return " ".join(out)</code></pre></details></li>
-</ol>
+return " ".join(out)</code></pre></details>
+</div>
 
 <h2 id="add-to-robot">4. Add it to your robot</h2>
 <div class="box bot"><span class="tag">🤖 Add it to your robot</span>
@@ -296,7 +385,7 @@ return fix_typos(____, CACHE["counts"])</code></pre></details>
 </div>
 
 <h2 id="challenge">5. Real-world challenge: a language model in a cup</h2>
-<div class="box play"><span class="tag">🌍 Real-world challenge</span>
+<div class="box world"><span class="tag">🌍 Real-world challenge</span>
 <ol>
 <li>Copy about 20 messages <em>you</em> sent onto paper (leave out anything private).</li>
 <li>Pick your most common word, say "i". Tally the words that came right after it.</li>

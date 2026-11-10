@@ -171,10 +171,10 @@ Zippy&gt; put away the block that's closest to the bin
 
 <div class="box build"><span class="tag">🛠 Build: <code>rescue(self, name)</code></span>
 <ol class="steps">
-<li><b>Get lost, then find yourself</b> (week 12): <code>body = Body(start=(6, 3), heading_deg=180, seed=5)</code>, then <code>guess = localise(body, random.Random(7))</code>. The guess is <code>(x, y, heading)</code> in metres.</li>
-<li><b>Plan</b> (weeks 11 and 5): <code>start = square_of(guess[0], guess[1])</code>, <code>goal = self.objects[name + " block"]</code>, <code>path = astar_path(ROOM, start, goal)[0]</code>.</li>
-<li><b>Drive</b> (week 9): <code>odo = Odometer(body, guess)</code>, then <code>drive_to(body, odo, centre(sq))</code> for every square in <code>path[1:]</code>.</li>
-<li><b>Check</b> (week 10): <code>x, y, _ = body.true_pose()</code>; <code>miss</code> = the distance from <code>(x, y)</code> to <code>centre(goal)</code>. Return <code>f"Rescued the {name} block: I started lost, found myself, and drove there. I'm {miss:.2f} m from it."</code></li>
+<li><b>Find myself</b> (week 12): make a body dropped at square (6, 3) facing west, and let your particle filter guess where it is.</li>
+<li><b>Plan</b> (weeks 11 and 5): turn the guess into a square, and plan an A* route from there to the block.</li>
+<li><b>Drive</b> (week 9): start wheel counting from the guess, and drive to the centre of each square on the route.</li>
+<li><b>Check</b> (week 10): measure how far the body <em>really</em> ended from the block's centre, and say it: <code>Rescued the {name} block: I started lost, found myself, and drove there. I'm {miss:.2f} m from it.</code></li>
 </ol>
 </div>
 <div class="box stuck"><span class="tag">🆘 Stuck?</span>
@@ -183,7 +183,7 @@ from lesson06_paths import astar_path
 from lesson23_wheels import Odometer, drive_to
 from lesson24_map import square_of
 from lesson25_localise import localise</code></pre></details>
-<details><summary>Hint 2</summary><p><code>astar_path</code> returns <code>(path, ...)</code>, so take <code>[0]</code>. Skip the first square (you're already there). The miss is Pythagoras: <code>((x - gx) ** 2 + (y - gy) ** 2) ** 0.5</code>.</p></details>
+<details><summary>Hint 2</summary><p>Step by step: <code>body = Body(start=(6, 3), heading_deg=180, seed=5)</code> and <code>guess = localise(body, random.Random(7))</code> (a guess is <code>(x, y, heading)</code> in metres). <code>square_of(guess[0], guess[1])</code> is the start square, <code>self.objects[name + " block"]</code> the goal. <code>odo = Odometer(body, guess)</code>, then <code>drive_to(body, odo, centre(sq))</code>. <code>body.true_pose()</code> gives the real <code>(x, y, heading)</code>.</p><p><code>astar_path</code> returns <code>(path, ...)</code>, so take <code>[0]</code>. Skip the first square (you're already there). The miss is Pythagoras: <code>((x - gx) ** 2 + (y - gy) ** 2) ** 0.5</code>.</p></details>
 <details><summary>Hint 3 (fill in the blanks)</summary><pre><code>body = Body(start=(6, 3), heading_deg=180, seed=5)
 guess = localise(body, random.Random(7))
 goal = self.objects[name + " block"]
@@ -315,7 +315,17 @@ Zippy passed 6 of 8 of your tests.</code></pre>
 </ol>
 </div>
 
-<h2 id="real-world">6. Real-world challenge: present it</h2>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint 5: is it done?</span>
+<p>Tick the README builder's boxes only for sections your <code>README.md</code> really has, and paste in your real numbers. You're done when it shows:</p>
+<ul>
+<li><b>Sections ready</b> <code>7 / 7</code> (or <code>6 / 7</code> if you have no hardware, so no safety notes);</li>
+<li><b>Honesty check</b> <code>Honest</code>. If it says <code>Perfect? Add harder tests</code>, every score is full marks: add tests it fails.</li>
+<li>Your friend ran it from the README in five minutes, without your help, and can name one thing it's bad at.</li>
+</ul>
+</div>
+
+<h2 id="real-world">6. Real-world challenge</h2>
+<div class="box world"><span class="tag">🌍 Real-world challenge · present it</span>
 <ol class="steps">
 <li>Find someone to listen for 10 minutes. Non-technical people are best.</li>
 <li>Present for 5 minutes: what it does, the demo, the honest score, one failure explained simply.</li>
@@ -323,6 +333,7 @@ Zippy passed 6 of 8 of your tests.</code></pre>
 <li>Add a short FAQ to your README. Questions you couldn't answer go in "What I'd do next".</li>
 </ol>
 <p><b>On your own (20 minutes).</b> Record yourself giving the talk, watch it the next day as a stranger, and write the first five questions they'd ask. Answer them in your FAQ.</p>
+</div>
 
 <div class="box safety" id="safety"><span class="tag">⚠️ If you build a real robot</span>
 <p>Moving robots can pinch fingers, trip people, scare pets and drive off tables. <b>Always</b> have a physical off switch, test with the wheels off the ground first, then on the floor at the slowest speed, away from stairs and pets. An adult supervises tools and batteries: use only the kit's batteries and charger, and never leave them charging alone.</p>
