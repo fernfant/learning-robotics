@@ -68,14 +68,14 @@
 <p>So the angle between the reading and the x axis is the <strong>tilt</strong>. Our real recording comes from a phone clipped to someone's waist, x pointing up when they stand. Here's what it found:</p>
 <svg class="diagram" viewBox="0 0 360 210" role="img" aria-label="The real recording. Standing: the phone leans 9 degrees from straight up. Sitting: 33 degrees. Lying: 79 degrees, nearly on its side.">
   <defs><marker id="aR" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--idea)"/></marker></defs>
-  <g stroke-width="2" stroke-dasharray="5 4" style="stroke:var(--muted)"><line x1="60" y1="20" x2="60" y2="110"/><line x1="180" y1="20" x2="180" y2="110"/><line x1="300" y1="20" x2="300" y2="110"/></g>
-  <g transform="translate(60 110) rotate(9)"><rect x="-16" y="-75" width="32" height="64" rx="6" fill="none" stroke-width="3" style="stroke:var(--muted)"/><line x1="0" y1="-12" x2="0" y2="-85" stroke-width="5" marker-end="url(#aR)" style="stroke:var(--idea)"/></g>
-  <g transform="translate(180 110) rotate(33)"><rect x="-16" y="-75" width="32" height="64" rx="6" fill="none" stroke-width="3" style="stroke:var(--muted)"/><line x1="0" y1="-12" x2="0" y2="-85" stroke-width="5" marker-end="url(#aR)" style="stroke:var(--idea)"/></g>
-  <g transform="translate(300 110) rotate(79)"><rect x="-16" y="-75" width="32" height="64" rx="6" fill="none" stroke-width="3" style="stroke:var(--muted)"/><line x1="0" y1="-12" x2="0" y2="-85" stroke-width="5" marker-end="url(#aR)" style="stroke:var(--idea)"/></g>
+  <g stroke-width="2" stroke-dasharray="5 4" style="stroke:var(--muted)"><line x1="60" y1="30" x2="60" y2="110"/><line x1="170" y1="30" x2="170" y2="110"/><line x1="265" y1="30" x2="265" y2="110"/></g>
+  <g transform="translate(60 110) rotate(9)"><rect x="-14" y="-62" width="28" height="52" rx="6" fill="none" stroke-width="3" style="stroke:var(--muted)"/><line x1="0" y1="-10" x2="0" y2="-72" stroke-width="5" marker-end="url(#aR)" style="stroke:var(--idea)"/></g>
+  <g transform="translate(170 110) rotate(33)"><rect x="-14" y="-62" width="28" height="52" rx="6" fill="none" stroke-width="3" style="stroke:var(--muted)"/><line x1="0" y1="-10" x2="0" y2="-72" stroke-width="5" marker-end="url(#aR)" style="stroke:var(--idea)"/></g>
+  <g transform="translate(265 110) rotate(79)"><rect x="-14" y="-62" width="28" height="52" rx="6" fill="none" stroke-width="3" style="stroke:var(--muted)"/><line x1="0" y1="-10" x2="0" y2="-72" stroke-width="5" marker-end="url(#aR)" style="stroke:var(--idea)"/></g>
   <g font-size="16" text-anchor="middle" style="fill:var(--fg)">
-    <text x="60" y="150">🧍 standing</text><text x="180" y="150">🪑 sitting</text><text x="300" y="150">🛏 lying</text>
-    <g font-size="24" font-weight="700" style="fill:var(--idea)"><text x="60" y="184">9°</text><text x="180" y="184">33°</text><text x="300" y="184">79°</text></g>
-    <text x="180" y="206" font-size="14" style="fill:var(--muted)">dashed: straight up · purple: the phone's x</text>
+    <text x="60" y="150">🧍 standing</text><text x="170" y="150">🪑 sitting</text><text x="280" y="150">🛏 lying</text>
+    <g font-size="24" font-weight="700" style="fill:var(--idea)"><text x="60" y="184">9°</text><text x="170" y="184">33°</text><text x="280" y="184">79°</text></g>
+    <text x="180" y="206" font-size="15" style="fill:var(--muted)">dashed: straight up · purple: the phone's x</text>
   </g>
 </svg>
 <p>Standing is nearly upright, sitting leans back, lying is nearly on its side. (You'll print these numbers yourself in step 5.)</p>
@@ -88,29 +88,47 @@
   <rect x="136" y="166" width="14" height="14" fill="none" stroke-width="2" style="stroke:var(--muted)"/>
   <g font-size="16" font-weight="700"><text x="90" y="172" text-anchor="middle" style="fill:var(--idea)">x = 3</text><text x="158" y="105" style="fill:var(--build)">y = 4</text><text x="20" y="100" style="fill:var(--ok)">5</text></g>
   <g font-size="16" style="fill:var(--fg)"><text x="200" y="60">length</text><text x="200" y="84">= √(3² + 4²)</text><text x="200" y="108">= √25 = <tspan font-weight="700" style="fill:var(--ok)">5</tspan></text>
-  <text x="200" y="150" style="fill:var(--muted)">In 3D, z is one</text><text x="200" y="172" style="fill:var(--muted)">more side: √(x²+y²+z²)</text></g>
+  <text x="200" y="150" style="fill:var(--muted)">In 3D, add z too:</text><text x="200" y="172" style="fill:var(--muted)">√(x² + y² + z²)</text></g>
 </svg>
 <p>Notice gravity isn't exactly 9.81 in the real recording (its six still parts read 8.64 to 10.19 m/s²): real sensors are a little off, like in week 2.</p>
 </div>
 
 <div class="box idea"><span class="tag">💡 The idea: every step is a bump</span>
 <p>When you walk, your body bounces: up, down, up, down. The phone feels each bounce as a bump in the reading's strength. Count the bumps and you've counted steps. Two tricks make it work: <strong>smooth</strong> the wobbly signal first, and <strong>ignore a second bump</strong> that comes too soon after the last step.</p>
-<svg class="diagram" viewBox="0 0 520 250" role="img" aria-label="Three seconds of real walking data. A thin grey wobbly line is the raw strength; a thick smooth line is the moving average. A dashed line at 10.5 is the threshold. Six green dots mark the counted steps. Four grey rings mark second bumps that came too soon after a step and were ignored.">
+<svg class="diagram" viewBox="0 0 520 256" role="img" aria-label="Three seconds of real walking data. A thin grey wobbly line is the raw strength; a thick smooth line is the moving average. A dashed line at 10.5 is the threshold. Six green dots mark the counted steps. Four grey rings mark second bumps that came too soon after a step and were ignored.">
   <line x1="50" y1="200" x2="505" y2="200" stroke-width="1.5" style="stroke:var(--muted)"/>
   <line x1="50" y1="200" x2="50" y2="25" stroke-width="1.5" style="stroke:var(--muted)"/>
-  <g font-size="12" style="fill:var(--muted)"><text x="44" y="204" text-anchor="end">5</text><text x="44" y="134" text-anchor="end">10</text><text x="44" y="64" text-anchor="end">15</text>
-  <text x="50" y="216" text-anchor="middle">171 s</text><text x="200" y="216" text-anchor="middle">172 s</text><text x="350" y="216" text-anchor="middle">173 s</text><text x="500" y="216" text-anchor="middle">174 s</text></g>
-  <text x="275" y="240" font-size="13" text-anchor="middle" style="fill:var(--fg)">time → (strength of the shake, m/s²)</text>
+  <g font-size="21" style="fill:var(--muted)"><text x="44" y="204" text-anchor="end">5</text><text x="44" y="134" text-anchor="end">10</text><text x="44" y="64" text-anchor="end">15</text>
+  <text x="50" y="224" text-anchor="middle">171 s</text><text x="200" y="224" text-anchor="middle">172 s</text><text x="350" y="224" text-anchor="middle">173 s</text><text x="512" y="224" text-anchor="end">174 s</text></g>
+  <text x="275" y="248" font-size="21" text-anchor="middle" style="fill:var(--fg)">time → (strength of the shake, m/s²)</text>
   <polyline fill="none" stroke-width="1.2" opacity=".7" style="stroke:var(--muted)" points="50,148 53,134 56,126 59,126 62,133 65,137 68,115 71,89 74,85 77,91 80,95 83,108 86,118 89,116 92,94 95,63 98,44 101,72 104,117 107,146 110,157 113,168 116,169 119,170 122,170 126,172 129,175 132,174 135,165 138,160 141,159 144,149 147,123 150,78 153,49 156,65 159,80 162,59 165,47 168,83 171,162 174,184 177,136 180,110 183,97 186,125 189,143 192,156 195,168 198,171 201,163 204,139 207,132 210,136 213,153 216,153 219,145 222,131 225,117 228,111 231,107 234,99 237,96 240,97 243,98 246,111 249,122 252,111 255,69 258,33 261,36 264,90 267,137 270,137 273,172 277,168 280,168 283,173 286,173 289,171 292,172 295,178 298,168 301,156 304,145 307,133 310,124 313,95 316,63 319,67 322,73 325,60 328,34 331,130 334,166 337,173 340,126 343,108 346,120 349,126 352,134 355,158 358,179 361,181 364,152 367,124 370,124 373,150 376,155 379,145 382,145 385,117 388,116 391,116 394,119 397,110 400,88 403,77 406,85 409,117 412,122 415,103 418,89 421,55 424,49 428,67 431,117 434,130 437,160 440,167 443,178 446,181 449,178 452,177 455,184 458,179 461,155 464,146 467,136 470,110 473,74 476,53 479,66 482,66 485,64 488,46 491,118 494,171 497,157 500,137"/>
   <polyline fill="none" stroke-width="3.5" stroke-linejoin="round" style="stroke:var(--idea)" points="50,144 53,142 56,139 59,137 62,133 65,131 68,127 71,120 74,112 77,103 80,95 83,94 86,99 89,106 92,106 95,100 98,87 101,78 104,78 107,88 110,107 113,132 116,151 119,162 122,167 126,170 129,171 132,172 135,171 138,169 141,166 144,161 147,151 150,134 153,112 156,93 159,79 162,66 165,60 168,67 171,86 174,107 177,122 180,135 183,138 186,130 189,122 192,126 195,138 198,153 201,160 204,159 207,155 210,148 213,145 216,143 219,144 222,144 225,140 228,131 231,122 234,113 237,106 240,102 243,99 246,100 249,105 252,108 255,102 258,89 261,74 264,68 267,73 270,87 273,115 277,141 280,157 283,164 286,171 289,171 292,172 295,174 298,173 301,169 304,164 307,156 310,145 313,131 316,112 319,97 322,84 325,72 328,59 331,73 334,93 337,113 340,126 343,141 346,139 349,131 352,123 355,129 358,144 361,156 364,161 367,159 370,152 373,146 376,141 379,139 382,143 385,142 388,135 391,128 394,123 397,116 400,110 403,102 406,96 409,95 412,98 415,101 418,103 421,97 424,83 428,72 431,75 434,83 437,105 440,128 443,150 446,163 449,173 452,176 455,180 458,180 461,175 464,168 467,160 470,145 473,124 476,104 479,88 482,74 485,65 488,59 491,72 494,93 497,111 500,126"/>
   <line x1="50" y1="123" x2="505" y2="123" stroke-width="2" stroke-dasharray="6 4" style="stroke:var(--build)"/>
-  <text x="505" y="118" font-size="12" text-anchor="end" font-weight="700" style="fill:var(--build)">threshold 10.5</text>
+  <text x="505" y="146" font-size="21" text-anchor="end" font-weight="700" paint-order="stroke" stroke-width="5" style="fill:var(--build);stroke:var(--idea-soft)">threshold 10.5</text>
   <g style="fill:var(--ok)"><circle cx="83" cy="94" r="6"/><circle cx="165" cy="60" r="6"/><circle cx="243" cy="99" r="6"/><circle cx="328" cy="59" r="6"/><circle cx="409" cy="95" r="6"/><circle cx="488" cy="59" r="6"/></g>
   <g fill="none" stroke-width="2.5" style="stroke:var(--muted)"><circle cx="101" cy="78" r="7"/><circle cx="189" cy="122" r="7"/><circle cx="264" cy="68" r="7"/><circle cx="428" cy="72" r="7"/></g>
-  <text x="60" y="22" font-size="13" font-weight="700" style="fill:var(--ok)">● counted step (6 in 3 s)</text>
-  <text x="260" y="22" font-size="13" font-weight="700" style="fill:var(--muted)">○ too soon after a step: ignored</text>
 </svg>
+<p class="room-caption"><b style="color:var(--ok)">● Counted step</b> (6 in 3 s) · <b>○ too soon after a step: ignored</b></p>
 <p>Real data from 171–174 s of the recording. Grey: the raw strength, wobbly. Purple: smoothed over 5 readings. Each step makes two bumps, 6–8 readings apart, so the counter ignores any bump less than 15 readings after the last step it counted.</p>
+<p><strong>Smoothing with a moving average:</strong> slide a small window along the readings, and write down the average of what's inside. Here the window is 3 wide:</p>
+<svg class="diagram" viewBox="0 0 360 210" role="img" aria-label="A row of readings 1, 9, 1, 9, 1, 9. A window 3 wide covers 9, 1, 9 and drops their average, 6.3, onto the output row below. The output row is 1.0, 5.0, 3.7, 6.3, 3.7, 6.3. The first output has only one value in its window, so it is 1.0.">
+  <defs><marker id="aW" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--build)"/></marker></defs>
+  <g font-size="15" font-weight="700" style="fill:var(--muted)"><text x="4" y="66">in</text><text x="4" y="156">out</text></g>
+  <g stroke-width="2" style="fill:var(--card);stroke:var(--line)">
+    <rect x="48" y="42" width="44" height="36" rx="6"/><rect x="100" y="42" width="44" height="36" rx="6"/><rect x="152" y="42" width="44" height="36" rx="6"/><rect x="204" y="42" width="44" height="36" rx="6"/><rect x="256" y="42" width="44" height="36" rx="6"/><rect x="308" y="42" width="44" height="36" rx="6"/>
+    <rect x="48" y="132" width="44" height="36" rx="6"/><rect x="100" y="132" width="44" height="36" rx="6"/><rect x="152" y="132" width="44" height="36" rx="6"/><rect x="204" y="132" width="44" height="36" rx="6" style="fill:var(--build-soft);stroke:var(--build)"/><rect x="256" y="132" width="44" height="36" rx="6"/><rect x="308" y="132" width="44" height="36" rx="6"/>
+  </g>
+  <g font-size="17" text-anchor="middle" style="fill:var(--fg)">
+    <text x="70" y="66">1</text><text x="122" y="66">9</text><text x="174" y="66">1</text><text x="226" y="66">9</text><text x="278" y="66">1</text><text x="330" y="66">9</text>
+    <text x="70" y="156">1.0</text><text x="122" y="156">5.0</text><text x="174" y="156">3.7</text><text x="226" y="156" font-weight="700">6.3</text><text x="278" y="156">3.7</text><text x="330" y="156">6.3</text>
+  </g>
+  <rect x="96" y="36" width="156" height="48" rx="9" fill="none" stroke-width="3.5" style="stroke:var(--build)"/>
+  <text x="174" y="26" font-size="15" font-weight="700" text-anchor="middle" style="fill:var(--build)">window of 3 → slides along</text>
+  <line x1="226" y1="88" x2="226" y2="126" stroke-width="3" marker-end="url(#aW)" style="stroke:var(--build)"/>
+  <text x="216" y="112" font-size="15" text-anchor="end" style="fill:var(--build)">(9 + 1 + 9) ÷ 3</text>
+  <text x="4" y="198" font-size="15" style="fill:var(--muted)">Start: the window holds only 1, so out = 1.0</text>
+</svg>
+<p class="room-caption">The readings jump 1 to 9. The smoothed ones only wobble 3.7 to 6.3.</p>
 </div>
 
 <h2 id="play">2. Play</h2>
@@ -262,7 +280,7 @@ Noise while standing still: raw readings vary by 0.20 m/s^2, smoothed by 0.08
 
 Your own recording: put it in data/ and run describe(DATA / 'your_file.csv')
   236 s of data: average tilt 13 degrees, 197 steps (0.83 a second).</code></pre>
-<p>About 1.8 steps a second in all four walks: a normal walking pace. Smoothing cut the standing-still wobble from 0.20 to 0.08. Then <code>python3 check.py 21</code>:</p>
+<p>About 1.8 steps a second in all four walks: a normal walking pace. Smoothing (this line averages 10 readings) cut the standing-still wobble from 0.20 to 0.08. Then <code>python3 check.py 21</code>:</p>
 <pre><code>Lesson 21: lesson21_phone.py
   ✓ read_phone_csv
   ✓ magnitude
@@ -278,12 +296,22 @@ Your own recording: put it in data/ and run describe(DATA / 'your_file.csv')
 
 <h2 id="add-to-robot">4. Add it to your robot</h2>
 <div class="box bot"><span class="tag">🤖 Add it to your robot: the <code>phone</code> command</span>
-<p>Fill in <code>phone(self, path)</code> in <code>my_robot.py</code>. It reads a recording with your four functions and returns one sentence:</p>
-<pre><code>times, xs, ys, zs = read_phone_csv(path)
-tilt  = tilt_degrees(average x, average y, average z)
-mags  = moving_average([magnitude(x, y, z) for each reading], 5)
-steps = count_steps(mags, 10.5, 15)
-return f"{seconds:.0f} s of real data: tilted {tilt:.0f} degrees on average, {steps} steps."</code></pre>
+<p>Fill in <code>phone(self, path)</code> in <code>my_robot.py</code>. It joins your four functions like this, and returns one sentence:</p>
+<svg class="diagram" viewBox="0 0 360 320" role="img" aria-label="Flow of phone(): read the CSV into times, xs, ys, zs. Left branch: average x, y and z, then tilt_degrees gives 13 degrees. Right branch: magnitude of each reading, moving_average over 5, count_steps with threshold 10.5 and gap 15 gives 197 steps. Both join into one sentence.">
+  <defs><marker id="aF" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--bot)"/></marker></defs>
+  <g stroke-width="2.5" style="fill:var(--card);stroke:var(--bot)">
+    <rect x="20" y="8" width="320" height="44" rx="10"/><rect x="6" y="88" width="164" height="132" rx="10"/><rect x="190" y="88" width="164" height="132" rx="10"/><rect x="20" y="256" width="320" height="56" rx="10"/>
+  </g>
+  <g stroke-width="3" marker-end="url(#aF)" style="stroke:var(--bot)"><line x1="110" y1="52" x2="88" y2="82"/><line x1="250" y1="52" x2="272" y2="82"/><line x1="88" y1="220" x2="120" y2="250"/><line x1="272" y1="220" x2="240" y2="250"/></g>
+  <g font-size="15" text-anchor="middle" style="fill:var(--fg)">
+    <text x="180" y="36">📄 read_phone_csv(path)</text>
+    <text x="88" y="114">average x, y, z</text><text x="88" y="140" style="fill:var(--muted)">↓</text><text x="88" y="166">tilt_degrees</text>
+    <text x="88" y="204" font-size="18" font-weight="700" style="fill:var(--idea)">13°</text>
+    <text x="272" y="112">magnitude of each</text><text x="272" y="136">moving_average, 5</text><text x="272" y="160">count_steps</text><text x="272" y="180" style="fill:var(--muted)">10.5, gap 15</text>
+    <text x="272" y="208" font-size="18" font-weight="700" style="fill:var(--ok)">197 steps</text>
+    <text x="180" y="280" font-weight="700">💬 one sentence</text><text x="180" y="300" style="fill:var(--muted)">seconds, tilt and steps</text>
+  </g>
+</svg>
 <div class="box stuck"><span class="tag">🆘 Stuck?</span>
 <details><summary>Hint 1</summary><p>First line of the gap:</p><pre><code>from lesson21_phone import read_phone_csv, magnitude, moving_average, tilt_degrees, count_steps</code></pre></details>
 <details><summary>Hint 2</summary><p>The average of a list is <code>sum(xs) / len(xs)</code>. The length of the recording is <code>times[-1] - times[0]</code>.</p></details>
@@ -304,7 +332,7 @@ return f"{times[-1] - times[0]:.0f} s of real data: tilted {tilt:.0f} degrees on
   … week 4: stops for the cat: not written yet (fill in should_stop_for() first)
   ...
   4/21 passed</code></pre>
-<p>Then <code>cd homework</code>, <code>python3 my_robot.py</code>, and type <code>phone</code>. It redraws the room, then says:</p>
+<p>Then <code>cd homework</code>, <code>python3 my_robot.py</code>, and type <code>phone</code>. It redraws the room, then says (ours is called Zippy; yours shows the name you gave it in week 1, or <code>Robo-Helper</code>):</p>
 <pre><code>Zippy&gt; phone
   236 s of real data: tilted 13 degrees on average, 197 steps.</code></pre>
 <p>To use your own recording: <code>phone data/my_walk.csv</code>.</p>
@@ -313,7 +341,7 @@ return f"{times[-1] - times[0]:.0f} s of real data: tilted {tilt:.0f} degrees on
 </div>
 
 <h2 id="challenge">5. Real-world challenge: record yourself</h2>
-<div class="box play"><span class="tag">🌍 Record with phyphox</span>
+<div class="box world"><span class="tag">🌍 Real-world challenge: record with phyphox</span>
 <p><strong>phyphox</strong> is a free app (iPhone and Android) that records your phone's sensors and saves the numbers. <strong>Ask an adult before you install it.</strong></p>
 <ol class="steps">
 <li>Open phyphox and choose <b>Acceleration with g</b>. (Not the one "without g": we want gravity.)</li>

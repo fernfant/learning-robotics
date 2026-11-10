@@ -37,9 +37,9 @@
 <h2 id="wheels">1. Two wheels</h2>
 <div class="box idea"><span class="tag">💡 The idea</span>
 <p>Think of a rowing boat. Both oars pull the same: it goes straight. One pulls harder: it turns. Pull opposite ways: it spins on the spot. A two-wheeled robot works exactly the same way.</p>
-<svg class="diagram" viewBox="0 0 520 190" role="img" aria-label="Three robots seen from above, facing up: equal wheels go straight; a faster right wheel curves it to the left; left wheel backwards and right wheel forwards spins it anticlockwise, to the left">
-<g font-size="16" text-anchor="middle" fill="var(--fg)">
-<text x="85" y="182">same speed: straight</text><text x="260" y="182">one faster: it curves</text><text x="435" y="182">opposite: it spins</text></g>
+<svg class="diagram" viewBox="0 0 520 222" role="img" aria-label="Three robots seen from above, facing up: equal wheels go straight; a faster right wheel curves it to the left; left wheel backwards and right wheel forwards spins it anticlockwise, to the left">
+<g font-size="21" text-anchor="middle" fill="var(--fg)">
+<text x="85" y="194">same speed:</text><text x="85" y="217" font-weight="700">straight</text><text x="260" y="194">one faster:</text><text x="260" y="217" font-weight="700">it curves</text><text x="435" y="194">opposite:</text><text x="435" y="217" font-weight="700">it spins</text></g>
 <g>
 <rect x="55" y="105" width="60" height="50" rx="10" fill="var(--bot-soft)" stroke="var(--bot)" stroke-width="2"/>
 <rect x="45" y="112" width="10" height="36" rx="3" fill="var(--fg)"/><rect x="115" y="112" width="10" height="36" rx="3" fill="var(--fg)"/>
@@ -50,7 +50,7 @@
 <rect x="230" y="105" width="60" height="50" rx="10" fill="var(--bot-soft)" stroke="var(--bot)" stroke-width="2"/>
 <rect x="220" y="112" width="10" height="36" rx="3" fill="var(--fg)"/><rect x="290" y="112" width="10" height="36" rx="3" fill="var(--fg)"/>
 <line x1="225" y1="105" x2="225" y2="88" stroke="var(--build)" stroke-width="4"/><line x1="295" y1="105" x2="295" y2="60" stroke="var(--build)" stroke-width="4"/>
-<text x="200" y="98" font-size="14" text-anchor="end" fill="var(--build)">slow</text><text x="304" y="66" font-size="14" fill="var(--build)">fast</text>
+<text x="212" y="98" font-size="21" text-anchor="end" fill="var(--build)">slow</text><text x="304" y="66" font-size="21" fill="var(--build)">fast</text>
 <path d="M260 98 Q262 40 215 25" fill="none" stroke="var(--ok)" stroke-width="3" marker-end="url(#ah)"/>
 </g>
 <g>
@@ -67,21 +67,21 @@
 <h2 id="encoders">2. Counting wheel turns</h2>
 <div class="box idea"><span class="tag">💡 The idea</span>
 <p>Stick a mark on a bike wheel and count how many times it passes your foot. One full turn rolls the bike forward one circumference. An <b>encoder</b> does this automatically, with lots of marks.</p>
-<svg class="diagram" viewBox="0 0 520 200" role="img" aria-label="A wheel with 36 marks around its edge, a sensor counting them, and the wheel rolling along the ground one circumference per turn">
+<svg class="diagram" viewBox="0 0 520 214" role="img" aria-label="A wheel with 36 marks around its edge, a sensor counting them, and the wheel rolling along the ground one circumference per turn">
 <g transform="translate(110 100)">
 <circle r="70" fill="var(--bot-soft)" stroke="var(--fg)" stroke-width="4"/>
 <g id="ticks" stroke="var(--fg)" stroke-width="2"></g>
 <circle r="6" fill="var(--fg)"/>
 <rect x="74" y="-10" width="26" height="20" rx="4" fill="var(--build)"/>
-<text x="87" y="34" font-size="12" text-anchor="middle" fill="var(--build)">sensor</text>
+<text x="87" y="38" font-size="20" text-anchor="middle" fill="var(--build)">sensor</text>
 </g>
 <line x1="40" y1="172" x2="500" y2="172" stroke="var(--muted)" stroke-width="2"/>
-<line x1="110" y1="186" x2="440" y2="186" stroke="var(--ok)" stroke-width="3"/>
-<text x="275" y="182" font-size="13" text-anchor="middle" fill="var(--ok)">1 turn = 2 × π × radius</text>
-<text x="230" y="60" font-size="15" fill="var(--fg)">360 ticks = 1 full turn</text>
-<text x="230" y="86" font-size="15" fill="var(--fg)">radius 0.03 m</text>
-<text x="230" y="112" font-size="15" font-weight="700" fill="var(--ok)">1 turn rolls 0.19 m</text>
-<text x="230" y="138" font-size="12" fill="var(--muted)">(each drawn mark = 10 ticks)</text>
+<line x1="110" y1="182" x2="440" y2="182" stroke="var(--ok)" stroke-width="3"/>
+<text x="275" y="208" font-size="20" text-anchor="middle" fill="var(--ok)">1 turn = 2 × π × radius</text>
+<text x="230" y="44" font-size="21" fill="var(--fg)">360 ticks = 1 turn</text>
+<text x="230" y="76" font-size="21" fill="var(--fg)">radius 0.03 m</text>
+<text x="230" y="108" font-size="21" font-weight="700" fill="var(--ok)">1 turn rolls 0.19 m</text>
+<text x="230" y="140" font-size="20" fill="var(--muted)">(1 drawn mark = 10 ticks)</text>
 </svg>
 <p>The encoder counts what the <b>motor</b> did. It can't tell if the wheel slipped on the floor. Hold that thought.</p>
 </div>
@@ -92,9 +92,9 @@
 <svg class="diagram" viewBox="0 0 520 150" role="img" aria-label="The true path is a straight line; the robot's chain of little arrows, each slightly off, curves away from it">
 <defs><marker id="ai" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--idea)"/></marker></defs>
 <line x1="30" y1="40" x2="490" y2="40" stroke="var(--ok)" stroke-width="3"/>
-<text x="490" y="28" font-size="13" text-anchor="end" fill="var(--ok)">where it really went</text>
+<text x="490" y="26" font-size="21" text-anchor="end" fill="var(--ok)">where it really went</text>
 <g stroke="var(--idea)" stroke-width="3" marker-end="url(#ai)" fill="none" id="chain"></g>
-<text x="420" y="140" font-size="13" text-anchor="end" fill="var(--idea)">where it thinks it went</text>
+<text x="490" y="144" font-size="21" text-anchor="end" fill="var(--idea)">where it thinks it went</text>
 </svg>
 <p>Here is the real thing, from <code>lesson23_wheels.py</code>: the robot drives a square loop 3 times using only its encoders. The floor doesn't slip at all here. The only problem is that the left wheel is 2% bigger than the robot believes.</p>
 <svg class="diagram" viewBox="40 40 260 225" role="img" aria-label="Three laps of a square: where the robot thinks it went (a neat square) and where it really went (a loop that slowly turns and drifts)">
@@ -105,9 +105,9 @@
 <circle cx="60.2" cy="183.7" r="7" fill="var(--idea)"/><circle cx="82.6" cy="94.3" r="7" fill="var(--ok)"/>
 <line x1="60.2" y1="183.7" x2="82.6" y2="94.3" stroke="var(--fail)" stroke-width="2.5"/>
 
-<text x="92.6" y="90.3" font-size="13" font-weight="700" fill="var(--ok)">really here</text>
-<text x="79.4" y="139" font-size="13" font-weight="700" fill="var(--fail)">1.15 m</text>
-<text x="124" y="256" font-size="12" fill="var(--idea)">● start, and where it THINKS it ended</text>
+<text x="92.6" y="90.3" font-size="14" font-weight="700" fill="var(--ok)">really here</text>
+<text x="79.4" y="139" font-size="14" font-weight="700" fill="var(--fail)">1.15 m</text>
+<text x="44" y="258" font-size="13" fill="var(--idea)">● start = where it THINKS it ended</text>
 </svg>
 <p>The robot (purple, dashed) believes it drove the same neat square three times and ended back at the start. Really (green) each lap turned a little too much, and it ended <b>1.15 m</b> away. A slippy floor makes it worse: 1.21 m with 5% slip, 1.43 m with 15%.</p>
 </div>
@@ -127,16 +127,16 @@
 <text x="14" y="172" style="font:14px sans-serif;fill:var(--fg)">closing in fast? ease off early.</text>
 </svg>
 <p>The motors have momentum (they take about a quarter of a second to change speed). So pushing hard with P alone swings straight past the goal, like a swing pushed too hard. Adding D brakes before it gets there. Real runs from <code>lesson23_wheels.py</code>, turning from 0° to 90°:</p>
-<svg class="diagram" viewBox="0 0 520 215" role="img" aria-label="Heading over time while turning to 90 degrees: P only overshoots to about 133 degrees and wobbles; PD rises and settles near 90 within about half a second">
+<svg class="diagram" viewBox="0 0 520 222" role="img" aria-label="Heading over time while turning to 90 degrees: P only overshoots to about 133 degrees and wobbles; PD rises and settles near 90 within about half a second">
 <line x1="40" y1="190" x2="480" y2="190" stroke="var(--muted)"/><line x1="40" y1="20" x2="40" y2="190" stroke="var(--muted)"/>
 <line x1="40" y1="82" x2="480" y2="82" stroke="var(--fg)" stroke-dasharray="4 4"/>
-<text x="484" y="86" font-size="12" fill="var(--fg)">90°</text>
-<text x="40" y="206" font-size="11" text-anchor="middle" fill="var(--muted)">0 s</text><text x="150" y="206" font-size="11" text-anchor="middle" fill="var(--muted)">1 s</text><text x="260" y="206" font-size="11" text-anchor="middle" fill="var(--muted)">2 s</text><text x="370" y="206" font-size="11" text-anchor="middle" fill="var(--muted)">3 s</text><text x="480" y="206" font-size="11" text-anchor="middle" fill="var(--muted)">4 s</text>
-<text x="34" y="194" font-size="11" text-anchor="end" fill="var(--muted)">0°</text>
+<text x="484" y="89" font-size="21" fill="var(--fg)">90°</text>
+<text x="40" y="214" font-size="21" text-anchor="middle" fill="var(--muted)">0 s</text><text x="150" y="214" font-size="21" text-anchor="middle" fill="var(--muted)">1 s</text><text x="260" y="214" font-size="21" text-anchor="middle" fill="var(--muted)">2 s</text><text x="370" y="214" font-size="21" text-anchor="middle" fill="var(--muted)">3 s</text><text x="480" y="214" font-size="21" text-anchor="middle" fill="var(--muted)">4 s</text>
+<text x="34" y="196" font-size="21" text-anchor="end" fill="var(--muted)">0°</text>
 <polyline points="40,190 45.5,168.4 51,133.8 56.5,96 62,62.9 67.5,39.9 73,30.2 78.5,32.7 84,44.6 89.5,61.8 95,79.5 100.5,93.9 106,103.2 111.5,106.5 117,104 122.5,97.8 128,89.6 133.5,81.6 139,75.2 144.5,71.6 150,70.5 155.5,72.3 161,75.5 166.5,79.5 172,83.1 177.5,85.6 183,87 188.5,87 194,86.3 199.5,84.5 205,82.7 210.5,81.3 216,80.2 221.5,79.5 227,79.8 232.5,80.2 238,80.9 243.5,81.6 249,82.4 254.5,83.1 260,83.1 265.5,83.1 271,82.7 276.5,82.4 282,82 287.5,82 293,81.6 298.5,81.6 304,81.6 309.5,81.6 315,81.6 320.5,82 326,82 331.5,82 337,82.4 342.5,82.4 348,82 353.5,82 359,82 364.5,82 370,82 375.5,82 381,82 386.5,82 392,82 397.5,82 403,82 408.5,82 414,82 419.5,82 425,82 430.5,82 436,82 441.5,82 447,82 452.5,82 458,82 463.5,82 469,82 474.5,82 480,82" fill="none" stroke="var(--fail)" stroke-width="2.5"/>
 <polyline points="40,190 45.5,168.4 51,140.3 56.5,114.8 62,95.3 67.5,83.1 73,76.6 78.5,74.4 84,74.8 89.5,76.6 95,78.4 100.5,80.2 106,81.3 111.5,82 117,82.4 122.5,82.7 128,82.4 133.5,82.4 139,82.4 144.5,82 150,82 155.5,82 161,82 166.5,82 172,82 177.5,82 183,82 188.5,82 194,82 199.5,82 205,82 210.5,82 216,82 221.5,82 227,82 232.5,82 238,82 243.5,82 249,82 254.5,82 260,82 265.5,82 271,82 276.5,82 282,82 287.5,82 293,82 298.5,82 304,82 309.5,82 315,82 320.5,82 326,82 331.5,82 337,82 342.5,82 348,82 353.5,82 359,82 364.5,82 370,82 375.5,82 381,82 386.5,82 392,82 397.5,82 403,82 408.5,82 414,82 419.5,82 425,82 430.5,82 436,82 441.5,82 447,82 452.5,82 458,82 463.5,82 469,82 474.5,82 480,82" fill="none" stroke="var(--ok)" stroke-width="3"/>
-<text x="120" y="22" font-size="13" fill="var(--fail)">P only (kp 20): overshoots 43°</text>
-<text x="200" y="160" font-size="13" fill="var(--ok)">PD (kp 20, kd 1.5): settles in 0.6 s</text>
+<text x="110" y="22" font-size="21" font-weight="700" fill="var(--fail)">P only (kp 20): overshoots 43°</text>
+<text x="96" y="160" font-size="21" font-weight="700" fill="var(--ok)">PD (kp 20, kd 1.5): settles in 0.6 s</text>
 </svg>
 <p>P alone with kp 20 overshoots by <b>43°</b>. PD (kp 20, kd 1.5) overshoots by only 6° and settles within 2° of the goal after <b>0.6 s</b>. Cruise control in cars and drones use the same rule.</p>
 </div>
@@ -162,7 +162,7 @@
 
 <div class="box play"><span class="tag">🎮 Play: tune the PID</span>
 <p>The robot turns on the spot from 0° to 90°. Move the sliders and watch the heading over 6 seconds.</p>
-<svg id="pidPlot" class="diagram" viewBox="0 0 520 215" role="img" aria-label="Heading over time for the chosen kp and kd"></svg>
+<svg id="pidPlot" class="diagram" viewBox="0 0 520 222" role="img" aria-label="Heading over time for the chosen kp and kd"></svg>
 <label for="kp">kp (push): <b id="kpv"></b></label><input style="display:block;width:100%;accent-color:var(--play)" id="kp" type="range" min="0" max="30" step="0.5" value="20">
 <label for="kd">kd (brake): <b id="kdv"></b></label><input style="display:block;width:100%;accent-color:var(--play)" id="kd" type="range" min="0" max="3" step="0.1" value="0">
 <p style="display:flex;flex-wrap:wrap;gap:6px"><button data-g="2,0">P kp 2</button><button data-g="8,0">P kp 8</button><button data-g="20,0">P kp 20</button><button data-g="20,1.5">PD kp 20, kd 1.5</button></p>
@@ -264,7 +264,13 @@ return math.hypot(target[0] - x, target[1] - y), (want - h + math.pi) % (____) -
 
 <div class="box build"><span class="tag">🛠 Build</span>
 <ol class="steps" start="4" style="counter-reset: step 3">
-<li><b><code>pid_step(state, error, dt, kp, ki, kd)</code></b>: one step of push, remember, brake. <code>state</code> is <code>(integral, previous_error)</code>, or <code>None</code> the very first time (then there's no derivative yet, so use the current error as the previous one).
+<li><b><code>pid_step(state, error, dt, kp, ki, kd)</code></b>: one step of push, remember, brake. <code>state</code> is <code>(integral, previous_error)</code>, or <code>None</code> the very first time (then there's no derivative yet, so use the current error as the previous one). In plain words:
+<ul>
+<li><b>push</b> (P) = the error now;</li>
+<li><b>remember</b> (I, the <em>integral</em>) = all the errors so far, added up;</li>
+<li><b>brake</b> (D, the <em>derivative</em>) = how much the error changed since last step, per second.</li>
+</ul>
+The lines to type:
 <pre><code>integral   = integral + error * dt
 derivative = (error - previous_error) / dt
 output     = kp * error + ki * integral + kd * derivative
@@ -550,9 +556,9 @@ function plotPid() {
   const yOf = v => Math.max(12, Math.min(200, 190 - v * 1.2));
   const pts = h.map((v, i) => `${(40 + i * 440 / 120).toFixed(1)},${yOf(v).toFixed(1)}`).join(" ");
   $("pidPlot").innerHTML = `<line x1="40" y1="190" x2="480" y2="190" stroke="var(--muted)"/><line x1="40" y1="12" x2="40" y2="190" stroke="var(--muted)"/>
-  <line x1="40" y1="82" x2="480" y2="82" stroke="var(--fg)" stroke-dasharray="4 4"/><text x="484" y="86" font-size="12" fill="var(--fg)">90°</text>
-  ${[0, 1, 2, 3, 4, 5, 6].map(s => `<text x="${40 + s * 440 / 6}" y="206" font-size="11" text-anchor="middle" fill="var(--muted)">${s} s</text>`).join("")}
-  <text x="34" y="194" font-size="11" text-anchor="end" fill="var(--muted)">0°</text>
+  <line x1="40" y1="82" x2="480" y2="82" stroke="var(--fg)" stroke-dasharray="4 4"/><text x="484" y="89" font-size="21" fill="var(--fg)">90°</text>
+  ${[0, 1, 2, 3, 4, 5, 6].map(s => `<text x="${40 + s * 440 / 6}" y="214" font-size="21" text-anchor="middle" fill="var(--muted)">${s} s</text>`).join("")}
+  <text x="34" y="196" font-size="21" text-anchor="end" fill="var(--muted)">0°</text>
   <polyline points="${pts}" fill="none" stroke="${over > 15 ? "var(--fail)" : "var(--ok)"}" stroke-width="3"/>`;
   $("ov").textContent = over.toFixed(1) + "°";
   $("st").textContent = settled === null ? "never" : settled.toFixed(1) + " s";
