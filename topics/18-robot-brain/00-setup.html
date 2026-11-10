@@ -36,26 +36,26 @@
 <div class="box idea"><span class="tag">💡 The idea</span>
 <p>Write instructions for a jam sandwich and give them to someone who follows them <em>exactly</em>. "Put jam on the bread." They put the closed jar on the loaf. You never said "open the jar". A computer is that person. It isn't stupid, it's literal.</p>
 <p>So a robot can't "just look" and see that the wall is 3 squares away. It has to <strong>look at the next square, step, and look again</strong>, counting as it goes:</p>
-<svg class="diagram" viewBox="0 0 520 200" role="img" aria-label="A corridor of squares 0 to 5. The robot is on square 1, the wall on square 5. Three arrows show three steps, then the robot sees the wall and stops.">
-  <defs><marker id="ah0" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--build)"/></marker></defs>
-  <g font-size="14" text-anchor="middle" style="fill:var(--muted)">
-    <text x="55" y="38">0</text><text x="135" y="38">1</text><text x="215" y="38">2</text><text x="295" y="38">3</text><text x="375" y="38">4</text><text x="455" y="38">5</text>
+<svg class="diagram" viewBox="0 0 360 184" role="img" aria-label="A corridor of squares 0 to 5. The robot is on square 1, the wall on square 5. Three arrows show three steps, then the robot sees the wall and stops.">
+  <defs><marker id="ah0" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--build)"/></marker></defs>
+  <g font-size="17" text-anchor="middle" style="fill:var(--muted)">
+    <text x="32" y="24">0</text><text x="90" y="24">1</text><text x="148" y="24">2</text><text x="206" y="24">3</text><text x="264" y="24">4</text><text x="322" y="24">5</text>
   </g>
   <g style="fill:var(--floor);stroke:var(--line)" stroke-width="2">
-    <rect x="20" y="48" width="70" height="70" rx="6"/><rect x="100" y="48" width="70" height="70" rx="6"/><rect x="180" y="48" width="70" height="70" rx="6"/><rect x="260" y="48" width="70" height="70" rx="6"/><rect x="340" y="48" width="70" height="70" rx="6"/>
+    <rect x="6" y="32" width="52" height="52" rx="6"/><rect x="64" y="32" width="52" height="52" rx="6"/><rect x="122" y="32" width="52" height="52" rx="6"/><rect x="180" y="32" width="52" height="52" rx="6"/><rect x="238" y="32" width="52" height="52" rx="6"/>
   </g>
-  <rect x="420" y="48" width="70" height="70" rx="6" style="fill:var(--wall)"/>
-  <text x="455" y="90" font-size="15" text-anchor="middle" fill="#fff" font-weight="700">wall</text>
-  <text x="135" y="96" font-size="34" text-anchor="middle">🤖</text>
+  <rect x="296" y="32" width="52" height="52" rx="6" style="fill:var(--wall)"/>
+  <text x="322" y="63" font-size="15" text-anchor="middle" fill="#fff" font-weight="700">wall</text>
+  <text x="90" y="69" font-size="30" text-anchor="middle">🤖</text>
   <g fill="none" stroke-width="3" style="stroke:var(--build)" marker-end="url(#ah0)">
-    <path d="M145,124 Q175,152 205,124"/><path d="M225,124 Q255,152 285,124"/><path d="M305,124 Q335,152 365,124"/>
+    <path d="M96,90 Q119,112 142,90"/><path d="M154,90 Q177,112 200,90"/><path d="M212,90 Q235,112 258,90"/>
   </g>
   <g font-size="15" text-anchor="middle" font-weight="700" style="fill:var(--build)">
-    <text x="175" y="172">step 1</text><text x="255" y="172">step 2</text><text x="335" y="172">step 3</text>
+    <text x="119" y="132">step 1</text><text x="177" y="132">step 2</text><text x="235" y="132">step 3</text>
   </g>
-  <text x="455" y="150" font-size="14" text-anchor="middle" style="fill:var(--fg)">next is the</text>
-  <text x="455" y="168" font-size="14" text-anchor="middle" style="fill:var(--fg)">wall: stop</text>
-  <text x="260" y="196" font-size="15" text-anchor="middle" font-weight="700" style="fill:var(--ok)">answer: 3 steps</text>
+  <text x="322" y="108" font-size="15" text-anchor="middle" style="fill:var(--fg)">next is</text>
+  <text x="322" y="126" font-size="15" text-anchor="middle" style="fill:var(--fg)">wall: stop</text>
+  <text x="180" y="170" font-size="18" text-anchor="middle" font-weight="700" style="fill:var(--ok)">answer: 3 steps</text>
 </svg>
 <p>Three things make a good algorithm: every step is exact, the order is right, and it stops.</p>
 </div>
@@ -66,8 +66,8 @@
 <h2 id="play">2. Play</h2>
 <div class="box play"><span class="tag">🎮 Play</span>
 <p><strong>Drive it before you build it.</strong> Right now <em>you</em> are the robot's brain. Press the arrows (or click a square next to the robot). Can you reach the bin in 11 moves, the fewest possible?</p>
-<div class="card demo" id="warmup">
-<canvas id="wuGrid" width="700" height="400" style="height:auto" aria-label="The robot's room; drive the robot with the buttons"></canvas>
+<div class="demo" id="warmup">
+<div class="room" id="wuRoom" data-robot="1,1" data-cat="4,1" data-blocks="red:2,1 blue:6,3 green:1,5"></div>
 <p><button id="wuN">↑ N</button> <button id="wuS">↓ S</button> <button id="wuW">← W</button> <button id="wuE">→ E</button> <button id="wuReset">Back to start</button></p>
 <div class="stats">
   <div class="stat"><div class="k">Position</div><div class="v" id="wuPos">–</div></div>
@@ -77,8 +77,8 @@
 <p class="legend" id="wuMsg"></p>
 </div>
 <p><strong>Now run the algorithm.</strong> Pick a start square and a wall square, then press <b>Step</b>. Each press is one turn of the loop you're about to write.</p>
-<div class="card demo">
-<canvas id="row" width="700" height="130" style="height:auto" aria-label="A corridor of squares with the robot and a wall"></canvas>
+<div class="demo">
+<svg id="row" class="diagram" viewBox="0 0 440 72" role="img" aria-label="A corridor of squares with the robot and a wall"></svg>
 <label for="sx">Start square: <span id="sxv" class="num"></span></label>
 <input id="sx" type="range" min="0" max="4" step="1" value="1">
 <label for="wx">Wall square: <span id="wxv" class="num"></span></label>
@@ -150,8 +150,18 @@ cd ..</code></pre>
 #g.......#
 #.#....B.#
 ##########</code></pre>
+<p>It's the same room as this picture. Key: <code>R</code> = 🤖, <code>r</code> <code>b</code> <code>g</code> = the red, blue and green blocks, <code>B</code> = 🪣, <code>#</code> = grey wall.</p>
+<div class="room" data-robot="1,1" data-blocks="red:2,1 blue:6,3 green:1,5"></div>
 </div></li>
-<li id="editor"><strong>Pick an editor.</strong> <strong>IDLE</strong> came with Python (File → Open). <strong>VS Code</strong> (code.visualstudio.com) is free and has its own terminal. Not Word or Pages: they break code. Open <code>homework/lesson00_hello.py</code>.</li>
+<li id="editor"><strong>Pick an editor.</strong> <strong>IDLE</strong> came with Python (File → Open). <strong>VS Code</strong> (code.visualstudio.com) is free and has its own terminal. Not Word or Pages: they break code. Open <code>homework/lesson00_hello.py</code>.
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p>The file is open and you can see these lines (with coloured words in VS Code or IDLE):</p>
+<pre><code>def introduce(name):
+    """Return the robot's greeting, e.g. introduce("Robo") -&gt; "Hello, I am Robo!"."""
+    # TODO: write this part. Read the docstring above carefully.
+    raise NotImplementedError("Lesson 0: write this function")</code></pre>
+<p><strong>If you see</strong> one long line of jumbled text, or the file opened in Word or Pages, close it and open it with IDLE (File → Open) or VS Code instead.</p>
+</div></li>
 </ol>
 </div>
 
@@ -224,7 +234,22 @@ python3 my_robot.py        # Windows: py my_robot.py</code></pre>
 <p>Then, from <code>project</code>, run <code>python3 check.py robot</code>. It ends with <code>0/21 passed</code>: 21 checks, one or more per week, all yellow for now.</p>
 <p><strong>If there's no "Hello"</strong>, your <code>introduce</code> isn't working yet: run <code>python3 check.py 0</code>.</p>
 </div>
-<div class="card note" id="robot-file"><strong>How your robot file works.</strong> You'll fill in its gaps, so here are the four ideas it uses.
+<details id="robot-file"><summary>How your robot file works (classes and <code>self</code>)</summary>
+<p>You'll fill in its gaps, so here are the four ideas it uses. One blueprint, many robots:</p>
+<svg class="diagram" viewBox="0 0 340 200" role="img" aria-label="A box labelled class Robot, the blueprint. Two arrows labelled Robot() lead to two robots: zippy at (1, 1) and another at (5, 3). Inside zippy.where(), self means zippy.">
+  <defs><marker id="ahc" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--bot)"/></marker></defs>
+  <rect x="60" y="6" width="220" height="48" rx="10" style="fill:var(--bot-soft);stroke:var(--bot)" stroke-width="2"/>
+  <text x="170" y="28" font-size="16" font-weight="700" text-anchor="middle" style="fill:var(--bot)">class Robot:</text>
+  <text x="170" y="46" font-size="14" text-anchor="middle" style="fill:var(--fg)">the blueprint</text>
+  <g stroke-width="2.5" style="stroke:var(--bot)" marker-end="url(#ahc)"><line x1="120" y1="56" x2="90" y2="96"/><line x1="220" y1="56" x2="250" y2="96"/></g>
+  <g font-size="14" style="fill:var(--muted)"><text x="40" y="82">Robot()</text><text x="244" y="82">Robot()</text></g>
+  <g style="fill:var(--card);stroke:var(--line)" stroke-width="2"><rect x="10" y="100" width="150" height="62" rx="10"/><rect x="180" y="100" width="150" height="62" rx="10"/></g>
+  <g font-size="15" text-anchor="middle" style="fill:var(--fg)">
+    <text x="85" y="126">🤖 zippy</text><text x="85" y="150" font-family="ui-monospace, monospace">pos = (1, 1)</text>
+    <text x="255" y="126">🤖 another</text><text x="255" y="150" font-family="ui-monospace, monospace">pos = (5, 3)</text>
+  </g>
+  <text x="85" y="188" font-size="14" text-anchor="middle" font-weight="700" style="fill:var(--build)">in zippy.where(), self = zippy</text>
+</svg>
 <ul>
 <li><strong>A class is a blueprint.</strong> <code>class Robot:</code> says what every robot knows and does. <code>Robot()</code> builds one.</li>
 <li><strong>A method is a function inside the class.</strong> <code>arrows</code> and <code>look</code> are methods.</li>
@@ -235,17 +260,19 @@ python3 my_robot.py        # Windows: py my_robot.py</code></pre>
     def where(self):
         return f"I am at {self.pos}."</code></pre>
 <p>If <code>zippy.pos</code> is <code>(1, 1)</code>, <code>zippy.where()</code> returns <code>"I am at (1, 1)."</code>. Python fills in <code>self</code> for you. Every gap is marked <code># TODO week N</code>.</p>
-</div>
+</details>
 </div>
 
 <h2 id="challenge">6. Real-world challenge: the literal friend</h2>
+<div class="box world"><span class="tag">🌍 Real-world challenge</span>
 <ol class="steps">
 <li>Write 8–15 numbered steps for making a sandwich (blunt knife, ask an adult) or drawing a house.</li>
 <li>A friend follows them <em>exactly</em>, and does something silly whenever a step is vague.</li>
 <li>Write down each bug: vague, missing, wrong order, or never stops. Fix it and run again until there are no bugs.</li>
 </ol>
-<div class="card note"><strong>On your own:</strong> write the steps for drawing a house, wait an hour, then follow them yourself as literally as you can.</div>
+<p><strong>On your own:</strong> write the steps for drawing a house, wait an hour, then follow them yourself as literally as you can.</p>
 <p>Most people find 5–10 bugs in version 1. Testing finds bugs you can't see while writing. That's why this course has <code>check.py</code>.</p>
+</div>
 
 <h2 id="check">Check yourself</h2>
 <details><summary>Predict: what does <code>steps_to_wall(3, 9)</code> return?</summary><p><strong>5.</strong> x goes 3 → 4 → 5 → 6 → 7 → 8. At 8 the next square is the wall.</p></details>
@@ -283,9 +310,10 @@ x = 4, steps = 3   next is 5, the wall → stop. Answer 3</code></pre>
 <footer>Build a Robot Brain · Week 1 of 16 · Part A</footer>
 </main>
 
+<script src="room.js"></script>
 <script>
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-const cv = document.getElementById('row'), ctx = cv.getContext('2d');
+const cv = document.getElementById('row');
 const sIn = document.getElementById('sx'), wIn = document.getElementById('wx');
 let x, steps, done, trace, visited;
 
@@ -318,23 +346,19 @@ function step() {
   draw();
 }
 
+// Drawn like room.js: floor squares, a grey wall, the yellow path and 🤖
 function draw() {
-  const w = +wIn.value, n = 11, W = cv.width, H = cv.height, cw = W / n, top = 30, sz = cw - 6;
+  const w = +wIn.value, S = 40, top = 26;
   document.getElementById('sxv').textContent = sIn.value;
   document.getElementById('wxv').textContent = w;
-  ctx.clearRect(0, 0, W, H);
-  ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+  let g = '';
   for (let i = 0; i <= w; i++) {
-    const cx = i * cw + 3;
-    ctx.fillStyle = i === w ? css('--fg') : (visited.includes(i) ? css('--accent-soft') : css('--card'));
-    ctx.fillRect(cx, top, sz, sz);
-    ctx.strokeStyle = css('--line'); ctx.strokeRect(cx, top, sz, sz);
-    ctx.fillStyle = css('--muted'); ctx.fillText(i, cx + sz / 2, top - 8);
-    if (i === w) { ctx.fillStyle = css('--bg'); ctx.font = 'bold 18px sans-serif'; ctx.fillText('#', cx + sz / 2, top + sz / 2 + 6); ctx.font = '13px sans-serif'; }
+    g += `<rect x="${i * S}" y="${top}" width="${S}" height="${S}" fill="${i === w ? css('--wall') : css('--floor')}" stroke="${css('--line')}"/>`;
+    g += `<text x="${i * S + S / 2}" y="19" font-size="18" text-anchor="middle" fill="${css('--muted')}">${i}</text>`;
   }
-  const rx = x * cw + 3 + sz / 2, ry = top + sz / 2;
-  ctx.fillStyle = css('--accent'); ctx.beginPath(); ctx.arc(rx, ry, sz * 0.32, 0, 7); ctx.fill();
-  ctx.fillStyle = css('--bg'); ctx.font = 'bold 15px sans-serif'; ctx.fillText('R', rx, ry + 5);
+  if (visited.length > 1) g += `<polyline points="${visited.map(v => `${v * S + S / 2},${top + S / 2}`).join(' ')}" fill="none" stroke="${css('--path')}" stroke-width="6" stroke-linecap="round"/>`;
+  g += `<text x="${x * S + S / 2}" y="${top + S * 0.72}" font-size="26" text-anchor="middle">🤖</text>`;
+  cv.innerHTML = g;
   document.getElementById('nx').textContent = x;
   document.getElementById('nsteps').textContent = steps;
   document.getElementById('ans').textContent = done ? steps : '…';
@@ -351,47 +375,34 @@ reset();
 <script>
 // Warm-up: drive the robot. Same moves and walls as Week 1 Part B's move/safe_move; the cat at (4, 1) bumps, like the week-1 robot.
 (() => {
-  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-  const cv = document.getElementById('wuGrid'), ctx = cv.getContext('2d');
+  const el = document.getElementById('wuRoom');
   const ROOM = ["##########", "#........#", "#..##....#", "#..#.....#", "#....##..#", "#........#", "#.#....B.#", "##########"];
-  const BLOCKS = { red: [2, 1], blue: [6, 3], green: [1, 5] }, CAT = [4, 1], START = [1, 1], BIN = [7, 6];
+  const CAT = [4, 1], START = [1, 1], BIN = [7, 6];
   const DIRS = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] };
   const same = (a, b) => a[0] === b[0] && a[1] === b[1], fmt = p => `(${p[0]}, ${p[1]})`;
-  let pos, moves, bumps, trail, msg;
-  function reset() { pos = START; moves = 0; bumps = 0; trail = [START]; msg = 'Press a button to drive.'; draw(); }
+  let pos, moves, bumps, trail, msg, hit;
+  function reset() { pos = START; moves = 0; bumps = 0; trail = [START]; hit = null; msg = 'Press a button to drive.'; draw(); }
   function go(d) {
     const n = [pos[0] + DIRS[d][0], pos[1] + DIRS[d][1]];
-    moves++;
-    if (ROOM[n[1]][n[0]] === '#') { bumps++; msg = `Bonk! ${fmt(n)} is a wall.`; }
-    else if (same(n, CAT)) { bumps++; msg = 'BUMP! You walked into the cat. Your robot will learn to stop for it in week 4.'; }
+    moves++; hit = null;
+    if (ROOM[n[1]][n[0]] === '#') { bumps++; hit = n; msg = `Bonk! ${fmt(n)} is a wall.`; }
+    else if (same(n, CAT)) { bumps++; hit = n; msg = 'BUMP! You walked into the cat. Your robot will learn to stop for it in week 4.'; }
     else { pos = n; trail.push(n); msg = same(n, BIN) ? `You reached the bin in ${moves} moves!` + (moves === 11 ? ' That is the fewest possible.' : ' Can you do it in 11?') : `Now at ${fmt(n)}.`; }
     draw();
   }
-  function geom() { const cs = Math.min(cv.width / 10, cv.height / 8); return { cs, ox: (cv.width - cs * 10) / 2, oy: (cv.height - cs * 8) / 2 }; }
   function draw() {
-    const { cs, ox, oy } = geom(), seen = new Set(trail.map(fmt));
-    ctx.clearRect(0, 0, cv.width, cv.height);
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    for (let y = 0; y < 8; y++) for (let x = 0; x < 10; x++) {
-      const c = ROOM[y][x], px = ox + x * cs, py = oy + y * cs;
-      ctx.fillStyle = c === '#' ? css('--muted') : seen.has(fmt([x, y])) ? css('--accent-soft') : css('--card');
-      ctx.fillRect(px, py, cs, cs); ctx.strokeStyle = css('--line'); ctx.strokeRect(px, py, cs, cs);
-      if (c === 'B') { ctx.fillStyle = css('--fg'); ctx.font = 'bold 18px sans-serif'; ctx.fillText('B', px + cs / 2, py + cs / 2); }
-    }
-    const col = { red: css('--fail'), blue: css('--pass'), green: css('--accent') };
-    for (const [k, [x, y]] of Object.entries(BLOCKS)) { ctx.fillStyle = col[k]; ctx.fillRect(ox + x * cs + cs * 0.25, oy + y * cs + cs * 0.25, cs * 0.5, cs * 0.5); }
-    ctx.fillStyle = css('--warn'); ctx.font = 'bold 20px sans-serif'; ctx.fillText('c', ox + CAT[0] * cs + cs / 2, oy + CAT[1] * cs + cs / 2);
-    const rx = ox + pos[0] * cs + cs / 2, ry = oy + pos[1] * cs + cs / 2;
-    ctx.fillStyle = css('--accent'); ctx.beginPath(); ctx.arc(rx, ry, cs * 0.33, 0, 7); ctx.fill();
-    ctx.fillStyle = css('--bg'); ctx.font = 'bold 16px sans-serif'; ctx.fillText('R', rx, ry);
+    el.dataset.robot = pos.join(',');
+    el.dataset.path = trail.map(p => p.join(',')).join(' ');
+    if (hit) el.dataset.mark = hit.join(','); else delete el.dataset.mark;
+    drawRoom(el);
     document.getElementById('wuPos').textContent = fmt(pos);
     document.getElementById('wuMoves').textContent = moves;
     document.getElementById('wuBumps').textContent = bumps;
     document.getElementById('wuMsg').textContent = msg;
   }
-  cv.addEventListener('click', e => {
-    const r = cv.getBoundingClientRect(), { cs, ox, oy } = geom();
-    const x = Math.floor(((e.clientX - r.left) * cv.width / r.width - ox) / cs), y = Math.floor(((e.clientY - r.top) * cv.height / r.height - oy) / cs);
+  el.addEventListener('click', e => {
+    const r = el.querySelector('svg').getBoundingClientRect();
+    const x = Math.floor((e.clientX - r.left) / r.width * 10), y = Math.floor((e.clientY - r.top) / r.height * 8);
     const d = Object.keys(DIRS).find(k => DIRS[k][0] === x - pos[0] && DIRS[k][1] === y - pos[1]);
     if (d) go(d); else { msg = 'Click a square right next to the robot (up, down, left or right).'; draw(); }
   });
@@ -401,6 +412,5 @@ reset();
   reset();
 })();
 </script>
-<script src="room.js"></script>
 </body>
 </html>

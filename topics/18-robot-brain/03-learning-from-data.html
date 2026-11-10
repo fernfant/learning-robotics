@@ -35,26 +35,23 @@
 <h2 id="idea">1. The idea</h2>
 <div class="box idea"><span class="tag">💡 The idea: draw the best line</span>
 <p>Your robot slides after it brakes, and the faster it goes, the further it slides. It has 13 real measurements: "at this speed, I slid this far". They lie almost on a straight line. A line has two numbers: <code>w</code> (how steep) and <code>b</code> (where it starts). Learning means finding good values for them.</p>
-<svg class="diagram" viewBox="0 0 520 300" role="img" aria-label="Scatter plot of the 13 braking measurements: speed across, stopping distance up. A dashed guess line, distance equals speed, sits above the points; red gaps show its misses. The learned solid line passes right through the points.">
-  <line x1="60" y1="250" x2="500" y2="250" stroke-width="2" style="stroke:var(--muted)"/>
-  <line x1="60" y1="250" x2="60" y2="10" stroke-width="2" style="stroke:var(--muted)"/>
-  <g font-size="13" text-anchor="middle" style="fill:var(--muted)"><text x="60" y="268">0</text><text x="160" y="268">0.5</text><text x="260" y="268">1.0</text><text x="360" y="268">1.5</text><text x="460" y="268">2.0</text></g>
-  <g font-size="13" text-anchor="end" style="fill:var(--muted)"><text x="52" y="194">0.5</text><text x="52" y="134">1.0</text><text x="52" y="74">1.5</text></g>
-  <text x="280" y="292" font-size="14" text-anchor="middle" style="fill:var(--fg)">speed (m/s)</text>
-  <text x="14" y="140" font-size="14" text-anchor="middle" style="fill:var(--fg)" transform="rotate(-90 14 140)">stopping distance (m)</text>
-  <line x1="60" y1="250" x2="440" y2="22" stroke-width="2.5" stroke-dasharray="7 5" style="stroke:var(--muted)"/>
-  <g stroke-width="3" style="stroke:var(--fail)">
-    <line x1="100" y1="218" x2="100" y2="226"/> <line x1="160" y1="196" x2="160" y2="190"/> <line x1="180" y1="182" x2="180" y2="178"/> <line x1="220" y1="166" x2="220" y2="154"/> <line x1="260" y1="147" x2="260" y2="130"/> <line x1="280" y1="136" x2="280" y2="118"/> <line x1="300" y1="124" x2="300" y2="106"/> <line x1="340" y1="108" x2="340" y2="82"/> <line x1="360" y1="94" x2="360" y2="70"/> <line x1="380" y1="87" x2="380" y2="58"/> <line x1="420" y1="64" x2="420" y2="34"/>
-  </g>
-  <line x1="60" y1="241" x2="500" y2="28" stroke-width="3.5" style="stroke:var(--ok)"/>
-  <g style="fill:var(--idea)">
-    <circle cx="100" cy="218" r="6"/> <circle cx="140" cy="202" r="6"/> <circle cx="160" cy="196" r="6"/> <circle cx="180" cy="182" r="6"/> <circle cx="220" cy="166" r="6"/> <circle cx="260" cy="147" r="6"/> <circle cx="280" cy="136" r="6"/> <circle cx="300" cy="124" r="6"/> <circle cx="340" cy="108" r="6"/> <circle cx="360" cy="94" r="6"/> <circle cx="380" cy="87" r="6"/> <circle cx="420" cy="64" r="6"/> <circle cx="460" cy="46" r="6"/>
-  </g>
-  <text x="200" y="40" font-size="14" style="fill:var(--muted)">guess: distance = speed</text>
-  <text x="200" y="58" font-size="14" font-weight="700" style="fill:var(--fail)">red = its misses</text>
-  <text x="330" y="200" font-size="14" font-weight="700" style="fill:var(--ok)">learned: 0.810 × speed + 0.071</text>
+<svg class="diagram" viewBox="0 0 340 250" role="img" aria-label="Scatter plot of the 13 braking measurements: speed across, stopping distance up. A dashed guess line, distance equals speed, sits above the points; red gaps show its misses, and shaded red squares show three of the squared misses. The learned green line passes right through the points.">
+  <line x1="44" y1="210" x2="334" y2="210" stroke-width="2" style="stroke:var(--muted)"/>
+  <line x1="44" y1="210" x2="44" y2="8" stroke-width="2" style="stroke:var(--muted)"/>
+  <g font-size="14" text-anchor="middle" style="fill:var(--muted)"><text x="44" y="228">0</text><text x="180" y="228">1</text><text x="316" y="228">2</text></g>
+  <g font-size="14" text-anchor="end" style="fill:var(--muted)"><text x="38" y="111">1</text><text x="38" y="215">0</text></g>
+  <text x="190" y="246" font-size="14" text-anchor="middle" style="fill:var(--fg)">speed (m/s) →</text>
+  <text x="50" y="20" font-size="14" style="fill:var(--fg)">↑ stopping distance (m)</text>
+  <line x1="44" y1="210" x2="309" y2="7" stroke-width="2.5" stroke-dasharray="7 5" style="stroke:var(--muted)"/>
+  <rect x="165" y="106" width="15" height="15" style="fill:var(--fail)" opacity=".25"/><rect x="227" y="54" width="21" height="21" style="fill:var(--fail)" opacity=".25"/><rect x="263" y="23" width="26" height="26" style="fill:var(--fail)" opacity=".25"/>
+  <g stroke-width="3" style="stroke:var(--fail)"><line x1="71" y1="182" x2="71" y2="189"/><line x1="98" y1="168" x2="98" y2="168"/><line x1="112" y1="163" x2="112" y2="158"/><line x1="126" y1="151" x2="126" y2="148"/><line x1="153" y1="137" x2="153" y2="127"/><line x1="180" y1="121" x2="180" y2="106"/><line x1="194" y1="111" x2="194" y2="96"/><line x1="207" y1="101" x2="207" y2="85"/><line x1="234" y1="87" x2="234" y2="64"/><line x1="248" y1="75" x2="248" y2="54"/><line x1="262" y1="69" x2="262" y2="44"/><line x1="289" y1="49" x2="289" y2="23"/><line x1="316" y1="33" x2="316" y2="2"/></g>
+  <line x1="44" y1="203" x2="330" y2="26" stroke-width="3.5" style="stroke:var(--ok)"/>
+  <circle cx="71" cy="182" r="5" style="fill:var(--idea)"/><circle cx="98" cy="168" r="5" style="fill:var(--idea)"/><circle cx="112" cy="163" r="5" style="fill:var(--idea)"/><circle cx="126" cy="151" r="5" style="fill:var(--idea)"/><circle cx="153" cy="137" r="5" style="fill:var(--idea)"/><circle cx="180" cy="121" r="5" style="fill:var(--idea)"/><circle cx="194" cy="111" r="5" style="fill:var(--idea)"/><circle cx="207" cy="101" r="5" style="fill:var(--idea)"/><circle cx="234" cy="87" r="5" style="fill:var(--idea)"/><circle cx="248" cy="75" r="5" style="fill:var(--idea)"/><circle cx="262" cy="69" r="5" style="fill:var(--idea)"/><circle cx="289" cy="49" r="5" style="fill:var(--idea)"/><circle cx="316" cy="33" r="5" style="fill:var(--idea)"/>
+  <text x="68" y="56" font-size="14" style="fill:var(--muted)">guess: distance = speed</text>
+  <text x="68" y="74" font-size="14" font-weight="700" style="fill:var(--fail)">red: its misses, squared</text>
+  <text x="326" y="196" font-size="14" text-anchor="end" font-weight="700" style="fill:var(--ok)">learned: 0.810 × speed + 0.071</text>
 </svg>
-<p>To score a line, take each miss, <strong>square it</strong> (so too-high and too-low both count, and big misses count a lot), then average. That's the <strong>mean squared error</strong>. The guess above scores 0.0293. The learned line scores 0.00036.</p>
+<p>To score a line, take each miss, <strong>square it</strong> (so too-high and too-low both count, and big misses count a lot), then average. The shaded squares show it: a miss twice as long makes a square four times as big. <strong>MSE = the average area of these squares</strong>, the <strong>mean squared error</strong>. The guess above scores 0.0293. The learned line scores 0.00036.</p>
 </div>
 
 <div class="box idea"><span class="tag">💡 The idea: walk downhill in the fog</span>
@@ -66,19 +63,17 @@
   <g style="fill:var(--ok)"><circle cx="62" cy="62" r="7"/><circle cx="121" cy="131" r="7"/><circle cx="162" cy="166" r="7"/><circle cx="192" cy="183" r="7"/><circle cx="212" cy="191" r="7"/><circle cx="227" cy="196" r="7"/></g>
   <g fill="none" stroke-width="2" style="stroke:var(--fail)" marker-end="url(#ah3)"><path d="M216,193 Q277,150 333,178"/><path d="M338,180 Q237,110 142,144"/><path d="M137,146 Q300,20 462,52"/></g>
   <g style="fill:var(--fail)"><circle cx="338" cy="180" r="6"/><circle cx="137" cy="146" r="6"/><circle cx="468" cy="54" r="6"/></g>
-  <text x="70" y="40" font-size="14" font-weight="700" style="fill:var(--ok)">small steps: down to the bottom</text>
-  <text x="372" y="196" font-size="14" font-weight="700" style="fill:var(--fail)">too big: jumps over,</text>
-  <text x="372" y="214" font-size="14" font-weight="700" style="fill:var(--fail)">climbs higher</text>
-  <text x="40" y="224" font-size="14" style="fill:var(--fg)">w →   (height = error)</text>
+        <text x="40" y="226" font-size="21" style="fill:var(--fg)">w →   (height = error)</text>
 </svg>
+<p class="room-caption"><b style="color:var(--ok)">● Green: small steps</b> walk down to the bottom. <b style="color:var(--fail)">● Red: steps too big</b> jump over the valley and climb higher.</p>
 <p>Each step: work out the gradient, then move <code>w</code> and <code>b</code> a little bit the <em>other</em> way. The step size is the <strong>learning rate</strong>. That loop is <strong>gradient descent</strong>. Swap "two numbers" for "billions" and "a line" for "a neural network", and it's how ChatGPT and Claude were trained.</p>
 </div>
 
 <h2 id="play">2. Play</h2>
 <div class="box play"><span class="tag">🎮 Play</span>
 <p>The 13 real points. Drag the sliders to move the line and watch the MSE. Then press <b>Reset to (0, 0)</b> and <b>One gradient step</b> a few times: the same maths as your <code>fit_line</code>.</p>
-<div class="card demo">
-<canvas id="fit" width="700" height="360" style="height:auto" aria-label="Scatter plot of speed against stopping distance with an adjustable line"></canvas>
+<div class="demo">
+<svg id="fit" class="diagram" viewBox="0 0 340 240" role="img" aria-label="Scatter plot of speed against stopping distance with an adjustable line"></svg>
 <label for="wS">w (slope): <span id="wv" class="num"></span></label>
 <input id="wS" type="range" min="-0.5" max="1.5" step="0.001" value="1">
 <label for="bS">b (start): <span id="bv" class="num"></span></label>
@@ -131,10 +126,23 @@ return total / len(____)</code></pre></details>
   2/5 passed</code></pre>
 <p><strong>If you see</strong> <code>✗ mse: mse(0, 0, [(1,1),(2,3)]) = (1 + 9) / 2 = 5</code>, you forgot to square, or used <code>abs</code>.</p>
 </div></li>
-<li><strong><code>gradients(w, b, data)</code></strong> returns <code>(dw, db)</code>, which way is uphill:
+<li><strong><code>gradients(w, b, data)</code></strong> returns <code>(dw, db)</code>, which way is uphill. First, the picture: what do <code>w</code> and <code>b</code> each do to the line?
+<svg class="diagram" viewBox="0 0 340 190" role="img" aria-label="Left: changing w tilts the line about its start, so a point at low speed moves a little and a point at high speed moves a lot. Right: changing b lifts the whole line, so every point moves the same amount.">
+  <defs><marker id="ahg" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--build)"/></marker></defs>
+  <g stroke-width="2" style="stroke:var(--muted)"><line x1="10" y1="140" x2="160" y2="140"/><line x1="10" y1="140" x2="10" y2="20"/><line x1="180" y1="140" x2="330" y2="140"/><line x1="180" y1="140" x2="180" y2="20"/></g>
+  <line x1="10" y1="120" x2="160" y2="70" stroke-width="3" stroke-dasharray="6 4" style="stroke:var(--muted)"/>
+  <line x1="10" y1="120" x2="160" y2="30" stroke-width="3.5" style="stroke:var(--ok)"/>
+  <g stroke-width="3" style="stroke:var(--build)" marker-end="url(#ahg)"><line x1="40" y1="110" x2="40" y2="104"/><line x1="140" y1="77" x2="140" y2="46"/></g>
+  <line x1="180" y1="120" x2="330" y2="70" stroke-width="3" stroke-dasharray="6 4" style="stroke:var(--muted)"/>
+  <line x1="180" y1="96" x2="330" y2="46" stroke-width="3.5" style="stroke:var(--ok)"/>
+  <g stroke-width="3" style="stroke:var(--build)" marker-end="url(#ahg)"><line x1="210" y1="110" x2="210" y2="90"/><line x1="310" y1="77" x2="310" y2="57"/></g>
+  <g font-size="15" font-weight="700" text-anchor="middle" style="fill:var(--fg)"><text x="85" y="162">change w: tilt</text><text x="255" y="162">change b: lift</text></g>
+  <g font-size="14" text-anchor="middle" style="fill:var(--muted)"><text x="85" y="182">far points move more</text><text x="255" y="182">all move the same</text></g>
+</svg>
+So <code>w</code>'s gradient weighs each miss by its speed <code>x</code>, and <code>b</code>'s doesn't. As a formula:
 <pre><code>dw = average of  2 × miss × x
 db = average of  2 × miss</code></pre>
-<p>A positive miss means the line is too high, so the gradient says "go down". The miss is multiplied by <code>x</code> for <code>w</code> because changing the slope moves the line more at high speed. <code>gradients(0, 0, [(1, 1), (2, 3)])</code> → <code>(-7.0, -4.0)</code>.</p>
+<p>A positive miss means the line is too high, so the gradient says "go down". <code>gradients(0, 0, [(1, 1), (2, 3)])</code> → <code>(-7.0, -4.0)</code>.</p>
 <div class="box stuck"><span class="tag">🆘 Stuck?</span>
 <details><summary>Hint 1</summary><p>Same loop as <code>mse</code>, with two running totals. Work out <code>miss</code> once per point.</p></details>
 <details><summary>Hint 2: fill in the blanks</summary><pre><code>dw = db = 0
@@ -204,9 +212,20 @@ max safe speed with 1.0 m free: 0.9 m/s</code></pre>
 <h2 id="add-to-robot">4. Add it to your robot</h2>
 <div class="box bot"><span class="tag">🤖 Add it to your robot</span>
 <p>Finish <code>look(self)</code> from <a href="02-sensors.html#add-to-robot">Part A</a>: add the safe speed. Fit your line with <code>fit_line(STOP_DATA)</code>, work out the free space in metres, and ask <code>max_safe_speed()</code>.</p>
-<div class="card note" id="metres"><strong>From squares to metres.</strong> One square is <strong>0.5 m</strong>. Use the <em>smallest true</em> distance (the closest wall is the dangerous one), and count the robot's own square too:
-<pre><code>free metres = squares × 0.5 + 0.5</code></pre>
-At the start the closest wall is north, 0 squares away, so 0.5 m. At 0.25 m/s the robot needs 0.810 × 0.25 + 0.071 + 0.2 = 0.47 m: fits. At 0.30 m/s it needs 0.51 m: doesn't. So the safe speed is 0.25 m/s.</div>
+<div class="card note" id="metres"><strong>From squares to metres.</strong> One square is <strong>0.5 m</strong>. Use the <em>smallest true</em> distance (the closest wall is the dangerous one), and count the robot's own square too: <code>free metres = squares × 0.5 + 0.5</code>. At the start the closest wall is north, 0 squares away, so 0.5 m. Does the robot stop in time?
+<svg class="diagram" viewBox="0 0 340 150" role="img" aria-label="The robot's own square gives 0.5 metres before the wall. At 0.25 m/s it needs 0.47 m (slide plus 0.2 m margin): it fits. At 0.30 m/s it needs 0.51 m: it hits the wall.">
+  <rect x="20" y="10" width="250" height="40" style="fill:var(--floor);stroke:var(--line)" stroke-width="2"/>
+  <rect x="270" y="10" width="60" height="40" style="fill:var(--wall)"/>
+  <text x="300" y="36" font-size="15" text-anchor="middle" fill="#fff" font-weight="700">wall</text>
+  <text x="40" y="38" font-size="24" text-anchor="middle">🤖</text>
+  <text x="160" y="36" font-size="15" text-anchor="middle" style="fill:var(--muted)">0.5 m free</text>
+  <rect x="20" y="66" width="237" height="24" rx="4" style="fill:var(--ok)"/>
+  <text x="26" y="83" font-size="14" font-weight="700" fill="#fff">0.25 m/s needs 0.47 m: fits ✓</text>
+  <rect x="20" y="104" width="257" height="24" rx="4" style="fill:var(--fail)"/>
+  <text x="26" y="121" font-size="14" font-weight="700" fill="#fff">0.30 m/s needs 0.51 m: too far ✗</text>
+  <line x1="270" y1="58" x2="270" y2="136" stroke-width="2" stroke-dasharray="4 3" style="stroke:var(--fg)"/>
+</svg>
+<p class="room-caption">needed = 0.810 × speed + 0.071 + 0.2 m margin. So the safe speed is 0.25 m/s.</p></div>
 <div class="box stuck"><span class="tag">🆘 Stuck?</span>
 <details><summary>Hint 1</summary><p>Add this import next to Part A's:</p><pre><code>from lesson03_learning import STOP_DATA, fit_line, max_safe_speed</code></pre></details>
 <details><summary>Hint 2</summary><p>After your Part A loop (<code>_</code> means "I don't need the history"):</p><pre><code>w, b, _ = fit_line(STOP_DATA)
@@ -232,7 +251,8 @@ Zippy&gt; EEEE
 
 Zippy&gt; look
   Walls (average of 16 readings): north 0.2, east 5.0, south 0.1, west 2.0. Safe speed: 0.25 m/s.</code></pre>
-<div class="room" data-robot="1,1" data-cat="4,1" data-blocks="red:2,1 blue:6,3 green:1,5" data-mark="1,0" data-label="Squeezed against the north wall (red ring), it may only creep at 0.25 m/s."></div>
+<div class="room" data-robot="1,1" data-cat="4,1" data-blocks="red:2,1 blue:6,3 green:1,5" data-mark="1,0" data-label="At the start: squeezed against the north wall (red ring), it may only creep at 0.25 m/s."></div>
+<div class="room" data-robot="3,1" data-path="1,1 2,1 3,1" data-cat="4,1" data-blocks="red:2,1 blue:6,3 green:1,5" data-mark="3,2" data-label="After EEEE it's at (3, 1): east 5, west 2, but the closest wall is now south (red ring), so still 0.25 m/s."></div>
 <p><strong>If you see</strong> <code>✗ week 2 part B: look's safe speed: at the start (against the north wall) the safe speed is 0.25 m/s</code>, you used the noisy distances, or the biggest instead of the smallest.</p>
 </div>
 </div>
@@ -292,7 +312,6 @@ new MSE: misses 0.1 and -1.2 → (0.01 + 1.44) / 2 = 0.725   (down from 5)</code
 </main>
 
 <script>
-const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 // Copied exactly from lesson03_learning.py
 const STOP_DATA = [
   [0.2, 0.27], [0.4, 0.40], [0.5, 0.45], [0.6, 0.57], [0.8, 0.70],
@@ -317,7 +336,7 @@ function maxSafeSpeed(w, b, free, margin = 0.2) {
   return Math.round(best * 100) / 100;
 }
 
-const cv = document.getElementById('fit'), ctx = cv.getContext('2d');
+const cv = document.getElementById('fit');
 const wS = document.getElementById('wS'), bS = document.getElementById('bS'), lrIn = document.getElementById('lr');
 let w = 1, b = 0, nSteps = 0;
 
@@ -330,25 +349,20 @@ function stepN(k) {
 function fmt(v) { return !isFinite(v) ? '∞' : Math.abs(v) >= 1000 ? v.toExponential(1) : Math.abs(v) < 0.001 && v !== 0 ? v.toExponential(1) : v.toFixed(4); }
 
 function draw() {
-  const W = cv.width, H = cv.height, L = 50, R = 20, T = 20, B = 40, xmax = 2.2, ymax = 2.0;
+  const W = 340, H = 240, L = 40, R = 10, T = 10, B = 40, xmax = 2.2, ymax = 2.0;
   const X = v => L + (W - L - R) * v / xmax, Y = v => H - B - (H - T - B) * v / ymax;
-  ctx.clearRect(0, 0, W, H);
-  ctx.strokeStyle = css('--line'); ctx.fillStyle = css('--muted'); ctx.font = '12px sans-serif';
-  ctx.beginPath(); ctx.moveTo(L, T); ctx.lineTo(L, H - B); ctx.lineTo(W - R, H - B); ctx.stroke();
-  ctx.textAlign = 'center';
-  for (let v = 0; v <= 2.0001; v += 0.5) { ctx.fillText(v.toFixed(1), X(v), H - B + 16); }
-  ctx.fillText('speed (m/s)', X(1.1), H - 6);
-  ctx.textAlign = 'right';
-  for (let v = 0; v <= 2.0001; v += 0.5) { ctx.fillText(v.toFixed(1), L - 6, Y(v) + 4); }
-  ctx.save(); ctx.translate(14, Y(1)); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center'; ctx.fillText('stopping distance (m)', 0, 0); ctx.restore();
-  ctx.save(); ctx.beginPath(); ctx.rect(L, T, W - L - R, H - T - B); ctx.clip();
-  ctx.strokeStyle = css('--fail'); ctx.lineWidth = 1;
-  STOP_DATA.forEach(([x, y]) => { ctx.beginPath(); ctx.moveTo(X(x), Y(y)); ctx.lineTo(X(x), Y(predict(w, b, x))); ctx.stroke(); });
-  ctx.strokeStyle = css('--accent'); ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.moveTo(X(0), Y(predict(w, b, 0))); ctx.lineTo(X(xmax), Y(predict(w, b, xmax))); ctx.stroke();
-  ctx.restore(); ctx.lineWidth = 1;
-  ctx.fillStyle = css('--pass');
-  STOP_DATA.forEach(([x, y]) => { ctx.beginPath(); ctx.arc(X(x), Y(y), 5, 0, 7); ctx.fill(); });
+  let g = `<defs><clipPath id="plot"><rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}"/></clipPath></defs>`;
+  g += `<path d="M${L},${T} V${H - B} H${W - R}" fill="none" style="stroke:var(--muted)" stroke-width="2"/>`;
+  for (let v = 0; v <= 2.0001; v += 0.5) g += `<text x="${X(v)}" y="${H - B + 18}" font-size="14" text-anchor="middle" style="fill:var(--muted)">${v.toFixed(1)}</text>`;
+  for (let v = 0.5; v <= 2.0001; v += 0.5) g += `<text x="${L - 5}" y="${Y(v) + 5}" font-size="14" text-anchor="end" style="fill:var(--muted)">${v.toFixed(1)}</text>`;
+  g += `<text x="${X(1.1)}" y="${H - 4}" font-size="14" text-anchor="middle" style="fill:var(--fg)">speed (m/s) →</text>`;
+  g += `<text x="${L + 6}" y="${T + 14}" font-size="14" style="fill:var(--fg)">↑ stopping distance (m)</text>`;
+  g += '<g clip-path="url(#plot)">';
+  STOP_DATA.forEach(([x, y]) => { g += `<line x1="${X(x)}" y1="${Y(y)}" x2="${X(x)}" y2="${Y(predict(w, b, x))}" style="stroke:var(--fail)" stroke-width="2"/>`; });
+  if (isFinite(w + b)) g += `<line x1="${X(0)}" y1="${Y(predict(w, b, 0))}" x2="${X(xmax)}" y2="${Y(predict(w, b, xmax))}" style="stroke:var(--ok)" stroke-width="3.5"/>`;
+  g += '</g>';
+  STOP_DATA.forEach(([x, y]) => { g += `<circle cx="${X(x)}" cy="${Y(y)}" r="5" style="fill:var(--idea)"/>`; });
+  cv.innerHTML = g;
   const [dw, db] = gradients(w, b, STOP_DATA);
   document.getElementById('wv').textContent = fmt(w);
   document.getElementById('bv').textContent = fmt(b);

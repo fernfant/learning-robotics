@@ -38,39 +38,57 @@
 <h2 id="idea">1. The idea</h2>
 <div class="box idea"><span class="tag">💡 The idea: every word votes</span>
 <p>Keyword rules break fast. "get rid of the red block" has no "put". "where did the blue one go" has "go", but it's a question. So instead, count how often each word appears in each pile's examples. Here are real counts from the 34 training commands:</p>
-<svg class="diagram" viewBox="0 0 520 290" role="img" aria-label="Bar chart: how often five words appear in put, go, find and stop examples">
+<svg class="diagram" style="max-width:420px" viewBox="0 0 340 330" role="img" aria-label="Bar chart: how often five words appear in put, go, find and stop examples">
   <g style="font:15px sans-serif">
-    <rect x="96" y="6" width="12" height="12" style="fill:var(--build)"/><text x="112" y="17" style="fill:var(--fg)">put</text>
-    <rect x="166" y="6" width="12" height="12" style="fill:var(--play)"/><text x="182" y="17" style="fill:var(--fg)">go</text>
-    <rect x="226" y="6" width="12" height="12" style="fill:var(--idea)"/><text x="242" y="17" style="fill:var(--fg)">find</text>
-    <rect x="296" y="6" width="12" height="12" style="fill:var(--ok)"/><text x="312" y="17" style="fill:var(--fg)">stop</text>
+    <rect x="60" y="6" width="13" height="13" style="fill:var(--build)"/><text x="78" y="18" style="fill:var(--fg)">put</text>
+    <rect x="128" y="6" width="13" height="13" style="fill:var(--play)"/><text x="146" y="18" style="fill:var(--fg)">go</text>
+    <rect x="186" y="6" width="13" height="13" style="fill:var(--idea)"/><text x="204" y="18" style="fill:var(--fg)">find</text>
+    <rect x="256" y="6" width="13" height="13" style="fill:var(--ok)"/><text x="274" y="18" style="fill:var(--fg)">stop</text>
   </g>
-  <g style="font:700 18px sans-serif;fill:var(--fg)" text-anchor="end">
-    <text x="80" y="56">bin</text><text x="80" y="108">to</text><text x="80" y="160">where</text><text x="80" y="212">stop</text><text x="80" y="264">the</text>
-  </g>
-  <g style="font:14px sans-serif;fill:var(--muted)">
-    <rect x="90" y="36" width="104" height="10" style="fill:var(--build)"/><text x="200" y="45">4</text>
-    <rect x="90" y="48" width="2" height="10" style="fill:var(--play)"/><rect x="90" y="60" width="2" height="10" style="fill:var(--idea)"/><rect x="90" y="72" width="2" height="10" style="fill:var(--ok)"/>
-    <rect x="90" y="88" width="2" height="10" style="fill:var(--build)"/>
-    <rect x="90" y="100" width="182" height="10" style="fill:var(--play)"/><text x="278" y="109">7</text>
-    <rect x="90" y="112" width="2" height="10" style="fill:var(--idea)"/><rect x="90" y="124" width="2" height="10" style="fill:var(--ok)"/>
-    <rect x="90" y="140" width="2" height="10" style="fill:var(--build)"/><rect x="90" y="152" width="2" height="10" style="fill:var(--play)"/>
-    <rect x="90" y="164" width="130" height="10" style="fill:var(--idea)"/><text x="226" y="173">5</text>
-    <rect x="90" y="176" width="2" height="10" style="fill:var(--ok)"/>
-    <rect x="90" y="192" width="2" height="10" style="fill:var(--build)"/><rect x="90" y="204" width="2" height="10" style="fill:var(--play)"/><rect x="90" y="216" width="2" height="10" style="fill:var(--idea)"/>
-    <rect x="90" y="228" width="156" height="10" style="fill:var(--ok)"/><text x="252" y="237">6</text>
-    <rect x="90" y="244" width="364" height="10" style="fill:var(--build)"/><text x="460" y="253">14</text>
-    <rect x="90" y="256" width="208" height="10" style="fill:var(--play)"/><text x="304" y="265">8</text>
-    <rect x="90" y="268" width="208" height="10" style="fill:var(--idea)"/><text x="304" y="277">8</text>
-    <rect x="90" y="280" width="2" height="10" style="fill:var(--ok)"/>
-  </g>
+  <text x="52" y="66" text-anchor="end" style="font:700 16px sans-serif;fill:var(--fg)">bin</text>
+  <rect x="58" y="40" width="64" height="10" style="fill:var(--build)"/><text x="127" y="50" style="font:14px sans-serif;fill:var(--muted)">4</text>
+  <rect x="58" y="52" width="2" height="10" style="fill:var(--play)"/>
+  <rect x="58" y="64" width="2" height="10" style="fill:var(--idea)"/>
+  <rect x="58" y="76" width="2" height="10" style="fill:var(--ok)"/>
+  <text x="52" y="124" text-anchor="end" style="font:700 16px sans-serif;fill:var(--fg)">to</text>
+  <rect x="58" y="98" width="2" height="10" style="fill:var(--build)"/>
+  <rect x="58" y="110" width="112" height="10" style="fill:var(--play)"/><text x="175" y="120" style="font:14px sans-serif;fill:var(--muted)">7</text>
+  <rect x="58" y="122" width="2" height="10" style="fill:var(--idea)"/>
+  <rect x="58" y="134" width="2" height="10" style="fill:var(--ok)"/>
+  <text x="52" y="182" text-anchor="end" style="font:700 16px sans-serif;fill:var(--fg)">where</text>
+  <rect x="58" y="156" width="2" height="10" style="fill:var(--build)"/>
+  <rect x="58" y="168" width="2" height="10" style="fill:var(--play)"/>
+  <rect x="58" y="180" width="80" height="10" style="fill:var(--idea)"/><text x="143" y="190" style="font:14px sans-serif;fill:var(--muted)">5</text>
+  <rect x="58" y="192" width="2" height="10" style="fill:var(--ok)"/>
+  <text x="52" y="240" text-anchor="end" style="font:700 16px sans-serif;fill:var(--fg)">stop</text>
+  <rect x="58" y="214" width="2" height="10" style="fill:var(--build)"/>
+  <rect x="58" y="226" width="2" height="10" style="fill:var(--play)"/>
+  <rect x="58" y="238" width="2" height="10" style="fill:var(--idea)"/>
+  <rect x="58" y="250" width="96" height="10" style="fill:var(--ok)"/><text x="159" y="260" style="font:14px sans-serif;fill:var(--muted)">6</text>
+  <text x="52" y="298" text-anchor="end" style="font:700 16px sans-serif;fill:var(--fg)">the</text>
+  <rect x="58" y="272" width="224" height="10" style="fill:var(--build)"/><text x="287" y="282" style="font:14px sans-serif;fill:var(--muted)">14</text>
+  <rect x="58" y="284" width="128" height="10" style="fill:var(--play)"/><text x="191" y="294" style="font:14px sans-serif;fill:var(--muted)">8</text>
+  <rect x="58" y="296" width="128" height="10" style="fill:var(--idea)"/><text x="191" y="306" style="font:14px sans-serif;fill:var(--muted)">8</text>
+  <rect x="58" y="308" width="2" height="10" style="fill:var(--ok)"/>
 </svg>
 <p>"bin" votes put. "where" votes find. "the" turns up almost everywhere, so its vote barely matters. To score a command, every word casts its vote for every pile, and the pile with the strongest total wins. This is called <strong>Naive Bayes</strong>. "Naive" because it treats each word as a separate clue, ignoring word order.</p>
 </div>
 
 <div class="box idea"><span class="tag">💡 Two small fixes</span>
-<p><strong>Fair shares.</strong> Put examples have 61 words in total and stop examples only 15. So we use each word's <em>share</em> of its pile, not the raw count.</p>
-<p><strong>Never zero.</strong> "halt" never appears in put examples. If a word could score exactly 0, one new word would wipe out all the other clues. So we add 1 to every count. And because multiplying many tiny chances gives numbers too small for the computer, we add their <em>logs</em> instead. Every score ends up negative, and <strong>the one closest to 0 wins</strong>.</p>
+<svg class="diagram" style="max-width:420px" viewBox="0 0 340 262" role="img" aria-label="Fair shares: please is 1 of 61 words in the put pile but 1 of 15 in the stop pile. Never zero: halt has 0 of 61 in put, which would wipe out every clue; adding 1 makes it a tiny sliver, 1 of 113">
+  <text x="4" y="18" style="font:700 15px sans-serif;fill:var(--idea)">Fair shares: one “please” in both</text>
+  <text x="4" y="44" style="font:14px sans-serif;fill:var(--fg)">put pile (61 words)</text>
+  <rect x="4" y="50" width="280" height="16" rx="3" style="fill:var(--build-soft);stroke:var(--build)"/><rect x="4" y="50" width="5" height="16" style="fill:var(--build)"/>
+  <text x="4" y="84" style="font:14px sans-serif;fill:var(--muted)">1 of 61 words: a small share</text>
+  <text x="4" y="110" style="font:14px sans-serif;fill:var(--fg)">stop pile (15 words)</text>
+  <rect x="4" y="116" width="69" height="16" rx="3" style="fill:var(--ok-soft);stroke:var(--ok)"/><rect x="4" y="116" width="5" height="16" style="fill:var(--ok)"/>
+  <text x="4" y="150" style="font:14px sans-serif;fill:var(--muted)">1 of 15 words: a 4× bigger share</text>
+  <text x="4" y="186" style="font:700 15px sans-serif;fill:var(--idea)">Never zero: “halt” in the put pile</text>
+  <rect x="4" y="196" width="120" height="16" rx="3" style="fill:none;stroke:var(--fail);stroke-dasharray:4 3"/><text x="132" y="209" style="font:14px sans-serif;fill:var(--fail)">0 of 61: wipes out the rest</text>
+  <rect x="4" y="226" width="120" height="16" rx="3" style="fill:var(--build-soft);stroke:var(--build)"/><rect x="4" y="226" width="3" height="16" style="fill:var(--build)"/><text x="132" y="239" style="font:14px sans-serif;fill:var(--ok)">add 1: 1 of 113, not 0</text>
+</svg>
+<p><strong>Fair shares.</strong> Put examples have 61 words, stop examples only 15. So a word votes with its <em>share</em> of the pile, not its raw count.</p>
+<p><strong>Never zero.</strong> One unseen word with a vote of 0 would wipe out every other clue. So we add 1 to every count. The computer adds the votes up as logs (see "Want to know more"), so every score is negative and <strong>the one closest to 0 wins</strong>.</p>
 </div>
 
 <h2 id="play">2. Play with it</h2>
@@ -84,7 +102,7 @@
 <button data-c="STOP!">STOP!</button>
 <button data-c="what is the weather">what is the weather</button>
 </p>
-<div class="demo"><canvas id="scoreBars" width="700" height="180" aria-label="Bar chart of the score for each intent"></canvas></div>
+<div class="demo"><canvas id="scoreBars" width="700" height="180" style="height:180px" aria-label="Bar chart of the score for each intent"></canvas></div>
 <p><b>Parsed:</b> <code id="parsed">–</code></p>
 <div class="table-wrap" id="evidence"></div>
 <p><label><input type="checkbox" id="fixBox"> Add two training examples: <code>("where's the red block", "find")</code> and <code>("where's the blue one", "find")</code></label></p>
@@ -120,7 +138,19 @@ for text, intent in examples:
         vocab.add(____)
 return {"word_counts": wc, "intent_counts": ic, "vocab": vocab}</code></pre></details></li>
 
-<li><p><strong><code>intent_scores(model, text)</code></strong>: for each intent, the log score:</p>
+<li><p><strong><code>intent_scores(model, text)</code></strong>: for each intent, a <b>starting score</b> (how common that pile is) plus <b>one vote per word</b>. Here is the real sum for the command "stop":</p>
+<svg class="diagram" style="max-width:420px" viewBox="0 0 340 150" role="img" aria-label="Score for the command stop. put: starting score minus 1.22 plus the vote for stop minus 4.73 gives minus 5.95. stop: minus 1.45 plus minus 2.26 gives minus 3.71, closest to 0, so it wins">
+  <rect x="4" y="4" width="13" height="13" style="fill:var(--muted)"/><text x="22" y="16" style="font:14px sans-serif;fill:var(--fg)">starting score</text>
+  <rect x="140" y="4" width="13" height="13" style="fill:var(--build)"/><text x="158" y="16" style="font:14px sans-serif;fill:var(--fg)">vote of “stop”</text>
+  <text x="4" y="48" style="font:700 15px sans-serif;fill:var(--fg)">put: −5.95</text>
+  <rect x="58" y="56" width="211" height="22" style="fill:var(--build)"/><rect x="269" y="56" width="55" height="22" style="fill:var(--muted)"/>
+  <text x="164" y="72" text-anchor="middle" style="font:13px sans-serif;fill:var(--card)">−4.73</text><text x="296" y="72" text-anchor="middle" style="font:13px sans-serif;fill:var(--card)">−1.22</text>
+  <text x="4" y="104" style="font:700 15px sans-serif;fill:var(--ok)">stop: −3.71 ← closest to 0, wins</text>
+  <rect x="158" y="112" width="101" height="22" style="fill:var(--build)"/><rect x="259" y="112" width="65" height="22" style="fill:var(--muted)"/>
+  <text x="208" y="128" text-anchor="middle" style="font:13px sans-serif;fill:var(--card)">−2.26</text><text x="291" y="128" text-anchor="middle" style="font:13px sans-serif;fill:var(--card)">−1.45</text>
+  <line x1="324" y1="40" x2="324" y2="142" style="stroke:var(--fg);stroke-width:2"/><text x="330" y="146" style="font:13px sans-serif;fill:var(--fg)">0</text>
+</svg>
+<p>Shorter bar = closer to 0 = better. The line to type:</p>
 <pre><code>score = log(examples of intent / all examples)
       + for each word:  log((count of word in intent + 1) / (all words in intent + vocab size))</code></pre>
 <div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
@@ -233,7 +263,7 @@ return f"The {obj} is in the bin."</code></pre></details>
   …
   10/21 passed</code></pre>
 <p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real replies:</p>
-<pre><code>Zippy&gt; put the red and blue blocks away
+<pre style="white-space:pre-wrap"><code>Zippy&gt; put the red and blue blocks away
   (I think you meant: 'put the red and blue block away')
   The red block is in the bin.
 Zippy&gt; where is the green block
@@ -244,7 +274,7 @@ Zippy&gt; put the purple block in the bin
 </div>
 
 <h2 id="challenge">5. Real-world challenge: collect real commands</h2>
-<div class="box play"><span class="tag">🌍 Real-world challenge</span>
+<div class="box world"><span class="tag">🌍 Real-world challenge</span>
 <ol>
 <li>Ask 4 people, one at a time: "A robot is in a room with a red, a blue and a green block and a bin. How would you tell it to (a) bin a block, (b) go to one, (c) say where one is, (d) stop?" Write down <em>exactly</em> what they say.</li>
 <li>Circle words that aren't in the model's vocabulary (the demo shows them in red). Predict which commands it will get wrong.</li>
@@ -381,11 +411,13 @@ if (typeof document !== 'undefined') {
     const best = predictIntent(model, text), p = parseCommand(model, text);
     $('parsed').textContent = `{"intent": "${p.intent}", "object": ${p.object === null ? 'None' : '"' + p.object + '"'}}`;
     // bars: length = how far above the worst score, so the winner is the longest
-    const W = cv.width, H = cv.height, vals = intents.map(k => parts[k].total);
+    const dpr = window.devicePixelRatio || 1, W = cv.clientWidth || 700, H = 180;
+    cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const vals = intents.map(k => parts[k].total);
     const lo = Math.min(...vals) - 1, hi = Math.max(...vals), rowH = H / intents.length;
     ctx.clearRect(0, 0, W, H); ctx.font = '14px sans-serif'; ctx.textBaseline = 'middle';
     intents.forEach((k, i) => {
-      const w = (parts[k].total - lo) / (hi - lo) * (W - 220);
+      const w = (parts[k].total - lo) / (hi - lo) * (W - 200);
       ctx.fillStyle = k === best ? css('--accent') : css('--line');
       ctx.fillRect(70, i * rowH + 8, w, rowH - 16);
       ctx.fillStyle = css('--fg'); ctx.textAlign = 'left';
@@ -415,6 +447,7 @@ if (typeof document !== 'undefined') {
   $('fixBox').onchange = retrain;
   document.querySelectorAll('button[data-c]').forEach(b => b.onclick = () => { $('cmdIn').value = b.dataset.c; update(); });
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', update);
+  addEventListener('resize', update);
   retrain();
 } else {
   module.exports = { trainIntentModel, intentScores, predictIntent, parseCommand, extractObject, testAccuracy, TRAIN, TEST, FIX };

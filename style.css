@@ -123,3 +123,14 @@ button:hover { border-color: var(--accent); }
 .room-caption { text-align: center; font-size: .85rem; color: var(--muted); margin-top: -4px; }
 .big-number { font-size: 1.6rem; font-weight: 700; color: var(--ok); }
 :not(pre) > code { overflow-wrap: anywhere; }
+/* 🌍 real-world challenge and ⚠️ safety boxes */
+:root { --world: #b23a7a; --world-soft: #fbeaf3; --safety: #c42b2b; --safety-soft: #fde9e7; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --world: #f19ac6; --world-soft: #331827; --safety: #ff8f85; --safety-soft: #3a1715; }
+}
+.box.world { background: var(--world-soft); border-color: var(--world); } .box.world .tag { color: var(--world); }
+.box.safety { background: var(--safety-soft); border-color: var(--safety); } .box.safety .tag { color: var(--safety); }
+/* phones: wrap long transcript lines instead of hiding them off-screen */
+@media (max-width: 600px) {
+  pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+}

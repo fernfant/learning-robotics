@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Week 15 · A world-class brain</title>
 <link rel="stylesheet" href="../../style.css?v=16">
+<style>
+@media (max-width: 480px) { .kid dl { grid-template-columns: 1fr; gap: 2px; } .kid dd { margin-bottom: 8px; } }
+#journey details { margin: 8px 0 0; padding: 6px 12px; }
+</style>
 </head>
 <body>
 <main>
@@ -13,7 +17,7 @@
 <div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 15 of 16 · Part A (optional Claude)</div>
 <h1>A world-class brain over the internet: planners and agents</h1>
 <p class="lede">Robo-Helper borrows a huge model (Claude) over the internet, in two ways. You write the gates that make sure it never drives the robot unchecked.</p>
-<div class="card note" id="journey"><strong>Week 15 of 16 · Part A.</strong> So far your robot: ✓ moves ✓ looks ✓ reads phone data ✓ stops for the cat ✓ plans routes ✓ fuses sensors ✓ understands sentences ✓ writes plans ✓ drives on wheels ✓ checks every action ✓ maps the room ✓ finds itself ✓ times its thinking ✓ learns from a teacher. <strong>Today</strong> it learns to use a world-class AI, with you in charge. Next: <a href="20-mcp.html">Bonus · Any AI app can drive it (MCP)</a>, then <a href="19-bakeoff.html">Week 15 · Part B: the bake-off</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>No key needed for the homework.</strong> Talking to the real Claude needs an API key, which costs a little money. Only an adult should set it up, with a spending limit.</div>
+<div class="card note" id="journey"><strong>Week 15 of 16 · Part A.</strong> <strong>Today</strong> it learns to use a world-class AI, with you in charge. Next: <a href="20-mcp.html">Bonus · Any AI app can drive it (MCP)</a>, then <a href="19-bakeoff.html">Week 15 · Part B: the bake-off</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>No key needed for the homework.</strong> Talking to the real Claude needs an API key, which costs a little money. Only an adult should set it up, with a spending limit.<details><summary>So far your robot: 14 skills ✓</summary>✓ moves ✓ looks ✓ reads phone data ✓ stops for the cat ✓ plans routes ✓ fuses sensors ✓ understands sentences ✓ writes plans ✓ drives on wheels ✓ checks every action ✓ maps the room ✓ finds itself ✓ times its thinking ✓ learns from a teacher.</details></div>
 
 <div class="facts">
   <div><b>Time</b>2–3 hours</div>
@@ -69,7 +73,23 @@
 </div>
 
 <div class="box idea"><span class="tag">💡 What goes into a request</span>
-<p>Calling Claude just sends a bundle of text to Anthropic's computers and gets text back. The bundle holds:</p>
+<p>Calling Claude just sends a bundle of text to Anthropic's computers and gets text back. Think of it as an envelope with three things inside:</p>
+<svg class="diagram" viewBox="0 0 320 300" role="img" aria-label="The request as an envelope holding three cards: the rules card (you are Robo-Helper, only put, go, find or stop), the room card (from robot.look), and a reply form with three boxes to fill in: reply, clarify and plan.">
+<rect x="4" y="4" width="312" height="292" rx="10" fill="var(--card)" stroke="var(--muted)" stroke-width="2"/>
+<text x="16" y="28" font-size="15" font-weight="700" fill="var(--fg)">✉️ one request</text>
+<rect x="16" y="40" width="288" height="56" rx="8" fill="var(--idea-soft)" stroke="var(--idea)"/>
+<text x="28" y="62" font-size="14" font-weight="700" fill="var(--idea)">1. The rules</text><text x="28" y="84" font-size="13" fill="var(--fg)">only put, go, find or stop. Ask if unsure.</text>
+<rect x="16" y="106" width="288" height="56" rx="8" fill="var(--bot-soft)" stroke="var(--bot)"/>
+<text x="28" y="128" font-size="14" font-weight="700" fill="var(--bot)">2. The room</text><text x="28" y="150" font-size="13" fill="var(--fg)">from robot.look(): where everything is</text>
+<rect x="16" y="172" width="288" height="114" rx="8" fill="var(--build-soft)" stroke="var(--build)"/>
+<text x="28" y="194" font-size="14" font-weight="700" fill="var(--build)">3. The reply form (the schema)</text>
+<rect x="28" y="204" width="80" height="34" rx="5" fill="var(--card)" stroke="var(--build)"/><text x="68" y="226" font-size="13" text-anchor="middle" fill="var(--fg)">reply</text>
+<rect x="120" y="204" width="80" height="34" rx="5" fill="var(--card)" stroke="var(--build)"/><text x="160" y="226" font-size="13" text-anchor="middle" fill="var(--fg)">clarify</text>
+<rect x="212" y="204" width="80" height="34" rx="5" fill="var(--card)" stroke="var(--build)"/><text x="252" y="226" font-size="13" text-anchor="middle" fill="var(--fg)">plan</text>
+<text x="68" y="262" font-size="13" text-anchor="middle" fill="var(--muted)">some text</text><text x="160" y="262" font-size="13" text-anchor="middle" fill="var(--muted)">a question</text><text x="252" y="262" font-size="13" text-anchor="middle" fill="var(--muted)">a list of</text>
+<text x="160" y="278" font-size="13" text-anchor="middle" fill="var(--muted)">or nothing</text><text x="252" y="278" font-size="13" text-anchor="middle" fill="var(--muted)">actions</text>
+</svg>
+<p>In more detail:</p>
 <ul>
 <li><b>The rules</b> (the system prompt <code>SYSTEM</code>): you are Robo-Helper; you may only put, go, find or stop; ask one question if unsure; never invent objects.</li>
 <li><b>The room</b>, from <code>robot.look()</code>. The model can't see your room, so you describe it. Real output on a fresh robot:</li>
@@ -124,8 +144,19 @@
 <div class="box build"><span class="tag">🛠 Build: the two gates</span>
 <p>Open <code>project/homework/lesson18_world_class.py</code>. The prompts, schema, tools, <code>ask_planner</code> and <code>run_agent</code> are written for you. Read <code>run_agent</code>: you should be able to point at each part of the loop in the diagram. Run every checkpoint from inside <code>homework</code>.</p>
 <ol class="steps">
-<li><strong><code>validate_plan(plan_obj, known_objects)</code></strong>: return <code>(True, "")</code> or <code>(False, reason)</code>. In order: a dict with exactly the keys <code>reply</code>, <code>clarify</code>, <code>plan</code>; <code>plan</code> is a list of at most <code>MAX_PLAN</code> (6); every action passes week 10's <code>validate_action</code>; if <code>clarify</code> is a non-empty string, the plan must be empty.</li>
+<li><strong><code>validate_plan(plan_obj, known_objects)</code></strong>: return <code>(True, "")</code> or <code>(False, reason)</code>. Check the doors in order:
+<ol>
+<li><code>plan_obj</code> is a dict with exactly the keys <code>reply</code>, <code>clarify</code>, <code>plan</code>.</li>
+<li><code>plan</code> is a list of at most <code>MAX_PLAN</code> (6) actions.</li>
+<li>Every action passes week 10's <code>validate_action</code>.</li>
+<li>If <code>clarify</code> is a non-empty string, the plan must be empty.</li>
+</ol></li>
 </ol>
+<p>Your gate is a row of four doors. A reply must get through every door, in order. The first door it fails is the reason you return:</p>
+<svg class="diagram" viewBox="0 0 320 272" role="img" aria-label="Four doors in order. 1 shape: exactly reply, clarify and plan; None bounces. 2 length: at most 6 steps; a 7-step plan bounces. 3 each action passes week 10's check; put the cat bounces. 4 ask or act, never both; a question and a plan bounces.">
+<rect x="4" y="8" width="40" height="56" rx="4" fill="var(--build-soft)" stroke="var(--build)" stroke-width="2"/><text x="24" y="44" font-size="20" text-anchor="middle">🚪</text><text x="54" y="28" font-size="14" font-weight="700" fill="var(--build)">1. Shape</text><text x="54" y="46" font-size="13" fill="var(--fg)">exactly reply, clarify, plan</text><text x="54" y="62" font-size="13" fill="var(--fail)">✗ bounces: None (no JSON at all)</text><rect x="4" y="74" width="40" height="56" rx="4" fill="var(--build-soft)" stroke="var(--build)" stroke-width="2"/><text x="24" y="110" font-size="20" text-anchor="middle">🚪</text><text x="54" y="94" font-size="14" font-weight="700" fill="var(--build)">2. Length</text><text x="54" y="112" font-size="13" fill="var(--fg)">at most 6 steps</text><text x="54" y="128" font-size="13" fill="var(--fail)">✗ bounces: a 7-step plan</text><rect x="4" y="140" width="40" height="56" rx="4" fill="var(--build-soft)" stroke="var(--build)" stroke-width="2"/><text x="24" y="176" font-size="20" text-anchor="middle">🚪</text><text x="54" y="160" font-size="14" font-weight="700" fill="var(--build)">3. Each action</text><text x="54" y="178" font-size="13" fill="var(--fg)">passes week 10's check</text><text x="54" y="194" font-size="13" fill="var(--fail)">✗ bounces: "the cat" (unknown)</text><rect x="4" y="206" width="40" height="56" rx="4" fill="var(--build-soft)" stroke="var(--build)" stroke-width="2"/><text x="24" y="242" font-size="20" text-anchor="middle">🚪</text><text x="54" y="226" font-size="14" font-weight="700" fill="var(--build)">4. Ask or act</text><text x="54" y="244" font-size="13" fill="var(--fg)">never both at once</text><text x="54" y="260" font-size="13" fill="var(--fail)">✗ bounces: a question AND a plan</text>
+</svg>
+<p>The same four doors are the preset buttons in the Play demo above.</p>
 </div>
 <div class="box checkpoint"><span class="tag">✅ Checkpoint 1</span>
 <pre><code>python3 -c "
@@ -200,11 +231,11 @@ return False, f"Unknown tool {name!r}. Allowed: look, go_to, pick_up, put_in_bin
 </ol>
 </div>
 <div class="box checkpoint"><span class="tag">✅ Checkpoint 3</span>
-<p>Real output:</p>
+<p>Real output (the long <code>look</code> line is cut short here with <code>...</code>):</p>
 <pre><code>good           -&gt; (True, '')
 sneaky         -&gt; (False, "step 1: unknown object 'the cat'")
 asks AND acts  -&gt; (False, 'asked a question AND gave a plan: ask first, act later')
-look         {}                       -&gt; (True, "Robot at (1, 1), holding nothing. Bin at (7, 6). Blocks not yet in the bin: {'red block': (2, 1), 'blue block': (6, 3), 'green block': (1, 5)}. In the bin: nothing. Obstacles seen so far: none.")
+look         {}                       -&gt; (True, "Robot at (1, 1), holding nothing. ...")
 pick_up      {'object': 'red block'}  -&gt; (False, "Not at the red block: it's at (2, 1), robot is at (1, 1). Use go_to first.")
 go_to        {'object': 'red block'}  -&gt; (True, 'Arrived at the red block at (2, 1).')
 pick_up      {'object': 'red block'}  -&gt; (True, 'Picked up the red block.')
@@ -238,7 +269,7 @@ return " ".join([plan_obj["reply"]] + [self.do(a) for a in plan_obj[____]])</cod
 <p>Real output on a computer with no key and no <code>anthropic</code> package:</p>
 <pre><code>Zippy&gt; claude: tidy up the room
   Claude isn't reachable (ModuleNotFoundError). It needs `pip install anthropic` and an API key: ask an adult.</code></pre>
-<p>There's no <code>check.py</code> line for this gap, because it needs the internet. <code>python3 check.py robot</code> still says <code>17/21 passed</code>; Part B's exam is next. With a key you'd see Claude's reply followed by your robot's own lines. We haven't recorded a real run, so we can't show its exact output.</p>
+<p><b>Without a key, this line is a pass.</b> It means your code reached Claude's door and handled "nobody home" without crashing. There's no <code>check.py</code> line for this gap, because it needs the internet: <code>python3 check.py robot</code> still says <code>17/21 passed</code>. With a key you'd see Claude's reply followed by your robot's own lines (we haven't recorded one, so we can't show it).</p>
 </div>
 
 <h2 id="challenge">5. Real-world challenge: phone a chef</h2>

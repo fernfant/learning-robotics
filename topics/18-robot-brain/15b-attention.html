@@ -38,65 +38,31 @@
 <h2 id="principles">1. The idea</h2>
 <div class="box idea"><span class="tag">💡 The idea: spotlights on words</span>
 <p>At every step the model shines a spotlight on the command's words. Brighter = more weight. Real weights from the trained attention model for "put the red and green blocks away":</p>
-<svg class="diagram" viewBox="0 0 520 335" role="img" aria-label="Spotlights on the words of put the red and green blocks away: spread out at the first step, mostly on red after put">
-<text x="8" y="20" style="fill:var(--fg);font:700 17px sans-serif">after &lt;start&gt;: which action? <tspan style="fill:var(--ok)">→ writes put</tspan></text>
-<path d="M41 34 L11 112 L71 112 Z" style="fill:var(--build);opacity:0.19"/>
-<rect x="8" y="112" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
-<text x="41" y="132" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">put</text>
-<text x="41" y="158" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.15</text>
-<path d="M113 34 L83 112 L143 112 Z" style="fill:var(--build);opacity:0.09"/>
-<rect x="80" y="112" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
-<text x="113" y="132" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">the</text>
-<text x="113" y="158" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.07</text>
-<path d="M185 34 L155 112 L215 112 Z" style="fill:var(--build);opacity:0.16"/>
-<rect x="152" y="112" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
-<text x="185" y="132" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">red</text>
-<text x="185" y="158" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.12</text>
-<path d="M257 34 L227 112 L287 112 Z" style="fill:var(--build);opacity:0.19"/>
-<rect x="224" y="112" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
-<text x="257" y="132" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">and</text>
-<text x="257" y="158" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.15</text>
-<path d="M329 34 L299 112 L359 112 Z" style="fill:var(--build);opacity:0.23"/>
-<rect x="296" y="112" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
-<text x="329" y="132" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">green</text>
-<text x="329" y="158" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.18</text>
-<path d="M401 34 L371 112 L431 112 Z" style="fill:var(--build);opacity:0.22"/>
-<rect x="368" y="112" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
-<text x="401" y="132" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">blocks</text>
-<text x="401" y="158" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.17</text>
-<path d="M473 34 L443 112 L503 112 Z" style="fill:var(--build);opacity:0.21"/>
-<rect x="440" y="112" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
-<text x="473" y="132" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">away</text>
-<text x="473" y="158" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.16</text>
-<text x="8" y="190" style="fill:var(--fg);font:700 17px sans-serif">after put: which colour first? <tspan style="fill:var(--ok)">→ writes red</tspan></text>
-<path d="M41 204 L11 282 L71 282 Z" style="fill:var(--build);opacity:0.06"/>
-<rect x="8" y="282" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
-<text x="41" y="302" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">put</text>
-<text x="41" y="328" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.04</text>
-<path d="M113 204 L83 282 L143 282 Z" style="fill:var(--build);opacity:0.06"/>
-<rect x="80" y="282" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
-<text x="113" y="302" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">the</text>
-<text x="113" y="328" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.02</text>
-<path d="M185 204 L155 282 L215 282 Z" style="fill:var(--build);opacity:1"/>
-<rect x="152" y="282" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
-<text x="185" y="302" text-anchor="middle" style="fill:var(--fg);font:700 16px sans-serif">red</text>
-<text x="185" y="328" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.77</text>
-<path d="M257 204 L227 282 L287 282 Z" style="fill:var(--build);opacity:0.09"/>
-<rect x="224" y="282" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
-<text x="257" y="302" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">and</text>
-<text x="257" y="328" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.07</text>
-<path d="M329 204 L299 282 L359 282 Z" style="fill:var(--build);opacity:0.06"/>
-<rect x="296" y="282" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
-<text x="329" y="302" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">green</text>
-<text x="329" y="328" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.03</text>
-<path d="M401 204 L371 282 L431 282 Z" style="fill:var(--build);opacity:0.06"/>
-<rect x="368" y="282" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
-<text x="401" y="302" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">blocks</text>
-<text x="401" y="328" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.04</text>
-<path d="M473 204 L443 282 L503 282 Z" style="fill:var(--build);opacity:0.06"/>
-<rect x="440" y="282" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
-<text x="473" y="302" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">away</text>
-<text x="473" y="328" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.03</text>
+<svg class="diagram" style="max-width:420px" viewBox="0 0 340 300" role="img" aria-label="Spotlights on the words of put the red and green blocks away: spread out after start, mostly on red (0.77) after put">
+  <g style="font:700 13px sans-serif;fill:var(--fg)" text-anchor="middle"><text x="140" y="16">after &lt;start&gt;</text><text x="270" y="16">after put</text></g>
+  <g style="font:13px sans-serif;fill:var(--muted)" text-anchor="middle"><text x="140" y="33">which action?</text><text x="270" y="33">which colour?</text></g>
+  <text x="72" y="62" text-anchor="end" style="font:14px sans-serif;fill:var(--fg)">put</text>
+  <rect x="82" y="44" width="116" height="26" rx="5" style="fill:var(--build);opacity:0.26"/><text x="140" y="62" text-anchor="middle" style="font:14px sans-serif;fill:var(--fg)">0.15</text>
+  <rect x="212" y="44" width="116" height="26" rx="5" style="fill:var(--build);opacity:0.13"/><text x="270" y="62" text-anchor="middle" style="font:14px sans-serif;fill:var(--fg)">0.04</text>
+  <text x="72" y="93" text-anchor="end" style="font:14px sans-serif;fill:var(--fg)">the</text>
+  <rect x="82" y="75" width="116" height="26" rx="5" style="fill:var(--build);opacity:0.16"/><text x="140" y="93" text-anchor="middle" style="font:14px sans-serif;fill:var(--fg)">0.07</text>
+  <rect x="212" y="75" width="116" height="26" rx="5" style="fill:var(--build);opacity:0.1"/><text x="270" y="93" text-anchor="middle" style="font:14px sans-serif;fill:var(--fg)">0.02</text>
+  <text x="72" y="124" text-anchor="end" style="font:700 14px sans-serif;fill:var(--fg)">red</text>
+  <rect x="82" y="106" width="116" height="26" rx="5" style="fill:var(--build);opacity:0.22"/><text x="140" y="124" text-anchor="middle" style="font:14px sans-serif;fill:var(--fg)">0.12</text>
+  <rect x="212" y="106" width="116" height="26" rx="5" style="fill:var(--build);opacity:1.0"/><text x="270" y="124" text-anchor="middle" style="font:14px sans-serif;fill:var(--card)">0.77</text>
+  <text x="72" y="155" text-anchor="end" style="font:14px sans-serif;fill:var(--fg)">and</text>
+  <rect x="82" y="137" width="116" height="26" rx="5" style="fill:var(--build);opacity:0.26"/><text x="140" y="155" text-anchor="middle" style="font:14px sans-serif;fill:var(--fg)">0.15</text>
+  <rect x="212" y="137" width="116" height="26" rx="5" style="fill:var(--build);opacity:0.16"/><text x="270" y="155" text-anchor="middle" style="font:14px sans-serif;fill:var(--fg)">0.07</text>
+  <text x="72" y="186" text-anchor="end" style="font:14px sans-serif;fill:var(--fg)">green</text>
+  <rect x="82" y="168" width="116" height="26" rx="5" style="fill:var(--build);opacity:0.3"/><text x="140" y="186" text-anchor="middle" style="font:14px sans-serif;fill:var(--fg)">0.18</text>
+  <rect x="212" y="168" width="116" height="26" rx="5" style="fill:var(--build);opacity:0.12"/><text x="270" y="186" text-anchor="middle" style="font:14px sans-serif;fill:var(--fg)">0.03</text>
+  <text x="72" y="217" text-anchor="end" style="font:14px sans-serif;fill:var(--fg)">blocks</text>
+  <rect x="82" y="199" width="116" height="26" rx="5" style="fill:var(--build);opacity:0.28"/><text x="140" y="217" text-anchor="middle" style="font:14px sans-serif;fill:var(--fg)">0.17</text>
+  <rect x="212" y="199" width="116" height="26" rx="5" style="fill:var(--build);opacity:0.13"/><text x="270" y="217" text-anchor="middle" style="font:14px sans-serif;fill:var(--fg)">0.04</text>
+  <text x="72" y="248" text-anchor="end" style="font:14px sans-serif;fill:var(--fg)">away</text>
+  <rect x="82" y="230" width="116" height="26" rx="5" style="fill:var(--build);opacity:0.27"/><text x="140" y="248" text-anchor="middle" style="font:14px sans-serif;fill:var(--fg)">0.16</text>
+  <rect x="212" y="230" width="116" height="26" rx="5" style="fill:var(--build);opacity:0.12"/><text x="270" y="248" text-anchor="middle" style="font:14px sans-serif;fill:var(--fg)">0.03</text>
+  <g style="font:700 14px sans-serif;fill:var(--ok)" text-anchor="middle"><text x="140" y="277">→ writes put</text><text x="270" y="277">→ writes red</text></g>
 </svg>
 <p>Choosing the action, the light is spread out. After "put", "red" grabs 0.77 of it. Nobody told it to do this: training found that it helps. If every weight were equal, you'd get the old average back.</p>
 </div>
@@ -106,12 +72,35 @@
 <li><strong>Softmax</strong> the scores into weights (your <code>softmax</code> from week 8).</li>
 <li><strong>Mix</strong>: each word's embedding times its weight, added up. That's the context.</li>
 </ol>
-<p>By hand, with 2-number embeddings: put [1, 0], red [0, 2], the [0.5, 0.5], and a query [0, 1] ("which colour?"). Scores ÷ 1.414: put 0, red 1.414, the 0.354. Softmax: <strong>put 0.153, red 0.629, the 0.218</strong>. Ask [1, 0] ("which action?") instead and put wins with 0.456. Same words, different question, different focus.</p>
+<p>Picture each word's numbers as an arrow. The dot product is big when two arrows point the <b>same way</b>. Here with tiny 2-number words, and the query (purple band) as the question:</p>
+<svg class="diagram" style="max-width:420px" viewBox="0 0 340 360" role="img" aria-label="Arrows for put [1, 0], red [0, 2] and the [0.5, 0.5]. A query pointing up, which colour, lines up with red, so red gets 0.629. A query pointing right, which action, lines up with put, so put gets 0.456">
+  <defs><marker id="da" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--fg)"/></marker></defs>
+  <text x="4" y="18" style="font:700 14px sans-serif;fill:var(--idea)">query [0, 1]: which colour?</text>
+  <line x1="34" y1="150" x2="34" y2="100" style="stroke:var(--idea);stroke-width:12;opacity:.35;stroke-linecap:round"/>
+  <line x1="34" y1="150" x2="84" y2="150" style="stroke:var(--fg);stroke-width:2.5" marker-end="url(#da)"/><text x="80" y="168" style="font:13px sans-serif;fill:var(--fg)">put</text>
+  <line x1="34" y1="150" x2="34" y2="50" style="stroke:var(--fg);stroke-width:2.5" marker-end="url(#da)"/><text x="42" y="54" style="font:13px sans-serif;fill:var(--fg)">red</text>
+  <line x1="34" y1="150" x2="59.0" y2="125.0" style="stroke:var(--fg);stroke-width:2.5" marker-end="url(#da)"/><text x="65.0" y="119.0" style="font:13px sans-serif;fill:var(--fg)">the</text>
+  <circle cx="34" cy="150" r="3" style="fill:var(--fg)"/>
+  <text x="150" y="63" style="font:14px sans-serif;fill:var(--fg)">put</text><rect x="184" y="50" width="26" height="18" rx="3" style="fill:var(--build);opacity:0.45"/><text x="214" y="64" style="font:13px sans-serif;fill:var(--fg)">0.153</text>
+  <text x="150" y="93" style="font:700 14px sans-serif;fill:var(--fg)">red</text><rect x="184" y="80" width="107" height="18" rx="3" style="fill:var(--build);opacity:1"/><text x="295" y="94" style="font:700 13px sans-serif;fill:var(--fg)">0.629</text>
+  <text x="150" y="123" style="font:14px sans-serif;fill:var(--fg)">the</text><rect x="184" y="110" width="37" height="18" rx="3" style="fill:var(--build);opacity:0.45"/><text x="225" y="124" style="font:13px sans-serif;fill:var(--fg)">0.218</text>
+  <line x1="4" y1="178" x2="336" y2="178" style="stroke:var(--line)"/>
+  <text x="4" y="202" style="font:700 14px sans-serif;fill:var(--idea)">query [1, 0]: which action?</text>
+  <line x1="34" y1="334" x2="84" y2="334" style="stroke:var(--idea);stroke-width:12;opacity:.35;stroke-linecap:round"/>
+  <line x1="34" y1="334" x2="84" y2="334" style="stroke:var(--fg);stroke-width:2.5" marker-end="url(#da)"/><text x="80" y="352" style="font:13px sans-serif;fill:var(--fg)">put</text>
+  <line x1="34" y1="334" x2="34" y2="234" style="stroke:var(--fg);stroke-width:2.5" marker-end="url(#da)"/><text x="42" y="238" style="font:13px sans-serif;fill:var(--fg)">red</text>
+  <line x1="34" y1="334" x2="59.0" y2="309.0" style="stroke:var(--fg);stroke-width:2.5" marker-end="url(#da)"/><text x="65.0" y="303.0" style="font:13px sans-serif;fill:var(--fg)">the</text>
+  <circle cx="34" cy="334" r="3" style="fill:var(--fg)"/>
+  <text x="150" y="247" style="font:700 14px sans-serif;fill:var(--fg)">put</text><rect x="184" y="234" width="78" height="18" rx="3" style="fill:var(--build);opacity:1"/><text x="266" y="248" style="font:700 13px sans-serif;fill:var(--fg)">0.456</text>
+  <text x="150" y="277" style="font:14px sans-serif;fill:var(--fg)">red</text><rect x="184" y="264" width="38" height="18" rx="3" style="fill:var(--build);opacity:0.45"/><text x="226" y="278" style="font:13px sans-serif;fill:var(--fg)">0.225</text>
+  <text x="150" y="307" style="font:14px sans-serif;fill:var(--fg)">the</text><rect x="184" y="294" width="54" height="18" rx="3" style="fill:var(--build);opacity:0.45"/><text x="242" y="308" style="font:13px sans-serif;fill:var(--fg)">0.320</text>
+</svg>
+<p>Same words, different question, different focus. (By hand: scores ÷ 1.414 are put 0, red 1.414, the 0.354, then softmax.)</p>
 </div>
 
 <h2 id="play">2. Play with it</h2>
 <div class="box play"><span class="tag">🎮 Play: the attention heatmap</span>
-<p class="legend">The real trained numbers from <code>train_attn_lm()</code> (seed 0), run in JavaScript exactly like the Python. Each row is one writing step; darker = more attention. Words in <b style="color:var(--fail)">red</b> aren't in its vocabulary.</p>
+<p class="legend">The real trained numbers from <code>train_attn_lm()</code> (seed 0), run in JavaScript exactly like the Python. Each column is one writing step, each row a word; darker = more attention. Words in <b style="color:var(--fail)">red</b> aren't in its vocabulary.</p>
 <p><label for="attIn">Command: </label><input id="attIn" value="put the red and green blocks away" size="30"></p>
 <p>
 <button data-ac="put the red and green blocks away">put the red and green blocks away</button>
@@ -125,7 +114,7 @@
 <div class="table-wrap"><table id="attMap" style="font-size:.85rem"></table></div>
 <p><b>Written:</b> <code id="attOut">[]</code></p>
 </div>
-<p>Try "stop the red block": "stop" gets 0.53 of the first spotlight and it writes <code>stop</code>, where the averaging model wrote <code>go red</code>. Then compare "put the red block in the bin" with "put the block in the red bin": the same weights, just in different columns. Our attention has no idea of word <em>order</em>.</p>
+<p>Try "stop the red block": "stop" gets 0.53 of the first spotlight and it writes <code>stop</code>, where the averaging model wrote <code>go red</code>. Then compare "put the red block in the bin" with "put the block in the red bin": the same weights, just in different rows. Our attention has no idea of word <em>order</em>.</p>
 
 <h2 id="homework">3. Build it</h2>
 <div class="box build"><span class="tag">🛠 Build</span>
@@ -171,6 +160,17 @@ What attention does NOT fix (it has no idea of word ORDER):
 </ol>
 
 <h2 id="results">4. Does it help?</h2>
+<svg class="diagram" style="max-width:420px" viewBox="0 0 340 150" role="img" aria-label="Held-out accuracy on 3 seeds. Averaging: 92, 94 and 80 percent, spread out. Attention: 92 percent on all three seeds">
+  <g style="font:13px sans-serif;fill:var(--muted)" text-anchor="middle"><line x1="126" y1="22" x2="126" y2="118" style="stroke:var(--line)"/><text x="126" y="138">80%</text><line x1="191" y1="22" x2="191" y2="118" style="stroke:var(--line)"/><text x="191" y="138">85%</text><line x1="256" y1="22" x2="256" y2="118" style="stroke:var(--line)"/><text x="256" y="138">90%</text><line x1="321" y1="22" x2="321" y2="118" style="stroke:var(--line)"/><text x="321" y="138">95%</text></g>
+  <text x="4" y="55" style="font:14px sans-serif;fill:var(--fg)">averaging</text><text x="4" y="99" style="font:14px sans-serif;fill:var(--fg)">attention</text>
+  <circle cx="282" cy="50" r="7" style="fill:var(--play)"/><text x="282" y="34" text-anchor="middle" style="font:12px sans-serif;fill:var(--muted)">seed 0</text>
+  <circle cx="308" cy="50" r="7" style="fill:var(--play)"/><text x="308" y="74" text-anchor="middle" style="font:12px sans-serif;fill:var(--muted)">seed 1</text>
+  <circle cx="126" cy="50" r="7" style="fill:var(--play)"/><text x="126" y="34" text-anchor="middle" style="font:12px sans-serif;fill:var(--muted)">seed 2</text>
+  <circle cx="273" cy="94" r="7" style="fill:var(--ok);stroke:var(--card);stroke-width:1.5"/>
+  <circle cx="282" cy="94" r="7" style="fill:var(--ok);stroke:var(--card);stroke-width:1.5"/>
+  <circle cx="291" cy="94" r="7" style="fill:var(--ok);stroke:var(--card);stroke-width:1.5"/>
+  <text x="282" y="118" text-anchor="middle" style="font:700 12px sans-serif;fill:var(--ok)">all 3 seeds: 92%</text>
+</svg>
 <p>A little on average (92% against 89%), and much <strong>steadier</strong>: 92% on every seed, while averaging swings from 80% to 94%. On seed 1, averaging wins. On the robot's 12-task exam both score 8/12. Small experiments wobble, so use several seeds and only believe a difference that shows up every time.</p>
 
 <h2 id="check">5. Check yourself</h2>
@@ -262,14 +262,11 @@ if (typeof document !== 'undefined') {
   function attUpdate() {
     const cmd = $a('attIn').value, toks = tokenize(cmd), res = attGenerate(cmd);
     $a('attRead').innerHTML = toks.length ? toks.map(w => attKnown(w) ? escA(w) : `<s style="color:var(--fail)">${escA(w)}</s>`).join(' ') : '(no words)';
-    const ws = res.steps[0].words;
-    let html = '<tr><th>step</th>' + ws.map(w => `<th>${escA(w)}</th>`).join('') + '<th>writes</th></tr>';
-    res.steps.forEach(st => {
-      html += `<tr><td>after <code>${escA(st.prev1)}</code></td>` + st.weights.map(a =>
-        `<td style="text-align:center;background:color-mix(in srgb, var(--accent) ${Math.round(a * 100)}%, transparent)">${a.toFixed(2)}</td>`).join('') +
-        `<td><b>${escA(st.word)}</b> (${st.p.toFixed(2)})</td></tr>`;
-    });
-    if (!ws.length) html += '<tr><td colspan="2">No known words: nothing to attend to, so the context is 12 zeros.</td></tr>';
+    const ws = res.steps[0].words, cell = a => `<td style="text-align:center;background:color-mix(in srgb, var(--accent) ${Math.round(a * 100)}%, transparent)">${a.toFixed(2)}</td>`;
+    let html = '<tr><th>word</th>' + res.steps.map(st => `<th>after<br><code>${escA(st.prev1)}</code></th>`).join('') + '</tr>';
+    ws.forEach((w, i) => { html += `<tr><td>${escA(w)}</td>` + res.steps.map(st => cell(st.weights[i])).join('') + '</tr>'; });
+    html += '<tr><td><b>writes</b></td>' + res.steps.map(st => `<td style="text-align:center"><b>${escA(st.word)}</b><br>(${st.p.toFixed(2)})</td>`).join('') + '</tr>';
+    if (!ws.length) html += `<tr><td colspan="${res.steps.length + 1}">No known words: nothing to attend to, so the context is 12 zeros.</td></tr>`;
     $a('attMap').innerHTML = html;
     $a('attOut').textContent = '[' + res.words.map(w => `'${w}'`).join(', ') + '] → ' + pyPlan(wordsToPlan(res.words));
   }

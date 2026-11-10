@@ -10,6 +10,18 @@
 .learn ul { padding-left: 20px; margin: 6px 0 0; }
 td .room-pic { max-width: 260px; margin: 6px 0; }
 td .room-caption { text-align: left; margin-top: 0; }
+.k { display: inline-block; font-weight: 700; padding: 0 8px; border-radius: 8px; border-left: 4px solid; }
+.k.idea { background: var(--idea-soft); color: var(--idea); } .k.play { background: var(--play-soft); color: var(--play); }
+.k.build { background: var(--build-soft); color: var(--build); } .k.ok { background: var(--ok-soft); color: var(--ok); }
+.k.stuck { background: var(--warn-soft); color: var(--warn); } .k.bot { background: var(--bot-soft); color: var(--bot); }
+.k.world { background: var(--world-soft); color: var(--world); }
+.learn .card h3 { margin: 0 0 4px; font-size: 1rem; }
+@media (max-width: 600px) {
+  #robot-weeks tr { display: grid; grid-template-columns: 2.6em 1fr; }
+  #robot-weeks td:nth-child(3), #robot-weeks th:nth-child(3) { grid-column: 1 / -1; padding-top: 0; }
+  #robot-weeks td:nth-child(1), #robot-weeks td:nth-child(2) { border-bottom: 0; }
+  #robot-weeks td .room-pic { max-width: 100%; }
+}
 </style>
 </head>
 <body>
@@ -20,7 +32,7 @@ td .room-caption { text-align: left; margin-top: 0; }
 <h1>Build a Robot Brain: 16 weeks, from zero to a robot that understands you</h1>
 <p class="lede">You build your own robot, one piece a week. It moves, senses, reads real phone data, drives on wheels, draws a map, finds itself when lost, and understands <em>"put the red block in the bin"</em>.</p>
 
-<div class="room" data-robot="7,6" data-cat="4,1" data-mark="4,1" data-blocks="green:1,5" data-path="1,1 2,1 3,1 2,1 2,2 2,3 2,4 2,5 3,5 3,6 4,6 5,6 6,6 7,6 7,5 7,4 7,3 6,3 7,3 7,4 7,5 7,6" data-label="Week 16: &quot;put the red and blue blocks away&quot;. It stops for the cat, drives round, and bins both blocks."></div>
+<div class="room" id="hero" data-robot="8,6" data-cat="4,1" data-mark="4,1" data-blocks="rgba(229,72,77,.35):2,1 rgba(62,123,250,.35):6,3 green:1,5" data-path="1,1 2,1 3,1 2,1 2,2 2,3 2,4 2,5 3,5 3,6 4,6 5,6 6,6 7,6 7,5 7,4 7,3 6,3 7,3 7,4 7,5 7,6" data-label="Week 16: &quot;put the red and blue blocks away&quot;. It stops for the cat (red ring), drives round, and takes the red block ① then the blue block ② (faded: where they were) to the bin 🪣."></div>
 <pre><code>Zippy&gt; put the red and blue blocks away
   (I think you meant: 'put the red and blue block away')
   (I thought for 0.34 ms, so I'd roll 0.34 mm meanwhile.)
@@ -31,12 +43,15 @@ td .room-caption { text-align: left; margin-top: 0; }
 <section class="kid" id="start">
 <h2>Start here</h2>
 <p class="big">You learn by building. Every week you write a few real lines of Python, and your robot can do one new thing.</p>
+<p>Every page uses the same coloured boxes, in this order:</p>
 <ol class="steps">
-<li><b>💡 The idea</b>, with a picture, before any code.</li>
-<li><b>🎮 Play</b> with it in your browser.</li>
-<li><b>🛠 Build</b> the homework, with ✅ checkpoints that show exactly what you should see.</li>
-<li><b>🤖 Add it to your robot</b>: fill this week's gap in <code>my_robot.py</code>.</li>
-<li><b>🌍 Try it for real</b>: your phone, a ramp, a friend.</li>
+<li><span class="k idea">💡 The idea</span> with a picture, before any code.</li>
+<li><span class="k play">🎮 Play</span> with it in your browser.</li>
+<li><span class="k build">🛠 Build</span> the homework, one function at a time.</li>
+<li><span class="k ok">✅ Checkpoint</span> after every step: the exact output you should see, and what to do if yours is different.</li>
+<li><span class="k stuck">🆘 Stuck?</span> hints, one at a time. The last one is fill-in-the-blanks.</li>
+<li><span class="k bot">🤖 Add it to your robot</span>: fill this week's gap in <code>my_robot.py</code>.</li>
+<li><span class="k world">🌍 Try it for real</span>: your phone, a ramp, a friend.</li>
 </ol>
 <p><b>You need:</b> very basic Python (variables, <code>if</code>, <code>for</code>, functions). If you can print 1 to 10 with a loop, you're ready. A grown-up helps with setup in week 1.</p>
 <p><b>Time:</b> 16 weeks. Half the weeks have two parts (A and B). Each page says how long it takes. If a week takes two, that's normal.</p>
@@ -44,14 +59,14 @@ td .room-caption { text-align: left; margin-top: 0; }
 
 <h2 id="learn">What you'll learn</h2>
 <div class="learn">
-<div class="box play"><span class="tag">🦾 The robot's body</span>
+<div class="card"><h3>🦾 The robot's body</h3>
 <ul>
 <li><b>Sensors:</b> noisy distances, real phone data, gyro drift and fusion (weeks 2, 3, 6)</li>
 <li><b>Motion:</b> grids, routes with A*, wheels and odometry (weeks 1, 5, 9)</li>
 <li><b>Control:</b> PID steering that doesn't overshoot (week 9)</li>
 <li><b>Maps:</b> a laser scan, its own map, and finding itself when lost (weeks 11, 12)</li>
 </ul></div>
-<div class="box idea"><span class="tag">🧠 The robot's brain</span>
+<div class="card"><h3>🧠 The robot's brain</h3>
 <ul>
 <li><b>Learning:</b> shrinking the error, a neuron, honest tests (weeks 2, 4)</li>
 <li><b>Language:</b> words as numbers, commands, a tiny language model (weeks 7, 8)</li>
@@ -106,7 +121,7 @@ td .room-caption { text-align: left; margin-top: 0; }
 <div class="paper-row"><span class="d">10B</span><div><label><input type="checkbox" data-d="11" data-label="Week 10B"><a href="11-capstone.html">Capstone: Robo-Helper</a><span class="track both">LLM + Robotics</span></label><p>Everything together, measured honestly (83%).</p></div></div>
 
 <h3 id="week-11">Week 11 · Its own map</h3>
-<div class="paper-row"><span class="d">11</span><div><label><input type="checkbox" data-d="24" data-label="Week 11"><a href="24-map.html">A laser scanner, frames and a map</a><span class="track robo">Robotics</span></label><p>Turn distances into dots on a map. <b>Adds:</b> <code>map</code>, its own map of the room.</p></div></div>
+<div class="paper-row"><span class="d">11</span><div><label><input type="checkbox" data-d="24" data-label="Week 11"><a href="24-map.html">A laser scanner, frames and a map</a><span class="track robo">Robotics</span></label><p>Turn distances into dots on a map. <b>Adds:</b> <code>map</code>, its own map of the room (100% right, and it finds the cat).</p></div></div>
 
 <h3 id="week-12">Week 12 · Lost and found</h3>
 <div class="paper-row"><span class="d">12</span><div><label><input type="checkbox" data-d="25" data-label="Week 12"><a href="25-localise.html">Where am I? A particle filter</a><span class="track robo">Robotics</span></label><p>Many guesses, keep the ones that fit. <b>Adds:</b> <code>whereami</code>.</p></div></div>
@@ -130,19 +145,19 @@ td .room-caption { text-align: left; margin-top: 0; }
 <h2 id="my-robot">Your robot, week by week</h2>
 <p>Your robot is one file, <code>homework/my_robot.py</code>, with one gap per week. Until a gap is filled it says "I can't do that yet". New to classes and <code>self</code>? Read <a href="00-setup.html#robot-file">How your robot file works</a> first.</p>
 <p>Real output with the gaps filled up to each week, typed straight after starting <code>python3 my_robot.py</code>. Decimals change a little every run.</p>
-<div class="table-wrap"><table>
+<div class="table-wrap"><table id="robot-weeks">
 <tr><th>Week</th><th>You type</th><th>Your robot</th></tr>
-<tr><td>1</td><td><code>EEEE</code></td><td>BUMP! I walked into the cat. (It's not on my map, so I can't sense it yet: add week 4.)<div class="room" data-robot="3,1" data-path="1,1 2,1 3,1" data-cat="4,1" data-mark="4,1" data-blocks="red:2,1 blue:6,3 green:1,5"></div></td></tr>
-<tr><td>2</td><td><code>look</code></td><td>Walls (average of 16 readings): north 0.2, east 7.0, south 5.0, west 0.1. Safe speed: 0.25 m/s.</td></tr>
+<tr><td>1</td><td><code>EEEE</code></td><td>BUMP! I walked into the cat. (It's not on my map, so I can't sense it yet: add week 4.)<div class="room" id="w1" data-robot="3,1" data-path="1,1 2,1 3,1 4,1" data-cat="4,1" data-mark="4,1" data-blocks="red:2,1 blue:6,3 green:1,5" data-label="💥 It drives straight into the cat."></div></td></tr>
+<tr><td>2</td><td><code>look</code></td><td>Walls (average of 16 readings): north 0.2, east 7.0, south 5.0, west 0.1. Safe speed: 0.25 m/s.<div class="room" id="w2" data-robot="1,1" data-blocks="red:2,1 blue:6,3 green:1,5" data-label="Dashed lines: what it measures, east and south. North and west walls are right next to it."></div></td></tr>
 <tr><td>3</td><td><code>phone</code></td><td>236 s of real data: tilted 13 degrees on average, 197 steps.</td></tr>
-<tr><td>4</td><td><code>EEEE</code></td><td>Something is in the way at (4, 1)! I stopped just in time (stop chance 0.99, my safe threshold 0.17).<div class="room" data-robot="3,1" data-path="1,1 2,1 3,1" data-cat="4,1" data-mark="4,1" data-blocks="red:2,1 blue:6,3 green:1,5"></div></td></tr>
+<tr><td>4</td><td><code>EEEE</code></td><td>Something is in the way at (4, 1)! I stopped just in time (stop chance 0.99, my safe threshold 0.17).<div class="room" id="w4" data-robot="3,1" data-path="1,1 2,1 3,1" data-cat="4,1" data-blocks="red:2,1 blue:6,3 green:1,5" data-label="Green ring: it senses the cat and stops one square before it."></div></td></tr>
 <tr><td>5</td><td><code>goto blue</code></td><td>Something is in the way at (4, 1)! I stopped just in time (…).<br>I'm at (6, 3).<div class="room" data-robot="6,3" data-path="1,1 2,1 3,1 2,1 2,2 2,3 2,4 3,4 4,4 4,3 5,3 6,3" data-cat="4,1" data-mark="4,1" data-blocks="red:2,1 blue:6,3 green:1,5"></div></td></tr>
 <tr><td>6</td><td><code>steady</code></td><td>Accelerometer alone wobbles 9.5 degrees; fused, 2.1.</td></tr>
 <tr><td>7</td><td><code>put the red and blue blocks away</code></td><td>(I think you meant: 'put the red and blue block away')<br>The red block is in the bin. <em>(only one: one action at a time)</em><div class="room" data-robot="7,6" data-path="1,1 2,1 2,2 2,3 2,4 2,5 3,5 3,6 4,6 5,6 6,6 7,6" data-cat="4,1" data-blocks="blue:6,3 green:1,5"></div></td></tr>
 <tr><td>8</td><td><code>put the red and blue blocks away</code></td><td>(I think you meant: 'put the red and blue block away')<br>The red block is in the bin. The blue block is in the bin.<div class="room" data-robot="7,6" data-path="1,1 2,1 2,2 2,3 2,4 2,5 3,5 3,6 4,6 5,6 6,6 7,6 7,5 7,4 7,3 6,3 7,3 7,4 7,5 7,6" data-cat="4,1" data-blocks="green:1,5"></div></td></tr>
-<tr><td>9</td><td><code>drive blue</code></td><td>Arrived. I think I'm at (3.20, 1.75); really I'm 0.94 m away from that. I scraped a wall on the way: my odometry drifted and I didn't notice. (Weeks 11-12 fix this.)</td></tr>
+<tr><td>9</td><td><code>drive blue</code></td><td>Arrived. I think I'm at (3.20, 1.75); really I'm 0.94 m away from that. I scraped a wall on the way: my odometry drifted and I didn't notice. (Weeks 11-12 fix this.)<div class="room" data-est="3.20,1.75" data-cat="4,1" data-blocks="red:2,1 blue:6,3 green:1,5" data-label="Dashed circle: where it thinks it is, on the blue block. Really it's 0.94 m away, almost two squares."></div></td></tr>
 <tr><td>10</td><td><code>json: {"intent": "launch", "object": "red block"}</code> <em>(pretends an AI sent this)</em></td><td>Sorry, I won't do that: unknown intent 'launch'.</td></tr>
-<tr><td>11</td><td><code>map</code></td><td>100% of 76 squares right (the 'c' square is the cat the official map doesn't know)<div class="room" data-room="####?#####|#...?....#|#..##....?|#..#...?.#|#....##..#|#........#|#.#......#|##########" data-cat="4,1" data-label="The map it drew itself (light ? squares: never seen). This run it got stuck behind a wall block and never saw the cat, so no 'c' square appears."></div></td></tr>
+<tr><td>11</td><td><code>map</code></td><td>100% of 79 squares right (the 'c' square is the cat the official map doesn't know)<div class="room" data-room="##########|#...#....#|#..##....#|#..#.....#|#....##..#|#........#|#.#......#|##########" data-cat="4,1" data-mark="4,1" data-label="The map it drew itself. The red ring is the 'c' square: its laser found the cat, which the official map doesn't know."></div></td></tr>
 <tr><td>12</td><td><code>whereami</code></td><td>I think I'm at (2.80, 1.14). Really (2.83, 1.11): 0.04 m off.<div class="room" data-robot="5,2" data-est="2.80,1.14" data-cat="4,1" data-blocks="red:2,1 blue:6,3 green:1,5" data-label="Dashed circle: its guess. 🤖: the square it's really in."></div></td></tr>
 <tr><td>13</td><td><code>slowbrain on</code>, then <code>EEEE</code></td><td>BUMP! My slow brain was still thinking when I reached the cat. (Type 'slowbrain off'.)</td></tr>
 <tr><td>14</td><td><code>where's the green one?</code></td><td>The green block is at (1, 5).</td></tr>
@@ -185,6 +200,18 @@ td .room-caption { text-align: left; margin-top: 0; }
 
 <script src="room.js"></script>
 <script>
+// Extra marks drawn on top of a room.js picture (redrawn when the theme changes)
+function roomPlus(id, svg) {
+  const el = document.getElementById(id), f = () => { drawRoom(el); el.querySelector('svg').insertAdjacentHTML('beforeend', svg); };
+  // after room.js has drawn every picture
+  document.addEventListener('DOMContentLoaded', f); matchMedia('(prefers-color-scheme: dark)').addEventListener('change', f);
+}
+const num = (x, y, n) => `<text x="${x * 40 + 20}" y="${y * 40 + 27}" font-size="20" font-weight="700" text-anchor="middle" fill="#fff">${n}</text>`;
+roomPlus('hero', num(2, 1, 1) + num(6, 3, 2));
+roomPlus('w1', '<text x="160" y="34" font-size="26" text-anchor="middle">💥</text>');
+roomPlus('w4', '<circle cx="140" cy="60" r="18" fill="none" style="stroke:var(--ok)" stroke-width="4"/>');
+roomPlus('w2', '<g style="stroke:var(--idea)" stroke-width="3" stroke-dasharray="6 5" fill="none"><line x1="76" y1="60" x2="360" y2="60"/><line x1="60" y1="76" x2="60" y2="280"/></g>'
+  + '<g font-size="18" font-weight="700" paint-order="stroke" style="fill:var(--idea);stroke:var(--floor)" stroke-width="4"><text x="250" y="52">7.0</text><text x="68" y="230">5.0</text></g>');
 const KEY = 'lr-robot-brain-done';
 const boxes = [...document.querySelectorAll('input[data-d]')];
 let done = {};

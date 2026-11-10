@@ -35,55 +35,62 @@
 <h2 id="idea">1. The idea</h2>
 <div class="box idea"><span class="tag">💡 The idea: look along a line</span>
 <p>Your robot only finds walls by bumping into them. It needs to <em>look ahead</em>. That's your week 1 loop again: look at the next square; if it's free, count it and look further.</p>
-<div class="room" data-robot="1,1" data-path="1,1 8,1" data-mark="9,1" data-blocks="red:2,1 blue:6,3 green:1,5" data-label="Facing east from (1, 1): 7 free squares, then the wall (red ring). The robot's own square doesn't count."></div>
+<div class="room" id="beam" data-robot="1,1" data-mark="9,1" data-blocks="red:2,1 blue:6,3 green:1,5" data-label="Facing east from (1, 1), the dashed beam counts 7 free squares, then hits the wall (red ring). The robot's own square doesn't count."></div>
 <p>Blocks don't stop the beam in this simple world. Only walls do.</p>
 </div>
 
 <div class="box idea"><span class="tag">💡 The idea: noise, and why averaging works</span>
 <p>Ask friends to guess how long a corridor is. Some guess too high, some too low. Average the guesses and the mistakes partly cancel. Real distance sensors (ultrasonic, infrared, laser) are the same: they never say exactly 7. Here are 8 real noisy readings of a true distance of 7:</p>
-<svg class="diagram" viewBox="0 0 520 170" role="img" aria-label="A number line from 5.5 to 8.5. Eight readings are scattered between 6.27 and 7.69. The true value 7 is a blue line. Their average, 7.10, is a red line, much closer to 7 than most single readings.">
-  <line x1="30" y1="120" x2="490" y2="120" stroke-width="2" style="stroke:var(--muted)"/>
-  <g font-size="14" text-anchor="middle" style="fill:var(--muted)">
-    <line x1="113" y1="114" x2="113" y2="126" style="stroke:var(--muted)" stroke-width="2"/><text x="113" y="144">6</text>
-    <line x1="407" y1="114" x2="407" y2="126" style="stroke:var(--muted)" stroke-width="2"/><text x="407" y="144">8</text>
+<svg class="diagram" viewBox="0 0 340 150" role="img" aria-label="A number line from 6 to 8. Eight readings are scattered between 6.27 and 7.69. The true value 7 is a blue line. Their average, 7.10, is a dashed red line, much closer to 7 than most single readings.">
+  <text x="4" y="22" font-size="15" font-weight="700" style="fill:var(--idea)">● 8 single readings: 6.27 to 7.69</text>
+  <circle cx="75" cy="56" r="8" style="fill:var(--idea)" opacity=".85"/><circle cx="260" cy="78" r="8" style="fill:var(--idea)" opacity=".85"/><circle cx="239" cy="56" r="8" style="fill:var(--idea)" opacity=".85"/><circle cx="106" cy="78" r="8" style="fill:var(--idea)" opacity=".85"/><circle cx="169" cy="56" r="8" style="fill:var(--idea)" opacity=".85"/><circle cx="157" cy="78" r="8" style="fill:var(--idea)" opacity=".85"/><circle cx="209" cy="56" r="8" style="fill:var(--idea)" opacity=".85"/><circle cx="245" cy="78" r="8" style="fill:var(--idea)" opacity=".85"/>
+  <line x1="20" y1="100" x2="320" y2="100" stroke-width="2" style="stroke:var(--muted)"/>
+  <g font-size="15" text-anchor="middle" style="fill:var(--muted)">
+    <line x1="40" y1="94" x2="40" y2="106" style="stroke:var(--muted)" stroke-width="2"/><text x="40" y="122">6</text>
+    <line x1="300" y1="94" x2="300" y2="106" style="stroke:var(--muted)" stroke-width="2"/><text x="300" y="122">8</text>
   </g>
-  <line x1="260" y1="40" x2="260" y2="126" stroke-width="4" style="stroke:var(--pass)"/>
-  <text x="252" y="162" font-size="14" text-anchor="end" font-weight="700" style="fill:var(--pass)">truth 7</text>
-  <line x1="274" y1="40" x2="274" y2="126" stroke-width="4" stroke-dasharray="6 4" style="stroke:var(--fail)"/>
-  <text x="282" y="162" font-size="14" font-weight="700" style="fill:var(--fail)">average 7.10</text>
-  <circle cx="153" cy="70" r="8" style="fill:var(--idea)" opacity=".85"/>
-  <circle cx="361" cy="92" r="8" style="fill:var(--idea)" opacity=".85"/>
-  <circle cx="338" cy="70" r="8" style="fill:var(--idea)" opacity=".85"/>
-  <circle cx="188" cy="92" r="8" style="fill:var(--idea)" opacity=".85"/>
-  <circle cx="259" cy="70" r="8" style="fill:var(--idea)" opacity=".85"/>
-  <circle cx="245" cy="92" r="8" style="fill:var(--idea)" opacity=".85"/>
-  <circle cx="304" cy="70" r="8" style="fill:var(--idea)" opacity=".85"/>
-  <circle cx="345" cy="92" r="8" style="fill:var(--idea)" opacity=".85"/>
-  <text x="30" y="30" font-size="14" style="fill:var(--idea)" font-weight="700">● 8 single readings: 6.27 to 7.69</text>
+  <line x1="170" y1="36" x2="170" y2="106" stroke-width="4" stroke="#3e7bfa"/>
+  <line x1="183" y1="36" x2="183" y2="106" stroke-width="4" stroke-dasharray="6 4" stroke="#e5484d"/>
+  <text x="164" y="144" font-size="15" text-anchor="end" font-weight="700" fill="#3e7bfa">truth 7</text>
+  <text x="189" y="144" font-size="15" font-weight="700" fill="#e5484d">average 7.10</text>
 </svg>
 <p>The worst single reading is off by 0.73. The average is off by 0.10. Bigger groups do better, but slowly. Here's the typical error from the homework file, over 500 tries each:</p>
-<svg class="diagram" viewBox="0 0 520 210" role="img" aria-label="Bar chart of typical error. Average of 1 reading: 0.503. Of 4: 0.227. Of 16: 0.117. Of 64: 0.056. Four times as many readings halves the error.">
-  <g font-size="14" text-anchor="end" style="fill:var(--fg)">
-    <text x="110" y="38">1 reading</text><text x="110" y="83">4 readings</text><text x="110" y="128">16 readings</text><text x="110" y="173">64 readings</text>
-  </g>
-  <g style="fill:var(--ok)">
-    <rect x="120" y="22" width="300" height="24" rx="4"/><rect x="120" y="67" width="135" height="24" rx="4"/><rect x="120" y="112" width="70" height="24" rx="4"/><rect x="120" y="157" width="33" height="24" rx="4"/>
-  </g>
-  <g font-size="14" font-weight="700" style="fill:var(--fg)">
-    <text x="428" y="39">0.503</text><text x="263" y="84">0.227</text><text x="198" y="129">0.117</text><text x="161" y="174">0.056</text>
-  </g>
-  <text x="120" y="204" font-size="13" style="fill:var(--muted)">4× as many readings → about half the error</text>
+<svg class="diagram" viewBox="0 0 340 200" role="img" aria-label="Bar chart of typical error. Average of 1 reading: 0.503. Of 4: 0.227. Of 16: 0.117. Of 64: 0.056. Four times as many readings halves the error.">
+  <text x="96" y="33" text-anchor="end" font-size="15" style="fill:var(--fg)">1 reading</text><rect x="104" y="14" width="190" height="26" rx="4" style="fill:var(--ok)"/><text x="300" y="33" font-size="15" font-weight="700" style="fill:var(--fg)">0.503</text><text x="96" y="75" text-anchor="end" font-size="15" style="fill:var(--fg)">4 readings</text><rect x="104" y="56" width="86" height="26" rx="4" style="fill:var(--ok)"/><text x="196" y="75" font-size="15" font-weight="700" style="fill:var(--fg)">0.227</text><text x="96" y="117" text-anchor="end" font-size="15" style="fill:var(--fg)">16 readings</text><rect x="104" y="98" width="44" height="26" rx="4" style="fill:var(--ok)"/><text x="154" y="117" font-size="15" font-weight="700" style="fill:var(--fg)">0.117</text><text x="96" y="159" text-anchor="end" font-size="15" style="fill:var(--fg)">64 readings</text><rect x="104" y="140" width="21" height="26" rx="4" style="fill:var(--ok)"/><text x="131" y="159" font-size="15" font-weight="700" style="fill:var(--fg)">0.056</text>
+  <text x="4" y="192" font-size="14" style="fill:var(--muted)">4× as many readings → about half the error</text>
 </svg>
+<p><strong>Noise wobbles both ways, bias leans one way.</strong> Right next to a wall the true distance is 0, and a reading can't go below 0. So the wobble can only push it up, and the average comes out a little too big. Here are 16 real readings with noise 0.5 (seed 1):</p>
+<svg class="diagram" viewBox="0 0 340 246" role="img" aria-label="Two dot plots of 16 readings each. Top: true distance 3, dots spread on both sides, average 2.98. Bottom: true distance 0, next to a wall. Readings can't go below 0, so 9 pile up at 0 and the rest lean to the right. Their average is 0.12, not 0.">
+  <text x="4" y="20" font-size="15" font-weight="700" style="fill:var(--fg)">True 3: noise wobbles both ways</text>
+  <circle cx="85" cy="48" r="5" style="fill:var(--idea)" opacity=".85"/><circle cx="251" cy="59" r="5" style="fill:var(--idea)" opacity=".85"/><circle cx="232" cy="70" r="5" style="fill:var(--idea)" opacity=".85"/><circle cx="113" cy="48" r="5" style="fill:var(--idea)" opacity=".85"/><circle cx="169" cy="59" r="5" style="fill:var(--idea)" opacity=".85"/><circle cx="158" cy="70" r="5" style="fill:var(--idea)" opacity=".85"/><circle cx="205" cy="48" r="5" style="fill:var(--idea)" opacity=".85"/><circle cx="237" cy="59" r="5" style="fill:var(--idea)" opacity=".85"/><circle cx="75" cy="70" r="5" style="fill:var(--idea)" opacity=".85"/><circle cx="60" cy="48" r="5" style="fill:var(--idea)" opacity=".85"/><circle cx="248" cy="59" r="5" style="fill:var(--idea)" opacity=".85"/><circle cx="154" cy="70" r="5" style="fill:var(--idea)" opacity=".85"/><circle cx="231" cy="48" r="5" style="fill:var(--idea)" opacity=".85"/><circle cx="54" cy="59" r="5" style="fill:var(--idea)" opacity=".85"/><circle cx="157" cy="70" r="5" style="fill:var(--idea)" opacity=".85"/><circle cx="222" cy="48" r="5" style="fill:var(--idea)" opacity=".85"/>
+  <line x1="20" y1="84" x2="320" y2="84" stroke-width="2" style="stroke:var(--muted)"/>
+  <line x1="170" y1="34" x2="170" y2="90" stroke-width="4" stroke="#3e7bfa"/>
+  <line x1="166" y1="34" x2="166" y2="90" stroke-width="3" stroke-dasharray="5 4" stroke="#e5484d"/>
+  <text x="170" y="106" font-size="15" text-anchor="middle" fill="#3e7bfa" font-weight="700">3</text>
+  <text x="318" y="106" font-size="15" text-anchor="end" fill="#e5484d" font-weight="700">average 2.98</text>
+  <text x="4" y="130" font-size="15" font-weight="700" style="fill:var(--fg)">True 0, at a wall: it can only lean up</text>
+  <rect x="20" y="140" width="150" height="74" style="fill:var(--line)" opacity=".7"/>
+  <text x="95" y="176" font-size="14" text-anchor="middle" style="fill:var(--muted)">below 0:</text>
+  <text x="95" y="192" font-size="14" text-anchor="middle" style="fill:var(--muted)">impossible</text>
+  <circle cx="251" cy="196" r="5" style="fill:var(--idea)" opacity=".85"/><circle cx="232" cy="207" r="5" style="fill:var(--idea)" opacity=".85"/><circle cx="205" cy="196" r="5" style="fill:var(--idea)" opacity=".85"/><circle cx="237" cy="207" r="5" style="fill:var(--idea)" opacity=".85"/><circle cx="248" cy="196" r="5" style="fill:var(--idea)" opacity=".85"/><circle cx="231" cy="207" r="5" style="fill:var(--idea)" opacity=".85"/><circle cx="222" cy="196" r="5" style="fill:var(--idea)" opacity=".85"/>
+  <line x1="20" y1="214" x2="320" y2="214" stroke-width="2" style="stroke:var(--muted)"/>
+  <line x1="170" y1="138" x2="170" y2="220" stroke-width="4" stroke="#3e7bfa"/>
+  <circle cx="170" cy="206" r="3.5" style="fill:var(--idea);stroke:var(--card)" stroke-width="1.5"/><circle cx="170" cy="199" r="3.5" style="fill:var(--idea);stroke:var(--card)" stroke-width="1.5"/><circle cx="170" cy="192" r="3.5" style="fill:var(--idea);stroke:var(--card)" stroke-width="1.5"/><circle cx="170" cy="185" r="3.5" style="fill:var(--idea);stroke:var(--card)" stroke-width="1.5"/><circle cx="170" cy="178" r="3.5" style="fill:var(--idea);stroke:var(--card)" stroke-width="1.5"/><circle cx="170" cy="171" r="3.5" style="fill:var(--idea);stroke:var(--card)" stroke-width="1.5"/><circle cx="170" cy="164" r="3.5" style="fill:var(--idea);stroke:var(--card)" stroke-width="1.5"/><circle cx="170" cy="157" r="3.5" style="fill:var(--idea);stroke:var(--card)" stroke-width="1.5"/><circle cx="170" cy="150" r="3.5" style="fill:var(--idea);stroke:var(--card)" stroke-width="1.5"/>
+  <line x1="197" y1="138" x2="197" y2="220" stroke-width="3" stroke-dasharray="5 4" stroke="#e5484d"/>
+  <text x="170" y="238" font-size="15" text-anchor="middle" fill="#3e7bfa" font-weight="700">0</text>
+  <text x="318" y="238" font-size="15" text-anchor="end" fill="#e5484d" font-weight="700">average 0.12</text>
+</svg>
+<p>Averaging cancels noise, but not bias. You'll see this bias in your robot's <code>look</code>.</p>
 <p>Why only half? The ups and downs only <em>partly</em> cancel. And averaging costs time: a moving robot can't wait for 64 readings. Engineers pick a balance. Your robot uses 16.</p>
 </div>
 
 <h2 id="play">2. Play</h2>
 <div class="box play"><span class="tag">🎮 Play</span>
 <p>Click a floor square to place the robot, pick a direction, and take readings. The true distance uses the same loop as your <code>distance_to_wall</code>; the noise is the same as your <code>noisy_reading</code>.</p>
-<div class="card demo">
-<canvas id="room" width="700" height="400" style="height:auto" aria-label="The robot's room; click a floor square to place the robot"></canvas>
+<div class="demo">
+<div class="room" id="room" data-robot="1,1" data-blocks="red:2,1 blue:6,3 green:1,5"></div>
 <p><button id="dN">Face N</button> <button id="dS">Face S</button> <button id="dE">Face E</button> <button id="dW">Face W</button></p>
-<canvas id="line" width="700" height="150" style="height:auto" aria-label="Number line showing each reading, their average and the true distance"></canvas>
+<svg id="line" class="diagram" viewBox="0 0 340 112" role="img" aria-label="Number line showing each reading, their average and the true distance"></svg>
 <label for="noise">Noise (± squares of wobble): <span id="noisev" class="num"></span></label>
 <input id="noise" type="range" min="0" max="2" step="0.1" value="1">
 <label for="nr">N, readings to average: <span id="nrv" class="num"></span></label>
@@ -95,7 +102,7 @@
   <div class="stat"><div class="k">This error</div><div class="v" id="errv">–</div></div>
   <div class="stat"><div class="k">Typical error (500 tries)</div><div class="v" id="typv">–</div></div>
 </div>
-<p class="legend">Dots: single readings. <b class="f">Red line</b>: their average. <b class="p">Blue line</b>: the truth.</p>
+<p class="legend">Purple dots: single readings. <b style="color:#e5484d">Dashed red line</b>: their average. <b style="color:#3e7bfa">Blue line</b>: the truth.</p>
 </div>
 <p>Press ten times with N = 1 and watch the red line jump. Then N = 16, then 64. Then face a wall right next to the robot: why do the dots pile up at 0?</p>
 </div>
@@ -186,12 +193,13 @@ average of 64 readings -> typical error 0.056</code></pre>
 <p><strong>New Python:</strong> <code>f"{x:.1f}"</code> shows a number with 1 decimal place.</p>
 <div class="box stuck"><span class="tag">🆘 Stuck?</span>
 <details><summary>Hint 1</summary><p>Put this import inside the method (<code>random</code> is already imported):</p><pre><code>from lesson02_sensors import distance_to_wall, smoothed_reading</code></pre></details>
-<details><summary>Hint 2</summary><p>Two dictionaries: the true distances (Part B needs them) and what the sensor sees.</p><pre><code>true = {}
+<details><summary>Hint 2</summary><p>Keep two dictionaries, one entry per direction: <code>true</code> holds the real distances (Part B needs them) and <code>seen</code> holds what the sensor says. Make <code>seen</code> from <code>true</code>, with <code>random.Random()</code> as the rng.</p></details>
+<details><summary>Hint 3: fill in the blanks</summary><pre><code>true = {}
 seen = {}
 for k in "NESW":
-    true[k] = distance_to_wall(ROOM, self.pos, k)
-    seen[k] = smoothed_reading(true[k], 0.5, 16, random.Random())</code></pre></details>
-<details><summary>Hint 3: fill in the blanks</summary><pre><code>return f"Walls (average of 16 readings): north {seen['N']:.1f}, east {____}, south {____}, west {____}."</code></pre></details>
+    true[k] = distance_to_wall(ROOM, self.pos, ____)
+    seen[k] = smoothed_reading(true[k], 0.5, ____, random.Random())
+return f"Walls (average of 16 readings): north {seen['N']:.1f}, east {____}, south {____}, west {____}."</code></pre></details>
 </div>
 <div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
 <p><code>python3 check.py robot</code> from <code>project</code>. Real output:</p>
@@ -207,20 +215,22 @@ for k in "NESW":
 
 Zippy&gt; look
   Walls (average of 16 readings): north 0.1, east 7.0, south 5.0, west 0.1.</code></pre>
-<p>Yours will wobble a little too: <code>random.Random()</code> has no seed. Notice north says 0.1, not 0. A reading can't go below 0, so next to a wall the wobble can only push it up. That's a small <em>bias</em>, and averaging can't fix it.</p>
+<p>Yours will wobble a little too: <code>random.Random()</code> has no seed. Notice north says 0.1, not 0: that's the bias from the picture in "The idea". Averaging can't fix it.</p>
 <p><strong>If you see</strong> <code>✗ week 2: look: at the start the walls are about north 0, east 7, south 5, west 0</code>, check the order of your four numbers.</p>
 </div>
 </div>
 
 <h2 id="challenge">5. Real-world challenge: be the noisy sensor</h2>
+<div class="box world"><span class="tag">🌍 Real-world challenge</span>
 <ol class="steps">
 <li>Pick a hallway or garden. Pace it out 16 times, writing down each count. Don't measure it yet.</li>
 <li>Now measure it with a tape measure, and measure one of your steps. Turn each count into metres.</li>
 <li>Find the error of each single pace-out, |reading − true|, and average them: that's N = 1.</li>
 <li>Split the 16 into four groups of 4. Average each group, find its error, and average those: that's N = 4. Then all 16 together.</li>
 </ol>
-<div class="card note"><strong>On your own:</strong> this works alone. No hallway? Measure your desk 16 times with a short ruler you have to move along.</div>
+<p><strong>On your own:</strong> this works alone. No hallway? Measure your desk 16 times with a short ruler you have to move along.</p>
 <p>The error should shrink as N grows. If it doesn't, look for a <em>bias</em>: maybe all your paces were short. Averaging cancels wobble, not a sensor that's always wrong the same way.</p>
+</div>
 
 <h2 id="check">Check yourself</h2>
 <details><summary>What's the difference between noise and bias?</summary><p>Noise wobbles up and down; averaging cancels it. Bias pushes every reading the same way; you fix it by calibrating against a known true value.</p></details>
@@ -259,8 +269,8 @@ rng = random.Random(1); print(rng.uniform(-1, 1))   # -0.7312715117751976 again<
 <footer>Build a Robot Brain · Week 2 of 16 · Part A</footer>
 </main>
 
+<script src="room.js"></script>
 <script>
-const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 // Copied exactly from world.py
 const ROOM = [
   "##########",
@@ -298,12 +308,9 @@ function averageError(t, noise, n, trials, rng) {
   const e = []; for (let i = 0; i < trials; i++) e.push(Math.abs(smoothedReading(t, noise, n, rng) - t)); return average(e);
 }
 
-const room = document.getElementById('room'), rc = room.getContext('2d');
-const line = document.getElementById('line'), lc = line.getContext('2d');
+const roomEl = document.getElementById('room'), line = document.getElementById('line');
 const noiseIn = document.getElementById('noise'), nIn = document.getElementById('nr');
 let pos = [1, 1], dir = 'E', last = null, rng = makeRng(1);
-
-function geom() { const cs = Math.min(room.width / 10, room.height / 8); return { cs, ox: (room.width - cs * 10) / 2, oy: (room.height - cs * 8) / 2 }; }
 
 function take() {
   const t = distanceToWall(ROOM, pos, dir), noise = +noiseIn.value, n = +nIn.value;
@@ -312,42 +319,36 @@ function take() {
   draw();
 }
 
-function drawRoom() {
-  const { cs, ox, oy } = geom(), t = distanceToWall(ROOM, pos, dir), [dx, dy] = DIRECTIONS[dir];
-  rc.clearRect(0, 0, room.width, room.height);
-  rc.textAlign = 'center'; rc.textBaseline = 'middle';
-  for (let y = 0; y < 8; y++) for (let x = 0; x < 10; x++) {
-    const c = ROOM[y][x], px = ox + x * cs, py = oy + y * cs;
-    rc.fillStyle = c === '#' ? css('--muted') : css('--card');
-    rc.fillRect(px, py, cs, cs); rc.strokeStyle = css('--line'); rc.strokeRect(px, py, cs, cs);
-    if (c === 'B') { rc.fillStyle = css('--fg'); rc.font = 'bold 18px sans-serif'; rc.fillText('B', px + cs / 2, py + cs / 2); }
-  }
-  for (let i = 1; i <= t; i++) {
-    const x = pos[0] + dx * i, y = pos[1] + dy * i;
-    rc.fillStyle = css('--accent-soft'); rc.fillRect(ox + x * cs + 2, oy + y * cs + 2, cs - 4, cs - 4);
-    rc.fillStyle = css('--accent'); rc.font = '14px sans-serif'; rc.fillText(i, ox + x * cs + cs / 2, oy + y * cs + cs / 2);
-  }
-  const cx = ox + pos[0] * cs + cs / 2, cy = oy + pos[1] * cs + cs / 2;
-  rc.fillStyle = css('--accent'); rc.beginPath(); rc.arc(cx, cy, cs * 0.33, 0, 7); rc.fill();
-  rc.strokeStyle = css('--bg'); rc.lineWidth = 3; rc.beginPath(); rc.moveTo(cx, cy); rc.lineTo(cx + dx * cs * 0.3, cy + dy * cs * 0.3); rc.stroke(); rc.lineWidth = 1;
+// The beam drawn on a room.js picture: dashed line, numbered free squares, red ring on the wall it hits
+function beamSvg(p, d) {
+  const t = distanceToWall(ROOM, p, d), [dx, dy] = DIRECTIONS[d], S = 40, c = v => v * S + S / 2;
+  const ex = c(p[0] + dx * (t + 0.5)), ey = c(p[1] + dy * (t + 0.5));
+  let g = `<line x1="${c(p[0]) + dx * 14}" y1="${c(p[1]) + dy * 14}" x2="${ex}" y2="${ey}" style="stroke:var(--idea)" stroke-width="3" stroke-dasharray="6 5"/>`;
+  g += '<g font-size="16" font-weight="700" text-anchor="middle" paint-order="stroke" style="fill:var(--idea);stroke:var(--floor)" stroke-width="4">';
+  for (let i = 1; i <= t; i++) g += `<text x="${c(p[0] + dx * i) + (dy ? 12 : 0)}" y="${c(p[1] + dy * i) + (dx ? -6 : 6)}">${i}</text>`;
+  return g + '</g>';
+}
+function wallHit(p, d) { const t = distanceToWall(ROOM, p, d), [dx, dy] = DIRECTIONS[d]; return `${p[0] + dx * (t + 1)},${p[1] + dy * (t + 1)}`; }
+
+function drawRoomPic() {
+  roomEl.dataset.robot = pos.join(',');
+  roomEl.dataset.mark = wallHit(pos, dir);
+  drawRoom(roomEl);
+  roomEl.querySelector('svg').insertAdjacentHTML('beforeend', beamSvg(pos, dir));
 }
 
 function drawLine() {
-  const W = line.width, H = line.height, pad = 30, noise = +noiseIn.value;
+  const W = 340, pad = 20, noise = +noiseIn.value;
   const t = distanceToWall(ROOM, pos, dir), max = Math.max(8, Math.ceil(t + noise + 1));
-  const X = v => pad + (W - 2 * pad) * v / max, axisY = H - 40;
-  lc.clearRect(0, 0, W, H);
-  lc.strokeStyle = css('--line'); lc.beginPath(); lc.moveTo(pad, axisY); lc.lineTo(W - pad, axisY); lc.stroke();
-  lc.fillStyle = css('--muted'); lc.font = '12px sans-serif'; lc.textAlign = 'center';
-  for (let i = 0; i <= max; i++) { lc.fillRect(X(i), axisY, 1, 6); lc.fillText(i, X(i), axisY + 20); }
-  lc.strokeStyle = css('--pass'); lc.lineWidth = 3; lc.beginPath(); lc.moveTo(X(t), 14); lc.lineTo(X(t), axisY); lc.stroke();
+  const X = v => pad + (W - 2 * pad) * v / max, axisY = 84;
+  let g = `<line x1="${pad}" y1="${axisY}" x2="${W - pad}" y2="${axisY}" style="stroke:var(--muted)" stroke-width="2"/>`;
+  for (let i = 0; i <= max; i++) g += `<line x1="${X(i)}" y1="${axisY}" x2="${X(i)}" y2="${axisY + 6}" style="stroke:var(--muted)"/><text x="${X(i)}" y="${axisY + 24}" font-size="15" text-anchor="middle" style="fill:var(--muted)">${i}</text>`;
+  g += `<line x1="${X(t)}" y1="8" x2="${X(t)}" y2="${axisY}" stroke="#3e7bfa" stroke-width="4"/>`;
   if (last && last.t === t) {
-    lc.fillStyle = css('--fg'); lc.globalAlpha = 0.55;
-    last.readings.forEach((r, i) => { lc.beginPath(); lc.arc(X(r), axisY - 12 - (i % 8) * 8, 4, 0, 7); lc.fill(); });
-    lc.globalAlpha = 1;
-    lc.strokeStyle = css('--fail'); lc.beginPath(); lc.moveTo(X(last.avg), 14); lc.lineTo(X(last.avg), axisY); lc.stroke();
+    last.readings.forEach((r, i) => { g += `<circle cx="${X(r)}" cy="${axisY - 8 - (i % 8) * 8}" r="4" style="fill:var(--idea)" opacity=".6"/>`; });
+    g += `<line x1="${X(last.avg)}" y1="8" x2="${X(last.avg)}" y2="${axisY}" stroke="#e5484d" stroke-width="4" stroke-dasharray="6 4"/>`;
   }
-  lc.lineWidth = 1;
+  line.innerHTML = g;
 }
 
 function draw() {
@@ -359,22 +360,24 @@ function draw() {
   document.getElementById('readv').textContent = last ? last.avg.toFixed(2) : '–';
   document.getElementById('errv').textContent = last ? Math.abs(last.avg - t).toFixed(2) : '–';
   document.getElementById('typv').textContent = averageError(t, noise, n, 500, makeRng(0)).toFixed(3);
-  drawRoom(); drawLine();
+  drawRoomPic(); drawLine();
 }
 
-room.addEventListener('click', e => {
-  const r = room.getBoundingClientRect(), { cs, ox, oy } = geom();
-  const x = Math.floor(((e.clientX - r.left) * room.width / r.width - ox) / cs);
-  const y = Math.floor(((e.clientY - r.top) * room.height / r.height - oy) / cs);
+roomEl.addEventListener('click', e => {
+  const r = roomEl.querySelector('svg').getBoundingClientRect();
+  const x = Math.floor((e.clientX - r.left) / r.width * 10), y = Math.floor((e.clientY - r.top) / r.height * 8);
   if (isFree(ROOM, [x, y])) { pos = [x, y]; last = null; draw(); }
 });
 ['N', 'S', 'E', 'W'].forEach(d => document.getElementById('d' + d).onclick = () => { dir = d; last = null; draw(); });
 document.getElementById('take').onclick = take;
 noiseIn.oninput = () => { last = null; draw(); };
 nIn.oninput = () => { last = null; draw(); };
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
-draw();
+// The idea picture, and the demo, drawn after room.js has drawn every room
+const beamEl = document.getElementById('beam');
+function drawBeam() { drawRoom(beamEl); beamEl.querySelector('svg').insertAdjacentHTML('beforeend', beamSvg([1, 1], 'E')); }
+const all = () => { drawBeam(); draw(); };
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', all);
+document.addEventListener('DOMContentLoaded', all);
 </script>
-<script src="room.js"></script>
 </body>
 </html>

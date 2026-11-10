@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Week 14 · Faster and cheaper</title>
 <link rel="stylesheet" href="../../style.css?v=16">
+<style>
+@media (max-width: 480px) { .kid dl { grid-template-columns: 1fr; gap: 2px; } .kid dd { margin-bottom: 8px; } }
+#journey details { margin: 8px 0 0; padding: 6px 12px; }
+</style>
 </head>
 <body>
 <main>
@@ -13,7 +17,7 @@
 <div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 14 of 16 · Part A</div>
 <h1>Faster and cheaper: caching, quantising and distilling</h1>
 <p class="lede">Three tricks every AI company uses to get closer to "smart <em>and</em> fast". You build all three, and find the catch in each.</p>
-<div class="card note" id="journey"><strong>Week 14 of 16 · Part A.</strong> So far your robot: ✓ moves ✓ looks ✓ reads phone data ✓ stops for the cat ✓ plans routes ✓ fuses sensors ✓ understands sentences ✓ writes plans ✓ drives on wheels ✓ checks every action ✓ maps the room ✓ finds itself ✓ times its thinking. <strong>Today</strong> it learns from a teacher, then shrinks to an eighth of its size. Next: <a href="13-lora.html">Week 14 · Part B: fine-tuning and LoRA</a>. <a href="index.html#my-robot">Your robot, week by week</a>.</div>
+<div class="card note" id="journey"><strong>Week 14 of 16 · Part A.</strong> <strong>Today</strong> it learns from a teacher, then shrinks to an eighth of its size. Next: <a href="13-lora.html">Week 14 · Part B: fine-tuning and LoRA</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<details><summary>So far your robot: 13 skills ✓</summary>✓ moves ✓ looks ✓ reads phone data ✓ stops for the cat ✓ plans routes ✓ fuses sensors ✓ understands sentences ✓ writes plans ✓ drives on wheels ✓ checks every action ✓ maps the room ✓ finds itself ✓ times its thinking.</details></div>
 
 <div class="facts">
   <div><b>Time</b>2 hours</div>
@@ -52,7 +56,7 @@
 </div>
 
 <div class="box idea"><span class="tag">💡 Quantising: a ruler with fewer marks</span>
-<p>Imagine a ruler with only a few marks. You round every measurement to the nearest mark, and only write down which mark it was. Fewer marks means fewer bits, but bigger jumps. With <em>b</em> bits the marks are the whole numbers from −top to +top, where top = 2<sup>b−1</sup> − 1 (4 bits: 7). The <strong>scale</strong> is the gap between marks, chosen so the biggest number lands on the top mark.</p>
+<p>Imagine a ruler with only a few marks. You round every measurement to the nearest mark, and only write down which mark it was. Fewer marks means fewer bits, but bigger jumps. <b>8 bits: 255 marks. 4 bits: 15 marks. 2 bits: just 3.</b></p>
 <svg class="diagram" viewBox="0 0 520 220" role="img" aria-label="Two rulers from minus 0.7 to plus 0.7. The 4-bit ruler has 15 marks 0.1 apart, and minus 0.35 snaps to minus 0.4. The 2-bit ruler has 3 marks, and minus 0.35 snaps to 0, wiped out.">
   <text x="10" y="30" font-size="14" font-weight="700" fill="var(--fg)">4 bits: 15 marks, scale 0.1</text>
   <line x1="50" y1="70" x2="470" y2="70" stroke="var(--fg)" stroke-width="2"/>
@@ -70,12 +74,18 @@
   <text x="300" y="154" font-size="13" fill="var(--fail)" font-weight="700">→ 0 (wiped out)</text>
   <defs><marker id="ah17" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="var(--muted)"/></marker></defs>
 </svg>
-<p>Real result on week 8's attention model (2,702 numbers):</p>
+<p>Real result on week 8's attention model (2,702 numbers). Blue: how big the model is. Green: how many held-out plans it still gets right.</p>
+<svg class="diagram" viewBox="0 0 320 236" role="img" aria-label="Size and score for each bit width. The size bar shrinks from 10808 bytes at 32 bits to 676 at 2 bits. The score stays at 92% for 32, 8 and 4 bits, drops to 80% at 3 bits and 8% at 2 bits.">
+<text x="54" y="20" font-size="14" font-weight="700" fill="var(--play)">size</text><text x="216" y="20" font-size="14" font-weight="700" fill="var(--ok)">plans right</text>
+<text x="4" y="50" font-size="14" font-weight="700" fill="var(--fg)">32-bit</text><rect x="54" y="34" width="100.0" height="22" rx="4" fill="var(--play)" opacity=".75"/><text x="158.0" y="50" font-size="13" fill="var(--fg)">10808 B</text><rect x="216" y="34" width="92" height="22" rx="4" fill="var(--ok)"/><text x="304" y="50" font-size="13" font-weight="700" text-anchor="end" fill="var(--card)">92%</text><text x="4" y="86" font-size="14" font-weight="700" fill="var(--fg)">8-bit</text><rect x="54" y="70" width="25.0" height="22" rx="4" fill="var(--play)" opacity=".75"/><text x="83.0" y="86" font-size="13" fill="var(--fg)">2702 B</text><rect x="216" y="70" width="92" height="22" rx="4" fill="var(--ok)"/><text x="304" y="86" font-size="13" font-weight="700" text-anchor="end" fill="var(--card)">92%</text><text x="4" y="122" font-size="14" font-weight="700" fill="var(--fg)">4-bit</text><rect x="54" y="106" width="12.5" height="22" rx="4" fill="var(--play)" opacity=".75"/><text x="70.5" y="122" font-size="13" fill="var(--fg)">1351 B</text><rect x="216" y="106" width="92" height="22" rx="4" fill="var(--ok)"/><text x="304" y="122" font-size="13" font-weight="700" text-anchor="end" fill="var(--card)">92%</text><text x="4" y="158" font-size="14" font-weight="700" fill="var(--fg)">3-bit</text><rect x="54" y="142" width="9.4" height="22" rx="4" fill="var(--play)" opacity=".75"/><text x="67.4" y="158" font-size="13" fill="var(--fg)">1013 B</text><rect x="216" y="142" width="80" height="22" rx="4" fill="var(--build)"/><text x="292" y="158" font-size="13" font-weight="700" text-anchor="end" fill="var(--card)">80%</text><text x="4" y="194" font-size="14" font-weight="700" fill="var(--fg)">2-bit</text><rect x="54" y="178" width="6.3" height="22" rx="4" fill="var(--play)" opacity=".75"/><text x="64.3" y="194" font-size="13" fill="var(--fg)">676 B</text><rect x="216" y="178" width="8" height="22" rx="4" fill="var(--fail)"/><text x="228" y="194" font-size="13" font-weight="700" fill="var(--fail)">8%</text>
+<text x="4" y="230" font-size="14" font-weight="700" fill="var(--ok)">4 bits: 8× smaller, still 92%</text>
+</svg>
+<details><summary>The real numbers, with the robot bake-off</summary>
 <pre><code>32-bit:   10808 bytes   held-out plans  92%   robot bake-off  8/12
  8-bit:    2702 bytes   held-out plans  92%   robot bake-off  8/12
  4-bit:    1351 bytes   held-out plans  92%   robot bake-off  8/12
  3-bit:    1013 bytes   held-out plans  80%   robot bake-off  7/12
- 2-bit:     676 bytes   held-out plans   8%   robot bake-off  4/12</code></pre>
+ 2-bit:     676 bytes   held-out plans   8%   robot bake-off  4/12</code></pre></details>
 <p>8 and 4 bits are free wins: 8× smaller, no loss. At 3 bits the close calls flip first (colours go wrong). At 2 bits it writes nonsense.</p>
 </div>
 
@@ -97,11 +107,18 @@
   <text x="150" y="177" font-size="12" fill="var(--muted)">the student learns the mistake too</text>
   <defs><marker id="ah17b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="var(--muted)"/></marker></defs>
 </svg>
-<p>Real result: three students, each also tested on 6 harder commands ("hard-6") and on the robot:</p>
+<p>Real result: three students. Each is tested on the usual held-out plans (an easy test) and on 6 harder commands ("hard-6"):</p>
+<svg class="diagram" viewBox="0 0 320 236" role="img" aria-label="Three students. Usual data only: 92% plans, 83% hard-6. With the word counter's labels: 94% plans, the best, but 67% hard-6, the worst. With a careful human's labels: 90% plans, 100% hard-6.">
+<rect x="4" y="2" width="14" height="14" rx="3" fill="var(--play)"/><text x="22" y="14" font-size="13" fill="var(--fg)">easy test (plans)</text>
+<rect x="150" y="2" width="14" height="14" rx="3" fill="var(--build)"/><text x="168" y="14" font-size="13" fill="var(--fg)">hard-6</text>
+<text x="4" y="40" font-size="14" font-weight="700" fill="var(--fg)">the usual data only</text><text x="316" y="40" font-size="13" text-anchor="end" fill="var(--muted)">robot 8/12</text><rect x="4" y="46" width="212" height="17" rx="3" fill="var(--play)"/><text x="212" y="59" font-size="13" font-weight="700" text-anchor="end" fill="var(--card)">92%</text><rect x="4" y="66" width="191" height="17" rx="3" fill="var(--build)"/><text x="191" y="79" font-size="13" font-weight="700" text-anchor="end" fill="var(--card)">83%</text><text x="4" y="106" font-size="14" font-weight="700" fill="var(--fg)">+ word counter's labels</text><text x="316" y="106" font-size="13" text-anchor="end" fill="var(--muted)">robot 8/12</text><rect x="4" y="112" width="216" height="17" rx="3" fill="var(--play)"/><text x="216" y="125" font-size="13" font-weight="700" text-anchor="end" fill="var(--card)">94%</text><rect x="4" y="132" width="154" height="17" rx="3" fill="var(--build)"/><text x="154" y="145" font-size="13" font-weight="700" text-anchor="end" fill="var(--card)">67%</text><text x="4" y="172" font-size="14" font-weight="700" fill="var(--fg)">+ careful human's labels</text><text x="316" y="172" font-size="13" text-anchor="end" fill="var(--muted)">robot 10/12</text><rect x="4" y="178" width="207" height="17" rx="3" fill="var(--play)"/><text x="207" y="191" font-size="13" font-weight="700" text-anchor="end" fill="var(--card)">90%</text><rect x="4" y="198" width="230" height="17" rx="3" fill="var(--build)"/><text x="230" y="211" font-size="13" font-weight="700" text-anchor="end" fill="var(--card)">100%</text>
+<text x="4" y="232" font-size="13" font-weight="700" fill="var(--fail)">Word counter: best on easy, worst on hard</text>
+</svg>
+<details><summary>The real numbers</summary>
 <pre><code>student (attention model) trained on       plans  hard-6  robot
 the usual data only                         92%    83%   8/12
 + 24 labels from word counter (Lesson 9)    94%    67%   8/12
-+ 24 labels from a careful human            90%   100%  10/12</code></pre>
++ 24 labels from a careful human            90%   100%  10/12</code></pre></details>
 <p>The word counter labelled "where's …" commands as <em>put</em>, and its student believed it. The careful human's student gets 10/12. Notice the easy held-out test ranked the <em>worst</em> teacher first: only the harder tests showed the truth.</p>
 </div>
 
@@ -245,11 +262,14 @@ return out</code></pre></details>
    the usual data only                         92%    83%  ? /12
    + 24 labels from word counter (Lesson 9)    94%    67%  ? /12
    + 24 labels from a careful human            90%   100%  ? /12</code></pre>
-<p>The <code>?</code> becomes a robot score once you write the bake-off scorer in <a href="19-bakeoff.html">week 15</a>. The scores are the ones in the idea boxes above. Without the stretch, your student is the plain tiny LM and some rows differ (on our computer: 3-bit 74%, 2-bit 6%, and the careful human's student 82% plans, still 100% hard-6).</p>
+<p><b>Compare three lines:</b> <code>hit rate 38%</code>, the <code>4-bit</code> line (<code>92%</code>), and the careful human's student (<code>100%</code> hard-6). The <code>?</code> becomes a robot score once you write the bake-off scorer in <a href="19-bakeoff.html">week 15</a>.</p>
 <p>Then <code>cd ..</code> and <code>python3 check.py 17</code>. All green ends with:</p>
 <pre><code>  ✓ distill_examples
   6/6 passed  🎉 lesson complete!</code></pre>
 <p>If you see <code>✗ cache_key: a different world must give a different key</code>, you left the world out: that's the stale-answer bug.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 My numbers are a bit different</span>
+<details><summary>I didn't do the week 8 attention stretch</summary><p>Then your student is the plain tiny LM, and some rows differ. On our computer: 3-bit 74%, 2-bit 6%, and the careful human's student 82% plans, still 100% hard-6.</p></details>
 </div>
 <!-- CLAUDE-RESULTS -->
 

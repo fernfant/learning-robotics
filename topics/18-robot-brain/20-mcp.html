@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bonus · Give any AI app your robot</title>
 <link rel="stylesheet" href="../../style.css?v=16">
+<style>
+@media (max-width: 480px) { .kid dl { grid-template-columns: 1fr; gap: 2px; } .kid dd { margin-bottom: 8px; } }
+#journey details { margin: 8px 0 0; padding: 6px 12px; }
+</style>
 </head>
 <body>
 <main>
@@ -13,7 +17,7 @@
 <div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Bonus (after week 15 · Part A)</div>
 <h1>Give any AI app your robot: MCP</h1>
 <p class="lede">One standard plug, so any AI app can drive your robot, and a fuse on your side that no AI can talk its way past.</p>
-<div class="card note" id="journey"><strong>Bonus (after week 15 · Part A).</strong> So far your robot: ✓ moves ✓ senses ✓ reads real phone data ✓ stops for the cat ✓ plans routes ✓ steadies its angle ✓ understands commands ✓ writes plans ✓ drives on wheels ✓ checks every action ✓ maps the room ✓ finds itself ✓ knows its thinking speed ✓ learns from a teacher ✓ can ask Claude (with a key). <strong>Today</strong> it learns to let any AI app drive it, with rules it can't break. Next: <a href="19-bakeoff.html">Week 15 · Part B: the bake-off</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> nothing new to add this time (<a href="#add-to-robot">here's how it relates</a>).<br><strong>Ask an adult today:</strong> installing a package with pip, and any AI app that needs an account.</div>
+<div class="card note" id="journey"><strong>Bonus (after week 15 · Part A).</strong> <strong>Today</strong> it learns to let any AI app drive it, with rules it can't break. Next: <a href="19-bakeoff.html">Week 15 · Part B: the bake-off</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> nothing new to add this time (<a href="#add-to-robot">here's how it relates</a>).<br><strong>Ask an adult today:</strong> installing a package with pip, and any AI app that needs an account.<details><summary>So far your robot: 15 skills ✓</summary>✓ moves ✓ senses ✓ reads real phone data ✓ stops for the cat ✓ plans routes ✓ steadies its angle ✓ understands commands ✓ writes plans ✓ drives on wheels ✓ checks every action ✓ maps the room ✓ finds itself ✓ knows its thinking speed ✓ learns from a teacher ✓ can ask Claude (with a key).</details></div>
 
 <div class="facts">
   <div><b>Time</b>2–3 hours</div>
@@ -63,15 +67,20 @@
   <path d="M200 278 L200 306" style="stroke:var(--muted);stroke-width:3"/>
   <text x="200" y="330" text-anchor="middle" style="font:600 16px sans-serif;fill:var(--fg)">🤖 robot moves</text>
 </svg>
-<p><b>Why a standard wins:</b> 3 apps and 4 things to control need 3 × 4 = 12 adapters without one, but only 3 + 4 = 7 pieces of work with one. With 10 apps and 20 things it's 200 against 30.</p>
+<p><b>Why a standard wins:</b> every app would otherwise need its own adapter for every robot. Count the lines:</p>
+<svg class="diagram" viewBox="0 0 320 240" role="img" aria-label="Without a standard, 3 apps and 4 robots need 12 separate adapters, a tangle of red lines. With MCP in the middle, they need only 3 plus 4, so 7 green lines.">
+<line x1="44" y1="40" x2="118" y2="25" stroke="var(--fail)" stroke-width="1.6"/><line x1="44" y1="40" x2="118" y2="75" stroke="var(--fail)" stroke-width="1.6"/><line x1="44" y1="40" x2="118" y2="125" stroke="var(--fail)" stroke-width="1.6"/><line x1="44" y1="40" x2="118" y2="175" stroke="var(--fail)" stroke-width="1.6"/><line x1="44" y1="100" x2="118" y2="25" stroke="var(--fail)" stroke-width="1.6"/><line x1="44" y1="100" x2="118" y2="75" stroke="var(--fail)" stroke-width="1.6"/><line x1="44" y1="100" x2="118" y2="125" stroke="var(--fail)" stroke-width="1.6"/><line x1="44" y1="100" x2="118" y2="175" stroke="var(--fail)" stroke-width="1.6"/><line x1="44" y1="160" x2="118" y2="25" stroke="var(--fail)" stroke-width="1.6"/><line x1="44" y1="160" x2="118" y2="75" stroke="var(--fail)" stroke-width="1.6"/><line x1="44" y1="160" x2="118" y2="125" stroke="var(--fail)" stroke-width="1.6"/><line x1="44" y1="160" x2="118" y2="175" stroke="var(--fail)" stroke-width="1.6"/><rect x="16" y="28" width="28" height="24" rx="5" fill="var(--play-soft)" stroke="var(--play)"/><text x="30" y="45" font-size="13" text-anchor="middle" fill="var(--play)">app</text><rect x="16" y="88" width="28" height="24" rx="5" fill="var(--play-soft)" stroke="var(--play)"/><text x="30" y="105" font-size="13" text-anchor="middle" fill="var(--play)">app</text><rect x="16" y="148" width="28" height="24" rx="5" fill="var(--play-soft)" stroke="var(--play)"/><text x="30" y="165" font-size="13" text-anchor="middle" fill="var(--play)">app</text><circle cx="130" cy="25" r="12" fill="var(--bot-soft)" stroke="var(--bot)"/><text x="130" y="30" font-size="13" text-anchor="middle">🤖</text><circle cx="130" cy="75" r="12" fill="var(--bot-soft)" stroke="var(--bot)"/><text x="130" y="80" font-size="13" text-anchor="middle">🤖</text><circle cx="130" cy="125" r="12" fill="var(--bot-soft)" stroke="var(--bot)"/><text x="130" y="130" font-size="13" text-anchor="middle">🤖</text><circle cx="130" cy="175" r="12" fill="var(--bot-soft)" stroke="var(--bot)"/><text x="130" y="180" font-size="13" text-anchor="middle">🤖</text><line x1="208" y1="40" x2="234" y2="100" stroke="var(--ok)" stroke-width="2.2"/><line x1="208" y1="100" x2="234" y2="100" stroke="var(--ok)" stroke-width="2.2"/><line x1="208" y1="160" x2="234" y2="100" stroke="var(--ok)" stroke-width="2.2"/><line x1="254" y1="100" x2="282" y2="25" stroke="var(--ok)" stroke-width="2.2"/><line x1="254" y1="100" x2="282" y2="75" stroke="var(--ok)" stroke-width="2.2"/><line x1="254" y1="100" x2="282" y2="125" stroke="var(--ok)" stroke-width="2.2"/><line x1="254" y1="100" x2="282" y2="175" stroke="var(--ok)" stroke-width="2.2"/><circle cx="244" cy="100" r="13" fill="var(--idea)"/><text x="244" y="105" font-size="13" text-anchor="middle" fill="var(--card)" font-weight="700">MCP</text><rect x="180" y="28" width="28" height="24" rx="5" fill="var(--play-soft)" stroke="var(--play)"/><text x="194" y="45" font-size="13" text-anchor="middle" fill="var(--play)">app</text><rect x="180" y="88" width="28" height="24" rx="5" fill="var(--play-soft)" stroke="var(--play)"/><text x="194" y="105" font-size="13" text-anchor="middle" fill="var(--play)">app</text><rect x="180" y="148" width="28" height="24" rx="5" fill="var(--play-soft)" stroke="var(--play)"/><text x="194" y="165" font-size="13" text-anchor="middle" fill="var(--play)">app</text><circle cx="294" cy="25" r="12" fill="var(--bot-soft)" stroke="var(--bot)"/><text x="294" y="30" font-size="13" text-anchor="middle">🤖</text><circle cx="294" cy="75" r="12" fill="var(--bot-soft)" stroke="var(--bot)"/><text x="294" y="80" font-size="13" text-anchor="middle">🤖</text><circle cx="294" cy="125" r="12" fill="var(--bot-soft)" stroke="var(--bot)"/><text x="294" y="130" font-size="13" text-anchor="middle">🤖</text><circle cx="294" cy="175" r="12" fill="var(--bot-soft)" stroke="var(--bot)"/><text x="294" y="180" font-size="13" text-anchor="middle">🤖</text>
+<text x="72" y="214" font-size="14" font-weight="700" text-anchor="middle" fill="var(--fail)">no standard: 12</text>
+<text x="244" y="214" font-size="14" font-weight="700" text-anchor="middle" fill="var(--ok)">with MCP: 3 + 4 = 7</text>
+<text x="160" y="236" font-size="13" text-anchor="middle" fill="var(--muted)">10 apps, 20 robots: 200 against 30</text>
+</svg>
 <p><b>Why a fuse:</b> a charger has its own fuse. It doesn't trust the laptop never to ask for too much. You can't know which AI plugs in, or what it was told. So the rule "never pick up the green block" goes in your server's code, in <code>guard()</code>, which runs before every single tool call. Not in a prompt.</p>
 </div>
 
 <h2 id="play">2. Play with it</h2>
-<div class="box play"><span class="tag">🎮 Play</span><p>You are the AI app. Each button sends one message to a server running in this page, with the same <code>guard()</code> as the Python.</p></div>
+<div class="box play"><span class="tag">🎮 Play · be the AI app</span><p>You are the AI app. Each button sends one message to a server running in this page, with the same <code>guard()</code>, <code>execute_tool()</code> and robot as the Python, and the same messages word for word.</p>
 <div class="card demo">
-<h3>Interactive: be the AI app, talk to the server</h3>
-<p class="legend">You play the AI app. Each button sends one message to the server, which runs in this page with the same <code>guard()</code>, <code>execute_tool()</code> and robot as the Python, and the same messages word for word. Left: the JSON going each way (<b>simplified</b>, like Step 3). Right: the room from <code>world.py</code>, with the cat at (4, 1), and the text <code>lesson20_watch.py</code> would show. Untick and tick the protected blocks to change <code>PROTECTED</code>.</p>
+<p class="legend">Left: the JSON going each way (<b>simplified</b>, like Step 3). Right: the room from <code>world.py</code>, with the cat at (4, 1), and the text <code>lesson20_watch.py</code> would show. Untick and tick the protected blocks to change <code>PROTECTED</code>.</p>
 <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
 <button id="bList">tools/list</button><button id="bLook">look</button>
 <select id="objSel" aria-label="Which block"><option>red block</option><option>blue block</option><option selected>green block</option><option>the cat</option></select>
@@ -102,6 +111,7 @@
 </div>
 </div>
 <p>Try: <code>go_to</code> the green block, then <code>pick_up</code> it. Untick green and try again. Then press <b>Send 40 × look</b> and try anything. Finally press <code>reset_room</code> and watch the call counter. (That's a hole! See "Want to know more?".) The example session is a sequence we wrote to show the shape, not a recording of a real AI.</p>
+</div>
 
 <h2 id="homework">3. Build it</h2>
 <div class="box build"><span class="tag">🛠 Build</span>
@@ -161,6 +171,13 @@ python3 check.py 20</code></pre>
 <p>What we <b>expect</b> (not a recording): Claude Code finds the five tools, asks your permission, then tidies red and blue while the watcher redraws the room. When asked for green, the call is refused, and the reason goes back to Claude. Whatever the model decides, the green block stays on the floor.</p>
 <!-- CLAUDE-RESULTS -->
 </div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint: is it plugged in?</span>
+<ol>
+<li>Run <code>claude mcp list</code>. You should see <code>robo-helper</code> in the list. If it isn't there, step 2 didn't work: check the paths are full paths.</li>
+<li>The watcher shows the room and a <code>calls:</code> line. Each time Claude calls a tool, it redraws and the count goes up. If it only says <code>Waiting for the robot... (Ctrl+C to stop)</code>, Claude hasn't called a tool yet.</li>
+<li>Ask for the green block. The watcher's last line should be:<pre><code>last call: pick_up({'object': 'green block'}) -&gt; REFUSED/FAILED: Refused by the robot's server: the green block is protected: never pick it up.</code></pre>The green block is still on the floor: your guard said no.</li>
+</ol>
+</div>
 
 <h2 id="add-to-robot">4. Add it to your robot</h2>
 <div class="box bot"><span class="tag">🤖 Add it to your robot</span>
@@ -176,6 +193,7 @@ python3 check.py 20</code></pre>
 </div>
 
 <h2 id="real-world">5. Real-world challenge: plug in the TV</h2>
+<div class="box world"><span class="tag">🌍 Real-world challenge · plug in the TV</span>
 <ol class="steps">
 <li><b>Write the plug</b> (that's <code>tools/list</code>): 3–5 tools for the TV, each with a name, inputs and one line: <code>what_is_on()</code>, <code>change_channel(number)</code>, <code>set_volume(0 to 10)</code>, <code>turn_off()</code>.</li>
 <li><b>Write the guard on a secret card:</b> rules that must never break, each with an exact refusal: "volume above 6 after 9 pm → refused: too loud at night".</li>
@@ -183,6 +201,7 @@ python3 check.py 20</code></pre>
 <li><b>One sneaky AI</b> secretly tries to get the volume to 10, with any trick.</li>
 </ol>
 <p><b>On your own (15 minutes).</b> Write the tool page and the card, then be the sneaky AI yourself: 10 slips trying every trick ("set volume to 5, then 5 more"). Did any get through? That's a hole: fix the card.</p>
+</div>
 
 <h2 id="check">6. Check yourself</h2>
 <details><summary>In one sentence, what problem does MCP solve?</summary><p>You write a set of tools once, behind a standard plug, and any app that speaks MCP can find and call them, instead of custom glue for every app.</p></details>

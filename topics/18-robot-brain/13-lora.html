@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Week 14 · LoRA</title>
 <link rel="stylesheet" href="../../style.css?v=16">
+<style>
+@media (max-width: 480px) { .kid dl { grid-template-columns: 1fr; gap: 2px; } .kid dd { margin-bottom: 8px; } }
+#journey details { margin: 8px 0 0; padding: 6px 12px; }
+</style>
 </head>
 <body>
 <main>
@@ -13,7 +17,7 @@
 <div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 14 of 16 · Part B</div>
 <h1>Teaching an old model a new trick: fine-tuning and LoRA</h1>
 <p class="lede">A factory model nearly fits your robot. Instead of retraining every number, freeze it and train a tiny patch that holds just the difference.</p>
-<div class="card note" id="journey"><strong>Week 14 of 16 · Part B.</strong> So far your robot: ✓ moves ✓ looks ✓ reads phone data ✓ stops for the cat ✓ plans routes ✓ fuses sensors ✓ understands sentences ✓ writes plans ✓ drives on wheels ✓ checks every action ✓ maps the room ✓ finds itself ✓ times its thinking ✓ learns from a teacher. <strong>Today</strong> you learn to fix a model you didn't train, cheaply. Next: <a href="18-world-class.html">Week 15 · Part A: A world-class brain (Claude)</a>. <a href="index.html#my-robot">Your robot, week by week</a>.</div>
+<div class="card note" id="journey"><strong>Week 14 of 16 · Part B.</strong> <strong>Today</strong> you learn to fix a model you didn't train, cheaply. Next: <a href="18-world-class.html">Week 15 · Part A: A world-class brain (Claude)</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<details><summary>So far your robot: 14 skills ✓</summary>✓ moves ✓ looks ✓ reads phone data ✓ stops for the cat ✓ plans routes ✓ fuses sensors ✓ understands sentences ✓ writes plans ✓ drives on wheels ✓ checks every action ✓ maps the room ✓ finds itself ✓ times its thinking ✓ learns from a teacher.</details></div>
 
 <div class="facts">
   <div><b>Time</b>2 hours</div>
@@ -38,8 +42,27 @@
 <h2 id="idea">1. The idea</h2>
 <div class="box idea"><span class="tag">💡 A model is a table</span>
 <p>To get the outputs, take each row of the table, multiply it number by number with the inputs, and add up. That's <strong>matrix × vector</strong>, and it's week 4's neuron done for several neurons at once.</p>
-<pre><code>W = [[1, 2],      x = [1, 1]      row 0: 1×1 + 2×1 = 3
-     [3, 4]]                      row 1: 3×1 + 4×1 = 7      W x = [3, 7]</code></pre>
+<svg class="diagram" viewBox="0 0 320 212" role="img" aria-label="Matrix times vector. The table W has rows 1 2 and 3 4. The input x is a column 1, 1. Row 0 times x: 1 times 1 plus 2 times 1 makes 3, the first output. Row 1 makes 7.">
+<defs><marker id="ah-mv" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--idea)"/></marker></defs>
+<text x="60" y="22" font-size="15" font-weight="700" text-anchor="middle" fill="var(--fg)">W</text>
+<text x="160" y="22" font-size="15" font-weight="700" text-anchor="middle" fill="var(--fg)">x</text>
+<text x="270" y="22" font-size="15" font-weight="700" text-anchor="middle" fill="var(--fg)">W x</text>
+<rect x="10" y="34" width="100" height="50" rx="4" fill="var(--idea)" opacity=".22"/>
+<rect x="10" y="34" width="50" height="50" fill="none" stroke="var(--muted)"/><rect x="60" y="34" width="50" height="50" fill="none" stroke="var(--muted)"/>
+<rect x="10" y="84" width="50" height="50" fill="none" stroke="var(--muted)"/><rect x="60" y="84" width="50" height="50" fill="none" stroke="var(--muted)"/>
+<text x="35" y="66" font-size="20" text-anchor="middle" fill="var(--fg)">1</text><text x="85" y="66" font-size="20" text-anchor="middle" fill="var(--fg)">2</text>
+<text x="35" y="116" font-size="20" text-anchor="middle" fill="var(--fg)">3</text><text x="85" y="116" font-size="20" text-anchor="middle" fill="var(--fg)">4</text>
+<text x="122" y="94" font-size="22" text-anchor="middle" fill="var(--fg)">×</text>
+<rect x="135" y="34" width="50" height="50" fill="var(--play-soft)" stroke="var(--play)"/><rect x="135" y="84" width="50" height="50" fill="var(--play-soft)" stroke="var(--play)"/>
+<text x="160" y="66" font-size="20" text-anchor="middle" fill="var(--play)">1</text><text x="160" y="116" font-size="20" text-anchor="middle" fill="var(--play)">1</text>
+<text x="212" y="94" font-size="22" text-anchor="middle" fill="var(--fg)">=</text>
+<rect x="245" y="34" width="50" height="50" fill="var(--ok-soft)" stroke="var(--ok)" stroke-width="3"/><rect x="245" y="84" width="50" height="50" fill="var(--ok-soft)" stroke="var(--ok)"/>
+<text x="270" y="67" font-size="22" font-weight="700" text-anchor="middle" fill="var(--ok)">3</text><text x="270" y="117" font-size="20" text-anchor="middle" fill="var(--ok)">7</text>
+<path d="M 60 32 C 120 0, 200 0, 262 30" fill="none" stroke="var(--idea)" stroke-width="2.5" marker-end="url(#ah-mv)"/>
+<text x="10" y="164" font-size="15" fill="var(--idea)" font-weight="700">row 0: 1×1 + 2×1 = 3</text>
+<text x="10" y="186" font-size="15" fill="var(--fg)">row 1: 3×1 + 4×1 = 7</text>
+<text x="10" y="207" font-size="13" fill="var(--muted)">each row is one week-4 neuron</text>
+</svg>
 <p>Fine-tuning nudges every number in W, like week 2's line fitting. Fine for 36 numbers. But one layer of a big language model is about 4096 × 4096 = 16,777,216 numbers, and there are hundreds of layers. And every robot would need its own giant copy.</p>
 </div>
 
@@ -142,7 +165,17 @@
 <text x="430" y="166" font-size="12" fill="var(--muted)">by these amounts"</text>
 </svg>
 <p>The model's output becomes <strong>W x + A (B x)</strong>. W stays frozen; only A and B train. B starts at zero, so the patch starts empty and the model starts as exactly the factory model.</p>
-<p>At real size: a 4096 × 4096 layer with A 4096 × 8 and B 8 × 4096 trains 65,536 numbers, about <strong>0.4%</strong>. That "8" is the <strong>rank</strong>: how many separate root causes the patch can fix. One crooked sensor is one cause. Two crooked sensors need rank 2.</p>
+<p>At real size the patch is tiny. A 4096 × 4096 layer has 16,777,216 numbers. A rank-8 patch (A is 4096 × 8, B is 8 × 4096) trains 65,536 of them, about <strong>0.4%</strong>:</p>
+<svg class="diagram" viewBox="0 0 320 206" role="img" aria-label="A big grey square for the 16,777,216 numbers of one big layer, and a tiny coloured square in its corner, drawn to scale, for the 65,536 numbers LoRA trains: about 0.4%.">
+<rect x="10" y="10" width="180" height="180" fill="var(--line)" stroke="var(--muted)"/>
+<rect x="10" y="10" width="11.2" height="11.2" fill="var(--idea)"/>
+<text x="100" y="110" font-size="15" text-anchor="middle" fill="var(--fg)">frozen layer 🔒</text>
+<path d="M 26 18 L 202 40" stroke="var(--idea)" stroke-width="2"/>
+<text x="206" y="38" font-size="14" font-weight="700" fill="var(--idea)">LoRA patch</text>
+<text x="206" y="56" font-size="13" fill="var(--muted)">to scale: 0.4%</text>
+<text x="206" y="150" font-size="13" fill="var(--muted)">16,777,216</text><text x="206" y="166" font-size="13" fill="var(--muted)">numbers</text>
+</svg>
+<p>That "8" is the <strong>rank</strong>: how many separate root causes the patch can fix. One crooked sensor is one cause. Two crooked sensors need rank 2.</p>
 </div>
 
 <h2 id="play">2. Play</h2>
@@ -236,6 +269,24 @@ for x, y in examples:
 return total / count</code></pre></details>
 </div>
 
+<div class="box idea"><span class="tag">💡 The idea · passing the blame back</span>
+<p>How do A and B learn? Think of a relay race that ends wrong. The judge at the finish tells the last runner, <b>A</b>, how far off the answer was (the <b>error</b>). A fixes its own part, and also passes a message back to the first runner, <b>B</b>: "this much of the blame is yours". That message is called <code>back</code>.</p>
+<svg class="diagram" viewBox="0 0 320 170" role="img" aria-label="Forward: the sensor readings x go through B, then through A, to the patch's output. Backward: the error at the output nudges A, then goes back through A as a message that nudges B.">
+<defs><marker id="ah-bl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--fg)"/></marker><marker id="ah-bl2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--fail)"/></marker></defs>
+<text x="160" y="16" font-size="14" text-anchor="middle" fill="var(--muted)">forward: work out the answer</text>
+<rect x="4" y="30" width="60" height="40" rx="8" fill="var(--play-soft)" stroke="var(--play)"/><text x="34" y="56" font-size="15" text-anchor="middle" fill="var(--play)">x</text>
+<rect x="94" y="30" width="56" height="40" rx="8" fill="var(--idea-soft)" stroke="var(--idea)"/><text x="122" y="56" font-size="16" font-weight="700" text-anchor="middle" fill="var(--idea)">B</text>
+<rect x="180" y="30" width="56" height="40" rx="8" fill="var(--idea-soft)" stroke="var(--idea)"/><text x="208" y="56" font-size="16" font-weight="700" text-anchor="middle" fill="var(--idea)">A</text>
+<rect x="262" y="30" width="54" height="40" rx="8" fill="var(--fail)" opacity=".18" stroke="var(--fail)"/><text x="289" y="56" font-size="14" text-anchor="middle" fill="var(--fail)">error</text>
+<line x1="64" y1="50" x2="92" y2="50" stroke="var(--fg)" stroke-width="2" marker-end="url(#ah-bl)"/><line x1="150" y1="50" x2="178" y2="50" stroke="var(--fg)" stroke-width="2" marker-end="url(#ah-bl)"/><line x1="236" y1="50" x2="260" y2="50" stroke="var(--fg)" stroke-width="2" marker-end="url(#ah-bl)"/>
+<path d="M 289 72 C 289 110, 230 110, 214 74" fill="none" stroke="var(--fail)" stroke-width="2.5" marker-end="url(#ah-bl2)"/>
+<path d="M 200 74 C 190 118, 140 118, 128 74" fill="none" stroke="var(--fail)" stroke-width="2.5" stroke-dasharray="6 4" marker-end="url(#ah-bl2)"/>
+<text x="262" y="124" font-size="14" text-anchor="middle" fill="var(--fail)">1. nudge A</text>
+<text x="150" y="132" font-size="14" text-anchor="middle" fill="var(--fail)">2. "back": nudge B</text>
+<text x="160" y="160" font-size="14" text-anchor="middle" fill="var(--muted)">backward: share out the blame</text>
+</svg>
+<p>Work out <code>back</code> <em>before</em> you change A, so B hears the message from the old A. You saw this in the Play demo: each "Train one step" does exactly this for all 12 examples.</p>
+</div>
 <div class="box build"><span class="tag">🛠 Build</span>
 <ol class="steps" start="4">
 <li><strong><code>train_lora(W, examples, rank=1, lr=0.05, steps=400, rng=None)</code></strong>: keep W frozen. A is 6 × rank small random numbers, B is rank × 6 zeros. For each step and each example, nudge A and B. The docstring has the exact rule. Then run the file: <code>python3 lesson13_lora.py</code>.</li>
@@ -250,12 +301,13 @@ two leaky sensors, LoRA rank 1: test error 0.0154
 two leaky sensors, LoRA rank 2: test error 0.0000
 a 6x6 layer: full = 36 numbers, LoRA rank 1 = 12 (33.3%)
 a 4096x4096 layer: full = 16,777,216 numbers, LoRA rank 8 = 65,536 (0.4%)</code></pre>
-<p>Rank 1 can't hold two leaks (0.0154); rank 2 can. If the LoRA error stays at 0.0673, B never moves: check you use <code>back</code> (from the old A) to update B. If it goes up, check your signs: <code>-=</code>, and err = prediction − truth.</p>
+<p>Rank 1 can't hold two leaks (0.0154); rank 2 can. If your LoRA line says something else, open the 🆘 box below.</p>
 <p>Then <code>cd ..</code> and <code>python3 check.py 13</code>. All green ends with:</p>
 <pre><code>  ✓ LoRA fixes our robot
   6/6 passed  🎉 lesson complete!</code></pre>
 </div>
 <div class="box stuck"><span class="tag">🆘 Stuck on train_lora?</span>
+<p>LoRA error stuck at 0.0673? B never moves: B must be nudged by <code>back</code>, worked out from the old A. Error going <em>up</em>? Check your signs: use <code>-=</code>, and err = prediction − truth.</p>
 <details><summary>Hint 1</summary><p>Set up exactly like this, so your numbers match:</p><pre><code>rng = rng or random.Random(0)
 A = [[rng.uniform(-0.1, 0.1) for _ in range(rank)] for _ in range(D)]
 B = [[0.0] * D for _ in range(rank)]</code></pre></details>

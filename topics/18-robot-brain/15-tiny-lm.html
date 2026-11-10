@@ -38,65 +38,111 @@
 <h2 id="principles">1. The idea</h2>
 <div class="box idea"><span class="tag">💡 The idea: write one word, then the next</span>
 <p>The model writes from a menu of 10 words: <code>put go find stop ask none red blue green &lt;end&gt;</code>. At every step it looks at your command plus the last two words it wrote, turns that into numbers, gives each menu word a chance, and writes the top one. Real numbers for "put the red and blue blocks away":</p>
-<svg class="diagram" viewBox="0 0 520 330" role="img" aria-label="The command and the words written so far become numbers, then chances for each menu word; the top word is written and the loop repeats">
-  <g style="font:16px sans-serif">
-    <rect x="8" y="10" width="150" height="58" rx="10" style="fill:var(--card);stroke:var(--line)"/>
-    <text x="83" y="34" text-anchor="middle" style="fill:var(--fg);font-weight:700">your command</text>
-    <text x="83" y="54" text-anchor="middle" style="fill:var(--muted)">+ last 2 words written</text>
-    <path d="M160 39 H 186" style="stroke:var(--idea);stroke-width:3"/><path d="M186 33 L198 39 L186 45 Z" style="fill:var(--idea)"/>
-    <rect x="200" y="10" width="130" height="58" rx="10" style="fill:var(--idea-soft);stroke:var(--idea)"/>
-    <text x="265" y="34" text-anchor="middle" style="fill:var(--fg);font-weight:700">36 numbers</text>
-    <text x="265" y="54" text-anchor="middle" style="fill:var(--muted)">→ 32 neurons</text>
-    <path d="M332 39 H 358" style="stroke:var(--idea);stroke-width:3"/><path d="M358 33 L370 39 L358 45 Z" style="fill:var(--idea)"/>
-    <rect x="372" y="10" width="140" height="58" rx="10" style="fill:var(--build-soft);stroke:var(--build)"/>
-    <text x="442" y="34" text-anchor="middle" style="fill:var(--fg);font-weight:700">10 chances</text>
-    <text x="442" y="54" text-anchor="middle" style="fill:var(--muted)">pick the top word</text>
-  </g>
-  <g style="font:16px sans-serif">
-    <text x="8" y="104" style="fill:var(--muted)">step</text><text x="60" y="104" style="fill:var(--muted)">looks at</text><text x="250" y="104" style="fill:var(--muted)">writes</text>
-    <text x="8" y="142" style="fill:var(--fg)">1</text><text x="60" y="142" style="fill:var(--fg)">&lt;start&gt; &lt;start&gt;</text>
-    <rect x="250" y="126" width="252" height="22" rx="4" style="fill:var(--line)"/><rect x="250" y="126" width="252" height="22" rx="4" style="fill:var(--ok)"/><text x="258" y="142" style="fill:var(--card);font-weight:700">put 1.0000</text>
-    <text x="8" y="186" style="fill:var(--fg)">2</text><text x="60" y="186" style="fill:var(--fg)">&lt;start&gt; put</text>
-    <rect x="250" y="170" width="252" height="22" rx="4" style="fill:var(--line)"/><rect x="250" y="170" width="250" height="22" rx="4" style="fill:var(--ok)"/><text x="258" y="186" style="fill:var(--card);font-weight:700">red 0.9941</text>
-    <text x="8" y="230" style="fill:var(--fg)">3</text><text x="60" y="230" style="fill:var(--fg)">put red</text>
-    <rect x="250" y="214" width="252" height="22" rx="4" style="fill:var(--line)"/><rect x="250" y="214" width="245" height="22" rx="4" style="fill:var(--ok)"/><text x="258" y="230" style="fill:var(--card);font-weight:700">blue 0.9705</text>
-    <text x="8" y="274" style="fill:var(--fg)">4</text><text x="60" y="274" style="fill:var(--fg)">red blue</text>
-    <rect x="250" y="258" width="252" height="22" rx="4" style="fill:var(--line)"/><rect x="250" y="258" width="250" height="22" rx="4" style="fill:var(--ok)"/><text x="258" y="274" style="fill:var(--card);font-weight:700">&lt;end&gt; 0.9921</text>
-    <text x="8" y="316" style="fill:var(--fg);font-weight:700">plan: put red blue → bin the red block, then the blue block</text>
-  </g>
+<svg class="diagram" style="max-width:420px" viewBox="0 0 340 380" role="img" aria-label="The command and the last two words written become 36 numbers, then 32 neurons, then 10 chances; the top word is written and the loop repeats: put 1.0000, red 0.9941, blue 0.9705, end 0.9921">
+  <defs><marker id="lp" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--idea)"/></marker></defs>
+  <rect x="4" y="4" width="314" height="34" rx="9" style="fill:var(--card);stroke:var(--line)"/><text x="161" y="26" text-anchor="middle" style="font:700 14px sans-serif;fill:var(--fg)">your command + last 2 words written</text>
+  <line x1="161" y1="39" x2="161" y2="52" style="stroke:var(--idea);stroke-width:3" marker-end="url(#lp)"/>
+  <rect x="4" y="54" width="314" height="34" rx="9" style="fill:var(--idea-soft);stroke:var(--idea)"/><text x="161" y="76" text-anchor="middle" style="font:700 14px sans-serif;fill:var(--fg)">36 numbers → 32 neurons</text>
+  <line x1="161" y1="89" x2="161" y2="102" style="stroke:var(--idea);stroke-width:3" marker-end="url(#lp)"/>
+  <rect x="4" y="104" width="314" height="34" rx="9" style="fill:var(--build-soft);stroke:var(--build)"/><text x="161" y="126" text-anchor="middle" style="font:700 14px sans-serif;fill:var(--fg)">10 chances: write the top one</text>
+  <path d="M319 121 C336 121 336 21 321 21" style="fill:none;stroke:var(--idea);stroke-width:2;stroke-dasharray:4 3" marker-end="url(#lp)"/>
+  <g style="font:13px sans-serif;fill:var(--muted)"><text x="4" y="172">step</text><text x="40" y="172">looks at</text><text x="150" y="172">writes (chance)</text></g>
+  <text x="8" y="201" style="font:14px sans-serif;fill:var(--fg)">1</text><text x="40" y="201" style="font:14px sans-serif;fill:var(--fg)">&lt;start&gt; &lt;start&gt;</text>
+  <rect x="150" y="186" width="186" height="22" rx="4" style="fill:var(--line)"/><rect x="150" y="186" width="186.0" height="22" rx="4" style="fill:var(--ok)"/><text x="158" y="202" style="font:700 14px sans-serif;fill:var(--card)">put 1.0000</text>
+  <text x="8" y="237" style="font:14px sans-serif;fill:var(--fg)">2</text><text x="40" y="237" style="font:14px sans-serif;fill:var(--fg)">&lt;start&gt; put</text>
+  <rect x="150" y="222" width="186" height="22" rx="4" style="fill:var(--line)"/><rect x="150" y="222" width="184.9" height="22" rx="4" style="fill:var(--ok)"/><text x="158" y="238" style="font:700 14px sans-serif;fill:var(--card)">red 0.9941</text>
+  <text x="8" y="273" style="font:14px sans-serif;fill:var(--fg)">3</text><text x="40" y="273" style="font:14px sans-serif;fill:var(--fg)">put red</text>
+  <rect x="150" y="258" width="186" height="22" rx="4" style="fill:var(--line)"/><rect x="150" y="258" width="180.5" height="22" rx="4" style="fill:var(--ok)"/><text x="158" y="274" style="font:700 14px sans-serif;fill:var(--card)">blue 0.9705</text>
+  <text x="8" y="309" style="font:14px sans-serif;fill:var(--fg)">4</text><text x="40" y="309" style="font:14px sans-serif;fill:var(--fg)">red blue</text>
+  <rect x="150" y="294" width="186" height="22" rx="4" style="fill:var(--line)"/><rect x="150" y="294" width="184.5" height="22" rx="4" style="fill:var(--ok)"/><text x="158" y="310" style="font:700 14px sans-serif;fill:var(--card)">&lt;end&gt; 0.9921</text>
+  <text x="4" y="348" style="font:700 14px sans-serif;fill:var(--fg)">plan: put red blue</text>
+  <text x="4" y="368" style="font:14px sans-serif;fill:var(--muted)">= bin the red block, then the blue block</text>
 </svg>
 <p>Each written word goes back in as "the last word" for the next step. <code>&lt;end&gt;</code> means "I've finished". With the random numbers it starts with, the same machine writes nonsense. Training is the only difference.</p>
 </div>
 
 <div class="box idea"><span class="tag">💡 The idea: words as dots on a map</span>
-<p>Every word gets 12 numbers, like a position on a map. They start random. Training nudges them, and words that lead to the same answers drift together. Here are 10 real trained words, with their 12 numbers squashed flat to 2 so we can draw them:</p>
-<svg class="diagram" viewBox="0 0 520 320" role="img" aria-label="Map of trained word embeddings: halt, stop and freeze close together; everything and all together; except and but together; red, blue and green far apart">
-  <rect x="1" y="1" width="518" height="318" rx="12" style="fill:var(--card);stroke:var(--line)"/>
-  <ellipse cx="162" cy="173" rx="34" ry="18" style="fill:var(--ok-soft);stroke:var(--ok)"/>
-  <ellipse cx="70" cy="123" rx="32" ry="16" style="fill:var(--play-soft);stroke:var(--play)"/>
-  <ellipse cx="170" cy="140" rx="22" ry="14" style="fill:var(--build-soft);stroke:var(--build)"/>
-  <g style="fill:var(--fg)">
-    <circle cx="167" cy="173" r="5"/><circle cx="152" cy="176" r="5"/><circle cx="170" cy="170" r="5"/>
-    <circle cx="81" cy="126" r="5"/><circle cx="58" cy="120" r="5"/>
-    <circle cx="168" cy="138" r="5"/><circle cx="171" cy="142" r="5"/>
-  </g>
-  <circle cx="251" cy="43" r="9" fill="#e5484d"/><circle cx="463" cy="96" r="9" fill="#3e7bfa"/><circle cx="300" cy="290" r="9" fill="#30a46c"/>
-  <g style="font:17px sans-serif;fill:var(--fg)">
-    <text x="120" y="212">halt · stop · freeze</text>
-    <text x="22" y="98">everything · all</text>
-    <text x="198" y="136">except · but</text>
-    <text x="266" y="48">red</text><text x="420" y="124">blue</text><text x="316" y="295">green</text>
-  </g>
+<p>Every word gets 12 numbers, like a position on a map. They start random. Training nudges them, and words that lead to the same answers drift together. Here are the same 10 real words before and after training, with their 12 numbers squashed flat to 2 so we can draw them:</p>
+<svg class="diagram" style="max-width:420px" viewBox="0 0 340 400" role="img" aria-label="Two maps of 10 words. Before training the dots are scattered at random. After training halt, stop and freeze sit together, everything and all together, except and but together, and red, blue and green far apart">
+  <rect x="1" y="1" width="338" height="196" rx="10" style="fill:var(--card);stroke:var(--line)"/>
+  <rect x="1" y="203" width="338" height="196" rx="10" style="fill:var(--card);stroke:var(--line)"/>
+  <text x="12" y="22" style="font:700 15px sans-serif;fill:var(--muted)">before training: random</text>
+  <text x="12" y="224" style="font:700 15px sans-serif;fill:var(--ok)">after training: groups</text>
+  <circle cx="30.0" cy="116.2" r="6" style="fill:var(--ok)"/><text x="34.0" y="106.2" text-anchor="start" style="font:13px sans-serif;fill:var(--fg)">halt</text>
+  <circle cx="104.7" cy="78.3" r="6" style="fill:var(--ok)"/><text x="104.7" y="68.3" text-anchor="middle" style="font:13px sans-serif;fill:var(--fg)">stop</text>
+  <circle cx="222.7" cy="107.8" r="6" style="fill:var(--ok)"/><text x="230.7" y="101.8" text-anchor="start" style="font:13px sans-serif;fill:var(--fg)">freeze</text>
+  <circle cx="118.2" cy="168.3" r="6" style="fill:var(--play)"/><text x="118.2" y="158.3" text-anchor="middle" style="font:13px sans-serif;fill:var(--fg)">everything</text>
+  <circle cx="310.0" cy="83.1" r="6" style="fill:var(--play)"/><text x="306.0" y="73.1" text-anchor="end" style="font:13px sans-serif;fill:var(--fg)">all</text>
+  <circle cx="243.7" cy="180.0" r="6" style="fill:var(--build)"/><text x="235.7" y="184.0" text-anchor="end" style="font:13px sans-serif;fill:var(--fg)">except</text>
+  <circle cx="67.7" cy="102.1" r="6" style="fill:var(--build)"/><text x="61.7" y="94.1" text-anchor="end" style="font:13px sans-serif;fill:var(--fg)">but</text>
+  <circle cx="84.9" cy="105.2" r="6" style="fill:#e5484d"/><text x="90.9" y="123.2" text-anchor="start" style="font:13px sans-serif;fill:var(--fg)">red</text>
+  <circle cx="218.0" cy="111.0" r="6" style="fill:#3e7bfa"/><text x="212.0" y="131.0" text-anchor="end" style="font:13px sans-serif;fill:var(--fg)">blue</text>
+  <circle cx="178.9" cy="40.0" r="6" style="fill:#30a46c"/><text x="186.9" y="45.0" text-anchor="start" style="font:13px sans-serif;fill:var(--fg)">green</text>
+  <ellipse cx="102" cy="314" rx="20" ry="9" style="fill:var(--ok-soft);stroke:var(--ok)"/>
+  <circle cx="105.6" cy="313.8" r="5" style="fill:var(--ok)"/>
+  <circle cx="94.9" cy="315.6" r="5" style="fill:var(--ok)"/>
+  <circle cx="107.5" cy="312.2" r="5" style="fill:var(--ok)"/>
+  <circle cx="46.2" cy="287.5" r="5" style="fill:var(--play)"/>
+  <circle cx="30.0" cy="283.6" r="5" style="fill:var(--play)"/>
+  <circle cx="106.6" cy="287.8" r="5" style="fill:var(--build)"/>
+  <circle cx="108.2" cy="290.1" r="5" style="fill:var(--build)"/>
+  <circle cx="163.5" cy="240.0" r="5" style="fill:#e5484d"/>
+  <circle cx="310.0" cy="269.9" r="5" style="fill:#3e7bfa"/>
+  <circle cx="198.2" cy="380.0" r="5" style="fill:#30a46c"/>
+  <text x="60" y="340" style="font:13px sans-serif;fill:var(--fg)">halt · stop · freeze</text>
+  <text x="118" y="293" style="font:13px sans-serif;fill:var(--fg)">except · but</text>
+  <text x="14" y="270" style="font:13px sans-serif;fill:var(--fg)">everything · all</text>
+  <text x="173" y="250" style="font:13px sans-serif;fill:var(--fg)">red</text>
+  <text x="304" y="292" text-anchor="end" style="font:13px sans-serif;fill:var(--fg)">blue</text>
+  <text x="208" y="385" style="font:13px sans-serif;fill:var(--fg)">green</text>
 </svg>
-<p>Nobody told it that "halt" means stop. It worked that out because they led to the same plans. How alike are two words' 12 numbers? On a scale from −1 to 1: halt and stop went from 0.27 before training to <strong>0.92</strong> after; everything and all from −0.56 to <strong>0.91</strong>. Every LLM starts with this step.</p>
+<p>Nobody told it that "halt" means stop. It worked that out because they led to the same plans. Every LLM starts with this step.</p>
 </div>
 
 <div class="box idea"><span class="tag">💡 The idea: scores into chances (softmax)</span>
-<p>The network gives each menu word a raw score. Softmax raises <em>e</em> (about 2.718) to each score, so all are positive and big scores get much bigger, then divides by the total:</p>
-<pre><code>scores           2        1        0
-math.exp(score)  7.389    2.718    1.000      total 11.107
-chance           0.665    0.245    0.090      ← adds up to 1</code></pre>
-<p>One trap: <code>math.exp(1000)</code> crashes. So <strong>subtract the biggest score first</strong> (2, 1, 0 becomes 0, −1, −2). You get exactly the same chances, and nothing is ever bigger than <code>math.exp(0) = 1</code>.</p>
+<p>The network gives each menu word a raw score. Softmax shares out 100 sweets between them, and a higher score gets a <em>much</em> bigger share: each extra point is worth about 2.7 times as many sweets. Scores 2, 1 and 0 become:</p>
+<svg class="diagram" style="max-width:420px" viewBox="0 0 340 130" role="img" aria-label="Softmax shares out chances: scores 2, 1 and 0 become chances 0.665, 0.245 and 0.090, like 67, 24 and 9 sweets out of 100">
+  <g style="font:14px sans-serif;fill:var(--fg)"><text x="4" y="30">score 2</text><text x="4" y="70">score 1</text><text x="4" y="110">score 0</text></g>
+  <rect x="66" y="14" width="133" height="24" rx="4" style="fill:var(--build)"/><text x="205" y="31" style="font:14px sans-serif;fill:var(--fg)"><tspan style="font-weight:700">0.665</tspan> · 67 sweets</text>
+  <rect x="66" y="54" width="49" height="24" rx="4" style="fill:var(--build)"/><text x="121" y="71" style="font:14px sans-serif;fill:var(--fg)"><tspan style="font-weight:700">0.245</tspan> · 24 sweets</text>
+  <rect x="66" y="94" width="18" height="24" rx="4" style="fill:var(--build)"/><text x="90" y="111" style="font:14px sans-serif;fill:var(--fg)"><tspan style="font-weight:700">0.090</tspan> · 9 sweets</text>
+</svg>
+<p>The shares always add up to 1 (all 100 sweets). Only the <em>differences</em> between scores matter.</p>
+</div>
+
+<div class="box idea"><span class="tag">💡 The idea: the network in the middle</span>
+<p>The middle box of the loop is a small neural network, like week 4's neuron but 42 of them. 36 numbers go in, 32 hidden neurons each read all 36, and 10 output scores each read all 32:</p>
+<svg class="diagram" style="max-width:420px" viewBox="0 0 340 290" role="img" aria-label="The network: 36 input numbers (12 for the command, 12 for the last word, 12 for the word before) feed 32 hidden neurons, which feed 10 scores, one per menu word">
+  <text x="4" y="30" style="font:13px sans-serif;fill:var(--fg)">command</text><text x="4" y="46" style="font:13px sans-serif;fill:var(--muted)">12 numbers</text>
+  <text x="4" y="110" style="font:13px sans-serif;fill:var(--fg)">last word</text><text x="4" y="126" style="font:13px sans-serif;fill:var(--muted)">12 numbers</text>
+  <text x="4" y="190" style="font:13px sans-serif;fill:var(--fg)">word before</text><text x="4" y="206" style="font:13px sans-serif;fill:var(--muted)">12 numbers</text>
+  <g style="stroke:var(--muted);stroke-width:.6;opacity:.35"><line x1="100" y1="22" x2="190" y2="22"/><line x1="100" y1="22" x2="190" y2="51"/><line x1="100" y1="22" x2="190" y2="80"/><line x1="100" y1="22" x2="190" y2="109"/><line x1="100" y1="22" x2="190" y2="138"/><line x1="100" y1="22" x2="190" y2="167"/><line x1="100" y1="22" x2="190" y2="196"/><line x1="100" y1="22" x2="190" y2="225"/><line x1="100" y1="36" x2="190" y2="22"/><line x1="100" y1="36" x2="190" y2="51"/><line x1="100" y1="36" x2="190" y2="80"/><line x1="100" y1="36" x2="190" y2="109"/><line x1="100" y1="36" x2="190" y2="138"/><line x1="100" y1="36" x2="190" y2="167"/><line x1="100" y1="36" x2="190" y2="196"/><line x1="100" y1="36" x2="190" y2="225"/><line x1="100" y1="50" x2="190" y2="22"/><line x1="100" y1="50" x2="190" y2="51"/><line x1="100" y1="50" x2="190" y2="80"/><line x1="100" y1="50" x2="190" y2="109"/><line x1="100" y1="50" x2="190" y2="138"/><line x1="100" y1="50" x2="190" y2="167"/><line x1="100" y1="50" x2="190" y2="196"/><line x1="100" y1="50" x2="190" y2="225"/><line x1="100" y1="64" x2="190" y2="22"/><line x1="100" y1="64" x2="190" y2="51"/><line x1="100" y1="64" x2="190" y2="80"/><line x1="100" y1="64" x2="190" y2="109"/><line x1="100" y1="64" x2="190" y2="138"/><line x1="100" y1="64" x2="190" y2="167"/><line x1="100" y1="64" x2="190" y2="196"/><line x1="100" y1="64" x2="190" y2="225"/><line x1="100" y1="102" x2="190" y2="22"/><line x1="100" y1="102" x2="190" y2="51"/><line x1="100" y1="102" x2="190" y2="80"/><line x1="100" y1="102" x2="190" y2="109"/><line x1="100" y1="102" x2="190" y2="138"/><line x1="100" y1="102" x2="190" y2="167"/><line x1="100" y1="102" x2="190" y2="196"/><line x1="100" y1="102" x2="190" y2="225"/><line x1="100" y1="116" x2="190" y2="22"/><line x1="100" y1="116" x2="190" y2="51"/><line x1="100" y1="116" x2="190" y2="80"/><line x1="100" y1="116" x2="190" y2="109"/><line x1="100" y1="116" x2="190" y2="138"/><line x1="100" y1="116" x2="190" y2="167"/><line x1="100" y1="116" x2="190" y2="196"/><line x1="100" y1="116" x2="190" y2="225"/><line x1="100" y1="130" x2="190" y2="22"/><line x1="100" y1="130" x2="190" y2="51"/><line x1="100" y1="130" x2="190" y2="80"/><line x1="100" y1="130" x2="190" y2="109"/><line x1="100" y1="130" x2="190" y2="138"/><line x1="100" y1="130" x2="190" y2="167"/><line x1="100" y1="130" x2="190" y2="196"/><line x1="100" y1="130" x2="190" y2="225"/><line x1="100" y1="144" x2="190" y2="22"/><line x1="100" y1="144" x2="190" y2="51"/><line x1="100" y1="144" x2="190" y2="80"/><line x1="100" y1="144" x2="190" y2="109"/><line x1="100" y1="144" x2="190" y2="138"/><line x1="100" y1="144" x2="190" y2="167"/><line x1="100" y1="144" x2="190" y2="196"/><line x1="100" y1="144" x2="190" y2="225"/><line x1="100" y1="182" x2="190" y2="22"/><line x1="100" y1="182" x2="190" y2="51"/><line x1="100" y1="182" x2="190" y2="80"/><line x1="100" y1="182" x2="190" y2="109"/><line x1="100" y1="182" x2="190" y2="138"/><line x1="100" y1="182" x2="190" y2="167"/><line x1="100" y1="182" x2="190" y2="196"/><line x1="100" y1="182" x2="190" y2="225"/><line x1="100" y1="196" x2="190" y2="22"/><line x1="100" y1="196" x2="190" y2="51"/><line x1="100" y1="196" x2="190" y2="80"/><line x1="100" y1="196" x2="190" y2="109"/><line x1="100" y1="196" x2="190" y2="138"/><line x1="100" y1="196" x2="190" y2="167"/><line x1="100" y1="196" x2="190" y2="196"/><line x1="100" y1="196" x2="190" y2="225"/><line x1="100" y1="210" x2="190" y2="22"/><line x1="100" y1="210" x2="190" y2="51"/><line x1="100" y1="210" x2="190" y2="80"/><line x1="100" y1="210" x2="190" y2="109"/><line x1="100" y1="210" x2="190" y2="138"/><line x1="100" y1="210" x2="190" y2="167"/><line x1="100" y1="210" x2="190" y2="196"/><line x1="100" y1="210" x2="190" y2="225"/><line x1="100" y1="224" x2="190" y2="22"/><line x1="100" y1="224" x2="190" y2="51"/><line x1="100" y1="224" x2="190" y2="80"/><line x1="100" y1="224" x2="190" y2="109"/><line x1="100" y1="224" x2="190" y2="138"/><line x1="100" y1="224" x2="190" y2="167"/><line x1="100" y1="224" x2="190" y2="196"/><line x1="100" y1="224" x2="190" y2="225"/><line x1="190" y1="22" x2="262" y2="20"/><line x1="190" y1="22" x2="262" y2="42"/><line x1="190" y1="22" x2="262" y2="64"/><line x1="190" y1="22" x2="262" y2="86"/><line x1="190" y1="22" x2="262" y2="108"/><line x1="190" y1="22" x2="262" y2="130"/><line x1="190" y1="22" x2="262" y2="152"/><line x1="190" y1="22" x2="262" y2="174"/><line x1="190" y1="22" x2="262" y2="196"/><line x1="190" y1="22" x2="262" y2="218"/><line x1="190" y1="51" x2="262" y2="20"/><line x1="190" y1="51" x2="262" y2="42"/><line x1="190" y1="51" x2="262" y2="64"/><line x1="190" y1="51" x2="262" y2="86"/><line x1="190" y1="51" x2="262" y2="108"/><line x1="190" y1="51" x2="262" y2="130"/><line x1="190" y1="51" x2="262" y2="152"/><line x1="190" y1="51" x2="262" y2="174"/><line x1="190" y1="51" x2="262" y2="196"/><line x1="190" y1="51" x2="262" y2="218"/><line x1="190" y1="80" x2="262" y2="20"/><line x1="190" y1="80" x2="262" y2="42"/><line x1="190" y1="80" x2="262" y2="64"/><line x1="190" y1="80" x2="262" y2="86"/><line x1="190" y1="80" x2="262" y2="108"/><line x1="190" y1="80" x2="262" y2="130"/><line x1="190" y1="80" x2="262" y2="152"/><line x1="190" y1="80" x2="262" y2="174"/><line x1="190" y1="80" x2="262" y2="196"/><line x1="190" y1="80" x2="262" y2="218"/><line x1="190" y1="109" x2="262" y2="20"/><line x1="190" y1="109" x2="262" y2="42"/><line x1="190" y1="109" x2="262" y2="64"/><line x1="190" y1="109" x2="262" y2="86"/><line x1="190" y1="109" x2="262" y2="108"/><line x1="190" y1="109" x2="262" y2="130"/><line x1="190" y1="109" x2="262" y2="152"/><line x1="190" y1="109" x2="262" y2="174"/><line x1="190" y1="109" x2="262" y2="196"/><line x1="190" y1="109" x2="262" y2="218"/><line x1="190" y1="138" x2="262" y2="20"/><line x1="190" y1="138" x2="262" y2="42"/><line x1="190" y1="138" x2="262" y2="64"/><line x1="190" y1="138" x2="262" y2="86"/><line x1="190" y1="138" x2="262" y2="108"/><line x1="190" y1="138" x2="262" y2="130"/><line x1="190" y1="138" x2="262" y2="152"/><line x1="190" y1="138" x2="262" y2="174"/><line x1="190" y1="138" x2="262" y2="196"/><line x1="190" y1="138" x2="262" y2="218"/><line x1="190" y1="167" x2="262" y2="20"/><line x1="190" y1="167" x2="262" y2="42"/><line x1="190" y1="167" x2="262" y2="64"/><line x1="190" y1="167" x2="262" y2="86"/><line x1="190" y1="167" x2="262" y2="108"/><line x1="190" y1="167" x2="262" y2="130"/><line x1="190" y1="167" x2="262" y2="152"/><line x1="190" y1="167" x2="262" y2="174"/><line x1="190" y1="167" x2="262" y2="196"/><line x1="190" y1="167" x2="262" y2="218"/><line x1="190" y1="196" x2="262" y2="20"/><line x1="190" y1="196" x2="262" y2="42"/><line x1="190" y1="196" x2="262" y2="64"/><line x1="190" y1="196" x2="262" y2="86"/><line x1="190" y1="196" x2="262" y2="108"/><line x1="190" y1="196" x2="262" y2="130"/><line x1="190" y1="196" x2="262" y2="152"/><line x1="190" y1="196" x2="262" y2="174"/><line x1="190" y1="196" x2="262" y2="196"/><line x1="190" y1="196" x2="262" y2="218"/><line x1="190" y1="225" x2="262" y2="20"/><line x1="190" y1="225" x2="262" y2="42"/><line x1="190" y1="225" x2="262" y2="64"/><line x1="190" y1="225" x2="262" y2="86"/><line x1="190" y1="225" x2="262" y2="108"/><line x1="190" y1="225" x2="262" y2="130"/><line x1="190" y1="225" x2="262" y2="152"/><line x1="190" y1="225" x2="262" y2="174"/><line x1="190" y1="225" x2="262" y2="196"/><line x1="190" y1="225" x2="262" y2="218"/></g>
+  <g style="fill:var(--idea)"><circle cx="100" cy="22" r="5"/><circle cx="100" cy="36" r="5"/><circle cx="100" cy="50" r="5"/><circle cx="100" cy="64" r="5"/><circle cx="100" cy="102" r="5"/><circle cx="100" cy="116" r="5"/><circle cx="100" cy="130" r="5"/><circle cx="100" cy="144" r="5"/><circle cx="100" cy="182" r="5"/><circle cx="100" cy="196" r="5"/><circle cx="100" cy="210" r="5"/><circle cx="100" cy="224" r="5"/></g>
+  <g style="fill:var(--idea-soft);stroke:var(--idea);stroke-width:2"><circle cx="190" cy="22" r="9"/><circle cx="190" cy="51" r="9"/><circle cx="190" cy="80" r="9"/><circle cx="190" cy="109" r="9"/><circle cx="190" cy="138" r="9"/><circle cx="190" cy="167" r="9"/><circle cx="190" cy="196" r="9"/><circle cx="190" cy="225" r="9"/></g>
+  <g style="fill:var(--build)"><circle cx="262" cy="20" r="5"/><circle cx="262" cy="42" r="5"/><circle cx="262" cy="64" r="5"/><circle cx="262" cy="86" r="5"/><circle cx="262" cy="108" r="5"/><circle cx="262" cy="130" r="5"/><circle cx="262" cy="152" r="5"/><circle cx="262" cy="174" r="5"/><circle cx="262" cy="196" r="5"/><circle cx="262" cy="218" r="5"/></g>
+  <g style="font:13px sans-serif;fill:var(--fg)"><text x="272" y="24">put</text><text x="272" y="46">go</text><text x="272" y="68">find</text><text x="272" y="90">stop</text><text x="272" y="112">ask</text><text x="272" y="134">none</text><text x="272" y="156">red</text><text x="272" y="178">blue</text><text x="272" y="200">green</text><text x="272" y="222">&lt;end&gt;</text></g>
+  <g style="font:700 13px sans-serif" text-anchor="middle"><text x="100" y="262" style="fill:var(--idea)">36 in</text><text x="190" y="262" style="fill:var(--idea)">32 neurons</text><text x="280" y="262" style="fill:var(--build)">10 scores</text></g>
+  <text x="170" y="284" text-anchor="middle" style="font:13px sans-serif;fill:var(--muted)">(only some dots drawn: every line is a weight)</text>
+</svg>
+<p>Zoom in on one neuron: each input times its weight, added up, plus a bias, then squashed.</p>
+<svg class="diagram" style="max-width:420px" viewBox="0 0 340 170" role="img" aria-label="One neuron, made-up numbers: inputs 1, 0 and 2 times weights 0.5, minus 1 and 0.25 make 0.5, 0 and 0.5; plus a bias of 0.1 the sum is 1.1; tanh squashes it to 0.80">
+  <defs><marker id="nr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker></defs>
+  <g style="font:14px sans-serif;fill:var(--fg)">
+    <text x="4" y="34">1 × 0.5 = 0.5</text><text x="4" y="74">0 × −1 = 0</text><text x="4" y="114">2 × 0.25 = 0.5</text>
+  </g>
+  <g style="stroke:var(--muted);stroke-width:2;fill:none" marker-end="url(#nr)"><path d="M104 30 L150 64"/><path d="M104 70 L148 72"/><path d="M110 110 L150 82"/></g>
+  <circle cx="180" cy="72" r="30" style="fill:var(--idea-soft);stroke:var(--idea);stroke-width:2"/>
+  <text x="180" y="68" text-anchor="middle" style="font:700 14px sans-serif;fill:var(--idea)">add up</text><text x="180" y="86" text-anchor="middle" style="font:14px sans-serif;fill:var(--fg)">= 1.1</text>
+  <text x="180" y="124" text-anchor="middle" style="font:13px sans-serif;fill:var(--muted)">+ bias 0.1</text>
+  <path d="M211 72 L232 72" style="stroke:var(--muted);stroke-width:2" marker-end="url(#nr)"/>
+  <rect x="236" y="44" width="56" height="56" rx="8" style="fill:var(--card);stroke:var(--line)"/>
+  <path d="M240 92 C258 92 258 92 264 72 C270 52 270 52 288 52" style="fill:none;stroke:var(--build);stroke-width:3"/>
+  <text x="264" y="118" text-anchor="middle" style="font:13px sans-serif;fill:var(--muted)">tanh squash</text>
+  <path d="M294 72 L306 72" style="stroke:var(--muted);stroke-width:2" marker-end="url(#nr)"/>
+  <text x="338" y="77" text-anchor="end" style="font:700 15px sans-serif;fill:var(--ok)">0.80</text>
+  <text x="4" y="158" style="font:13px sans-serif;fill:var(--muted)">Made-up numbers. tanh squeezes any sum into −1…1.</text>
+</svg>
+<p>Training nudges every weight and bias: that's the 2,702 learnable numbers.</p>
 </div>
 
 <h2 id="play">2. Play with it</h2>
@@ -131,7 +177,7 @@ chance           0.665    0.245    0.090      ← adds up to 1</code></pre>
 </div>
 
 <ol class="steps">
-<li><p><strong><code>softmax(scores)</code></strong>: chances that add up to 1, <em>with</em> the subtract-the-biggest trick.</p>
+<li><p><strong><code>softmax(scores)</code></strong>: chances that add up to 1. Each chance is <code>math.exp(score)</code> divided by the total of them all. One trap: <code>math.exp(1000)</code> crashes. So <strong>subtract the biggest score first</strong> (2, 1, 0 becomes 0, −1, −2): exactly the same chances, and nothing is ever bigger than <code>math.exp(0) = 1</code>.</p>
 <div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
 <pre><code>python3 -c "from lesson15_tiny_lm import *; print([round(p, 3) for p in softmax([2, 1, 0])], softmax([1000, 1000]))"</code></pre>
 <pre><code>[0.665, 0.245, 0.09] [0.5, 0.5]</code></pre>
@@ -157,7 +203,7 @@ if not vecs:
     return [0.0] * ____
 return [sum(v[i] for v in vecs) / len(____) for i in range(E)]</code></pre></details></li>
 
-<li><p><strong><code>TinyLM.forward(self, ctx, prev2, prev1)</code></strong>: join <code>ctx</code> with the embeddings of the last two written words into 36 numbers <code>x</code>. Each of 32 hidden neurons: inputs times weights, added up, plus a bias, squashed with <code>math.tanh</code>. Then 10 scores the same way (no squash), then softmax. Return <code>(x, hidden, probs)</code>.</p>
+<li><p><strong><code>TinyLM.forward(self, ctx, prev2, prev1)</code></strong>: the network picture above, as code. Join <code>ctx</code> with the embeddings of the last two written words into 36 numbers <code>x</code>. Each of 32 hidden neurons does the one-neuron sum and squashes it with <code>math.tanh</code>. Then 10 scores the same way (no squash), then softmax. Return <code>(x, hidden, probs)</code>.</p>
 <p><strong>New Python:</strong> <code>sum(a * b for a, b in zip(w, x))</code> multiplies two lists pair by pair and adds up. For <code>w = [0.5, -1, 0.25]</code> and <code>x = [1, 0, 2]</code> that's 1.0.</p>
 <div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
 <pre><code>python3 -c "from lesson15_tiny_lm import *; m = TinyLM(['red', 'block']); x, h, p = m.forward(m.read('red block'), START, START); print(len(x), len(h), len(p), round(sum(p), 6))"</code></pre>
@@ -215,7 +261,33 @@ if words[0] != "put" and len(colours) != ____:
     return None
 return [{"intent": words[0], "object": f"{c} block"} for c in ____]</code></pre></details></li>
 
-<li><p><strong><code>plan_examples(put_templates, except_templates, rng)</code></strong>: make training data from templates. For <em>each</em> put template, in this order: (1) each colour, <code>x = rng.choice(["the c block", "the c one"])</code> → <code>["put", c]</code>; (2) each ordered pair of different colours, <code>x = rng.choice(["the a and b blocks", "the a block and the b block", "the a and the b one"])</code> → <code>["put"]</code> + the pair in <code>COLOURS</code> order; (3) each phrase in <code>ALL_PHRASES</code> → all three colours; (4) each except template and colour, <code>e.format(c=c)</code> → the other two colours.</p>
+<li><p><strong><code>plan_examples(put_templates, except_templates, rng)</code></strong>: make training data by filling in templates. One template, four kinds of filling (these are real results):</p>
+<svg class="diagram" style="max-width:420px" viewBox="0 0 340 250" role="img" aria-label="One template, bin {x}, filled four ways: one colour, a pair, an all phrase and all except one, each with the plan it should write">
+  <rect x="96" y="4" width="148" height="30" rx="8" style="fill:var(--build-soft);stroke:var(--build)"/><text x="170" y="25" text-anchor="middle" style="font:700 15px ui-monospace,Menlo,monospace;fill:var(--build)">bin {x}</text>
+  <circle cx="14" cy="60" r="11" style="fill:var(--build)"/><text x="14" y="65" text-anchor="middle" style="font:700 13px sans-serif;fill:var(--card)">1</text>
+  <text x="32" y="58" style="font:13px sans-serif;fill:var(--muted)">one colour</text>
+  <text x="32" y="76" style="font:14px sans-serif;fill:var(--fg)">“bin the red one”</text>
+  <text x="32" y="93" style="font:700 13px ui-monospace,Menlo,monospace;fill:var(--ok)">→ put red</text>
+  <circle cx="14" cy="110" r="11" style="fill:var(--build)"/><text x="14" y="115" text-anchor="middle" style="font:700 13px sans-serif;fill:var(--card)">2</text>
+  <text x="32" y="108" style="font:13px sans-serif;fill:var(--muted)">a pair (any order)</text>
+  <text x="32" y="126" style="font:14px sans-serif;fill:var(--fg)">“bin the blue block and the red block”</text>
+  <text x="32" y="143" style="font:700 13px ui-monospace,Menlo,monospace;fill:var(--ok)">→ put red blue</text>
+  <circle cx="14" cy="160" r="11" style="fill:var(--build)"/><text x="14" y="165" text-anchor="middle" style="font:700 13px sans-serif;fill:var(--card)">3</text>
+  <text x="32" y="158" style="font:13px sans-serif;fill:var(--muted)">an “all” phrase</text>
+  <text x="32" y="176" style="font:14px sans-serif;fill:var(--fg)">“bin everything”</text>
+  <text x="32" y="193" style="font:700 13px ui-monospace,Menlo,monospace;fill:var(--ok)">→ put red blue green</text>
+  <circle cx="14" cy="210" r="11" style="fill:var(--build)"/><text x="14" y="215" text-anchor="middle" style="font:700 13px sans-serif;fill:var(--card)">4</text>
+  <text x="32" y="208" style="font:13px sans-serif;fill:var(--muted)">all except one</text>
+  <text x="32" y="226" style="font:14px sans-serif;fill:var(--fg)">“bin everything except the red”</text>
+  <text x="32" y="243" style="font:700 13px ui-monospace,Menlo,monospace;fill:var(--ok)">→ put blue green</text>
+</svg>
+<p>For <em>each</em> put template, in this order:</p>
+<ol>
+<li>each colour <code>c</code>: <code>x = rng.choice(["the c block", "the c one"])</code> → <code>["put", c]</code>;</li>
+<li>each ordered pair of different colours: <code>x = rng.choice(["the a and b blocks", "the a block and the b block", "the a and the b one"])</code> → <code>["put"]</code> + the pair in <code>COLOURS</code> order;</li>
+<li>each phrase in <code>ALL_PHRASES</code> → all three colours;</li>
+<li>each except template and colour, <code>e.format(c=c)</code> → the other two colours.</li>
+</ol>
 <div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
 <pre><code>python3 -c "import random; from lesson15_tiny_lm import *; ex = plan_examples(['bin {x}'], ['everything except the {c}'], random.Random(0)); print(len(ex), ex[0], ex[-1])"</code></pre>
 <pre><code>16 ('bin the red one', ['put', 'red']) ('bin everything except the green', ['put', 'red', 'blue'])</code></pre>
@@ -282,7 +354,7 @@ if plan == "none":
     return ____
 return plan</code></pre></details>
 </div>
-<div class="room" data-robot="7,6" data-cat="4,1" data-blocks="green:1,5" data-label="After 'put the red and blue blocks away': both blocks binned, green left"></div>
+<div class="room" data-robot="7,6" data-path="1,1 2,1 3,1 2,1 2,2 2,3 2,4 2,5 3,5 3,6 4,6 5,6 6,6 7,6 7,5 7,4 7,3 6,3 7,3 7,4 7,5 7,6" data-cat="4,1" data-blocks="green:1,5" data-mark="2,1 6,3" data-label="'put the red and blue blocks away': to the red block (ringed), stop for the cat, to the bin, up to the blue block (ringed), back to the bin. Two trips from one plan."></div>
 <div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
 <p>From <code>project</code>, <code>python3 check.py robot</code>:</p>
 <pre><code>  ✓ week 7: fixes typos
@@ -292,7 +364,7 @@ return plan</code></pre></details>
   …
   11/21 passed</code></pre>
 <p>Then <code>cd homework</code>, <code>python3 my_robot.py</code>. Real replies:</p>
-<pre><code>Zippy&gt; put the red and blue blocks away
+<pre style="white-space:pre-wrap"><code>Zippy&gt; put the red and blue blocks away
   (I think you meant: 'put the red and blue block away')
   (Training my language brain. About 10-20 seconds, once...)
   The red block is in the bin. The blue block is in the bin.
@@ -305,7 +377,7 @@ Zippy&gt; make me a cup of tea
 </div>
 
 <h2 id="challenge">5. Real-world challenge: be the language model</h2>
-<div class="box play"><span class="tag">🌍 Real-world challenge</span>
+<div class="box world"><span class="tag">🌍 Real-world challenge</span>
 <ol>
 <li>A partner secretly writes a 6–8 word sentence and tells you the first word. Before each next word, split 10 coins between up to three guesses. Then they reveal it.</li>
 <li>Score your surprise from the coins on the right word: 10 → 0, 8 → 0.22, 5 → 0.69, 3 → 1.20, 2 → 1.61, 1 → 2.30, 0 → 4.6. Add up each sentence. Swap roles.</li>
@@ -324,7 +396,8 @@ Zippy&gt; make me a cup of tea
 <h2 id="deeper">7. Want to know more?</h2>
 <details><summary>Inside one step: averaging, 36 inputs and tanh</summary>
 <p><strong>Reading by averaging.</strong> With 3-number lists: "red" [1, 0, 2] and "block" [3, 2, 0] average to [2, 1, 1]. Averaging ignores order, so "away block red the put" gives the same plan as "put the red block away". For "go to the blue block, not the red one" that's a disaster. Attention fixes part of this: see the <a href="15b-attention.html">stretch</a>.</p>
-<p><strong>A neuron with 3 inputs</strong> (made-up numbers): inputs [1, 0, 2], weights [0.5, −1, 0.25], bias 0.1. Sum 0.5 + 0 + 0.5 + 0.1 = 1.1, and tanh(1.1) ≈ 0.80. tanh squashes any number into −1 to 1: <code>math.tanh(2)</code> ≈ 0.96, <code>math.tanh(100)</code> is 1.0. Our hidden layer is 32 of these side by side, each reading all 36 inputs (the command's 12 + two written words' 12 each).</p></details>
+<p><strong>tanh.</strong> It squashes any number into −1 to 1: <code>math.tanh(1.1)</code> ≈ 0.80, <code>math.tanh(2)</code> ≈ 0.96, <code>math.tanh(100)</code> is 1.0.</p>
+<p><strong>How alike are two words?</strong> On a scale from −1 to 1 (cosine similarity): halt and stop went from 0.27 before training to 0.92 after; everything and all from −0.56 to 0.91.</p></details>
 <details><summary>Surprise (loss) and how training works</summary>
 <div class="table-wrap"><table>
 <tr><th>chance given to the right word</th><th>surprise −log(p)</th></tr>

@@ -24,6 +24,9 @@ svg .u { fill: var(--line); } svg .est { fill: none; stroke: var(--idea); stroke
 .twin { display: flex; flex-wrap: wrap; gap: 12px; } .twin > div { flex: 1 1 260px; min-width: 0; }
 .twin .room-pic, .twin svg { max-width: 100%; }
 .demo-pic { display: block; width: 100%; height: auto; cursor: pointer; touch-action: manipulation; }
+@media (max-width: 480px) { .kid dl { grid-template-columns: 1fr; gap: 2px; } .kid dd { margin-bottom: 8px; } }
+#journey details { margin: 8px 0 0; padding: 6px 12px; }
+svg.big-lbl .lbl { font-size: 19px; } svg.big-lbl .lbl.vt { font-size: 18px; }
 </style>
 </head>
 <body>
@@ -32,8 +35,8 @@ svg .u { fill: var(--line); } svg .est { fill: none; stroke: var(--idea); stroke
 
 <div class="eyebrow"><span class="track robo">Robotics</span>Build a Robot Brain · Week 11 of 16</div>
 <h1>Making a map: frames and a laser scanner</h1>
-<p class="lede">Your robot drives around and turns its laser readings into its own map. Drive it close enough and the map even finds the cat.</p>
-<div class="card note" id="journey"><strong>Week 11 of 16.</strong> So far your robot: ✓ moves ✓ looks around ✓ reads real phone data ✓ stops for the cat ✓ plans routes ✓ holds a steady angle ✓ fixes typos ✓ understands sentences ✓ writes plans ✓ drives on real wheels ✓ checks every action. <strong>Today</strong> it learns to scan the room and draw its own map. Next: <a href="25-localise.html">Week 12 · Where am I?</a>. <a href="index.html#my-robot">Your robot, week by week</a>.</div>
+<p class="lede">Your robot drives around and turns its laser readings into its own map. When it knows where it is, the map is 100% right, and it even finds the cat the official map doesn't know about.</p>
+<div class="card note" id="journey"><strong>Week 11 of 16.</strong> <strong>Today</strong> it learns to scan the room and draw its own map. Next: <a href="25-localise.html">Week 12 · Where am I?</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<details><summary>So far your robot: 11 skills ✓</summary>✓ moves ✓ looks around ✓ reads real phone data ✓ stops for the cat ✓ plans routes ✓ holds a steady angle ✓ fixes typos ✓ understands sentences ✓ writes plans ✓ drives on real wheels ✓ checks every action.</details></div>
 
 <div class="facts">
   <div><b>Time</b>2–3 hours</div>
@@ -57,7 +60,7 @@ svg .u { fill: var(--line); } svg .est { fill: none; stroke: var(--idea); stroke
 
 <div class="box idea"><span class="tag">💡 The idea · two points of view</span>
 <p>If a friend says "the ball is on my left", you can only find it if you know which way your friend is facing. The laser measures angles from where the <b>robot</b> faces. The map uses the <b>room's</b> x and y. To go from one to the other, add the robot's heading to the beam's angle:</p>
-<svg class="diagram" viewBox="0 0 420 320" role="img" aria-label="Robot frame and room frame: the robot's heading plus the beam angle gives the beam's angle in the room">
+<svg class="diagram big-lbl" viewBox="0 0 420 300" role="img" aria-label="Robot frame and room frame: the robot's heading plus the beam angle gives the beam's angle in the room">
 <defs><marker id="ah-frames" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="fill-fg"/></marker></defs>
 <rect x="330" y="40" width="16" height="260" class="w"/><text x="352" y="56" class="lbl">wall</text>
 <line x1="20" y1="20" x2="110" y2="20" class="ax-room" marker-end="url(#ah-frames)"/><text x="114" y="24" class="lbl rmt">x</text>
@@ -69,34 +72,99 @@ svg .u { fill: var(--line); } svg .est { fill: none; stroke: var(--idea); stroke
 <line x1="170" y1="170" x2="220" y2="257" class="ax-bot" marker-end="url(#ah-frames)"/><text x="186" y="290" class="lbl bott">robot's right</text>
 <path d="M 222 140 A 60 60 0 0 1 222 200" class="arc"/><text x="236" y="176" class="lbl beamt">+60°</text>
 <circle cx="170" cy="170" r="22" class="robot"/><text x="170" y="178" text-anchor="middle" font-size="22">🤖</text>
-<text x="20" y="314" class="lbl">room angle = heading (−30°) + beam (+60°) = 30°</text>
 </svg>
-<p>Then walk the distance along that angle from where the robot stands: <code>x = robot_x + distance × cos(angle)</code>, <code>y = robot_y + distance × sin(angle)</code>. Because y grows <em>down</em> the screen, a positive angle turns clockwise, which is to the robot's right.</p>
+<p class="room-caption">The robot faces −30°. Its beam is +60° to its right. In the room, the beam points −30° + 60° = <b>30°</b>.</p>
+<p>Then walk along the beam from where the robot stands. A sloping walk is the same as two straight ones: some steps <b>across</b> (x), then some steps <b>down</b> (y).</p>
+<svg class="diagram" viewBox="0 0 300 190" role="img" aria-label="A beam drawn as the long side of a right triangle: first go across (the x step), then go down (the y step), and you land at the beam's end">
+<line x1="40" y1="40" x2="240" y2="40" stroke="var(--idea)" stroke-width="3" stroke-dasharray="7 5"/>
+<line x1="240" y1="40" x2="240" y2="155" stroke="var(--bot)" stroke-width="3" stroke-dasharray="7 5"/>
+<line x1="40" y1="40" x2="240" y2="155" class="beam"/><circle cx="240" cy="155" r="6" class="hit"/>
+<path d="M 90 40 A 50 50 0 0 1 83 65" class="arc"/><text x="96" y="64" font-size="14" class="beamt">30°</text>
+<text x="40" y="26" font-size="15" font-weight="700" class="rmt">1. across: the x step</text>
+<text x="232" y="92" font-size="15" font-weight="700" class="bott" text-anchor="end">2. down:</text>
+<text x="232" y="110" font-size="15" font-weight="700" class="bott" text-anchor="end">the y step</text>
+<text x="120" y="140" font-size="15" class="beamt" text-anchor="end">beam</text>
+<text x="40" y="52" text-anchor="middle" font-size="22">🤖</text>
+<text x="10" y="184" font-size="14" class="muted">y grows down, so +30° turns clockwise</text>
+</svg>
+<p>Because y grows <em>down</em> the screen, a positive angle turns clockwise, which is to the robot's right. In step 1 of the Build, <code>cos</code> and <code>sin</code> work out the two steps for you.</p>
 </div>
 
 <div class="box idea"><span class="tag">💡 The idea · every beam votes</span>
 <p>Each beam is a poke with the stick. The squares it passes through get a <b>free</b> vote. The square where it stops gets a <b>wall</b> vote. Here are four beams in a small practice room (the numbers come from the lesson's own <code>squares_passed</code> code):</p>
 <svg class="diagram" viewBox="0 0 392 258" role="img" aria-label="Four beams. Squares a beam passes through get a free vote (green); the square where it stops gets a wall vote (red)">
-<rect class="w" x="0" y="0" width="56" height="56"/><rect class="w" x="56" y="0" width="56" height="56"/><rect class="w" x="112" y="0" width="56" height="56"/><rect class="w" x="168" y="0" width="56" height="56"/><rect class="w" x="224" y="0" width="56" height="56"/><rect class="w" x="280" y="0" width="56" height="56"/><rect class="w" x="336" y="0" width="56" height="56"/><rect class="w" x="0" y="56" width="56" height="56"/><rect class="f" x="56" y="56" width="56" height="56"/><rect class="f" x="112" y="56" width="56" height="56"/><rect class="f" x="168" y="56" width="56" height="56"/><rect class="f" x="224" y="56" width="56" height="56"/><rect class="f" x="280" y="56" width="56" height="56"/><rect class="w" x="336" y="56" width="56" height="56"/><rect class="w" x="0" y="112" width="56" height="56"/><rect class="f" x="56" y="112" width="56" height="56"/><rect class="f" x="112" y="112" width="56" height="56"/><rect class="w" x="168" y="112" width="56" height="56"/><rect class="f" x="224" y="112" width="56" height="56"/><rect class="f" x="280" y="112" width="56" height="56"/><rect class="w" x="336" y="112" width="56" height="56"/><rect class="w" x="0" y="168" width="56" height="56"/><rect class="w" x="56" y="168" width="56" height="56"/><rect class="w" x="112" y="168" width="56" height="56"/><rect class="w" x="168" y="168" width="56" height="56"/><rect class="w" x="224" y="168" width="56" height="56"/><rect class="w" x="280" y="168" width="56" height="56"/><rect class="w" x="336" y="168" width="56" height="56"/><rect class="vfree" x="59" y="115" width="50" height="50" rx="6"/><text x="68" y="132" class="vt okt" text-anchor="middle">4</text><rect class="vfree" x="59" y="59" width="50" height="50" rx="6"/><text x="84.0" y="90.0" class="vt okt" text-anchor="middle">1</text><rect class="vwall" x="59" y="3" width="50" height="50" rx="6"/><text x="84.0" y="34.0" class="vt failt" text-anchor="middle">1</text><rect class="vfree" x="115" y="115" width="50" height="50" rx="6"/><text x="140.0" y="146.0" class="vt okt" text-anchor="middle">3</text><rect class="vfree" x="115" y="59" width="50" height="50" rx="6"/><text x="140.0" y="90.0" class="vt okt" text-anchor="middle">1</text><rect class="vfree" x="171" y="59" width="50" height="50" rx="6"/><text x="196.0" y="90.0" class="vt okt" text-anchor="middle">1</text><rect class="vwall" x="171" y="3" width="50" height="50" rx="6"/><text x="196.0" y="34.0" class="vt failt" text-anchor="middle">1</text><rect class="vwall" x="171" y="115" width="50" height="50" rx="6"/><text x="196.0" y="146.0" class="vt failt" text-anchor="middle">1</text><rect class="vwall" x="115" y="171" width="50" height="50" rx="6"/><text x="140.0" y="202.0" class="vt failt" text-anchor="middle">1</text><line x1="84" y1="140" x2="99" y2="55" class="beam"/><circle cx="99" cy="55" r="5" class="hit"/><line x1="84" y1="140" x2="204" y2="56" class="beam"/><circle cx="204" cy="56" r="5" class="hit"/><line x1="84" y1="140" x2="168" y2="140" class="beam"/><circle cx="168" cy="140" r="5" class="hit"/><line x1="84" y1="140" x2="132" y2="168" class="beam"/><circle cx="132" cy="168" r="5" class="hit"/><text x="84.0" y="149.0" text-anchor="middle" font-size="24">🤖</text><text x="4" y="248" class="lbl"><tspan class="okt">green = free votes</tspan>   <tspan class="failt">red = wall votes</tspan></text></svg>
+<rect class="w" x="0" y="0" width="56" height="56"/><rect class="w" x="56" y="0" width="56" height="56"/><rect class="w" x="112" y="0" width="56" height="56"/><rect class="w" x="168" y="0" width="56" height="56"/><rect class="w" x="224" y="0" width="56" height="56"/><rect class="w" x="280" y="0" width="56" height="56"/><rect class="w" x="336" y="0" width="56" height="56"/><rect class="w" x="0" y="56" width="56" height="56"/><rect class="f" x="56" y="56" width="56" height="56"/><rect class="f" x="112" y="56" width="56" height="56"/><rect class="f" x="168" y="56" width="56" height="56"/><rect class="f" x="224" y="56" width="56" height="56"/><rect class="f" x="280" y="56" width="56" height="56"/><rect class="w" x="336" y="56" width="56" height="56"/><rect class="w" x="0" y="112" width="56" height="56"/><rect class="f" x="56" y="112" width="56" height="56"/><rect class="f" x="112" y="112" width="56" height="56"/><rect class="w" x="168" y="112" width="56" height="56"/><rect class="f" x="224" y="112" width="56" height="56"/><rect class="f" x="280" y="112" width="56" height="56"/><rect class="w" x="336" y="112" width="56" height="56"/><rect class="w" x="0" y="168" width="56" height="56"/><rect class="w" x="56" y="168" width="56" height="56"/><rect class="w" x="112" y="168" width="56" height="56"/><rect class="w" x="168" y="168" width="56" height="56"/><rect class="w" x="224" y="168" width="56" height="56"/><rect class="w" x="280" y="168" width="56" height="56"/><rect class="w" x="336" y="168" width="56" height="56"/><rect class="vfree" x="59" y="115" width="50" height="50" rx="6"/><text x="68" y="132" class="vt okt" text-anchor="middle">4</text><rect class="vfree" x="59" y="59" width="50" height="50" rx="6"/><text x="84.0" y="90.0" class="vt okt" text-anchor="middle">1</text><rect class="vwall" x="59" y="3" width="50" height="50" rx="6"/><text x="84.0" y="34.0" class="vt failt" text-anchor="middle">1</text><rect class="vfree" x="115" y="115" width="50" height="50" rx="6"/><text x="140.0" y="146.0" class="vt okt" text-anchor="middle">3</text><rect class="vfree" x="115" y="59" width="50" height="50" rx="6"/><text x="140.0" y="90.0" class="vt okt" text-anchor="middle">1</text><rect class="vfree" x="171" y="59" width="50" height="50" rx="6"/><text x="196.0" y="90.0" class="vt okt" text-anchor="middle">1</text><rect class="vwall" x="171" y="3" width="50" height="50" rx="6"/><text x="196.0" y="34.0" class="vt failt" text-anchor="middle">1</text><rect class="vwall" x="171" y="115" width="50" height="50" rx="6"/><text x="196.0" y="146.0" class="vt failt" text-anchor="middle">1</text><rect class="vwall" x="115" y="171" width="50" height="50" rx="6"/><text x="140.0" y="202.0" class="vt failt" text-anchor="middle">1</text><line x1="84" y1="140" x2="99" y2="55" class="beam"/><circle cx="99" cy="55" r="5" class="hit"/><line x1="84" y1="140" x2="204" y2="56" class="beam"/><circle cx="204" cy="56" r="5" class="hit"/><line x1="84" y1="140" x2="168" y2="140" class="beam"/><circle cx="168" cy="140" r="5" class="hit"/><line x1="84" y1="140" x2="132" y2="168" class="beam"/><circle cx="132" cy="168" r="5" class="hit"/><text x="84.0" y="149.0" text-anchor="middle" font-size="24">🤖</text><text x="4" y="248" class="lbl" style="font-size:18px"><tspan class="okt">green = free votes</tspan>   <tspan class="failt">red = wall votes</tspan></text></svg>
+<p><b>Zoom in on one beam.</b> How does the code know which squares a beam passed? It walks along the beam in tiny 5 cm steps (the dots) and notes each new square it lands in. The last square is where the beam stopped, so it is the wall, not free:</p>
+<svg class="diagram" viewBox="0 0 310 214" role="img" aria-label="One beam crossing a grid of 0.5 m squares, with a dot every 5 cm. The four squares it passes through are green (free). The square where it ends is red: that is the wall, so it is left out.">
+<rect x="5" y="5" width="75" height="75" class="vfree" stroke="var(--muted)"/>
+<rect x="80" y="5" width="75" height="75" class="vfree" stroke="var(--muted)"/>
+<rect x="155" y="5" width="75" height="75" class="vfree" stroke="var(--muted)"/>
+<rect x="230" y="5" width="75" height="75" class="u" stroke="var(--muted)"/>
+<rect x="5" y="80" width="75" height="75" class="u" stroke="var(--muted)"/>
+<rect x="80" y="80" width="75" height="75" class="u" stroke="var(--muted)"/>
+<rect x="155" y="80" width="75" height="75" class="vfree" stroke="var(--muted)"/>
+<rect x="230" y="80" width="75" height="75" class="vwall" stroke="var(--muted)"/>
+<line x1="42" y1="28" x2="282" y2="132" class="beam"/>
+<circle cx="42.5" cy="27.5" r="2.2" class="fill-fg"/>
+<circle cx="49.4" cy="30.5" r="2.2" class="fill-fg"/>
+<circle cx="56.2" cy="33.5" r="2.2" class="fill-fg"/>
+<circle cx="63.1" cy="36.5" r="2.2" class="fill-fg"/>
+<circle cx="70.0" cy="39.5" r="2.2" class="fill-fg"/>
+<circle cx="76.9" cy="42.5" r="2.2" class="fill-fg"/>
+<circle cx="83.7" cy="45.5" r="2.2" class="fill-fg"/>
+<circle cx="90.6" cy="48.5" r="2.2" class="fill-fg"/>
+<circle cx="97.5" cy="51.5" r="2.2" class="fill-fg"/>
+<circle cx="104.3" cy="54.6" r="2.2" class="fill-fg"/>
+<circle cx="111.2" cy="57.6" r="2.2" class="fill-fg"/>
+<circle cx="118.1" cy="60.6" r="2.2" class="fill-fg"/>
+<circle cx="125.0" cy="63.6" r="2.2" class="fill-fg"/>
+<circle cx="131.8" cy="66.6" r="2.2" class="fill-fg"/>
+<circle cx="138.7" cy="69.6" r="2.2" class="fill-fg"/>
+<circle cx="145.6" cy="72.6" r="2.2" class="fill-fg"/>
+<circle cx="152.4" cy="75.6" r="2.2" class="fill-fg"/>
+<circle cx="159.3" cy="78.6" r="2.2" class="fill-fg"/>
+<circle cx="166.2" cy="81.6" r="2.2" class="fill-fg"/>
+<circle cx="173.1" cy="84.6" r="2.2" class="fill-fg"/>
+<circle cx="179.9" cy="87.6" r="2.2" class="fill-fg"/>
+<circle cx="186.8" cy="90.6" r="2.2" class="fill-fg"/>
+<circle cx="193.7" cy="93.6" r="2.2" class="fill-fg"/>
+<circle cx="200.5" cy="96.6" r="2.2" class="fill-fg"/>
+<circle cx="207.4" cy="99.6" r="2.2" class="fill-fg"/>
+<circle cx="214.3" cy="102.7" r="2.2" class="fill-fg"/>
+<circle cx="221.2" cy="105.7" r="2.2" class="fill-fg"/>
+<circle cx="228.0" cy="108.7" r="2.2" class="fill-fg"/>
+<circle cx="234.9" cy="111.7" r="2.2" class="fill-fg"/>
+<circle cx="241.8" cy="114.7" r="2.2" class="fill-fg"/>
+<circle cx="248.6" cy="117.7" r="2.2" class="fill-fg"/>
+<circle cx="255.5" cy="120.7" r="2.2" class="fill-fg"/>
+<circle cx="262.4" cy="123.7" r="2.2" class="fill-fg"/>
+<circle cx="269.2" cy="126.7" r="2.2" class="fill-fg"/>
+<circle cx="276.1" cy="129.7" r="2.2" class="fill-fg"/>
+<circle cx="282" cy="132" r="6" class="hit"/>
+<text x="42" y="38" text-anchor="middle" font-size="20">🤖</text>
+<text x="5" y="182" font-size="14" class="okt" font-weight="700">green: passed through, a free vote each</text>
+<text x="5" y="204" font-size="14" class="failt" font-weight="700">red: the end square, left out (it's the wall)</text>
+</svg>
+
 <p>One scan can be wrong (the laser has a little noise). But after hundreds of scans, each square has lots of votes, and the majority wins: more wall votes than free votes means wall.</p>
 </div>
 
 <div class="box idea"><span class="tag">💡 The idea · a map appears</span>
-<p>The lesson drives the robot around the room, scanning as it goes. If it knows exactly where it is for every scan (cheating, using the hidden true position), every square the map decided is right: <b>100%</b> of 76:</p>
+<p>The lesson drives the robot around the room, scanning as it goes. If it knows exactly where it is for every scan (cheating, using the hidden true position), every square the map decided is right: <b>100%</b> of 79:</p>
 <div class="twin">
 <div><div class="room" data-cat="4,1" data-label="The real room"></div></div>
-<div><div class="room" data-room="####?#####|#...?....#|#..##....?|#..#...?.#|#....##..#|#........#|#.#......#|##########" data-mark="4,1" data-label="The robot's map: 100% of 76 squares right"></div></div>
+<div><div class="room" data-room="####?#####|#...?....#|#..##....?|#..#...?.#|#....##..#|#........#|#.#......#|##########" data-mark="4,1" data-label="The robot's map: 100% of 79 squares right"></div></div>
 </div>
-<p>Grey squares are "never seen" (no beam reached them). Look at the red ring, the cat's square (4, 1): it's grey. On its first trip up the room, the 2% bigger left wheel steered the robot into the wall block in the middle, and it stayed stuck there, scraping, for the rest of the drive. Its wheels kept turning and its encoders kept counting, so it never noticed. From that spot the cat is hidden behind the wall block, so no beam ever reached it. (Drive right up to the cat in the Play demo below and the laser finds it: the official map says floor there, but the laser sees something solid. The map knows something the official map doesn't.)</p>
+<p>Here the robot also steers by its true position, so it follows the route cleanly and never bumps into anything. Look at the red ring, the cat's square (4, 1). The official map says floor, but the robot's map says <b>wall</b>: the laser hit something solid there. That's the cat. The map knows something the official map doesn't. (The cat's square doesn't count towards the score.)</p>
 </div>
 
 <div class="box idea"><span class="tag">💡 The idea · why the map smears</span>
-<p>A real robot doesn't know where it is. It uses its odometry from week 9, which drifts (remember the 2% bigger left wheel?). Here it's even worse: while the robot is stuck against the wall block, its odometry thinks it is still driving the whole route. Every scan gets stuck onto the map in the wrong place, so walls get drawn where there's floor, and floor where there's wall. Same drive, same laser, only the position is different:</p>
+<p>A real robot doesn't know where it is. It uses its odometry from week 9, which drifts (remember the 2% bigger left wheel?). It also steers by that drifting guess, so it wanders off the route and scrapes along walls. Its wheels keep turning and its encoders keep counting, so it never notices. Every scan gets stuck onto the map in the wrong place, so walls get drawn where there's floor, and floor where there's wall. Same room, same laser, only the position is different:</p>
 <div class="twin">
-<div><div class="room" data-room="####?#####|#...?....#|#..##....?|#..#...?.#|#....##..#|#........#|#.#......#|##########" data-label="Knowing where it is: 100% of 76"></div></div>
-<div><div class="room" data-room="....#....#|#.......#.|#..#......|..........|..........|#........#|#########?|?#????????" data-label="Using its own odometry: 62% of 69"></div></div>
+<div><div class="room" data-room="####?#####|#...?....#|#..##....?|#..#...?.#|#....##..#|#........#|#.#......#|##########" data-label="Knowing where it is: 100% of 79"></div></div>
+<div><div class="room" data-room="....#....#|#.......#.|#..#......|..........|..........|#........#|#########?|?#????????" data-label="Using its own odometry: 55% of 71"></div></div>
 </div>
-<p>The bottom wall is drawn a whole row too high, the right wall a column too far left, and most of the top wall has vanished. A good map needs a good idea of where you are. Next week you'll fix the other half: knowing where you are needs a map. Robotics people call doing both at once <b>SLAM</b>.</p>
+<p>The top wall has vanished, a wall runs down column 3 where there's floor, and the bottom wall is drawn a whole row too high. Only 55% of the squares it decided are right. A good map needs a good idea of where you are. Next week you'll fix the other half: knowing where you are needs a map. Robotics people call doing both at once <b>SLAM</b>.</p>
 </div>
 
 <h2 id="play">2. Play</h2>
@@ -122,7 +190,7 @@ svg .u { fill: var(--line); } svg .est { fill: none; stroke: var(--idea); stroke
 <div class="box build"><span class="tag">🛠 Build · <code>project/homework/lesson24_map.py</code></span>
 <p>Five short functions. After each one, run the checker from the <code>project</code> folder.</p>
 <ol class="steps">
-<li><b><code>beam_end(pose, beam_deg, distance)</code></b>: robot frame → room frame. <code>pose</code> is <code>(x, y, heading)</code>, with the heading in <em>radians</em> but the beam angle in <em>degrees</em>.</li>
+<li><b><code>beam_end(pose, beam_deg, distance)</code></b>: robot frame → room frame. <code>pose</code> is <code>(x, y, heading)</code>, with the heading in <em>radians</em> but the beam angle in <em>degrees</em>. The room angle is <code>heading + beam</code>, then the two steps from the triangle picture: <code>x = robot_x + distance × cos(angle)</code> and <code>y = robot_y + distance × sin(angle)</code>.</li>
 </ol>
 </div>
 <div class="box checkpoint"><span class="tag">✅ Checkpoint 1</span>
@@ -150,7 +218,15 @@ return x + distance * math.cos(a), y + ____ * math.____(a)</code></pre></details
 </ol>
 </div>
 <div class="box checkpoint"><span class="tag">✅ Checkpoint 2</span>
-<p><code>python3 check.py 24</code> now shows <code>✓ square_of</code> as well, and ends <code>2/5 passed</code>.</p>
+<p>Run <code>python3 check.py 24</code> again. You should see:</p>
+<pre><code>Lesson 24: lesson24_map.py
+  ✓ beam_end
+  ✓ square_of
+  … squares_passed: not written yet (Lesson 24: write this function)
+  … add_scan + to_map: not written yet (Lesson 24: write this function)
+  … real map: not written yet (Lesson 24: write this function)
+  2/5 passed</code></pre>
+<p>If you see <code>✗ square_of: 0.5 m squares: (1.24, 0.5) is in square (2, 1)</code>, you divided by 1 instead of by <code>SQUARE</code> (0.5), or used <code>round</code> instead of <code>//</code>.</p>
 </div>
 
 <div class="box build"><span class="tag">🛠 Build</span>
@@ -159,7 +235,14 @@ return x + distance * math.cos(a), y + ____ * math.____(a)</code></pre></details
 </ol>
 </div>
 <div class="box checkpoint"><span class="tag">✅ Checkpoint 3</span>
-<p><code>python3 check.py 24</code> now shows <code>✓ squares_passed</code> too, and ends <code>3/5 passed</code>.</p>
+<p>Run <code>python3 check.py 24</code> again. You should see:</p>
+<pre><code>Lesson 24: lesson24_map.py
+  ✓ beam_end
+  ✓ square_of
+  ✓ squares_passed
+  … add_scan + to_map: not written yet (Lesson 24: write this function)
+  … real map: not written yet (Lesson 24: write this function)
+  3/5 passed</code></pre>
 <p>If you see <code>✗ squares_passed: east along row 0 from square 0 to square 3: passes 0, 1, 2 (not 3)</code>, you kept the end square. Work out <code>end = square_of(x1, y1)</code> first and skip it.</p>
 </div>
 <div class="box stuck"><span class="tag">🆘 Stuck on squares_passed?</span>
@@ -211,30 +294,30 @@ return votes</code></pre></details>
 
 2) MAPPING. Drive around the room scanning, and let every beam vote.
 
-   knowing exactly where it is (cheating): 100% of 76 squares right
+   knowing exactly where it is (cheating): 100% of 79 squares right
    real room      the robot's map
-   ##########     ####?#####
-   #........#     #...?....#
-   #..##....#     #..##....?
-   #..#.....#     #..#...?.#
+   ##########     ##########
+   #........#     #...#....#
+   #..##....#     #..##....#
+   #..#.....#     #..#.....#
    #....##..#     #....##..#
    #........#     #........#
    #.#....B.#     #.#......#
    ##########     ##########
 
-   using its own odometry: 62% of 69 squares right
+   using its own odometry: 55% of 71 squares right
    real room      the robot's map
-   ##########     ....#....#
-   #........#     #.......#.
+   ##########     ...#......
+   #........#     ...#......
    #..##....#     #..#......
-   #..#.....#     ..........
+   #..#.....#     .........#
    #....##..#     ..........
-   #........#     #........#
-   #.#....B.#     #########?
-   ##########     ?#????????
+   #........#     ......####
+   #.#....B.#     .########?
+   ##########     ##?#??????
 
    Look at square (4, 1): the official map says floor, but the scanner found the cat.</code></pre>
-<p>Facing south, the robot's right is west, so (1.0, 2.0) plus 1 m west is (0.0, 2.0). The last line is printed every run, but look at the map: in this run square (4, 1) is a <code>?</code>. The robot got stuck behind the wall block and never saw the cat (see "A map appears" above). The cat's square doesn't count towards the score either way.</p>
+<p>Facing south, the robot's right is west, so (1.0, 2.0) plus 1 m west is (0.0, 2.0). In the first map, square (4, 1) is a <code>#</code>: the scanner found the cat. The cat's square doesn't count towards the score.</p>
 </div>
 
 <h2 id="add-to-robot">4. Add it to your robot</h2>
@@ -246,33 +329,33 @@ return rows + [f"{right:.0%} of {total} squares right (the 'c' square is the cat
 </div>
 <div class="box checkpoint"><span class="tag">✅ Checkpoint · your robot</span>
 <p>Run <code>python3 my_robot.py</code> and type <code>map</code>. After the room picture you should see:</p>
-<pre><code>  ####?#####
-  #...?....#
-  #..##....?
-  #..#...?.#
+<pre><code>  ##########
+  #...c....#
+  #..##....#
+  #..#.....#
   #....##..#
   #........#
   #.#......#
   ##########
-  100% of 76 squares right (the 'c' square is the cat the official map doesn't know)</code></pre>
-<p>Row 1, column 4 is the cat's square, and here it's a <code>?</code>: the robot got stuck behind the wall block and never saw the cat. <b>Bonus:</b> the worked robot swaps that square for a <code>c</code> when it's a <code>#</code> (the laser found the cat). In this run it's a <code>?</code>, so nothing changes and no <code>c</code> appears. Write the swap anyway: it's ready for the day your robot drives close enough.</p>
+  100% of 79 squares right (the 'c' square is the cat the official map doesn't know)</code></pre>
+<p>Row 1, column 4 is the cat's square. The map has a <code>#</code> there (the laser found the cat), and the worked robot swaps it for a <code>c</code>. <b>Bonus:</b> write that swap yourself, so your <code>map</code> shows the <code>c</code> too.</p>
 <p>Then <code>cd ..</code> and run <code>python3 check.py robot</code>. You should see <code>✓ week 11: makes a map</code>, and if every earlier week is done, <code>14/21 passed</code>.</p>
 </div>
 
 <h2 id="challenge">5. Real-world challenge</h2>
 <div class="box build"><span class="tag">🌍 Perfect wheels, still smeared?</span>
-<p>Was the 62% all the big wheel's fault? Map with odometry but <b>equal</b> wheels. From <code>project/homework</code>:</p>
+<p>Was the 55% all the big wheel's fault? Map with odometry but <b>equal</b> wheels. From <code>project/homework</code>:</p>
 <pre><code>python3 -c "from lesson24_map import explore, score; m, _ = explore(False, mismatch=0.0); print(score(m))"</code></pre>
-<p>Real output: <code>(0.6582278481012658, 79)</code>. That's 66%: a little better than 62%, but still far short of 100%. The wheels slip a little on every move, and those small errors add up. Odometry alone is never enough.</p>
+<p>Real output: <code>(0.8026315789473685, 76)</code>. That's 80%: much better than 55%, but still short of 100%. The wheels slip a little on every move, and those small errors add up. Odometry alone is never enough.</p>
 <p><b>On your own:</b> map your bedroom on squared paper. Stand in one spot, and measure the distance to the nearest thing in 8 directions with a tape measure. Mark the free squares and the walls. Then take 3 steps, <em>guess</em> where you are, and do it again. If your guess is off, the walls don't line up. That's the smear.</p>
 </div>
 
 <h2 id="check">6. Check yourself</h2>
 <details><summary>The robot is at (1.0, 2.0) facing east (0°). Its straight-ahead beam hits a wall 1 m away. Where is that point in the room?</summary><p>(2.0, 2.0). Heading 0 plus beam 0 is 0 (east), and 1 m east of x = 1.0 is x = 2.0.</p></details>
 <details><summary>Why does the end square only get a wall vote if the distance is less than 4 m?</summary><p>4.0 m is the scanner's maximum. A reading of 4.0 means "I hit nothing", so there's no wall to vote for. The squares along the way are still free.</p></details>
-<details><summary>Why is the cat's square (4, 1) a "?" in the map?</summary><p>No beam ever ended in or passed through that square. The robot got stuck below the wall block, which hides the cat. The robot only knows what its beams reached.</p></details>
+<details><summary>Why is the cat's square (4, 1) a "#" in the map when the official map says floor?</summary><p>Beams ended in that square, so it got wall votes. Something solid is there: the cat. The robot only knows what its beams reached, and here they reached the cat.</p></details>
 <details><summary>Drive next to the cat in the Play demo. Why does your map find it when the official map doesn't?</summary><p>The official map was written by hand before the cat sat down. The new map is built from what the laser actually measured today.</p></details>
-<details><summary>The same laser readings give 100% one way and 62% the other. What's different?</summary><p>Only where the robot <em>thinks</em> it was for each scan. Drifting odometry puts each scan in a slightly wrong place on the map.</p></details>
+<details><summary>Knowing where it is gives 100%. Using odometry gives 55%. What's different?</summary><p>Where the robot <em>thinks</em> it is. Drifting odometry puts each scan in the wrong place on the map. It also steers by that wrong guess, so it drives a different path and scrapes walls.</p></details>
 
 <h2 id="more">7. Want to know more?</h2>
 <details><summary>Real occupancy maps</summary><p>Real robots don't just count votes. They keep a probability for each square, often stored as "log-odds" so that adding a vote is just adding a number. Squares are also much smaller than 0.5 m, often a few centimetres.</p></details>
