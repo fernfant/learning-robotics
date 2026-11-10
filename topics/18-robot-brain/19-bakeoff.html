@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Week 15 · The bake-off</title>
 <link rel="stylesheet" href="../../style.css?v=16">
+<style>
+@media (max-width: 480px) { .kid dl { grid-template-columns: 1fr; gap: 2px; } .kid dd { margin-bottom: 8px; } }
+#journey details { margin: 8px 0 0; padding: 6px 12px; }
+</style>
 </head>
 <body>
 <main>
@@ -13,7 +17,7 @@
 <div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 15 of 16 · Part B</div>
 <h1>The bake-off: every brain, the same 12 tasks</h1>
 <p class="lede">Race every brain you built on the same 12 tasks, judge the room afterwards, and see who really wins.</p>
-<div class="card note" id="journey"><strong>Week 15 of 16 · Part B.</strong> So far your robot: ✓ moves ✓ senses ✓ reads real phone data ✓ stops for the cat ✓ plans routes ✓ steadies its angle ✓ understands commands ✓ writes plans ✓ drives on wheels ✓ checks every action ✓ maps the room ✓ finds itself ✓ knows its thinking speed ✓ learns from a teacher ✓ can ask Claude (with a key). <strong>Today</strong> it learns to sit its own exam: the same 12 tasks as every brain. Next: <a href="12-preferences.html">Week 16 · Part A: what people prefer</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a>, then type <code>exam</code>.</div>
+<div class="card note" id="journey"><strong>Week 15 of 16 · Part B.</strong> <strong>Today</strong> it learns to sit its own exam: the same 12 tasks as every brain. Next: <a href="12-preferences.html">Week 16 · Part A: what people prefer</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a>, then type <code>exam</code>.<details><summary>So far your robot: 15 skills</summary>✓ moves ✓ senses ✓ reads real phone data ✓ stops for the cat ✓ plans routes ✓ steadies its angle ✓ understands commands ✓ writes plans ✓ drives on wheels ✓ checks every action ✓ maps the room ✓ finds itself ✓ knows its thinking speed ✓ learns from a teacher ✓ can ask Claude (with a key).</details></div>
 
 <div class="facts">
   <div><b>Time</b>2–3 hours (plus optional stretches)</div>
@@ -108,19 +112,26 @@
 <p>In <code>project/homework</code>, open <code>lesson19_bakeoff.py</code>. <code>TASKS</code>, <code>run_bakeoff</code> and <code>print_table</code> are written for you: every brain gets a <em>fresh</em> robot for every task. You write the judge and the scorecard.</p>
 <div class="box build"><span class="tag">🛠 Build</span>
 <ol class="steps">
-<li><b>Write <code>score_task(task, robot, result)</code></b>: did the robot do the right thing? Return <code>(passed, reason)</code>, checking in this order and stopping at the first failure:
+<li><b>Write <code>score_task(task, robot, result)</code></b>: the finish-line camera. Look at the room and the reply, check five things in order, and stop at the first one that fails:
 <ol>
-<li><code>robot.binned == task["binned"]</code> (exactly these blocks), else <code>"binned X, wanted Y"</code>;</li>
-<li><code>task.get("still")</code>: the robot must still be at <code>ROBOT_START</code>, else <code>"moved but shouldn't have"</code>;</li>
-<li><code>"at"</code>: the robot must end at <code>task["at"]</code>, else <code>"ended at P, wanted Q"</code>;</li>
-<li><code>"says"</code>: that text must be in <code>result["reply"]</code>;</li>
-<li><code>task.get("asks")</code>: the reply, stripped, must end with "?", else <code>"should ask a question"</code>.</li>
+<li>exactly the right blocks are in the bin;</li>
+<li>if it should stay still, it's still at the start;</li>
+<li>if it should end somewhere, it's there;</li>
+<li>if it should say something, the reply says it;</li>
+<li>if it should ask, the reply ends with "?".</li>
 </ol>
-All passed → <code>(True, "ok")</code>.</li>
+Return <code>(False, reason)</code> at the first failure, or <code>(True, "ok")</code>. The exact reasons are in Hint 1.</li>
 </ol>
 </div>
 <div class="box stuck"><span class="tag">🆘 Stuck?</span>
-<details><summary>Hint 1</summary><p>Signature: <code>def score_task(task, robot, result):</code>. Five <code>if</code>s, each with its own <code>return False, ...</code>, then <code>return True, "ok"</code>.</p></details>
+<details><summary>Hint 1</summary><p>Signature: <code>def score_task(task, robot, result):</code>. Five <code>if</code>s, each with its own <code>return False, ...</code>, then <code>return True, "ok"</code>. The checks and their reasons:</p>
+<ol>
+<li><code>robot.binned == task["binned"]</code>, else <code>"binned X, wanted Y"</code></li>
+<li><code>task.get("still")</code>: at <code>ROBOT_START</code>, else <code>"moved but shouldn't have"</code></li>
+<li><code>"at" in task</code>: at <code>task["at"]</code>, else <code>"ended at P, wanted Q"</code></li>
+<li><code>"says" in task</code>: in <code>result["reply"]</code>, else <code>"reply missing ..."</code></li>
+<li><code>task.get("asks")</code>: the stripped reply ends with "?", else <code>"should ask a question"</code></li>
+</ol></details>
 <details><summary>Hint 2</summary><p><code>robot.pos</code> may be a list: compare <code>tuple(robot.pos)</code>. Print sets with <code>sorted(robot.binned) or 'nothing'</code>. Use <code>result.get("reply", "")</code>.</p></details>
 <details><summary>Hint 3 (fill in the blanks)</summary><pre><code>reply = result.get("reply", "")
 if robot.binned != task["binned"]:
@@ -135,9 +146,17 @@ if task.get("asks") and not reply.strip().endswith(____):
     return False, "should ask a question"
 return True, "ok"</code></pre></details>
 </div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint 1: judge two tasks</span>
+<p>From <code>project/homework</code>, judge a fresh robot that did nothing, on task 3 ("make me a sandwich") and task 1 ("put the red block in the bin"):</p>
+<pre><code>python3 -c "from sim import SimRobot; from lesson19_bakeoff import TASKS, score_task; r = SimRobot(); print(score_task(TASKS[2], r, {'reply': ''})); print(score_task(TASKS[0], r, {'reply': ''}))"</code></pre>
+<p>Real output:</p>
+<pre><code>(True, 'ok')
+(False, "binned nothing, wanted ['red block']")</code></pre>
+<p>Doing nothing is right for a sandwich, and wrong for the red block. If you see <code>binned [], wanted ['red block']</code>, add <code>or 'nothing'</code> after each <code>sorted(...)</code>.</p>
+</div>
 <div class="box build"><span class="tag">🛠 Build</span>
 <ol class="steps" start="2">
-<li><b>Write <code>scorecard(rows)</code></b>: squeeze one brain's 12 rows (<code>{"passed", "seconds", "tokens_in", "tokens_out"}</code>) into <code>{"passed", "total", "p50", "p95", "cost"}</code>, using week 13's <code>summarize</code> and <code>cost_usd</code>. Check by hand: times 1, 2, 3 s, 1,000 input tokens each, first two passed → <code>{"passed": 2, "total": 3, "p50": 2.0, "p95": 3.0, "cost": 0.012}</code>.</li>
+<li><b>Write <code>scorecard(rows)</code></b>: squeeze one brain's 12 rows (<code>{"passed", "seconds", "tokens_in", "tokens_out"}</code>) into <code>{"passed", "total", "p50", "p95", "cost"}</code>, using week 13's <code>summarize</code> and <code>cost_usd</code>. Check by hand: times 1, 2, 3 s, 1,000 input tokens each, first two passed, should give 2 passed, p50 2 s, p95 3 s and $0.012.</li>
 </ol>
 </div>
 <div class="box stuck"><span class="tag">🆘 Stuck?</span>
@@ -148,7 +167,14 @@ return {"passed": sum(r["passed"] for r in rows), "total": len(rows),
         "p50": s["p50"], "p95": s[____],
         "cost": cost_usd(sum(r["tokens_in"] for r in rows), sum(r[____] for r in rows))}</code></pre></details>
 </div>
-<div class="box checkpoint"><span class="tag">✅ Checkpoint 1: run the race</span>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint 2: one scorecard</span>
+<p>From <code>project/homework</code>:</p>
+<pre><code>python3 -c "from lesson19_bakeoff import scorecard; print(scorecard([{'passed': True, 'seconds': 1, 'tokens_in': 1000, 'tokens_out': 0}, {'passed': True, 'seconds': 2, 'tokens_in': 1000, 'tokens_out': 0}, {'passed': False, 'seconds': 3, 'tokens_in': 1000, 'tokens_out': 0}]))"</code></pre>
+<p>Real output:</p>
+<pre><code>{'passed': 2, 'total': 3, 'p50': 2, 'p95': 3, 'cost': 0.012}</code></pre>
+<p>If <code>cost</code> is <code>0.004</code>, you priced one row's tokens, not all three.</p>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint 3: run the race</span>
 <pre><code>cd project/homework
 python3 lesson19_bakeoff.py</code></pre>
 <p>It takes about half a minute. Real output from the solution (your times will differ; the ✓ and ✗ won't):</p>
@@ -171,7 +197,7 @@ task                                         words   tinylm  attention  distille
 PASSED                                        5/12     8/12     8/12      10/12      10/12</code></pre>
 <p>(We narrowed the columns to fit; then come thinking times, costs of $0.000, and one line per ✗ with its reason.) The two "skipping" lines are normal: there are no Claude recordings yet. <b>If a brain scores 12/12</b>, your <code>binned</code> check is "the wanted blocks are in the bin" instead of "exactly these blocks".</p>
 </div>
-<div class="box checkpoint"><span class="tag">✅ Checkpoint 2: the checker</span>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint 4: the checker</span>
 <pre><code>cd ..
 python3 check.py 19</code></pre>
 <pre><code>  ✓ score_task: binned
@@ -183,14 +209,32 @@ python3 check.py 19</code></pre>
 </div>
 
 <h3 id="results">What the scoreboard tells you</h3>
-<p>Group the failures by <em>cause</em>, and each one points at a fix:</p>
-<ul>
-<li><b>One action only</b> (tasks 4, 6, 8): the word counter can only say one <code>{"intent", "object"}</code>. Week 8 fixed it with a new output format: whole plans, or <code>ask</code>.</li>
-<li><b>Hears the wrong intent</b> (tasks 2, 11): "where's" wasn't in the training templates. Week 14's teacher labels fixed it.</li>
-<li><b>An unseen word</b> (task 5): no small brain has ever seen "room".</li>
-<li><b>No idea where things are</b> (task 7): "closest" is about the room. No amount of training on words can fix it.</li>
-</ul>
-<p>And speed is a separate score. A brain that passes 12/12 but thinks for seconds is no good for "stop": the robot keeps rolling while it waits. Real robots use a <b>hybrid</b>: a fast local reflex for "stop" and the cat, and a big clever brain (checked by week 15's <code>validate_plan</code>) for hard commands.</p>
+<div class="box idea"><span class="tag">💡 The idea · sort the ✗ by cause</span>
+<p>Group the red crosses by <em>why</em> they failed (the circles are task numbers). Each group points at its own fix:</p>
+<svg class="diagram" viewBox="0 0 320 262" role="img" aria-label="Four kinds of failure. One action only: tasks 4, 6 and 8, fixed in week 8 by whole plans. Wrong intent: tasks 2 and 11, fixed in week 14 by teacher labels. Unseen word: task 5. Needs the room: task 7. Week 16 fixes both by looking at the room.">
+<defs><marker id="ah19" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+<text x="0" y="16" font-size="15" font-weight="700" fill="var(--fg)">One action only</text>
+<circle cx="14" cy="38" r="13" fill="var(--fail)" opacity=".9"/><text x="14" y="43" font-size="14" font-weight="700" text-anchor="middle" fill="#fff">4</text>
+<circle cx="46" cy="38" r="13" fill="var(--fail)" opacity=".9"/><text x="46" y="43" font-size="14" font-weight="700" text-anchor="middle" fill="#fff">6</text>
+<circle cx="78" cy="38" r="13" fill="var(--fail)" opacity=".9"/><text x="78" y="43" font-size="14" font-weight="700" text-anchor="middle" fill="#fff">8</text>
+<line x1="104" y1="38" x2="140" y2="38" stroke="var(--muted)" stroke-width="2" marker-end="url(#ah19)"/>
+<text x="148" y="43" font-size="14" font-weight="700" fill="var(--ok)">week 8: plans</text>
+<text x="0" y="80" font-size="15" font-weight="700" fill="var(--fg)">Wrong intent</text>
+<circle cx="14" cy="102" r="13" fill="var(--fail)" opacity=".9"/><text x="14" y="107" font-size="14" font-weight="700" text-anchor="middle" fill="#fff">2</text>
+<circle cx="46" cy="102" r="13" fill="var(--fail)" opacity=".9"/><text x="46" y="107" font-size="14" font-weight="700" text-anchor="middle" fill="#fff">11</text>
+<line x1="72" y1="102" x2="108" y2="102" stroke="var(--muted)" stroke-width="2" marker-end="url(#ah19)"/>
+<text x="116" y="107" font-size="14" font-weight="700" fill="var(--ok)">week 14: teacher</text>
+<text x="0" y="144" font-size="15" font-weight="700" fill="var(--fg)">Unseen word (“room”)</text>
+<circle cx="14" cy="166" r="13" fill="var(--fail)" opacity=".9"/><text x="14" y="171" font-size="14" font-weight="700" text-anchor="middle" fill="#fff">5</text>
+<line x1="40" y1="166" x2="76" y2="166" stroke="var(--muted)" stroke-width="2" marker-end="url(#ah19)"/>
+<text x="84" y="171" font-size="14" font-weight="700" fill="var(--bot)">week 16: look</text>
+<text x="0" y="208" font-size="15" font-weight="700" fill="var(--fg)">Needs the room (“closest”)</text>
+<circle cx="14" cy="230" r="13" fill="var(--fail)" opacity=".9"/><text x="14" y="235" font-size="14" font-weight="700" text-anchor="middle" fill="#fff">7</text>
+<line x1="40" y1="230" x2="76" y2="230" stroke="var(--muted)" stroke-width="2" marker-end="url(#ah19)"/>
+<text x="84" y="235" font-size="14" font-weight="700" fill="var(--bot)">week 16: look</text>
+</svg>
+<p>Speed is a separate score: a brain that thinks for seconds is no good for "stop", because the robot keeps rolling. Real robots use a <b>hybrid</b>: a fast local reflex for "stop" and the cat, and a big brain (checked by week 15's <code>validate_plan</code>) for hard commands.</p>
+</div>
 
 <h2 id="add-to-robot">4. Add it to your robot</h2>
 <div class="box bot"><span class="tag">🤖 Add it to your robot</span>
@@ -228,7 +272,8 @@ return f"I passed {____} of {len(TASKS)}."</code></pre></details>
 <p>10 of 12, the same as the best brain in the race, because your robot <em>has</em> that brain inside it. The two ✗ won't stay red: next week's boss takes it to 12 of 12.</p>
 </div>
 
-<h2 id="real-world">5. Real-world challenge: the family tidy-up bake-off</h2>
+<h2 id="real-world">5. Real-world challenge</h2>
+<div class="box world"><span class="tag">🌍 Real-world challenge · the family tidy-up bake-off</span>
 <ol class="steps">
 <li>Write 8 task cards like <code>TASKS</code> (a sock, a pen, a toy and a box as the bin): a simple one, two objects, "everything except the pen", "the one closest to the box", an ambiguous one, an impossible one, a question, and "stop".</li>
 <li>On the back of each card, write the pass rule <em>first</em>: what's in the box afterwards, should they move, should they ask.</li>
@@ -236,6 +281,7 @@ return f"I passed {____} of {len(TASKS)}."</code></pre></details>
 <li>Judge the room, not the words. Score passes out of 8 and the middle thinking time.</li>
 </ol>
 <p><b>On your own (20 minutes).</b> Play every card twice yourself: once as the strict word counter, once as you. Which cards did the strict version fail? The same ones as our word counter?</p>
+</div>
 
 <h2 id="check">6. Check yourself</h2>
 <details><summary>Why does every brain get a fresh robot for every task?</summary><p>So every run starts from the same room. Otherwise one task's binned block changes the next task, and the comparison isn't fair.</p></details>

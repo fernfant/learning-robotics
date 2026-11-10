@@ -115,18 +115,17 @@
 <h2 id="pid">4. PID: push, remember, brake</h2>
 <div class="box idea"><span class="tag">💡 The idea</span>
 <p>To turn to face a direction, steer by the <b>error</b>: how far you still have to go.</p>
-<svg class="diagram" viewBox="0 0 520 120" role="img" aria-label="Three parts of PID: P pushes harder the further away, I remembers errors that last, D brakes when the error shrinks fast">
-<g font-size="13" fill="var(--fg)" text-anchor="middle">
-<rect x="10" y="10" width="160" height="100" rx="12" fill="var(--build-soft)" stroke="var(--build)"/>
-<text x="90" y="40" font-size="22" font-weight="700" fill="var(--build)">P · push</text>
-<text x="90" y="66">far away? push hard.</text><text x="90" y="86">close? push gently.</text>
-<rect x="180" y="10" width="160" height="100" rx="12" fill="var(--idea-soft)" stroke="var(--idea)"/>
-<text x="260" y="40" font-size="22" font-weight="700" fill="var(--idea)">I · remember</text>
-<text x="260" y="66">still a bit off after</text><text x="260" y="86">ages? add a nudge.</text>
-<rect x="350" y="10" width="160" height="100" rx="12" fill="var(--ok-soft)" stroke="var(--ok)"/>
-<text x="430" y="40" font-size="22" font-weight="700" fill="var(--ok)">D · brake</text>
-<text x="430" y="66">closing in fast?</text><text x="430" y="86">ease off early.</text>
-</g></svg>
+<svg class="diagram" style="max-width:420px" viewBox="0 0 340 190" role="img" aria-label="Three parts of PID: P pushes harder the further away, I remembers errors that last, D brakes when the error shrinks fast">
+<rect x="2" y="4" width="336" height="54" rx="10" style="fill:var(--build-soft);stroke:var(--build)"/>
+<text x="14" y="27" style="font:700 17px sans-serif;fill:var(--build)">P · push</text>
+<text x="14" y="48" style="font:14px sans-serif;fill:var(--fg)">far away? push hard. close? gently.</text>
+<rect x="2" y="66" width="336" height="54" rx="10" style="fill:var(--idea-soft);stroke:var(--idea)"/>
+<text x="14" y="89" style="font:700 17px sans-serif;fill:var(--idea)">I · remember</text>
+<text x="14" y="110" style="font:14px sans-serif;fill:var(--fg)">still a bit off after ages? nudge.</text>
+<rect x="2" y="128" width="336" height="54" rx="10" style="fill:var(--ok-soft);stroke:var(--ok)"/>
+<text x="14" y="151" style="font:700 17px sans-serif;fill:var(--ok)">D · brake</text>
+<text x="14" y="172" style="font:14px sans-serif;fill:var(--fg)">closing in fast? ease off early.</text>
+</svg>
 <p>The motors have momentum (they take about a quarter of a second to change speed). So pushing hard with P alone swings straight past the goal, like a swing pushed too hard. Adding D brakes before it gets there. Real runs from <code>lesson23_wheels.py</code>, turning from 0° to 90°:</p>
 <svg class="diagram" viewBox="0 0 520 215" role="img" aria-label="Heading over time while turning to 90 degrees: P only overshoots to about 133 degrees and wobbles; PD rises and settles near 90 within about half a second">
 <line x1="40" y1="190" x2="480" y2="190" stroke="var(--muted)"/><line x1="40" y1="20" x2="40" y2="190" stroke="var(--muted)"/>
@@ -193,7 +192,22 @@
 
 <div class="box build"><span class="tag">🛠 Build</span>
 <ol class="steps" start="2" style="counter-reset: step 1">
-<li><b><code>move_pose(pose, d_left, d_right, wheel_base)</code></b>: one little arrow. <code>pose</code> is <code>(x, y, heading)</code> with the heading in <b>radians</b>. Forward by the average, turn by the difference:
+<li><b><code>move_pose(pose, d_left, d_right, wheel_base)</code></b>: one little arrow. <code>pose</code> is <code>(x, y, heading)</code> with the heading in <b>radians</b>. Go forward by the <b>average</b> of the wheels (<code>d</code>), turn by the <b>difference</b>. Then split that one arrow into its x part and its y part, like its shadows on the two walls:
+<svg class="diagram" style="max-width:420px" viewBox="0 0 340 200" role="img" aria-label="One little arrow of length d at the robot's heading. Its shadow along x is d times cos of the heading; its shadow along y, downwards, is d times sin of the heading">
+<defs><marker id="amp" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--idea)"/></marker></defs>
+<line x1="20" y1="50" x2="184.5" y2="50" style="stroke:var(--build);stroke-width:3;stroke-dasharray:7 5"/>
+<line x1="184.5" y1="50" x2="184.5" y2="145" style="stroke:var(--ok);stroke-width:3;stroke-dasharray:7 5"/>
+<line x1="20" y1="50" x2="182" y2="143.5" style="stroke:var(--idea);stroke-width:4" marker-end="url(#amp)"/>
+<path d="M62 50 A42 42 0 0 1 56.4 71" style="fill:none;stroke:var(--fg);stroke-width:2"/>
+<circle cx="20" cy="50" r="6" style="fill:var(--fg)"/>
+<text x="102" y="38" text-anchor="middle" style="font:14px sans-serif;fill:var(--build)">x grows by d × cos(heading)</text>
+<text x="192" y="94" style="font:14px sans-serif;fill:var(--ok)">y grows by</text>
+<text x="192" y="112" style="font:14px sans-serif;fill:var(--ok)">d × sin(heading)</text>
+<text x="66" y="67" style="font:14px sans-serif;fill:var(--fg)">heading</text>
+<text x="88" y="128" text-anchor="end" style="font:700 15px sans-serif;fill:var(--idea)">d</text>
+<text x="4" y="186" style="font:13px sans-serif;fill:var(--muted)">y grows DOWN the screen in this room.</text>
+</svg>
+The lines to type:
 <pre><code>d = (d_left + d_right) / 2        dtheta = (d_left - d_right) / wheel_base
 x += d * cos(heading + dtheta / 2)
 y += d * sin(heading + dtheta / 2)
@@ -216,7 +230,24 @@ return x + d * math.cos(h + dtheta / 2), y + d * math.sin(____), h + ____</code>
 
 <div class="box build"><span class="tag">🛠 Build</span>
 <ol class="steps" start="3" style="counter-reset: step 2">
-<li><b><code>errors_to(pose, target)</code></b>: how far to the target, and how much to turn. The direction to the target is <code>math.atan2(ty - y, tx - x)</code>. Subtract the heading, then <b>wrap</b> it into −π…π so the robot always turns the short way: <code>(a + math.pi) % (2 * math.pi) - math.pi</code>. Return <code>(distance, heading_error)</code>.</li>
+<li><b><code>errors_to(pose, target)</code></b>: how far to the target, and how much to turn. A target 35° to your left is <em>also</em> 325° to your right. Always pick the short way:
+<svg class="diagram" style="max-width:420px" viewBox="0 0 340 290" role="img" aria-label="Seen from above: the robot faces left and slightly up; the target is left and down. Turning 35 degrees anticlockwise is the short way; turning 325 degrees clockwise is the long way round">
+<defs><marker id="aok" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+<marker id="afl" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--fail)"/></marker>
+<marker id="afg" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--fg)"/></marker>
+<marker id="abt" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--build)"/></marker></defs>
+<circle cx="200" cy="118" r="88" style="fill:none;stroke:var(--line);stroke-width:2"/>
+<path d="M130.7 108.1 A70 70 0 1 1 137.4 149.3" style="fill:none;stroke:var(--fail);stroke-width:3;stroke-dasharray:7 5" marker-end="url(#afl)"/>
+<path d="M148.5 110.7 A52 52 0 0 0 153.5 141.3" style="fill:none;stroke:var(--ok);stroke-width:5" marker-end="url(#aok)"/>
+<line x1="200" y1="118" x2="112.9" y2="105.6" style="stroke:var(--fg);stroke-width:3" marker-end="url(#afg)"/>
+<line x1="200" y1="118" x2="121.3" y2="157.4" style="stroke:var(--build);stroke-width:3;stroke-dasharray:2 4" marker-end="url(#abt)"/>
+<circle cx="200" cy="118" r="12" style="fill:var(--bot-soft);stroke:var(--bot);stroke-width:2"/>
+<text x="108.9" y="95.6" text-anchor="middle" style="font:700 14px sans-serif;fill:var(--fg)">facing</text>
+<text x="115.3" y="179.4" text-anchor="middle" style="font:700 14px sans-serif;fill:var(--build)">target</text>
+<text x="4" y="250" style="font:700 15px sans-serif;fill:var(--ok)">━ −35°: the short way ✓</text>
+<text x="4" y="276" style="font:700 15px sans-serif;fill:var(--fail)">╍ 325°: the long way round ✗</text>
+</svg>
+The direction to the target is <code>math.atan2(ty - y, tx - x)</code>. Subtract the heading, then <b>wrap</b> it into −π…π so the robot always turns the short way: <code>(a + math.pi) % (2 * math.pi) - math.pi</code>. Return <code>(distance, heading_error)</code>.</li>
 </ol>
 </div>
 <div class="box checkpoint"><span class="tag">✅ Checkpoint 3</span>
@@ -284,10 +315,18 @@ return output, (integral, ____)</code></pre></details>
 <div class="box bot"><span class="tag">🤖 Add it to your robot</span>
 <p>Fill in <code>drive(self, square)</code> in <code>my_robot.py</code>. It puts your robot in <code>body.py</code>'s wheeled body, plans the route (week 5), and drives each square of it with your PID and odometry. Then it compares where it <b>thinks</b> it is with where it <b>really</b> is.</p>
 <ol class="steps">
-<li>Make a body and an odometer at the robot's square: <code>body = Body(start=self.pos, seed=4)</code>, <code>odo = Odometer(body, (*centre(self.pos), 0.0))</code>.</li>
-<li>Plan around the cat (it met it in week 4): <code>self.blocked.add(CAT)</code>, then <code>path = self.route(square) or [self.pos]</code>.</li>
-<li>For every square after the first, <code>drive_to(body, odo, centre(sq))</code>.</li>
-<li>Work out the gap between <code>odo.pose</code> and <code>body.true_pose()</code>, set <code>self.body = body</code>, and return the message from the docstring (adding the "scraped a wall" sentence if <code>body.bumped</code>).</li>
+<li>Make a body and an odometer at the robot's square. Type these two lines:
+<pre><code>body = Body(start=self.pos, seed=4)
+odo = Odometer(body, (*centre(self.pos), 0.0))</code></pre></li>
+<li>Plan around the cat (it met it in week 4). The <code>or [self.pos]</code> means "if there's no route, stay where you are", so the next loop just does nothing:
+<pre><code>self.blocked.add(CAT)
+path = self.route(square) or [self.pos]</code></pre></li>
+<li>Drive every square after the first (the first is where you already are):
+<pre><code>for sq in path[1:]:
+    drive_to(body, odo, centre(sq))</code></pre></li>
+<li>Work out the gap between <code>odo.pose</code> and <code>body.true_pose()</code> (Hint 2). Then keep the wheeled body on your robot. Type exactly:
+<pre><code>self.body = body</code></pre>
+Finally return the message from the docstring, adding the "scraped a wall" sentence if <code>body.bumped</code> (Hint 3).</li>
 </ol>
 </div>
 <div class="box stuck"><span class="tag">🆘 Stuck?</span>
@@ -325,7 +364,7 @@ return msg</code></pre></details>
 </div>
 
 <h2 id="real-world">8. Real-world challenge: be the encoder</h2>
-<div class="box build"><span class="tag">🌍 Real-world challenge</span>
+<div class="box world"><span class="tag">🌍 Real-world challenge</span>
 <p><b>With a partner:</b> in a clear room, walk a square of 4 steps per side with your eyes closed, counting steps and turning 90° at each corner. Your partner walks beside you to keep you safe and puts a coin where you stop. How far from the start are you? Do it 3 laps: does the gap grow?</p>
 <p><b>On your own:</b> make a mark on the side of a tin can. Measure its radius. Predict how far 5 full turns will roll it (5 × 2 × π × radius), then roll it on the floor and measure. Try it on a rug too: that's wheel slip.</p>
 </div>

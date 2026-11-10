@@ -37,49 +37,60 @@
 <h2 id="idea">1. The idea</h2>
 <div class="box idea"><span class="tag">💡 The idea: gravity is an arrow the phone can measure</span>
 <p>Hold a glass of water and tilt it. The water stays level, because gravity always pulls straight down. A phone feels that same pull, about 9.8 m/s², even sitting still. It measures it along its own three edges: x, y and z. Stand the phone up and all of it lands on x. Lay it flat and none does. Tip it halfway and it splits.</p>
-<svg class="diagram" viewBox="0 0 520 270" role="img" aria-label="Three phones with a gravity arrow pointing down beside each. Upright: the x part is 9.8 and the y part is 0, tilt 0 degrees. Tipped 45 degrees: x and y parts are both 6.9. On its side: x is 0, y is 9.8, tilt 90 degrees.">
+<svg class="diagram" viewBox="0 0 360 250" role="img" aria-label="Gravity pulls straight down. Three phones. Upright: the x part is 9.8 and the y part is 0, tilt 0 degrees. Tipped halfway: x and y are both 6.9, tilt 45 degrees. On its side: x is 0, y is 9.8, tilt 90 degrees.">
   <defs>
-    <marker id="aG" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--fg)"/></marker>
-    <marker id="aX" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--idea)"/></marker>
-    <marker id="aY" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--build)"/></marker>
+    <marker id="aX" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--idea)"/></marker>
+    <marker id="aY" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--build)"/></marker>
   </defs>
+  <text x="180" y="20" font-size="16" font-weight="700" text-anchor="middle" style="fill:var(--fg)">⬇ gravity: 9.8 m/s², always straight down</text>
+  <g transform="translate(60 105)">
+    <rect x="-20" y="-40" width="40" height="80" rx="7" fill="none" stroke-width="3" style="stroke:var(--muted)"/>
+    <line x1="0" y1="0" x2="0" y2="-55" stroke-width="5" marker-end="url(#aX)" style="stroke:var(--idea)"/>
+  </g>
+  <g transform="translate(180 108) rotate(-45)">
+    <rect x="-20" y="-40" width="40" height="80" rx="7" fill="none" stroke-width="3" style="stroke:var(--muted)"/>
+    <line x1="0" y1="0" x2="0" y2="-40" stroke-width="5" marker-end="url(#aX)" style="stroke:var(--idea)"/>
+    <line x1="0" y1="0" x2="40" y2="0" stroke-width="5" marker-end="url(#aY)" style="stroke:var(--build)"/>
+  </g>
+  <g transform="translate(300 108) rotate(-90)">
+    <rect x="-20" y="-40" width="40" height="80" rx="7" fill="none" stroke-width="3" style="stroke:var(--muted)"/>
+    <line x1="0" y1="0" x2="55" y2="0" stroke-width="5" marker-end="url(#aY)" style="stroke:var(--build)"/>
+  </g>
   <g font-size="16" text-anchor="middle" style="fill:var(--fg)">
-    <!-- upright -->
-    <line x1="30" y1="70" x2="30" y2="170" stroke-width="3" marker-end="url(#aG)" style="stroke:var(--fg)"/>
-    <text x="30" y="60">gravity</text>
-    <g transform="translate(100 120)">
-      <rect x="-25" y="-50" width="50" height="100" rx="8" fill="none" stroke-width="3" style="stroke:var(--muted)"/>
-      <line x1="0" y1="0" x2="0" y2="-60" stroke-width="4" marker-end="url(#aX)" style="stroke:var(--idea)"/>
-    </g>
-    <text x="100" y="205">upright</text>
-    <text x="100" y="225" style="fill:var(--idea)">x 9.8</text><text x="100" y="243" style="fill:var(--build)">y 0</text>
-    <text x="100" y="263" font-weight="700">tilt 0°</text>
-    <!-- 45 -->
-    <line x1="200" y1="70" x2="200" y2="170" stroke-width="3" marker-end="url(#aG)" style="stroke:var(--fg)"/>
-    <g transform="translate(275 125) rotate(-45)">
-      <rect x="-25" y="-50" width="50" height="100" rx="8" fill="none" stroke-width="3" style="stroke:var(--muted)"/>
-      <line x1="0" y1="0" x2="0" y2="-42" stroke-width="4" marker-end="url(#aX)" style="stroke:var(--idea)"/>
-      <line x1="0" y1="0" x2="42" y2="0" stroke-width="4" marker-end="url(#aY)" style="stroke:var(--build)"/>
-    </g>
-    <text x="275" y="205">tipped halfway</text>
-    <text x="275" y="225" style="fill:var(--idea)">x 6.9</text><text x="275" y="243" style="fill:var(--build)">y 6.9</text>
-    <text x="275" y="263" font-weight="700">tilt 45°</text>
-    <!-- 90 -->
-    <line x1="370" y1="70" x2="370" y2="170" stroke-width="3" marker-end="url(#aG)" style="stroke:var(--fg)"/>
-    <g transform="translate(450 125) rotate(-90)">
-      <rect x="-25" y="-50" width="50" height="100" rx="8" fill="none" stroke-width="3" style="stroke:var(--muted)"/>
-      <line x1="0" y1="0" x2="60" y2="0" stroke-width="4" marker-end="url(#aY)" style="stroke:var(--build)"/>
-    </g>
-    <text x="450" y="205">on its side</text>
-    <text x="450" y="225" style="fill:var(--idea)">x 0</text><text x="450" y="243" style="fill:var(--build)">y 9.8</text>
-    <text x="450" y="263" font-weight="700">tilt 90°</text>
+    <text x="60" y="182">upright</text><text x="180" y="182">halfway</text><text x="300" y="182">on its side</text>
+    <text x="60" y="204"><tspan style="fill:var(--idea)">x 9.8</tspan> <tspan style="fill:var(--build)">y 0</tspan></text>
+    <text x="180" y="204"><tspan style="fill:var(--idea)">x 6.9</tspan> <tspan style="fill:var(--build)">y 6.9</tspan></text>
+    <text x="300" y="204"><tspan style="fill:var(--idea)">x 0</tspan> <tspan style="fill:var(--build)">y 9.8</tspan></text>
+    <g font-weight="700"><text x="60" y="230">tilt 0°</text><text x="180" y="230">tilt 45°</text><text x="300" y="230">tilt 90°</text></g>
   </g>
 </svg>
-<p>So the angle between the reading and the x axis is the <strong>tilt</strong>. Our real recording comes from a phone clipped to someone's waist, x pointing up when they stand. Here's what it measured (real output):</p>
-<pre><code>  standing      5- 25 s   gravity 10.12 m/s^2   tilt   9 degrees
-  sitting      28- 44 s   gravity  9.74 m/s^2   tilt  33 degrees
-  laying       73- 91 s   gravity  9.74 m/s^2   tilt  79 degrees</code></pre>
-<p>Standing is nearly upright, sitting leans back, lying is nearly on its side. Notice gravity isn't exactly 9.81: real sensors are a little off, like in week 2.</p>
+<p class="room-caption">Why do the arrows point <em>up</em>? A still phone feels the floor (or your hand) pushing it up against gravity, so that's what it measures.</p>
+<p>So the angle between the reading and the x axis is the <strong>tilt</strong>. Our real recording comes from a phone clipped to someone's waist, x pointing up when they stand. Here's what it found:</p>
+<svg class="diagram" viewBox="0 0 360 210" role="img" aria-label="The real recording. Standing: the phone leans 9 degrees from straight up. Sitting: 33 degrees. Lying: 79 degrees, nearly on its side.">
+  <defs><marker id="aR" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--idea)"/></marker></defs>
+  <g stroke-width="2" stroke-dasharray="5 4" style="stroke:var(--muted)"><line x1="60" y1="20" x2="60" y2="110"/><line x1="180" y1="20" x2="180" y2="110"/><line x1="300" y1="20" x2="300" y2="110"/></g>
+  <g transform="translate(60 110) rotate(9)"><rect x="-16" y="-75" width="32" height="64" rx="6" fill="none" stroke-width="3" style="stroke:var(--muted)"/><line x1="0" y1="-12" x2="0" y2="-85" stroke-width="5" marker-end="url(#aR)" style="stroke:var(--idea)"/></g>
+  <g transform="translate(180 110) rotate(33)"><rect x="-16" y="-75" width="32" height="64" rx="6" fill="none" stroke-width="3" style="stroke:var(--muted)"/><line x1="0" y1="-12" x2="0" y2="-85" stroke-width="5" marker-end="url(#aR)" style="stroke:var(--idea)"/></g>
+  <g transform="translate(300 110) rotate(79)"><rect x="-16" y="-75" width="32" height="64" rx="6" fill="none" stroke-width="3" style="stroke:var(--muted)"/><line x1="0" y1="-12" x2="0" y2="-85" stroke-width="5" marker-end="url(#aR)" style="stroke:var(--idea)"/></g>
+  <g font-size="16" text-anchor="middle" style="fill:var(--fg)">
+    <text x="60" y="150">🧍 standing</text><text x="180" y="150">🪑 sitting</text><text x="300" y="150">🛏 lying</text>
+    <g font-size="24" font-weight="700" style="fill:var(--idea)"><text x="60" y="184">9°</text><text x="180" y="184">33°</text><text x="300" y="184">79°</text></g>
+    <text x="180" y="206" font-size="14" style="fill:var(--muted)">dashed: straight up · purple: the phone's x</text>
+  </g>
+</svg>
+<p>Standing is nearly upright, sitting leans back, lying is nearly on its side. (You'll print these numbers yourself in step 5.)</p>
+<p><strong>How strong is the arrow?</strong> Its length, whichever way it points. That length is the <strong>magnitude</strong>. Walk 3 squares across and 4 up, and the straight line back is 5 long:</p>
+<svg class="diagram" viewBox="0 0 360 200" role="img" aria-label="A right triangle. The x part, 3, goes across. The y part, 4, goes up. The slanted arrow, the reading itself, is 5 long: the square root of 3 squared plus 4 squared.">
+  <defs><marker id="aM" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--ok)"/></marker></defs>
+  <line x1="30" y1="180" x2="150" y2="180" stroke-width="5" style="stroke:var(--idea)"/>
+  <line x1="150" y1="180" x2="150" y2="20" stroke-width="5" style="stroke:var(--build)"/>
+  <line x1="30" y1="180" x2="146" y2="26" stroke-width="5" marker-end="url(#aM)" style="stroke:var(--ok)"/>
+  <rect x="136" y="166" width="14" height="14" fill="none" stroke-width="2" style="stroke:var(--muted)"/>
+  <g font-size="16" font-weight="700"><text x="90" y="172" text-anchor="middle" style="fill:var(--idea)">x = 3</text><text x="158" y="105" style="fill:var(--build)">y = 4</text><text x="20" y="100" style="fill:var(--ok)">5</text></g>
+  <g font-size="16" style="fill:var(--fg)"><text x="200" y="60">length</text><text x="200" y="84">= √(3² + 4²)</text><text x="200" y="108">= √25 = <tspan font-weight="700" style="fill:var(--ok)">5</tspan></text>
+  <text x="200" y="150" style="fill:var(--muted)">In 3D, z is one</text><text x="200" y="172" style="fill:var(--muted)">more side: √(x²+y²+z²)</text></g>
+</svg>
+<p>Notice gravity isn't exactly 9.81 in the real recording (its six still parts read 8.64 to 10.19 m/s²): real sensors are a little off, like in week 2.</p>
 </div>
 
 <div class="box idea"><span class="tag">💡 The idea: every step is a bump</span>
