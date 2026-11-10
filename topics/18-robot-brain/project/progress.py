@@ -196,13 +196,53 @@ def l20():
     return "any AI app can drive it over MCP, and the server's own rules hold" if not ok else "server let an AI pick up the protected block!"
 
 
+def l21():
+    from lesson21_phone import describe, DATA
+    return "reads real phone data: " + describe(DATA / "phone_acc.csv")
+
+
+def l22():
+    from lesson22_fusion import load, still_angle, complementary, wobble, DT
+    t, acc, rate = load(149.9, 161.6)
+    truth = still_angle(t, acc, 149.9, 161.6)
+    return (f"fuses two sensors: walking wobble {wobble(t, acc, 149.9, 161.6, truth):.1f} -> "
+            f"{wobble(t, complementary(acc[0], rate, acc, DT, 0.98), 149.9, 161.6, truth):.1f} degrees")
+
+
+def l23():
+    import math
+    from body import Body, centre
+    from lesson23_wheels import Odometer, turn_to, settle_report
+    def run(gains):
+        b = Body(start=(1, 5), slip=0.0, mismatch=0.0, seed=2, cat=False)
+        return settle_report(turn_to(b, Odometer(b, (*centre((1, 5)), 0.0)), 90, *gains), 90)
+    p, pd = run((20.0, 0.0, 0.0)), run((20.0, 0.0, 1.5))
+    return f"steers with PID: turning 90 degrees, P overshoots {p[0]:.0f}, PD {pd[0]:.0f} and settles in {pd[1]:.1f} s"
+
+
+def l24():
+    from lesson24_map import explore, score
+    right, total = score(explore(True)[0])
+    return f"scans and maps the room: {right:.0%} of {total} squares right (and it finds the cat)"
+
+
+def l25():
+    import random
+    from body import Body
+    from lesson25_localise import localise, error
+    b = Body(start=(6, 3), heading_deg=180, seed=5)
+    return f"finds itself when kidnapped: {error(b, localise(b, random.Random(7))):.2f} m off"
+
+
 ROWS = [
-    ("1", "01", "moves", l01), ("2", "02", "senses", l02), ("2", "03", "learns", l03), ("3", "04-05", "decides to stop", l05),
-    ("4", "06", "finds the way", l06), ("bonus", "07", "learns by trying", l07), ("5", "08", "reads typos", l08),
-    ("5", "09", "understands", l09), ("6", "15", "writes plans", l15), ("6+", "15 stretch", "attention", l15a),
-    ("7", "10", "stays safe", l10), ("7", "11", "capstone", l11), ("8", "16", "speed", l16), ("9", "17", "faster, smarter", l17),
-    ("9", "13", "adapts (LoRA)", l13), ("10", "18", "world-class brain", l18), ("11", "19", "bake-off", l19),
-    ("12", "12", "what people like", l12), ("bonus", "20", "MCP", l20),
+    ("1", "01", "moves", l01), ("2", "02", "senses", l02), ("2", "03", "learns", l03), ("3", "21", "real phone data", l21),
+    ("4", "04-05", "decides to stop", l05), ("5", "06", "finds the way", l06), ("bonus", "07", "learns by trying", l07),
+    ("6", "22", "sensor fusion", l22), ("7", "08", "reads typos", l08), ("7", "09", "understands", l09),
+    ("8", "15", "writes plans", l15), ("8+", "15b", "attention", l15a), ("9", "23", "wheels and PID", l23),
+    ("10", "10", "stays safe", l10), ("10", "11", "capstone", l11), ("11", "24", "makes a map", l24),
+    ("12", "25", "where am I?", l25), ("13", "16", "speed", l16), ("14", "17", "faster, smarter", l17),
+    ("14", "13", "adapts (LoRA)", l13), ("15", "18", "world-class brain", l18), ("15", "19", "bake-off", l19),
+    ("16", "12", "what people like", l12), ("bonus", "20", "MCP", l20),
 ]
 
 if __name__ == "__main__":

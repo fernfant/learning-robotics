@@ -7,7 +7,7 @@ A self-paced course on large language models and robotics. It's built from links
 ## What's inside
 
 - **21 modules** (`topics/`): LLM evals, inference engineering, post-training, Ilya's 30 papers, robotics maths, and more. Each module is marked LLM, Robotics, or LLM + Robotics.
-- **Module 18, "Build a Robot Brain"** (`topics/18-robot-brain/`): our own 12-week, hands-on course for ages 12+ with basic Python. **New here? Start with this one.**
+- **Module 18, "Build a Robot Brain"** (`topics/18-robot-brain/`): our own 16-week, hands-on course (robot body with real sensor data, and robot brain) for ages 12+ with basic Python. **New here? Start with this one.**
   - You build **Robo-Helper**, a simulated robot, using only the Python standard library.
   - Homework is in `project/homework/`, worked answers in `project/solutions/`, and `check.py` marks it (100 checks).
   - `progress.py` shows what each lesson added to the robot, measured.

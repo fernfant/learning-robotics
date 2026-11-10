@@ -4,112 +4,80 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Week 2 Part B · Learning from data</title>
-<link rel="stylesheet" href="../../style.css">
+<link rel="stylesheet" href="../../style.css?v=16">
 </head>
 <body>
 <main>
 <nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 2 · Part B</nav>
 
-<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 2 of 12 · Part B</div>
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 2 of 16 · Part B</div>
 <h1>Learning from data: fit a line by shrinking the error</h1>
-<p class="lede">Instead of telling the robot a rule, give it measurements and let it work the rule out. You'll write a number that says "how wrong", then a loop that keeps nudging the rule to make that number smaller. That loop, gradient descent, is how every modern AI learns, ChatGPT included.</p>
-<div class="card note" id="journey"><strong>Week 2 of 12 · Part B.</strong> So far your robot: ✓ says hello ✓ moves ✓ senses. <strong>Today</strong> it learns how far it needs to brake, from data. Next: <a href="04-neuron.html">Week 3 · Part A: The artificial neuron</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>look</code> (now it knows its safe speed).</div>
+<p class="lede">Don't give the robot a rule. Give it measurements, and let it nudge a rule until it fits. That loop is how every modern AI learns.</p>
+<div class="card note" id="journey"><strong>Week 2 of 16 · Part B.</strong> So far your robot: ✓ says hello ✓ moves ✓ measures walls. <strong>Today</strong> it learns its own braking distance from data, and picks a safe speed. Next: <a href="21-phone.html">Week 3: Real sensors in your phone</a>. <a href="index.html#my-robot">Your robot, week by week</a>.</div>
 
 <div class="facts">
   <div><b>Time</b>3–4 h</div>
-  <div><b>You'll need</b>Part A done, a calculator, a ball or toy car, some books, a tape measure</div>
+  <div><b>You'll need</b>Part A done, a calculator</div>
   <div><b>New words</b>Model, parameter, mean squared error, gradient, learning rate</div>
-  <div><b>Project piece</b>Learns its own braking distance</div>
   <div><b>Homework file</b><code>lesson03_learning.py</code></div>
 </div>
 
 <section class="kid" id="start">
 <h2>Start here</h2>
-<p class="big">Learning means: guess a rule, measure how wrong it is, nudge it to be a bit less wrong, and repeat.</p>
-<h3>The problem</h3>
-<p>Robo-Helper slides a bit after it brakes. The faster it goes, the further it slides. If it's driving towards a wall 1 metre away, how fast can it safely go? Nobody gave it a formula. It only has a list of 13 measurements: "at this speed, I slid this far".</p>
-<h3>The idea in one picture</h3>
-<p>Imagine you're on a hillside in thick fog, and you want to reach the bottom of the valley. You can't see it. But you can feel which way the ground slopes under your feet. So you take a small step downhill, feel again, take another step. Eventually you're at the bottom. In this lesson the "height" is how wrong the robot's rule is, and walking downhill makes the rule better.</p>
-<h3>Words to know</h3>
+<p class="big">Learning means: guess a rule, measure how wrong it is, nudge it to be a bit less wrong, repeat.</p>
 <dl>
-<dt>Model</dt><dd>A rule with adjustable numbers in it. Ours: <code>distance = w × speed + b</code>.</dd>
-<dt>Parameter</dt><dd>One of the adjustable numbers. We have two: <code>w</code> (how steep) and <code>b</code> (where it starts).</dd>
-<dt>Mean squared error (MSE)</dt><dd>One number that says how wrong the model is on the data. 0 means perfect.</dd>
-<dt>Gradient</dt><dd>Which way, and how steeply, the error goes up when you change each parameter. You walk the other way.</dd>
-<dt>Learning rate</dt><dd>How big a step you take each time. Too small is slow. Too big and you overshoot.</dd>
+<dt>Model</dt><dd>A rule with adjustable numbers. Ours: <code>distance = w × speed + b</code>.</dd>
+<dt>Mean squared error (MSE)</dt><dd>One number for "how wrong". 0 is perfect.</dd>
+<dt>Learning rate</dt><dd>How big a nudge you take each time.</dd>
 </dl>
 </section>
-<p class="deeper"><strong>Going deeper:</strong> everything below is the full lesson. It has the most maths of the course so far, but nothing harder than multiplying and adding. Go slowly, with a calculator.</p>
 
-<h2 id="problem">1. The problem</h2>
-<p>Here are the robot's real braking measurements, from the homework file. Speed is in metres per second, stopping distance in metres:</p>
-<pre><code>speed:     0.2   0.4   0.5   0.6   0.8   1.0   1.1   1.2   1.4   1.5   1.6   1.8   2.0
-distance:  0.27  0.40  0.45  0.57  0.70  0.86  0.95  1.05  1.18  1.30  1.36  1.55  1.70</code></pre>
-<p><strong>Obvious approach #1: a lookup table.</strong> At 1.0 m/s it stops in 0.86 m. Fine. But what about 0.7 m/s, or 0.95? They aren't in the table. And the measurements are a bit noisy (remember Part A), so the table has little bumps that aren't real.</p>
-<p><strong>Obvious approach #2: guess a rule.</strong> The distance roughly grows with the speed, so maybe <code>distance = speed</code>? At 2.0 m/s that predicts 2.0, but the robot actually stopped in 1.70. Too pessimistic. We could keep guessing… but which guess is best, and how would we even know?</p>
-<p>We need two things: a way to <em>score</em> a guess, and a way to <em>improve</em> it automatically.</p>
+<h2 id="idea">1. The idea</h2>
+<div class="box idea"><span class="tag">💡 The idea: draw the best line</span>
+<p>Your robot slides after it brakes, and the faster it goes, the further it slides. It has 13 real measurements: "at this speed, I slid this far". They lie almost on a straight line. A line has two numbers: <code>w</code> (how steep) and <code>b</code> (where it starts). Learning means finding good values for them.</p>
+<svg class="diagram" viewBox="0 0 520 300" role="img" aria-label="Scatter plot of the 13 braking measurements: speed across, stopping distance up. A dashed guess line, distance equals speed, sits above the points; red gaps show its misses. The learned solid line passes right through the points.">
+  <line x1="60" y1="250" x2="500" y2="250" stroke-width="2" style="stroke:var(--muted)"/>
+  <line x1="60" y1="250" x2="60" y2="10" stroke-width="2" style="stroke:var(--muted)"/>
+  <g font-size="13" text-anchor="middle" style="fill:var(--muted)"><text x="60" y="268">0</text><text x="160" y="268">0.5</text><text x="260" y="268">1.0</text><text x="360" y="268">1.5</text><text x="460" y="268">2.0</text></g>
+  <g font-size="13" text-anchor="end" style="fill:var(--muted)"><text x="52" y="194">0.5</text><text x="52" y="134">1.0</text><text x="52" y="74">1.5</text></g>
+  <text x="280" y="292" font-size="14" text-anchor="middle" style="fill:var(--fg)">speed (m/s)</text>
+  <text x="14" y="140" font-size="14" text-anchor="middle" style="fill:var(--fg)" transform="rotate(-90 14 140)">stopping distance (m)</text>
+  <line x1="60" y1="250" x2="440" y2="22" stroke-width="2.5" stroke-dasharray="7 5" style="stroke:var(--muted)"/>
+  <g stroke-width="3" style="stroke:var(--fail)">
+    <line x1="100" y1="218" x2="100" y2="226"/> <line x1="160" y1="196" x2="160" y2="190"/> <line x1="180" y1="182" x2="180" y2="178"/> <line x1="220" y1="166" x2="220" y2="154"/> <line x1="260" y1="147" x2="260" y2="130"/> <line x1="280" y1="136" x2="280" y2="118"/> <line x1="300" y1="124" x2="300" y2="106"/> <line x1="340" y1="108" x2="340" y2="82"/> <line x1="360" y1="94" x2="360" y2="70"/> <line x1="380" y1="87" x2="380" y2="58"/> <line x1="420" y1="64" x2="420" y2="34"/>
+  </g>
+  <line x1="60" y1="241" x2="500" y2="28" stroke-width="3.5" style="stroke:var(--ok)"/>
+  <g style="fill:var(--idea)">
+    <circle cx="100" cy="218" r="6"/> <circle cx="140" cy="202" r="6"/> <circle cx="160" cy="196" r="6"/> <circle cx="180" cy="182" r="6"/> <circle cx="220" cy="166" r="6"/> <circle cx="260" cy="147" r="6"/> <circle cx="280" cy="136" r="6"/> <circle cx="300" cy="124" r="6"/> <circle cx="340" cy="108" r="6"/> <circle cx="360" cy="94" r="6"/> <circle cx="380" cy="87" r="6"/> <circle cx="420" cy="64" r="6"/> <circle cx="460" cy="46" r="6"/>
+  </g>
+  <text x="200" y="40" font-size="14" style="fill:var(--muted)">guess: distance = speed</text>
+  <text x="200" y="58" font-size="14" font-weight="700" style="fill:var(--fail)">red = its misses</text>
+  <text x="330" y="200" font-size="14" font-weight="700" style="fill:var(--ok)">learned: 0.810 × speed + 0.071</text>
+</svg>
+<p>To score a line, take each miss, <strong>square it</strong> (so too-high and too-low both count, and big misses count a lot), then average. That's the <strong>mean squared error</strong>. The guess above scores 0.0293. The learned line scores 0.00036.</p>
+</div>
 
-<h2 id="principles">2. First principles</h2>
-<h3>Step 1: choose a model shape</h3>
-<p>If you plot the 13 points, they lie almost on a straight line. A straight line has the form:</p>
-<pre><code>distance = w × speed + b</code></pre>
-<p><code>w</code> is the slope: how many extra metres of sliding for each extra 1 m/s of speed. <code>b</code> is the starting value: the distance at speed 0. These two numbers are the model's <strong>parameters</strong>. "Learning" will mean finding good values for them. The function <code>predict(w, b, speed)</code> just computes this line.</p>
+<div class="box idea"><span class="tag">💡 The idea: walk downhill in the fog</span>
+<p>You're on a foggy hillside and want the bottom of the valley. You can't see it, but you can feel the slope under your feet. So: step downhill, feel again, step again. Here the height is the error, and the slope is called the <strong>gradient</strong>.</p>
+<svg class="diagram" viewBox="0 0 520 230" role="img" aria-label="The error as a valley over w. Green dots step down the left side towards the bottom: small steps work. Red dots jump from side to side and climb higher each time: steps that are too big.">
+  <defs><marker id="ah3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--fail)"/></marker></defs>
+  <polyline points="40,30 51,46 62,62 73,77 84,91 95,104 106,116 117,127 128,138 139,148 150,157 161,165 172,172 183,178 194,184 205,189 216,193 227,196 238,198 249,199 260,200 271,200 282,199 293,197 304,194 315,190 326,186 337,181 348,175 359,168 370,160 381,151 392,142 403,132 414,120 425,109 436,96 447,82 458,68 469,52 480,36" fill="none" stroke-width="3" style="stroke:var(--fg)"/>
+  <polyline points="62,62 121,131 162,166 192,183 212,191 227,196" fill="none" stroke-width="2" stroke-dasharray="4 4" style="stroke:var(--ok)"/>
+  <g style="fill:var(--ok)"><circle cx="62" cy="62" r="7"/><circle cx="121" cy="131" r="7"/><circle cx="162" cy="166" r="7"/><circle cx="192" cy="183" r="7"/><circle cx="212" cy="191" r="7"/><circle cx="227" cy="196" r="7"/></g>
+  <g fill="none" stroke-width="2" style="stroke:var(--fail)" marker-end="url(#ah3)"><path d="M216,193 Q277,150 333,178"/><path d="M338,180 Q237,110 142,144"/><path d="M137,146 Q300,20 462,52"/></g>
+  <g style="fill:var(--fail)"><circle cx="338" cy="180" r="6"/><circle cx="137" cy="146" r="6"/><circle cx="468" cy="54" r="6"/></g>
+  <text x="70" y="40" font-size="14" font-weight="700" style="fill:var(--ok)">small steps: down to the bottom</text>
+  <text x="372" y="196" font-size="14" font-weight="700" style="fill:var(--fail)">too big: jumps over,</text>
+  <text x="372" y="214" font-size="14" font-weight="700" style="fill:var(--fail)">climbs higher</text>
+  <text x="40" y="224" font-size="14" style="fill:var(--fg)">w →   (height = error)</text>
+</svg>
+<p>Each step: work out the gradient, then move <code>w</code> and <code>b</code> a little bit the <em>other</em> way. The step size is the <strong>learning rate</strong>. That loop is <strong>gradient descent</strong>. Swap "two numbers" for "billions" and "a line" for "a neural network", and it's how ChatGPT and Claude were trained.</p>
+</div>
 
-<h3>Step 2: score a guess with the mean squared error</h3>
-<p>Take a guess, <code>w = 1, b = 0</code>, and look at just two points:</p>
-<pre><code>speed 1.0: predict 1×1.0 + 0 = 1.00, real 0.86, miss = 1.00 - 0.86 = +0.14
-speed 2.0: predict 1×2.0 + 0 = 2.00, real 1.70, miss = 2.00 - 1.70 = +0.30</code></pre>
-<p>To turn many misses into one score, we could just average them. But misses can be positive (too high) or negative (too low), and a +0.3 and a −0.3 would average to 0, a "perfect" score for a bad line. So we <strong>square</strong> each miss first. Squares are never negative, and squaring punishes big misses much more than small ones (0.3² = 0.09, but 0.1² = 0.01). Then we take the mean. That's the <strong>mean squared error</strong>:</p>
-<pre><code>MSE = average of (prediction - real)²</code></pre>
-<p>Let's do a full one by hand on a tiny data set, just two points: (1, 1) and (2, 3). Guess <code>w = 0, b = 0</code>, so every prediction is 0:</p>
-<pre><code>point (1, 1): predict 0, miss = 0 - 1 = -1, squared = 1
-point (2, 3): predict 0, miss = 0 - 3 = -3, squared = 9
-MSE = (1 + 9) / 2 = 5</code></pre>
-<p>On the robot's 13 real points, Python gives these scores:</p>
-<pre><code>w = 0,   b = 0     MSE = 1.0938     (terrible: predicts 0 for everything)
-w = 1,   b = 0     MSE = 0.0293     (much better)
-w = 0.8, b = 0.1   MSE = 0.00072    (very close)</code></pre>
-<p>Now we can compare guesses with one number. Lower is better.</p>
-
-<h3>Step 3: which way is downhill?</h3>
-<p>Picture every possible (w, b) as a spot on a landscape, with the MSE as the height. We want the lowest spot. We're in the fog: we can't see the whole landscape. But we can feel the slope where we stand.</p>
-<p><strong>Feeling the slope, the simple way:</strong> nudge w by a tiny amount and see how the error changes. On the robot data at (0, 0):</p>
-<pre><code>MSE at w = 0,    b = 0:  1.0938
-MSE at w = 0.01, b = 0:  1.0686   (a bit lower)
-change per unit of w = (1.0686 - 1.0938) / 0.01 ≈ -2.52</code></pre>
-<p>Negative means "increasing w makes the error go <em>down</em>". So increase w. That number is the <strong>gradient</strong> for w. Doing the same for b gives the gradient for b.</p>
-<p><strong>The shortcut:</strong> for the MSE there's an exact formula, and the homework file gives it to you:</p>
-<pre><code>dw = average of  2 × (prediction - real) × speed
-db = average of  2 × (prediction - real)</code></pre>
-<p>Here's the intuition. <code>(prediction − real)</code> is the miss. If the line is too high (positive miss), the gradient is positive, so we'll make w and b smaller. If it's too low, the opposite. For w, each miss is multiplied by the speed, because changing the slope moves the line much more at high speed than at low speed. (The 2 comes from the squaring. You'll meet why in calculus class.) On the robot data, the formula gives dw = −2.53 at (0, 0), very close to our nudge estimate of −2.52.</p>
-<p>Back to the tiny data set, (1, 1) and (2, 3), at w = 0, b = 0. The misses are −1 and −3:</p>
-<pre><code>dw = ( 2 × -1 × 1  +  2 × -3 × 2 ) / 2 = (-2 + -12) / 2 = -7
-db = ( 2 × -1      +  2 × -3     ) / 2 = (-2 +  -6) / 2 = -4</code></pre>
-
-<h3>Step 4: take a step, and repeat</h3>
-<p>Walk <em>against</em> the gradient (downhill), by a small amount called the <strong>learning rate</strong>, <code>lr</code>. With <code>lr = 0.1</code>:</p>
-<pre><code>w = w - lr × dw = 0 - 0.1 × (-7) = 0.7
-b = b - lr × db = 0 - 0.1 × (-4) = 0.4
-new MSE: predictions 1.1 and 1.8, misses 0.1 and -1.2
-         (0.01 + 1.44) / 2 = 0.725           down from 5!</code></pre>
-<p>Repeat that 2,000 times and you reach w = 2, b = −1, the line that goes exactly through both points, with an error of practically 0. That loop is <strong>gradient descent</strong>. It's the whole algorithm.</p>
-<details><summary>Predict first: on the robot's data, starting at (0, 0) with lr = 0.1, the error after one step is 0.326. If you take 2,000 steps, where do you think w ends up? And what about with lr = 0.5?</summary>
-<p>With lr = 0.1 the real output is <strong>w = 0.810, b = 0.071</strong>, and the error drops from 0.3259 to 0.00036. With lr = 0.5 something surprising happens: the error goes <em>up</em>. Python measured 1.95, then 3.51, then 6.33, and after 30 steps it's in the millions. The steps are so big that each one jumps right over the valley to a higher point on the other side, and it gets worse every time. That's called <strong>diverging</strong>. Try it in the demo below.</p>
-</details>
-
-<h3>Step 5: use what you learned</h3>
-<p>Now the robot has a rule: <code>distance ≈ 0.810 × speed + 0.071</code>. If there's 1.0 m of free space ahead, and we want a 0.2 m safety margin, what's the fastest safe speed? Try speeds 0.00, 0.05, 0.10… and keep the fastest one where <code>predicted distance + 0.2 ≤ 1.0</code>:</p>
-<pre><code>speed 0.90: 0.810 × 0.90 + 0.071 = 0.800, plus margin 0.2 = 1.000 ≤ 1.0  ✓
-speed 0.95: 0.810 × 0.95 + 0.071 = 0.840, plus margin 0.2 = 1.040 > 1.0  ✗
-max safe speed = 0.9 m/s</code></pre>
-
-<h3>Why this is the big idea of AI</h3>
-<p>Swap "two numbers" for "a few billion numbers" and "a straight line" for "a giant neural network", and you have how large language models like ChatGPT and Claude are trained. Their "error" measures how badly they predict the next word. Gradient descent nudges every number a tiny bit downhill, trillions of times. Same loop as yours: predict, measure the error, find the gradient, step.</p>
-
-<h2 id="play">3. Play with it</h2>
+<h2 id="play">2. Play</h2>
+<div class="box play"><span class="tag">🎮 Play</span>
+<p>The 13 real points. Drag the sliders to move the line and watch the MSE. Then press <b>Reset to (0, 0)</b> and <b>One gradient step</b> a few times: the same maths as your <code>fit_line</code>.</p>
 <div class="card demo">
-<h3>Interactive: fit the line yourself, then let gradient descent do it</h3>
-<p class="legend">The 13 real <code>STOP_DATA</code> points. Drag the sliders to move the line, and watch the misses (thin lines) and the MSE. Then press <b>Reset to (0, 0)</b> and <b>One gradient step</b> a few times: the same maths as your <code>fit_line</code>.</p>
 <canvas id="fit" width="700" height="360" style="height:auto" aria-label="Scatter plot of speed against stopping distance with an adjustable line"></canvas>
 <label for="wS">w (slope): <span id="wv" class="num"></span></label>
 <input id="wS" type="range" min="-0.5" max="1.5" step="0.001" value="1">
@@ -126,72 +94,101 @@ max safe speed = 0.9 m/s</code></pre>
   <div class="stat"><div class="k">Safe speed, 1 m free</div><div class="v" id="safeV">–</div></div>
 </div>
 </div>
-<p>Challenges: can you beat MSE 0.0005 by hand with the sliders? Now reset, set the learning rate to 0.5, and take a few steps. Watch the MSE. Then try 0.01 and count how many steps it takes to get under 0.001.</p>
+<p>Can you beat MSE 0.0005 by hand? Then reset, set the learning rate to 0.5 and step. Watch the MSE blow up.</p>
+</div>
 
-<h2 id="homework">4. Homework</h2>
-<p>Open <code>homework/lesson03_learning.py</code>. <code>STOP_DATA</code> is already there. Write five functions, in order.</p>
-
-<h3>Function 1: <code>predict(w, b, speed)</code></h3>
-<p><strong>What it does:</strong> the straight line.</p>
-<p><strong>Example:</strong> <code>predict(2, 1, 3)</code> → 2 × 3 + 1 = <code>7</code>.</p>
-<details><summary>Hint 1</summary><p>It's the formula from Step 1, in one line.</p></details>
-<details><summary>Hint 2</summary><p>Python uses <code>*</code> for multiply.</p></details>
-<details><summary>Hint 3</summary><p><code>return</code> w times speed plus b.</p></details>
-
-<h3>Function 2: <code>mse(w, b, data)</code></h3>
-<p><strong>What it does:</strong> for every <code>(x, y)</code> in data, square the miss <code>predict(w, b, x) − y</code>, then average.</p>
-<p><strong>Example:</strong> <code>mse(0, 0, [(1, 1), (2, 3)])</code> → (1 + 9) / 2 = <code>5</code>. A line through every point, like <code>mse(1, 0, [(1, 1), (2, 2)])</code>, gives <code>0</code>.</p>
-<details><summary>Hint 1</summary><p>Loop over the pairs: <code>for x, y in data:</code> unpacks each tuple for you.</p></details>
-<details><summary>Hint 2</summary><p><code>** 2</code> squares a number. Keep a running total, then divide by <code>len(data)</code>.</p></details>
-<details><summary>Hint 3</summary><pre><code>total = 0
-for each x, y in data:
+<h2 id="homework">3. Build</h2>
+<div class="box build"><span class="tag">🛠 Build</span>
+<p>Open <code>homework/lesson03_learning.py</code>. <code>STOP_DATA</code> (the 13 points) is already there. Run <code>python3 check.py 3</code> from <code>project</code> after each step.</p>
+<ol class="steps">
+<li><strong><code>predict(w, b, speed)</code></strong> is the line. <code>predict(2, 1, 3)</code> → 2 × 3 + 1 = <code>7</code>.
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint: fill in the blank</summary><pre><code>return w * ____ + b</code></pre></details>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>Lesson 3: lesson03_learning.py
+  ✓ predict
+  … mse: not written yet (Lesson 3: write this function)
+  … gradients: not written yet (Lesson 3: write this function)
+  … fit_line learns: not written yet (Lesson 3: write this function)
+  … max_safe_speed: not written yet (Lesson 3: write this function)
+  1/5 passed</code></pre>
+</div></li>
+<li><strong><code>mse(w, b, data)</code></strong>: for every <code>(x, y)</code>, square the miss <code>predict(w, b, x) - y</code>, then average. By hand on two points: <code>mse(0, 0, [(1, 1), (2, 3)])</code> has misses −1 and −3, squares 1 and 9, so (1 + 9) / 2 = <code>5</code>.
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p><code>for x, y in data:</code> unpacks each pair. <code>** 2</code> squares.</p></details>
+<details><summary>Hint 2: fill in the blanks</summary><pre><code>total = 0
+for x, y in data:
     miss = predict(w, b, x) - y
-    total += miss squared
-return total / number of points</code></pre></details>
-
-<h3>Function 3: <code>gradients(w, b, data)</code></h3>
-<p><strong>What it does:</strong> returns <code>(dw, db)</code> using the two formulas from Step 3.</p>
-<p><strong>Example:</strong> <code>gradients(0, 0, [(1, 1), (2, 3)])</code> → <code>(-7.0, -4.0)</code>, exactly the hand calculation above.</p>
-<details><summary>Hint 1</summary><p>Same loop shape as <code>mse</code>, but keep two running totals at once.</p></details>
-<details><summary>Hint 2</summary><p>Inside the loop, work out <code>miss = predict(w, b, x) - y</code> once, then add <code>2 * miss * x</code> to one total and <code>2 * miss</code> to the other.</p></details>
-<details><summary>Hint 3</summary><pre><code>dw_total = 0, db_total = 0
-for each x, y:
-    miss = ...
-    dw_total += 2 * miss * x
-    db_total += 2 * miss
-return (dw_total / n, db_total / n)</code></pre></details>
-
-<h3>Function 4: <code>fit_line(data, lr=0.1, steps=2000)</code></h3>
-<p><strong>What it does:</strong> gradient descent. Start at w = 0, b = 0. Repeat <code>steps</code> times: get the gradients, step both parameters downhill, then record the new MSE in a <code>history</code> list. Return <code>(w, b, history)</code>.</p>
-<p><strong>Example:</strong> on <code>STOP_DATA</code>, w ends up about 0.81, and <code>history[0]</code> (after the first step) is 0.3259.</p>
-<details><summary>Hint 1</summary><p>The docstring spells out the loop. Read it line by line.</p></details>
-<details><summary>Hint 2</summary><p>Downhill means <em>minus</em>: <code>w = w - lr * dw</code>. Record the MSE <em>after</em> updating w and b, so <code>history</code> has exactly <code>steps</code> numbers.</p></details>
-<details><summary>Hint 3</summary><pre><code>w, b, history = 0.0, 0.0, []
-repeat steps times:
+    total += ____ ** 2
+return total / len(____)</code></pre></details>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>  ✓ predict
+  ✓ mse
+  … gradients: not written yet (Lesson 3: write this function)
+  ...
+  2/5 passed</code></pre>
+<p><strong>If you see</strong> <code>✗ mse: mse(0, 0, [(1,1),(2,3)]) = (1 + 9) / 2 = 5</code>, you forgot to square, or used <code>abs</code>.</p>
+</div></li>
+<li><strong><code>gradients(w, b, data)</code></strong> returns <code>(dw, db)</code>, which way is uphill:
+<pre><code>dw = average of  2 × miss × x
+db = average of  2 × miss</code></pre>
+<p>A positive miss means the line is too high, so the gradient says "go down". The miss is multiplied by <code>x</code> for <code>w</code> because changing the slope moves the line more at high speed. <code>gradients(0, 0, [(1, 1), (2, 3)])</code> → <code>(-7.0, -4.0)</code>.</p>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>Same loop as <code>mse</code>, with two running totals. Work out <code>miss</code> once per point.</p></details>
+<details><summary>Hint 2: fill in the blanks</summary><pre><code>dw = db = 0
+for x, y in data:
+    miss = predict(w, b, x) - y
+    dw += 2 * miss * ____
+    db += 2 * ____
+return (dw / len(data), db / len(data))</code></pre></details>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>  ✓ predict
+  ✓ mse
+  ✓ gradients
+  … fit_line learns: not written yet (Lesson 3: write this function)
+  … max_safe_speed: not written yet (Lesson 3: write this function)
+  3/5 passed</code></pre>
+<p><strong>If you see</strong> <code>✗ gradients: gradients(0, 0, [(1,1),(2,3)]) should be (-7.0, -4.0)</code>, check the miss is <code>predict - y</code>, not <code>y - predict</code>.</p>
+</div></li>
+<li><strong><code>fit_line(data, lr=0.1, steps=2000)</code></strong> is gradient descent. Start at w = 0, b = 0. Each step: get the gradients, move both downhill, append the new MSE to <code>history</code>. Return <code>(w, b, history)</code>.
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>Downhill means <em>minus</em>: <code>w = w - lr * dw</code>. Get both gradients before changing either.</p></details>
+<details><summary>Hint 2: fill in the blanks</summary><pre><code>w, b, history = 0.0, 0.0, []
+for _ in range(steps):
     dw, db = gradients(w, b, data)
-    update w and b
-    append mse(w, b, data) to history
+    w = w - lr * ____
+    b = b - lr * ____
+    history.append(mse(w, b, data))
 return w, b, history</code></pre></details>
-
-<h3>Function 5: <code>max_safe_speed(w, b, free_distance, margin=0.2)</code></h3>
-<p><strong>What it does:</strong> tries speeds 0.00, 0.05, 0.10 … 3.00 and returns the fastest one where <code>predict(w, b, speed) + margin ≤ free_distance</code>, rounded to 2 decimal places. If none fit, 0.0.</p>
-<p><strong>Example:</strong> <code>max_safe_speed(1, 0, 1.0)</code> → <code>0.8</code> (0.8 + 0.2 = 1.0 just fits). <code>max_safe_speed(1, 0, 0.1)</code> → <code>0.0</code>.</p>
-<details><summary>Hint 1</summary><p>0.00 to 3.00 in steps of 0.05 is 61 speeds. Loop over a whole number <code>i</code> from 0 to 60 and make the speed <code>i * 0.05</code>. (Adding 0.05 over and over builds up tiny rounding errors.)</p></details>
-<details><summary>Hint 2</summary><p>Keep a variable <code>best = 0.0</code>. Every time a speed fits, set <code>best</code> to it. Since speeds go up, the last one that fits is the fastest.</p></details>
-<details><summary>Hint 3</summary><p>At the end, <code>return round(best, 2)</code>. Without rounding you might return 0.9000000000000001.</p></details>
-
-<h3>Run it and see</h3>
-<pre><code>cd homework
-python3 lesson03_learning.py          # Windows: py lesson03_learning.py
-cd ..</code></pre>
-<p>Real output from the finished file:</p>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>  ✓ predict
+  ✓ mse
+  ✓ gradients
+  ✓ fit_line learns
+  … max_safe_speed: not written yet (Lesson 3: write this function)
+  4/5 passed</code></pre>
+<p><strong>If you see</strong> <code>✗ fit_line learns: the learned w should be about 0.81</code> but gradients passed, check your signs: <code>+ lr * dw</code> walks <em>uphill</em>.</p>
+</div></li>
+<li><strong><code>max_safe_speed(w, b, free_distance, margin=0.2)</code></strong> tries speeds 0.00, 0.05 … 3.00 and returns the fastest where <code>predict(w, b, speed) + margin ≤ free_distance</code>, rounded to 2 places (0.0 if none fit). <code>max_safe_speed(1, 0, 1.0)</code> → <code>0.8</code>.
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>Loop a whole number <code>i</code> from 0 to 60 and use <code>speed = i * 0.05</code>. Adding 0.05 again and again builds up rounding errors.</p></details>
+<details><summary>Hint 2: fill in the blanks</summary><pre><code>best = 0.0
+for i in range(61):
+    speed = i * 0.05
+    if predict(w, b, speed) + margin &lt;= ____:
+        best = speed
+return round(____, 2)</code></pre></details>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p><code>cd homework</code>, then <code>python3 lesson03_learning.py</code>. Real output:</p>
 <pre><code>learned: distance = 0.810 * speed + 0.071
 error went from 0.3259 to 0.00036
 max safe speed with 1.0 m free: 0.9 m/s</code></pre>
-<p>The robot worked out its own braking rule from 13 measurements. Nobody told it 0.810.</p>
-
-<h3>Check it</h3>
-<pre><code>python3 check.py 3                 # Windows: py check.py 3</code></pre>
+<p>Nobody told the robot 0.810. It worked it out. Then <code>python3 check.py 3</code>:</p>
 <pre><code>Lesson 3: lesson03_learning.py
   ✓ predict
   ✓ mse
@@ -199,97 +196,99 @@ max safe speed with 1.0 m free: 0.9 m/s</code></pre>
   ✓ fit_line learns
   ✓ max_safe_speed
   5/5 passed  🎉 lesson complete!</code></pre>
-<p>Two of the hints the checker can give you:</p>
-<pre><code>  ✗ gradients: gradients(0, 0, [(1,1),(2,3)]) should be (-7.0, -4.0)
-  ✗ fit_line learns: the learned w should be about 0.81</code></pre>
-<p>If <code>gradients</code> is wrong, <code>fit_line</code> will be too, so fix them in order. If the gradients pass but <code>fit_line</code> doesn't, check your signs: <code>+ lr * dw</code> walks <em>uphill</em>.</p>
-
-<h3>Stretch</h3>
-<ol>
-<li>Print <code>history[0]</code>, <code>history[9]</code>, <code>history[99]</code> and <code>history[-1]</code>. Real values: 0.3259, 0.0158, 0.00052, 0.00036. Where does most of the learning happen?</li>
-<li>Write <code>fit_line_until(data, lr, tol)</code> that stops as soon as the error improves by less than <code>tol</code> in one step, and returns how many steps it took. Compare lr = 0.01, 0.1 and 0.3.</li>
+<p><strong>If you get</strong> 0.9000000000000001 somewhere, you forgot <code>round</code>.</p>
+</div></li>
 </ol>
+</div>
 
-<h2 id="add-to-robot">Add it to your robot</h2>
-<p>Finish <code>look(self)</code> from <a href="02-sensors.html#add-to-robot">Part A</a>: add the safe speed. Fit your braking line with <code>fit_line(STOP_DATA)</code>, work out how much free space the robot has in metres, and ask your <code>max_safe_speed()</code>.</p>
-<div class="card note" id="metres"><strong>From squares to metres.</strong> Your sensors count squares, but braking is in metres. In the robot's world <strong>one square is 0.5 m</strong>. Use the <em>smallest</em> true distance (the closest wall is the dangerous one), and count the robot's own square too, since it can roll across that one as well. So:
-<pre><code>free metres = (squares + 1) × 0.5   which is the same as   squares × 0.5 + 0.5</code></pre>
-At the start the closest wall is north, 0 squares away, so the robot has 0 × 0.5 + 0.5 = 0.5 m. With your line, 0.810 × 0.25 + 0.071 + 0.2 = 0.47, which fits in 0.5 m, but 0.30 m/s needs 0.51 m, which doesn't. So the safe speed is 0.25 m/s.</div>
-<div class="card note"><strong>New Python this time.</strong> <code>.values()</code> gives just the numbers from a dictionary, so <code>min</code> can find the smallest. And <code>_</code> is a name for "a value I don't need".
-<pre><code>min({"N": 0, "E": 7}.values())      # 0
-w, b, _ = fit_line(STOP_DATA)       # ignore the history list</code></pre></div>
-<details><summary>Hint 1</summary><p>Add this import, next to Part A's one:</p><pre><code>from lesson03_learning import STOP_DATA, fit_line, max_safe_speed</code></pre></details>
-<details><summary>Hint 2</summary><p>After your Part A loop, use the <em>true</em> distances (not the noisy ones):</p><pre><code>w, b, _ = fit_line(STOP_DATA)
+<h2 id="add-to-robot">4. Add it to your robot</h2>
+<div class="box bot"><span class="tag">🤖 Add it to your robot</span>
+<p>Finish <code>look(self)</code> from <a href="02-sensors.html#add-to-robot">Part A</a>: add the safe speed. Fit your line with <code>fit_line(STOP_DATA)</code>, work out the free space in metres, and ask <code>max_safe_speed()</code>.</p>
+<div class="card note" id="metres"><strong>From squares to metres.</strong> One square is <strong>0.5 m</strong>. Use the <em>smallest true</em> distance (the closest wall is the dangerous one), and count the robot's own square too:
+<pre><code>free metres = squares × 0.5 + 0.5</code></pre>
+At the start the closest wall is north, 0 squares away, so 0.5 m. At 0.25 m/s the robot needs 0.810 × 0.25 + 0.071 + 0.2 = 0.47 m: fits. At 0.30 m/s it needs 0.51 m: doesn't. So the safe speed is 0.25 m/s.</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>Add this import next to Part A's:</p><pre><code>from lesson03_learning import STOP_DATA, fit_line, max_safe_speed</code></pre></details>
+<details><summary>Hint 2</summary><p>After your Part A loop (<code>_</code> means "I don't need the history"):</p><pre><code>w, b, _ = fit_line(STOP_DATA)
 speed = max_safe_speed(w, b, min(true.values()) * 0.5 + 0.5)</code></pre></details>
-<details><summary>Hint 3</summary><p>Fill in the blank at the end of your Part A sentence:</p><pre><code>return (f"Walls (average of 16 readings): north {seen['N']:.1f}, east {seen['E']:.1f}, "
-        f"south {seen['S']:.1f}, west {seen['W']:.1f}. Safe speed: {____} m/s.")</code></pre><p>(Two f-strings inside round brackets join into one long string.)</p></details>
-<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). The yellow line from Part A turns green: <em>"week 2 part B: look's safe speed"</em>. Real output:</p>
+<details><summary>Hint 3: fill in the blank</summary><pre><code>return (f"Walls (average of 16 readings): north {seen['N']:.1f}, east {seen['E']:.1f}, "
+        f"south {seen['S']:.1f}, west {seen['W']:.1f}. Safe speed: {____} m/s.")</code></pre></details>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p><code>python3 check.py robot</code> from <code>project</code>. Part A's yellow line turns green. Real output:</p>
 <pre><code>Your robot: my_robot.py
   ✓ week 1: arrows
   ✓ week 2: look
   ✓ week 2 part B: look's safe speed
-  … week 3: stops for the cat: not written yet (fill in should_stop_for() first)
+  … week 3: real phone data: not written yet (fill in phone() first)
   ...
-  3/15 passed</code></pre>
-<p>If the number is wrong, the ✗ starts: <code>✗ week 2 part B: look's safe speed: at the start (against the north wall) the safe speed is 0.25 m/s</code>. The usual cause is using the noisy distances, or the biggest distance instead of the smallest.</p>
-<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
+  3/21 passed</code></pre>
+<p>Then <code>python3 my_robot.py</code>. Real replies:</p>
 <pre><code>Zippy&gt; look
-  Walls (average of 16 readings): north 0.1, east 6.9, south 5.0, west 0.1. Safe speed: 0.25 m/s.</code></pre>
-<p>Squeezed against the north wall, it's only allowed to creep along at 0.25 m/s. For now your robot just tells you. In the week 7 capstone, the robot uses this rule to choose how fast to drive.</p>
+  Walls (average of 16 readings): north 0.1, east 7.1, south 5.0, west 0.1. Safe speed: 0.25 m/s.
+
+Zippy&gt; EEEE
+  BUMP! I walked into the cat. (It's not on my map, so I can't sense it yet: add week 4.)
+
+Zippy&gt; look
+  Walls (average of 16 readings): north 0.2, east 5.0, south 0.1, west 2.0. Safe speed: 0.25 m/s.</code></pre>
+<div class="room" data-robot="1,1" data-cat="4,1" data-blocks="red:2,1 blue:6,3 green:1,5" data-mark="1,0" data-label="Squeezed against the north wall (red ring), it may only creep at 0.25 m/s."></div>
+<p><strong>If you see</strong> <code>✗ week 2 part B: look's safe speed: at the start (against the north wall) the safe speed is 0.25 m/s</code>, you used the noisy distances, or the biggest instead of the smallest.</p>
+</div>
+</div>
 
 <h2 id="challenge">5. Real-world challenge: the ramp</h2>
-<p>You'll collect your own data and fit your own line, first by hand and then with your code.</p>
-<ol>
-<li><strong>Build a ramp:</strong> lean a stiff board, tray or big hardback book on a stack of books. Put it on a hard floor with space in front.</li>
-<li><strong>Choose your input:</strong> the number of books in the stack (1, 2, 3, 4, 5). That's your "speed".</li>
-<li><strong>Measure the output:</strong> let a ball or toy car roll down from the top (let go, don't push) and measure how far it travels across the floor from the bottom of the ramp, in metres. Do 2–3 rolls per height (week 2 Part A: average them!).</li>
-<li><strong>Plot it</strong> on squared paper: books across, distance up. Draw the straight line you think fits best with a ruler, and read off your w (slope) and b (where it crosses 0 books).</li>
-<li><strong>Score your line by hand:</strong> for each point, the miss, squared, then average. That's your MSE.</li>
-<li><strong>Let the computer do it:</strong> type your data into Python as a list of <code>(books, metres)</code> pairs and run <code>fit_line(my_data, lr=0.01)</code>. With inputs as big as 5, lr = 0.1 may diverge. If <code>history</code> grows instead of shrinking, divide lr by 10.</li>
-<li><strong>Record:</strong> your table of data, your hand-drawn w and b with its MSE, and the computer's w and b with its MSE.</li>
+<ol class="steps">
+<li>Lean a board or big book on a stack of books. The number of books (1 to 5) is your "speed".</li>
+<li>Let a ball or toy car roll down (don't push) and measure how far it goes past the bottom. Do 2–3 rolls per height and average them (Part A!).</li>
+<li>Plot it on squared paper, draw your best line with a ruler, and read off w and b.</li>
+<li>Type your data into Python and run <code>fit_line(my_data, lr=0.01)</code>. If <code>history</code> grows instead of shrinking, divide lr by 10.</li>
+<li>Predict how far it rolls from 6 books. Then test it.</li>
 </ol>
-<div class="card note"><strong>On your own:</strong> this one works alone. No ball or toy car? Roll a round pen, a marble or a coin on its edge. No tape measure? Measure in floor tiles or in lengths of a ruler, and say so in your table.</div>
-<p><strong>What it teaches:</strong> real data is noisy and not perfectly straight, and that's fine. The best line isn't the one through every point; it's the one with the smallest total squared miss. You'll probably find the computer beats your ruler by a little. Then use your line to <em>predict</em>: how far will it roll from 6 books? Test it. Predicting something you never measured is the whole point of learning a model.</p>
+<div class="card note"><strong>On your own:</strong> this works alone. No ball? A marble, a round pen or a coin on its edge. No tape measure? Measure in floor tiles.</div>
+<p>The best line isn't the one through every point. It's the one with the smallest squared misses. Predicting something you never measured is the whole point.</p>
 
-<h2 id="project">6. Your Robo-Helper so far</h2>
-<pre><code>Week 1A  ✓ greets you, counts steps
-Week 1B  ✓ moves without crashing
-Week 2A  ✓ measures distance to walls, averages noisy readings
-Week 2B  ✓ fit_line + max_safe_speed: learns its own braking and picks a safe speed</code></pre>
+<h2 id="check">Check yourself</h2>
+<details><summary>Why square the misses instead of just averaging them?</summary><p>Plus and minus misses would cancel, so a bad line could score 0. Squaring makes every miss count, and big ones count most.</p></details>
+<details><summary>dw = +3.0 and db = −0.5. Which way does each move?</summary><p>Against the gradient: <strong>w goes down</strong>, <strong>b goes up</strong>. With lr = 0.1: w changes by −0.3, b by +0.05.</p></details>
+<details><summary>Predict: <code>mse(2, -1, [(1, 1), (2, 3)])</code>?</summary><p><strong>0.</strong> The line hits both points exactly.</p></details>
+<details><summary>Predict: <code>max_safe_speed(0.810, 0.071, 1.5)</code>?</summary><p><strong>1.5.</strong> You need 0.810 × s + 0.271 ≤ 1.5, so s ≤ 1.517.</p></details>
+
+<h2 id="deeper">Want to know more?</h2>
+<details><summary>Gradient descent by hand, one step</summary>
+<p>On (1, 1) and (2, 3) at w = 0, b = 0, the gradients are −7 and −4. With lr = 0.1:</p>
+<pre><code>w = 0 - 0.1 × (-7) = 0.7
+b = 0 - 0.1 × (-4) = 0.4
+new MSE: misses 0.1 and -1.2 → (0.01 + 1.44) / 2 = 0.725   (down from 5)</code></pre>
+<p>Repeat 2,000 times and you reach w = 2, b = −1, through both points.</p>
+</details>
+<details><summary>Feeling the slope without a formula</summary>
+<p>Nudge w a tiny bit and see how the error changes. On the robot data: MSE at w = 0 is 1.0938, at w = 0.01 it's 1.0686. Change per unit of w ≈ −2.52. The formula gives −2.53. The 2 in the formula comes from the squaring; you'll meet why in calculus.</p>
+</details>
+<details><summary>What "too big a step" really does</summary><p>With lr = 0.5 on the robot data, the error goes 1.95, 3.51, 6.33… and after 30 steps it's in the millions. Each step jumps over the valley to a higher point. That's called <em>diverging</em>.</p></details>
+<details><summary>Stretch</summary>
 <ul>
-<li><a href="04-neuron.html">Week 3</a> reuses the exact same recipe (a model, an error, gradients, steps) to train a neuron that decides "stop or go".</li>
-<li>In the <a href="11-capstone.html">week 7 capstone</a>, <code>RoboHelper</code> calls your <code>fit_line(STOP_DATA)</code> when it starts up. Then, before every step, <code>drive_to</code> asks your <code>max_safe_speed</code> how fast it can go, given what <code>distance_to_wall</code> from Part A says is ahead.</li>
-</ul>
-
-<h2 id="mistakes">7. Common mistakes</h2>
+<li>Print <code>history[0]</code>, <code>history[9]</code>, <code>history[99]</code>, <code>history[-1]</code>. Real values: 0.3259, 0.0158, 0.00052, 0.00036. Where does most learning happen?</li>
+<li>Write <code>fit_line_until(data, lr, tol)</code> that stops when one step improves the error by less than <code>tol</code>. Compare lr = 0.01, 0.1, 0.3.</li>
+</ul></details>
+<details><summary>Common mistakes</summary>
 <ul>
-<li><strong>Walking uphill.</strong> <code>w = w + lr * dw</code> makes the error grow. The checker says <code>the learned w should be about 0.81</code>, or <code>the error should go DOWN during training</code>.</li>
-<li><strong>Forgetting to square</strong> (or using <code>abs</code>). The checker says <code>mse(0, 0, [(1,1),(2,3)]) = (1 + 9) / 2 = 5</code>.</li>
-<li><strong>Miss the wrong way round.</strong> <code>y - predict</code> instead of <code>predict - y</code> flips the sign of both gradients, and the checker says <code>gradients(0, 0, [(1,1),(2,3)]) should be (-7.0, -4.0)</code>. (In <code>mse</code> it doesn't matter, because squaring hides the sign.)</li>
-<li><strong>Updating w before computing db.</strong> If you change <code>w</code> and then work out <code>db</code> with the new <code>w</code>, the two steps don't match. Get both gradients first, then update both.</li>
-<li><strong>Learning rate too big.</strong> The error explodes into huge numbers or <code>OverflowError</code>. Make it 10 times smaller.</li>
-</ul>
-
-<h2 id="check">8. Check yourself</h2>
-<details><summary>Why do we square the misses instead of just averaging them?</summary><p>Positive and negative misses would cancel, so a bad line could score 0. Squaring makes every miss count as positive, and punishes big misses more than small ones.</p></details>
-<details><summary>At some (w, b), dw = +3.0 and db = −0.5. Which way should each parameter move?</summary><p>Against the gradient: <strong>w goes down</strong> (dw is positive, so the error rises as w rises) and <strong>b goes up</strong> (db is negative). With lr = 0.1: w changes by −0.3 and b by +0.05.</p></details>
-<details><summary>Predict: what does <code>mse(2, -1, [(1, 1), (2, 3)])</code> return?</summary><p><strong>0.</strong> Predictions are 2×1−1 = 1 and 2×2−1 = 3, exactly the real values. That's the line gradient descent finds on this data.</p></details>
-<details><summary>Predict: with the learned w = 0.810 and b = 0.071, what's <code>max_safe_speed(w, b, 1.5)</code>? Work it out, then run it.</summary><p><strong>1.5.</strong> You need 0.810 × s + 0.071 + 0.2 ≤ 1.5, so s ≤ 1.517. The fastest speed on the 0.05 grid below that is 1.50.</p></details>
-<details><summary>How is this the same as how an LLM learns?</summary><p>Same loop: a model with adjustable numbers makes predictions (next words instead of stopping distances), an error measures how wrong they are, gradients say which way to nudge every number, and small steps downhill repeat many times. The LLM just has billions of numbers instead of two.</p></details>
-
-<h2 id="deeper">9. Go deeper (optional)</h2>
+<li><strong>Walking uphill</strong>: <code>w + lr * dw</code>. The checker says <code>the learned w should be about 0.81</code> or <code>the error should go DOWN during training</code>.</li>
+<li><strong>Updating w before working out db.</strong> Get both gradients first.</li>
+<li><strong>Learning rate too big</strong>: huge numbers or <code>OverflowError</code>. Make it 10 times smaller.</li>
+</ul></details>
+<details><summary>Where this goes next</summary>
 <ul>
-<li><a href="../12-training-inference-videos/07-adamw.html">Video 07 · AdamW</a>: how plain gradient descent grew into the optimiser that trains almost every big model, with a 2D "optimiser race" to play with.</li>
-<li><a href="../14-deep-ml-deep-path.html">Deep-ML Deep-Path</a>: practice problems, starting with linear regression and gradient descent from scratch.</li>
-<li><a href="../02-tensortonic.html">TensorTonic</a>: more implement-it-yourself ML problems in the same style as this homework.</li>
-<li><a href="../07-post-training.html">LLM post-training</a>: for later. What happens after the "predict the next word" training you just met in miniature.</li>
-</ul>
+<li><a href="04-neuron.html">Week 4</a> uses the same recipe (model, error, gradients, steps) to train a neuron that decides "stop or go".</li>
+<li><a href="11-capstone.html">Week 10 capstone</a>: before every step, the robot asks your <code>max_safe_speed</code> how fast it may go.</li>
+<li><a href="../12-training-inference-videos/07-adamw.html">AdamW</a>, <a href="../14-deep-ml-deep-path.html">Deep-ML Deep-Path</a>, <a href="../02-tensortonic.html">TensorTonic</a> and <a href="../07-post-training.html">LLM post-training</a> for more.</li>
+</ul></details>
 
 <nav class="pager">
   <a href="02-sensors.html"><small>Previous</small>Week 2 · Part A: Noisy senses</a>
-  <a class="next" href="04-neuron.html"><small>Next</small>Week 3 · Part A: The artificial neuron</a>
+  <a class="next" href="21-phone.html"><small>Next</small>Week 3: Real sensors in your phone</a>
 </nav>
-<footer>Build a Robot Brain · Week 2 of 12 · Part B</footer>
+<footer>Build a Robot Brain · Week 2 of 16 · Part B</footer>
 </main>
 
 <script>
@@ -368,5 +367,6 @@ document.getElementById('reset0').onclick = () => { w = 0; b = 0; nSteps = 0; wS
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
 draw();
 </script>
+<script src="room.js"></script>
 </body>
 </html>

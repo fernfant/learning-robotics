@@ -31,7 +31,7 @@
 <h3>The twist</h3>
 <p>The marker can be wrong too. If another AI does the marking, you have to test the marker first. A marker that says "well done!" to everything will make a broken robot look great.</p>
 <h3>Why robots care</h3>
-<p>A robot that says "Done! The blue block is in the bin" when you asked for the purple one is exactly this problem. You check what's actually in the bin, not what the robot says. You build this yourself in <a href="18-robot-brain/19-bakeoff.html#judge">Robo-Helper week 11</a>.</p>
+<p>A robot that says "Done! The blue block is in the bin" when you asked for the purple one is exactly this problem. You check what's actually in the bin, not what the robot says. You build this yourself in <a href="18-robot-brain/19-bakeoff.html#judge">Robo-Helper week 15</a>.</p>
 <h3>Try it</h3>
 <p>Ask a friend 10 quick quiz questions. Before you start, write the answers down. Then mark them twice: once just by how sure they sounded, and once with your answer key. How often do the two marks disagree?</p>
 <h3>Words to know</h3>
@@ -280,7 +280,7 @@
 <li><strong>Satisfaction vs success.</strong> Asked "where's the green one?", the word counter drives off, bins the green block and says "The green block is in the bin." A reply-only judge passes it, but the bin shows the robot did the wrong thing: it was asked a question, not told to tidy up.</li>
 <li><strong>Error bars and paired comparison.</strong> Word counter 5/12 (bootstrap 95% range 17%–67%), tiny LM 8/12 (42%–92%), distilled 10/12 (58%–100%). Paired: tiny LM minus word counter is +25 points [+0, +50] over 3 differing tasks, which is too close to call on 12 tasks. Distilled minus word counter is +42 points [+17, +67] over 5 differing tasks: a real difference.</li>
 </ul>
-<p>Homework: <code>kappa</code>, <code>catch_rate</code> and <code>bootstrap_ci</code> in <code>lesson19_judge.py</code>, checked by <code>python3 check.py 19a</code>. See <a href="18-robot-brain/19-bakeoff.html#judge">week 11, stretch 2</a>.</p>
+<p>Homework: <code>kappa</code>, <code>catch_rate</code> and <code>bootstrap_ci</code> in <code>lesson19_judge.py</code>, checked by <code>python3 check.py 19a</code>. See <a href="18-robot-brain/19-bakeoff.html#judge">week 15, stretch 2</a>.</p>
 
 <h2 id="playbook">12. Playbook</h2>
 <ol>
@@ -339,7 +339,7 @@
 <li>Related: <a href="01-decision-model-evals.html">Module 01: decision models</a> (thresholds, precision/recall, calibration: the typed-judge side of this page)</li>
 <li>Related: <a href="04-distill-small-models.html#eval">Module 04: evaluation that doesn't fool you</a> (paired bootstrap, splits by day)</li>
 <li>Related: <a href="07-post-training.html#rlvr">Module 07: checkers as rewards</a>, where reward hacking comes from</li>
-<li>Related: <a href="18-robot-brain/05-evaluation.html">Module 18, week 3: testing Robo-Helper honestly</a> and <a href="18-robot-brain/19-bakeoff.html#judge">week 11: the bake-off and the AI judge</a></li>
+<li>Related: <a href="18-robot-brain/05-evaluation.html">Module 18, week 4: testing Robo-Helper honestly</a> and <a href="18-robot-brain/19-bakeoff.html#judge">week 15: the bake-off and the AI judge</a></li>
 </ul>
 
 <footer>Module 19 · added 2026-11-05 · <a href="../index.html">Back to course index</a></footer>

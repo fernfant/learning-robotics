@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 11 · Making a map</title>
+<link rel="stylesheet" href="../../style.css?v=16">
+<style>
+svg .w { fill: var(--wall); } svg .f { fill: var(--floor); stroke: var(--line); stroke-width: 1; }
+svg .lbl { font-size: 15px; fill: var(--fg); } svg .lbl.small { font-size: 12px; } svg .lbl.big { font-size: 18px; font-weight: 700; } svg .strong { font-weight: 700; }
+svg .rmt { fill: var(--idea); } svg .bott { fill: var(--bot); } svg .beamt { fill: var(--play); } svg .fill-fg { fill: var(--fg); }
+svg .okt { fill: var(--ok); } svg .failt { fill: var(--fail); } svg .muted { fill: var(--muted); }
+svg .ax-room { stroke: var(--idea); stroke-width: 3; } svg .ax-bot { stroke: var(--bot); stroke-width: 3; }
+svg .beam { stroke: var(--play); stroke-width: 3; } svg .hit { fill: var(--fail); } svg .arc { fill: none; stroke: var(--play); stroke-width: 2; }
+svg .robot { fill: var(--card); stroke: var(--fg); stroke-width: 2; }
+svg .vfree { fill: var(--ok); opacity: .28; } svg .vwall { fill: var(--fail); opacity: .3; } svg .vt { font-weight: 700; font-size: 18px; }
+svg .kid-arrow { fill: none; stroke: var(--fg); stroke-width: 2.5; stroke-dasharray: 6 5; } svg .bubble { fill: var(--card); stroke: var(--fg); }
+svg .pdot { fill: var(--idea); } svg .ptick { stroke: var(--idea); stroke-width: 1.2; }
+svg .rs { stroke: var(--fg); stroke-width: 2; } svg .rs-dot { fill: var(--fg); } svg .rs-faint { stroke: var(--line); stroke-width: 6; } svg .rs-faint-dot { fill: var(--line); }
+svg .ok-ray { stroke: var(--ok); stroke-width: 2; } svg .ok-ray-dot { fill: var(--ok); } svg .bad-ray { stroke: var(--fail); stroke-width: 2; } svg .bad-ray-dot { fill: var(--fail); }
+svg .wdot { fill: var(--idea); opacity: .85; } svg .ndot { fill: var(--ok); }
+svg .axis { stroke: var(--muted); } svg .ax-ok { stroke: var(--ok); stroke-width: 2; } svg .curve-on { fill: none; stroke: var(--ok); stroke-width: 3; } svg .curve-off { fill: none; stroke: var(--muted); stroke-width: 2; stroke-dasharray: 5 4; }
+svg .u { fill: var(--line); } svg .est { fill: none; stroke: var(--idea); stroke-width: 3; stroke-dasharray: 4 3; }
+.twin { display: flex; flex-wrap: wrap; gap: 12px; } .twin > div { flex: 1 1 260px; min-width: 0; }
+.twin .room-pic, .twin svg { max-width: 100%; }
+.demo-pic { display: block; width: 100%; height: auto; cursor: pointer; touch-action: manipulation; }
+</style>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 11 of 16</nav>
+
+<div class="eyebrow"><span class="track robo">Robotics</span>Build a Robot Brain · Week 11 of 16</div>
+<h1>Making a map: frames and a laser scanner</h1>
+<p class="lede">Your robot drives around and turns its laser readings into its own map. Drive it close enough and the map even finds the cat.</p>
+<div class="card note" id="journey"><strong>Week 11 of 16.</strong> So far your robot: ✓ moves ✓ looks around ✓ reads real phone data ✓ stops for the cat ✓ plans routes ✓ holds a steady angle ✓ fixes typos ✓ understands sentences ✓ writes plans ✓ drives on real wheels ✓ checks every action. <strong>Today</strong> it learns to scan the room and draw its own map. Next: <a href="25-localise.html">Week 12 · Where am I?</a>. <a href="index.html#my-robot">Your robot, week by week</a>.</div>
+
+<div class="facts">
+  <div><b>Time</b>2–3 hours</div>
+  <div><b>You'll need</b>Python 3 and week 9 finished (<code>lesson23_wheels.py</code>)</div>
+  <div><b>New words</b>frame, laser scanner, occupancy map, vote</div>
+  <div><b>Homework file</b><code>lesson24_map.py</code></div>
+</div>
+
+<section class="kid" id="start">
+<h2>Start here</h2>
+<p class="big">The robot's laser says "a wall 1.3 m away, a bit to my right". Turn that into a spot on a map, do it thousands of times, and a map appears.</p>
+<p>Imagine you're blindfolded in a room with a very long stick. You poke in every direction and feel where the stick stops. Each poke tells you two things: the air along the stick is empty, and there's something solid at the end. Write every poke down on squared paper and you get a map. That's exactly what your robot does today.</p>
+<dl>
+<dt>Frame</dt><dd>A point of view for measuring angles and positions. "To my right" (robot frame) is not the same as "to the east" (room frame).</dd>
+<dt>Laser scanner</dt><dd>A sensor that spins and measures the distance to the nearest thing in many directions. Yours has 36 beams, one every 10°.</dd>
+<dt>Occupancy map</dt><dd>A grid where each square says "wall", "free" or "don't know yet".</dd>
+</dl>
+</section>
+
+<h2 id="idea">1. The idea</h2>
+
+<div class="box idea"><span class="tag">💡 The idea · two points of view</span>
+<p>If a friend says "the ball is on my left", you can only find it if you know which way your friend is facing. The laser measures angles from where the <b>robot</b> faces. The map uses the <b>room's</b> x and y. To go from one to the other, add the robot's heading to the beam's angle:</p>
+<svg class="diagram" viewBox="0 0 420 320" role="img" aria-label="Robot frame and room frame: the robot's heading plus the beam angle gives the beam's angle in the room">
+<defs><marker id="ah-frames" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="fill-fg"/></marker></defs>
+<rect x="330" y="40" width="16" height="260" class="w"/><text x="352" y="56" class="lbl">wall</text>
+<line x1="20" y1="20" x2="110" y2="20" class="ax-room" marker-end="url(#ah-frames)"/><text x="114" y="24" class="lbl rmt">x</text>
+<line x1="20" y1="20" x2="20" y2="110" class="ax-room" marker-end="url(#ah-frames)"/><text x="12" y="126" class="lbl rmt">y</text>
+<text x="30" y="40" class="lbl rmt">room frame</text>
+<line x1="170" y1="170" x2="326" y2="260" class="beam"/><circle cx="326" cy="260" r="6" class="hit"/>
+<text x="232" y="250" class="lbl beamt">beam</text>
+<line x1="170" y1="170" x2="257" y2="120" class="ax-bot" marker-end="url(#ah-frames)"/><text x="230" y="104" class="lbl bott">forward</text>
+<line x1="170" y1="170" x2="220" y2="257" class="ax-bot" marker-end="url(#ah-frames)"/><text x="186" y="290" class="lbl bott">robot's right</text>
+<path d="M 222 140 A 60 60 0 0 1 222 200" class="arc"/><text x="236" y="176" class="lbl beamt">+60°</text>
+<circle cx="170" cy="170" r="22" class="robot"/><text x="170" y="178" text-anchor="middle" font-size="22">🤖</text>
+<text x="20" y="314" class="lbl">room angle = heading (−30°) + beam (+60°) = 30°</text>
+</svg>
+<p>Then walk the distance along that angle from where the robot stands: <code>x = robot_x + distance × cos(angle)</code>, <code>y = robot_y + distance × sin(angle)</code>. Because y grows <em>down</em> the screen, a positive angle turns clockwise, which is to the robot's right.</p>
+</div>
+
+<div class="box idea"><span class="tag">💡 The idea · every beam votes</span>
+<p>Each beam is a poke with the stick. The squares it passes through get a <b>free</b> vote. The square where it stops gets a <b>wall</b> vote. Here are four beams in a small practice room (the numbers come from the lesson's own <code>squares_passed</code> code):</p>
+<svg class="diagram" viewBox="0 0 392 258" role="img" aria-label="Four beams. Squares a beam passes through get a free vote (green); the square where it stops gets a wall vote (red)">
+<rect class="w" x="0" y="0" width="56" height="56"/><rect class="w" x="56" y="0" width="56" height="56"/><rect class="w" x="112" y="0" width="56" height="56"/><rect class="w" x="168" y="0" width="56" height="56"/><rect class="w" x="224" y="0" width="56" height="56"/><rect class="w" x="280" y="0" width="56" height="56"/><rect class="w" x="336" y="0" width="56" height="56"/><rect class="w" x="0" y="56" width="56" height="56"/><rect class="f" x="56" y="56" width="56" height="56"/><rect class="f" x="112" y="56" width="56" height="56"/><rect class="f" x="168" y="56" width="56" height="56"/><rect class="f" x="224" y="56" width="56" height="56"/><rect class="f" x="280" y="56" width="56" height="56"/><rect class="w" x="336" y="56" width="56" height="56"/><rect class="w" x="0" y="112" width="56" height="56"/><rect class="f" x="56" y="112" width="56" height="56"/><rect class="f" x="112" y="112" width="56" height="56"/><rect class="w" x="168" y="112" width="56" height="56"/><rect class="f" x="224" y="112" width="56" height="56"/><rect class="f" x="280" y="112" width="56" height="56"/><rect class="w" x="336" y="112" width="56" height="56"/><rect class="w" x="0" y="168" width="56" height="56"/><rect class="w" x="56" y="168" width="56" height="56"/><rect class="w" x="112" y="168" width="56" height="56"/><rect class="w" x="168" y="168" width="56" height="56"/><rect class="w" x="224" y="168" width="56" height="56"/><rect class="w" x="280" y="168" width="56" height="56"/><rect class="w" x="336" y="168" width="56" height="56"/><rect class="vfree" x="59" y="115" width="50" height="50" rx="6"/><text x="68" y="132" class="vt okt" text-anchor="middle">4</text><rect class="vfree" x="59" y="59" width="50" height="50" rx="6"/><text x="84.0" y="90.0" class="vt okt" text-anchor="middle">1</text><rect class="vwall" x="59" y="3" width="50" height="50" rx="6"/><text x="84.0" y="34.0" class="vt failt" text-anchor="middle">1</text><rect class="vfree" x="115" y="115" width="50" height="50" rx="6"/><text x="140.0" y="146.0" class="vt okt" text-anchor="middle">3</text><rect class="vfree" x="115" y="59" width="50" height="50" rx="6"/><text x="140.0" y="90.0" class="vt okt" text-anchor="middle">1</text><rect class="vfree" x="171" y="59" width="50" height="50" rx="6"/><text x="196.0" y="90.0" class="vt okt" text-anchor="middle">1</text><rect class="vwall" x="171" y="3" width="50" height="50" rx="6"/><text x="196.0" y="34.0" class="vt failt" text-anchor="middle">1</text><rect class="vwall" x="171" y="115" width="50" height="50" rx="6"/><text x="196.0" y="146.0" class="vt failt" text-anchor="middle">1</text><rect class="vwall" x="115" y="171" width="50" height="50" rx="6"/><text x="140.0" y="202.0" class="vt failt" text-anchor="middle">1</text><line x1="84" y1="140" x2="99" y2="55" class="beam"/><circle cx="99" cy="55" r="5" class="hit"/><line x1="84" y1="140" x2="204" y2="56" class="beam"/><circle cx="204" cy="56" r="5" class="hit"/><line x1="84" y1="140" x2="168" y2="140" class="beam"/><circle cx="168" cy="140" r="5" class="hit"/><line x1="84" y1="140" x2="132" y2="168" class="beam"/><circle cx="132" cy="168" r="5" class="hit"/><text x="84.0" y="149.0" text-anchor="middle" font-size="24">🤖</text><text x="4" y="248" class="lbl"><tspan class="okt">green = free votes</tspan>   <tspan class="failt">red = wall votes</tspan></text></svg>
+<p>One scan can be wrong (the laser has a little noise). But after hundreds of scans, each square has lots of votes, and the majority wins: more wall votes than free votes means wall.</p>
+</div>
+
+<div class="box idea"><span class="tag">💡 The idea · a map appears</span>
+<p>The lesson drives the robot around the room, scanning as it goes. If it knows exactly where it is for every scan (cheating, using the hidden true position), every square the map decided is right: <b>100%</b> of 76:</p>
+<div class="twin">
+<div><div class="room" data-cat="4,1" data-label="The real room"></div></div>
+<div><div class="room" data-room="####?#####|#...?....#|#..##....?|#..#...?.#|#....##..#|#........#|#.#......#|##########" data-mark="4,1" data-label="The robot's map: 100% of 76 squares right"></div></div>
+</div>
+<p>Grey squares are "never seen" (no beam reached them). Look at the red ring, the cat's square (4, 1): it's grey. On its first trip up the room, the 2% bigger left wheel steered the robot into the wall block in the middle, and it stayed stuck there, scraping, for the rest of the drive. Its wheels kept turning and its encoders kept counting, so it never noticed. From that spot the cat is hidden behind the wall block, so no beam ever reached it. (Drive right up to the cat in the Play demo below and the laser finds it: the official map says floor there, but the laser sees something solid. The map knows something the official map doesn't.)</p>
+</div>
+
+<div class="box idea"><span class="tag">💡 The idea · why the map smears</span>
+<p>A real robot doesn't know where it is. It uses its odometry from week 9, which drifts (remember the 2% bigger left wheel?). Here it's even worse: while the robot is stuck against the wall block, its odometry thinks it is still driving the whole route. Every scan gets stuck onto the map in the wrong place, so walls get drawn where there's floor, and floor where there's wall. Same drive, same laser, only the position is different:</p>
+<div class="twin">
+<div><div class="room" data-room="####?#####|#...?....#|#..##....?|#..#...?.#|#....##..#|#........#|#.#......#|##########" data-label="Knowing where it is: 100% of 76"></div></div>
+<div><div class="room" data-room="....#....#|#.......#.|#..#......|..........|..........|#........#|#########?|?#????????" data-label="Using its own odometry: 62% of 69"></div></div>
+</div>
+<p>The bottom wall is drawn a whole row too high, the right wall a column too far left, and most of the top wall has vanished. A good map needs a good idea of where you are. Next week you'll fix the other half: knowing where you are needs a map. Robotics people call doing both at once <b>SLAM</b>.</p>
+</div>
+
+<h2 id="play">2. Play</h2>
+<div class="box play"><span class="tag">🎮 Play · map the room yourself</span>
+<p>Left: the real room, with the robot's 36 laser beams. Right: the map built from the beams' votes. <b>Click a floor square on the left</b> and the robot drives there in a straight line, scanning every 25 cm. It stops if it would bump into something.</p>
+<div class="twin">
+<div><svg id="real" class="demo-pic" viewBox="0 0 400 320" role="img" aria-label="The real room with the robot and its laser beams. Click a square to drive there."></svg><p class="room-caption">The real room (click to drive)</p></div>
+<div><svg id="map" class="demo-pic" viewBox="0 0 400 320" role="img" aria-label="The map the robot has built from its votes"></svg><p class="room-caption">The robot's map (dashed circle: where it thinks it is)</p></div>
+</div>
+<p style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button id="tour">Drive a tour</button><button id="reset">Reset</button>
+<label><input type="checkbox" id="drift"> Use odometry that drifts</label></p>
+<div class="stats">
+  <div class="stat"><div class="k">Scans</div><div class="v" id="nScans">0</div></div>
+  <div class="stat"><div class="k">Map right</div><div class="v" id="acc">–</div></div>
+  <div class="stat"><div class="k">Squares decided</div><div class="v" id="dec">–</div></div>
+</div>
+<p class="legend" id="msg">Click a floor square to start.</p>
+<p class="legend">The beams, votes and scoring are the same as <code>body.py</code> and <code>lesson24_map.py</code>. Two things are simpler: the robot drives in perfect straight lines, and the drifting odometry is made up for this demo (its heading creeps 3° for every metre). JavaScript also uses its own random numbers, so your percentages won't match the Python ones.</p>
+</div>
+<p>Try: drive a tour with drift off, then reset, tick "drifts" and drive it again. Watch the walls go wrong. Then drive right up next to the cat at (4, 1).</p>
+
+<h2 id="build">3. Build</h2>
+<div class="box build"><span class="tag">🛠 Build · <code>project/homework/lesson24_map.py</code></span>
+<p>Five short functions. After each one, run the checker from the <code>project</code> folder.</p>
+<ol class="steps">
+<li><b><code>beam_end(pose, beam_deg, distance)</code></b>: robot frame → room frame. <code>pose</code> is <code>(x, y, heading)</code>, with the heading in <em>radians</em> but the beam angle in <em>degrees</em>.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint 1</span>
+<p>Run <code>python3 check.py 24</code>. You should see:</p>
+<pre><code>Lesson 24: lesson24_map.py
+  ✓ beam_end
+  … square_of: not written yet (Lesson 24: write this function)
+  … squares_passed: not written yet (Lesson 24: write this function)
+  … add_scan + to_map: not written yet (Lesson 24: write this function)
+  … real map: not written yet (Lesson 24: write this function)
+  1/5 passed</code></pre>
+<p>If you see <code>✗ beam_end: facing south, beam at +90 degrees -&gt; (0, 2)</code> instead, you added degrees to radians. Turn the beam angle into radians first with <code>math.radians(beam_deg)</code>.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck on beam_end?</span>
+<details><summary>Hint 1</summary><p>Unpack the pose: <code>x, y, h = pose</code>. The beam's angle in the room is <code>h + math.radians(beam_deg)</code>.</p></details>
+<details><summary>Hint 2</summary><p>Walk <code>distance</code> along that angle: add <code>distance * math.cos(a)</code> to x and <code>distance * math.sin(a)</code> to y.</p></details>
+<details><summary>Hint 3 (fill in the blanks)</summary><pre><code>x, y, h = pose
+a = h + math.radians(____)
+return x + distance * math.cos(a), y + ____ * math.____(a)</code></pre></details>
+</div>
+
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" start="2">
+<li><b><code>square_of(x, y)</code></b>: which grid square is a point in? Squares are 0.5 m, so it's one line: <code>(int(x // SQUARE), int(y // SQUARE))</code>.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint 2</span>
+<p><code>python3 check.py 24</code> now shows <code>✓ square_of</code> as well, and ends <code>2/5 passed</code>.</p>
+</div>
+
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" start="3">
+<li><b><code>squares_passed(x0, y0, x1, y1, step=0.05)</code></b>: walk along the beam in 5 cm steps and collect each new square, in order, with no repeats. <b>Leave out the square the beam ends in</b>: that one is the wall.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint 3</span>
+<p><code>python3 check.py 24</code> now shows <code>✓ squares_passed</code> too, and ends <code>3/5 passed</code>.</p>
+<p>If you see <code>✗ squares_passed: east along row 0 from square 0 to square 3: passes 0, 1, 2 (not 3)</code>, you kept the end square. Work out <code>end = square_of(x1, y1)</code> first and skip it.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck on squares_passed?</span>
+<details><summary>Hint 1</summary><p>The beam is <code>length = math.hypot(x1 - x0, y1 - y0)</code> long, so there are <code>int(length / step) + 1</code> points to visit.</p></details>
+<details><summary>Hint 2</summary><p>Point number <code>i</code> is a fraction <code>f = i * step / length</code> of the way along: <code>(x0 + (x1 - x0) * f, y0 + (y1 - y0) * f)</code>. Careful: if <code>length</code> is 0, use <code>f = 0</code>.</p></details>
+<details><summary>Hint 3 (fill in the blanks)</summary><pre><code>length = math.hypot(x1 - x0, y1 - y0)
+end, out = square_of(x1, y1), []
+for i in range(int(length / step) + 1):
+    f = i * step / length if length else 0
+    s = square_of(x0 + (x1 - x0) * f, ____)
+    if s != ____ and s not in out:
+        out.append(s)
+return out</code></pre></details>
+</div>
+
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" start="4">
+<li><b><code>add_scan(votes, pose, scan)</code></b>: <code>votes</code> is a dict, <code>square → [wall_votes, free_votes]</code>. For each <code>(beam_deg, distance)</code>: find the end with <code>beam_end</code>, give every square from <code>squares_passed</code> a free vote, and if <code>distance &lt; MAX_RANGE</code> give the end square a wall vote. (A reading of exactly 4.0 m means "hit nothing".) Return <code>votes</code>.</li>
+<li><b><code>to_map(votes, width, height)</code></b>: one string per row. <code>"#"</code> if more wall votes than free, <code>"?"</code> if no votes at all, otherwise <code>"."</code>.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint 4</span>
+<p><code>python3 check.py 24</code>:</p>
+<pre><code>Lesson 24: lesson24_map.py
+  ✓ beam_end
+  ✓ square_of
+  ✓ squares_passed
+  ✓ add_scan + to_map
+  ✓ real map
+  5/5 passed  🎉 lesson complete!</code></pre>
+<p>If you see <code>✗ add_scan + to_map: free, wall, never seen -&gt; '.#?'</code>, you forgot the <code>"?"</code> for squares with no votes. If you see <code>… real map: not written yet (Lesson 23: write this function)</code>, the drive uses your week 9 code: finish <code>lesson23_wheels.py</code> first.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck on add_scan?</span>
+<details><summary>Hint 1</summary><p><code>votes.setdefault(s, [0, 0])</code> gives you the square's <code>[wall, free]</code> list, creating it if it's new. Add 1 to index <code>1</code> for free, index <code>0</code> for wall.</p></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code>for beam_deg, distance in scan:
+    ex, ey = beam_end(pose, beam_deg, distance)
+    for s in squares_passed(pose[0], pose[1], ex, ey):
+        votes.setdefault(s, [0, 0])[____] += 1
+    if distance &lt; MAX_RANGE:
+        votes.setdefault(square_of(ex, ey), [0, 0])[____] += 1
+return votes</code></pre></details>
+</div>
+
+<div class="box checkpoint"><span class="tag">✅ Checkpoint 5 · run it</span>
+<p>From <code>project/homework</code>, run <code>python3 lesson24_map.py</code>. Real output:</p>
+<pre><code>1) FRAMES. The robot is at (1.0, 2.0) facing south (90 degrees, down the screen). The beam at +90 degrees
+   points to the robot's RIGHT (y grows down, so positive angles turn clockwise), and hits a wall 1 m away.
+   in the room, that point is (0.0, 2.0)
+
+2) MAPPING. Drive around the room scanning, and let every beam vote.
+
+   knowing exactly where it is (cheating): 100% of 76 squares right
+   real room      the robot's map
+   ##########     ####?#####
+   #........#     #...?....#
+   #..##....#     #..##....?
+   #..#.....#     #..#...?.#
+   #....##..#     #....##..#
+   #........#     #........#
+   #.#....B.#     #.#......#
+   ##########     ##########
+
+   using its own odometry: 62% of 69 squares right
+   real room      the robot's map
+   ##########     ....#....#
+   #........#     #.......#.
+   #..##....#     #..#......
+   #..#.....#     ..........
+   #....##..#     ..........
+   #........#     #........#
+   #.#....B.#     #########?
+   ##########     ?#????????
+
+   Look at square (4, 1): the official map says floor, but the scanner found the cat.</code></pre>
+<p>Facing south, the robot's right is west, so (1.0, 2.0) plus 1 m west is (0.0, 2.0). The last line is printed every run, but look at the map: in this run square (4, 1) is a <code>?</code>. The robot got stuck behind the wall block and never saw the cat (see "A map appears" above). The cat's square doesn't count towards the score either way.</p>
+</div>
+
+<h2 id="add-to-robot">4. Add it to your robot</h2>
+<div class="box bot"><span class="tag">🤖 Add it to your robot · <code>map</code></span>
+<p>Fill in <code>make_map(self)</code> in <code>my_robot.py</code>. The docstring has the whole recipe. You need one import at the top of the method: <code>from lesson24_map import explore, score</code>.</p>
+<pre><code>rows, _ = explore(True)
+right, total = score(rows)
+return rows + [f"{right:.0%} of {total} squares right (the 'c' square is the cat the official map doesn't know)"]</code></pre>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint · your robot</span>
+<p>Run <code>python3 my_robot.py</code> and type <code>map</code>. After the room picture you should see:</p>
+<pre><code>  ####?#####
+  #...?....#
+  #..##....?
+  #..#...?.#
+  #....##..#
+  #........#
+  #.#......#
+  ##########
+  100% of 76 squares right (the 'c' square is the cat the official map doesn't know)</code></pre>
+<p>Row 1, column 4 is the cat's square, and here it's a <code>?</code>: the robot got stuck behind the wall block and never saw the cat. <b>Bonus:</b> the worked robot swaps that square for a <code>c</code> when it's a <code>#</code> (the laser found the cat). In this run it's a <code>?</code>, so nothing changes and no <code>c</code> appears. Write the swap anyway: it's ready for the day your robot drives close enough.</p>
+<p>Then <code>cd ..</code> and run <code>python3 check.py robot</code>. You should see <code>✓ week 11: makes a map</code>, and if every earlier week is done, <code>14/21 passed</code>.</p>
+</div>
+
+<h2 id="challenge">5. Real-world challenge</h2>
+<div class="box build"><span class="tag">🌍 Perfect wheels, still smeared?</span>
+<p>Was the 62% all the big wheel's fault? Map with odometry but <b>equal</b> wheels. From <code>project/homework</code>:</p>
+<pre><code>python3 -c "from lesson24_map import explore, score; m, _ = explore(False, mismatch=0.0); print(score(m))"</code></pre>
+<p>Real output: <code>(0.6582278481012658, 79)</code>. That's 66%: a little better than 62%, but still far short of 100%. The wheels slip a little on every move, and those small errors add up. Odometry alone is never enough.</p>
+<p><b>On your own:</b> map your bedroom on squared paper. Stand in one spot, and measure the distance to the nearest thing in 8 directions with a tape measure. Mark the free squares and the walls. Then take 3 steps, <em>guess</em> where you are, and do it again. If your guess is off, the walls don't line up. That's the smear.</p>
+</div>
+
+<h2 id="check">6. Check yourself</h2>
+<details><summary>The robot is at (1.0, 2.0) facing east (0°). Its straight-ahead beam hits a wall 1 m away. Where is that point in the room?</summary><p>(2.0, 2.0). Heading 0 plus beam 0 is 0 (east), and 1 m east of x = 1.0 is x = 2.0.</p></details>
+<details><summary>Why does the end square only get a wall vote if the distance is less than 4 m?</summary><p>4.0 m is the scanner's maximum. A reading of 4.0 means "I hit nothing", so there's no wall to vote for. The squares along the way are still free.</p></details>
+<details><summary>Why is the cat's square (4, 1) a "?" in the map?</summary><p>No beam ever ended in or passed through that square. The robot got stuck below the wall block, which hides the cat. The robot only knows what its beams reached.</p></details>
+<details><summary>Drive next to the cat in the Play demo. Why does your map find it when the official map doesn't?</summary><p>The official map was written by hand before the cat sat down. The new map is built from what the laser actually measured today.</p></details>
+<details><summary>The same laser readings give 100% one way and 62% the other. What's different?</summary><p>Only where the robot <em>thinks</em> it was for each scan. Drifting odometry puts each scan in a slightly wrong place on the map.</p></details>
+
+<h2 id="more">7. Want to know more?</h2>
+<details><summary>Real occupancy maps</summary><p>Real robots don't just count votes. They keep a probability for each square, often stored as "log-odds" so that adding a vote is just adding a number. Squares are also much smaller than 0.5 m, often a few centimetres.</p></details>
+<details><summary>Faster beam walking</summary><p>Walking along a beam in 5 cm steps can miss a corner it just clips. Real code uses Bresenham's line algorithm, which visits exactly the squares a line crosses, with no floating point at all.</p></details>
+<details><summary>SLAM</summary><p>Simultaneous Localisation And Mapping: build the map and work out where you are on it, both at once, each one helping the other. Robot vacuums do this. Next week's particle filter is one of the building blocks.</p></details>
+
+<nav class="pager">
+  <a href="11-capstone.html"><small>Previous</small>Week 10 · Part B: Capstone: Robo-Helper</a>
+  <a class="next" href="25-localise.html"><small>Next</small>Week 12 · Where am I?</a>
+</nav>
+<footer>Build a Robot Brain · Week 11 of 16 (homework file: lesson24_map.py)</footer>
+</main>
+
+<script>
+// Same room as world.py; is_wall and ray as in body.py; votes as in lesson24_map.py
+(function () {
+const ROOM = ["##########", "#........#", "#..##....#", "#..#.....#", "#....##..#", "#........#", "#.#....B.#", "##########"];
+const SQ = 0.5, CAT = [2.25, 0.75], CAT_R = 0.15, RAD = 0.1, MAX_RANGE = 4.0, PX = 80, DRIFT = Math.PI / 60;
+const TOUR = [[1, 4], [1, 5], [3, 5], [4, 4], [4, 3], [5, 3], [5, 1], [7, 1], [8, 3], [8, 5], [5, 5], [3, 5], [1, 4], [1, 1], [3, 1]];
+function rng(seed) { // JavaScript has no seeded random numbers, so we make our own
+  let a = seed >>> 0, spare = null;
+  const r = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  r.gauss = (mu, s) => { if (spare !== null) { const g = spare; spare = null; return mu + s * g; }
+    const u = 1 - r(), v = r(), m = Math.sqrt(-2 * Math.log(u)); spare = m * Math.sin(2 * Math.PI * v); return mu + s * m * Math.cos(2 * Math.PI * v); };
+  return r;
+}
+function isWall(x, y) {
+  const gx = Math.floor(x / SQ), gy = Math.floor(y / SQ);
+  if (gy < 0 || gy >= ROOM.length || gx < 0 || gx >= ROOM[0].length || ROOM[gy][gx] === "#") return true;
+  return Math.hypot(x - CAT[0], y - CAT[1]) < CAT_R;
+}
+function ray(x, y, a) {
+  const dx = Math.cos(a), dy = Math.sin(a); let d = 0;
+  while (d < MAX_RANGE) { d += 0.01; if (isWall(x + dx * d, y + dy * d)) return d; }
+  return MAX_RANGE;
+}
+const rad = d => d * Math.PI / 180;
+const beamEnd = (p, deg, d) => [p[0] + d * Math.cos(p[2] + rad(deg)), p[1] + d * Math.sin(p[2] + rad(deg))];
+const squareOf = (x, y) => [Math.floor(x / SQ), Math.floor(y / SQ)];
+function squaresPassed(x0, y0, x1, y1) {
+  const len = Math.hypot(x1 - x0, y1 - y0), end = squareOf(x1, y1) + "", out = [];
+  for (let i = 0; i <= Math.floor(len / 0.05); i++) {
+    const f = len ? i * 0.05 / len : 0, s = squareOf(x0 + (x1 - x0) * f, y0 + (y1 - y0) * f) + "";
+    if (s !== end && !out.includes(s)) out.push(s);
+  }
+  return out;
+}
+function addScan(pose, sc) {
+  for (const [deg, d] of sc) {
+    const [ex, ey] = beamEnd(pose, deg, d);
+    for (const s of squaresPassed(pose[0], pose[1], ex, ey)) (votes[s] = votes[s] || [0, 0])[1]++;
+    if (d < MAX_RANGE) { const s = squareOf(ex, ey) + ""; (votes[s] = votes[s] || [0, 0])[0]++; }
+  }
+}
+const cell = (x, y) => { const [w, f] = votes[x + "," + y] || [0, 0]; return w + f === 0 ? "?" : w > f ? "#" : "."; };
+function blocked(x, y) { for (let i = 0; i < 8; i++) if (isWall(x + RAD * Math.cos(i * Math.PI / 4), y + RAD * Math.sin(i * Math.PI / 4))) return true; return false; }
+
+let r, votes, p, est, last, scans, busy, queue;
+const $ = id => document.getElementById(id);
+function reset() {
+  r = rng(11); votes = {}; p = [0.75, 0.75, 0]; est = p.slice(); scans = 0; busy = false; queue = [];
+  scan(); $("msg").textContent = "Click a floor square to start.";
+}
+function scan() {
+  last = Array.from({ length: 36 }, (_, i) => [i * 10, Math.max(0, ray(p[0], p[1], p[2] + rad(i * 10)) + r.gauss(0, 0.02))]);
+  addScan(est, last); scans++; draw();
+}
+function draw() {
+  let a = "", b = "";
+  ROOM.forEach((row, y) => [...row].forEach((ch, x) => {
+    a += `<rect class="${ch === "#" ? "w" : "f"}" x="${x * 40}" y="${y * 40}" width="40" height="40"/>`;
+    const m = cell(x, y);
+    b += `<rect class="${m === "#" ? "w" : m === "?" ? "u" : "f"}" x="${x * 40}" y="${y * 40}" width="40" height="40"/>`;
+  }));
+  a += `<text x="180" y="69" font-size="24" text-anchor="middle">🐱</text>`;
+  for (const [deg, d] of last) { const [ex, ey] = beamEnd(p, deg, d);
+    a += `<line x1="${p[0] * PX}" y1="${p[1] * PX}" x2="${ex * PX}" y2="${ey * PX}" class="beam" style="stroke-width:1;opacity:.6"/><circle cx="${ex * PX}" cy="${ey * PX}" r="2.5" class="hit"/>`; }
+  a += `<line x1="${p[0] * PX}" y1="${p[1] * PX}" x2="${(p[0] + 0.3 * Math.cos(p[2])) * PX}" y2="${(p[1] + 0.3 * Math.sin(p[2])) * PX}" class="ax-bot"/>`;
+  a += `<text x="${p[0] * PX}" y="${p[1] * PX + 9}" font-size="24" text-anchor="middle">🤖</text>`;
+  b += `<circle cx="${est[0] * PX}" cy="${est[1] * PX}" r="10" class="est"/>`;
+  $("real").innerHTML = a; $("map").innerHTML = b;
+  let right = 0, total = 0;
+  ROOM.forEach((row, y) => [...row].forEach((real, x) => { const m = cell(x, y);
+    if (m === "?" || (x === 4 && y === 1)) return; total++; if ((m === "#") === (real === "#")) right++; }));
+  $("nScans").textContent = scans; $("dec").textContent = total; $("acc").textContent = total ? Math.round(100 * right / total) + "%" : "–";
+}
+function driveTo(sx, sy, done) {
+  const tx = (sx + 0.5) * SQ, ty = (sy + 0.5) * SQ, h = Math.atan2(ty - p[1], tx - p[0]);
+  let turn = h - p[2]; turn = Math.atan2(Math.sin(turn), Math.cos(turn));
+  p[2] = h; est[2] += turn; busy = true; let n = 0;
+  const t = setInterval(() => {
+    const left = Math.hypot(tx - p[0], ty - p[1]);
+    if (left < 0.01) { clearInterval(t); scan(); busy = false; done && done(true); return; }
+    const s = Math.min(0.05, left), nx = p[0] + s * Math.cos(h), ny = p[1] + s * Math.sin(h);
+    if (blocked(nx, ny)) { clearInterval(t); scan(); busy = false; $("msg").textContent = "Stopped: something is in the way."; done && done(false); return; }
+    p[0] = nx; p[1] = ny;
+    if ($("drift").checked) est[2] += DRIFT * s;
+    est[0] += s * Math.cos(est[2]); est[1] += s * Math.sin(est[2]);
+    if (++n % 5 === 0) scan(); else draw();
+  }, 25);
+}
+$("real").addEventListener("click", e => {
+  if (busy) return;
+  const box = $("real").getBoundingClientRect(), x = Math.floor((e.clientX - box.left) / box.width * 10), y = Math.floor((e.clientY - box.top) / box.height * 8);
+  if (!ROOM[y] || ROOM[y][x] === "#") { $("msg").textContent = "That's a wall. Pick a floor square."; return; }
+  $("msg").textContent = `Driving to square (${x}, ${y})…`;
+  driveTo(x, y, ok => { if (ok) $("msg").textContent = `Arrived at square (${x}, ${y}).`; });
+});
+$("tour").addEventListener("click", () => {
+  if (busy) return;
+  const stops = TOUR.slice();
+  const next = () => { const s = stops.shift(); if (!s) { $("msg").textContent = "Tour finished."; return; }
+    $("msg").textContent = `Tour: driving to square (${s[0]}, ${s[1]})…`; driveTo(s[0], s[1], next); };
+  if (Math.hypot(p[0] - 0.75, p[1] - 0.75) > 0.01) driveTo(1, 1, next); else next();
+});
+$("reset").addEventListener("click", () => { if (!busy) reset(); });
+reset();
+})();
+</script>
+<script src="room.js"></script>
+</body>
+</html>

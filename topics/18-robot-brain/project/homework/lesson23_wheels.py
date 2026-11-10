@@ -2,7 +2,8 @@
 
 The grid robot jumped between squares. Robo-Helper's body (body.py) has two wheels and drives smoothly:
   KINEMATICS   both wheels roll forward d_left and d_right metres. The robot moves forward their average,
-               and turns by (d_right - d_left) / wheel_base radians.
+               and turns by (d_left - d_right) / wheel_base radians (a faster right wheel turns it LEFT).
+               Here headings grow clockwise on screen (y grows down), so turning left makes the heading smaller.
   ODOMETRY     the robot can't see where it is, but its ENCODERS count wheel ticks. Turn ticks into metres, add up
                every little move, and you get an estimate of where it is. Wheels slip, so the estimate DRIFTS.
   PID          to drive to a point, steer by the ERROR (how far off we are):
@@ -27,7 +28,7 @@ def ticks_to_metres(ticks, ticks_per_rev=TICKS_PER_REV, radius=WHEEL_RADIUS):
 
 def move_pose(pose, d_left, d_right, wheel_base=WHEEL_BASE):
     """Odometry: pose is (x, y, heading in RADIANS). The wheels rolled d_left and d_right metres.
-        d = (d_left + d_right) / 2          dtheta = (d_right - d_left) / wheel_base
+        d = (d_left + d_right) / 2          dtheta = (d_left - d_right) / wheel_base
         x += d * cos(heading + dtheta / 2)  y += d * sin(heading + dtheta / 2)   heading += dtheta
     Return the new (x, y, heading). (Using heading + dtheta / 2 is a little more accurate on curves.)"""
     # TODO: write this part. Read the docstring above carefully.
@@ -80,7 +81,7 @@ def drive_to(body, odo, target, kp=3.0, ki=0.0, kd=0.15, max_speed=0.3, toleranc
             return step, worst
         turn, state = pid_step(state, herr, DT, kp, ki, kd)
         speed = min(max_speed, dist) * max(0.0, math.cos(herr))      # slow down when facing the wrong way
-        body.drive(speed - turn * WHEEL_BASE / 2, speed + turn * WHEEL_BASE / 2, DT)
+        body.drive(speed + turn * WHEEL_BASE / 2, speed - turn * WHEEL_BASE / 2, DT)   # left faster -> heading grows
         if step > 5:
             worst = max(worst, abs(math.degrees(herr)))
     return max_steps, worst
@@ -94,7 +95,7 @@ def turn_to(body, odo, heading_deg, kp, ki=0.0, kd=0.0, seconds=6.0):
         pose = odo.update()
         err = (math.radians(heading_deg) - pose[2] + math.pi) % (2 * math.pi) - math.pi
         turn, state = pid_step(state, err, DT, kp, ki, kd)
-        body.drive(-turn * WHEEL_BASE / 2, turn * WHEEL_BASE / 2, DT)
+        body.drive(turn * WHEEL_BASE / 2, -turn * WHEEL_BASE / 2, DT)
         seen.append(math.degrees(pose[2]))
     return seen
 
@@ -143,5 +144,5 @@ if __name__ == "__main__":
         body = Body(start=(1, 5), slip=0.05, mismatch=mismatch, seed=2, cat=False)
         odo = Odometer(body, (*centre((1, 5)), 0.0))
         steps, _ = drive_to(body, odo, goal)
-        print(f"   right wheel {mismatch:3.0%} bigger: the robot thinks it arrived after {steps * DT:.1f} s; "
+        print(f"   left wheel {mismatch:3.0%} bigger: the robot thinks it arrived after {steps * DT:.1f} s; "
               f"really it's {true_error(body, goal):.2f} m away")

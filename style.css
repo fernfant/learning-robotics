@@ -86,3 +86,40 @@ button:hover { border-color: var(--accent); }
 .track.both { color: var(--accent); }
 .eyebrow .track { font-size: .68rem; }
 .paper-row .track { font-size: .62rem; padding: 1px 6px; margin-left: 4px; }
+
+/* ---------- Robot Brain lesson kit: coloured section boxes (light + dark) ---------- */
+:root {
+  --idea: #6b4bd8; --idea-soft: #f1edff;
+  --play: #1f6fd1; --play-soft: #e8f1fd;
+  --build: #c26a00; --build-soft: #fff1df;
+  --ok: #1e8a4c; --ok-soft: #e4f6eb;
+  --bot: #0f7d7d; --bot-soft: #e0f4f3;
+  --wall: #5b5a56; --floor: #f3f1ec; --path: #f2c94c;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --idea: #b5a3ff; --idea-soft: #231d3d; --play: #7fb4f5; --play-soft: #15253a;
+    --build: #f3ab55; --build-soft: #33240f; --ok: #6fd69a; --ok-soft: #12291c;
+    --bot: #63d2d2; --bot-soft: #102b2b; --wall: #8a8882; --floor: #23231f; --path: #b8952c;
+  }
+}
+.box { border-radius: 14px; padding: 14px 18px; margin: 18px 0; border-left: 6px solid; }
+.box > :first-child { margin-top: 0; }
+.box > :last-child { margin-bottom: 0; }
+.box .tag { font-weight: 700; font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; display: block; margin-bottom: 4px; background: none; padding: 0; }
+.box.idea { background: var(--idea-soft); border-color: var(--idea); } .box.idea .tag { color: var(--idea); }
+.box.play { background: var(--play-soft); border-color: var(--play); } .box.play .tag { color: var(--play); }
+.box.build { background: var(--build-soft); border-color: var(--build); } .box.build .tag { color: var(--build); }
+.box.checkpoint { background: var(--ok-soft); border-color: var(--ok); } .box.checkpoint .tag { color: var(--ok); }
+.box.bot { background: var(--bot-soft); border-color: var(--bot); } .box.bot .tag { color: var(--bot); }
+.box.stuck { background: var(--warn-soft); border-color: var(--warn); } .box.stuck .tag { color: var(--warn); }
+.box pre { background: var(--card); }
+.steps { counter-reset: step; list-style: none; padding-left: 0; }
+.steps > li { counter-increment: step; position: relative; padding-left: 44px; margin: 14px 0; }
+.steps > li::before { content: counter(step); position: absolute; left: 0; top: 0; width: 30px; height: 30px; border-radius: 50%;
+  background: var(--build); color: var(--card); font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.diagram { display: block; width: 100%; max-width: 520px; height: auto; margin: 12px auto; }
+.room-pic { display: block; width: 100%; max-width: 420px; height: auto; margin: 10px auto; }
+.room-caption { text-align: center; font-size: .85rem; color: var(--muted); margin-top: -4px; }
+.big-number { font-size: 1.6rem; font-weight: 700; color: var(--ok); }
+:not(pre) > code { overflow-wrap: anywhere; }

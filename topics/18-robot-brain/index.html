@@ -4,199 +4,186 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Build a Robot Brain</title>
-<link rel="stylesheet" href="../../style.css">
+<link rel="stylesheet" href="../../style.css?v=16">
+<style>
+.learn { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0 16px; }
+.learn ul { padding-left: 20px; margin: 6px 0 0; }
+td .room-pic { max-width: 260px; margin: 6px 0; }
+td .room-caption { text-align: left; margin-top: 0; }
+</style>
 </head>
 <body>
 <main>
 <nav class="crumbs"><a href="../../index.html">← LLMs &amp; Robotics</a> · Module 18</nav>
 
 <div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 18 · Our own course, for ages 12+</div>
-<h1>Build a Robot Brain: 12 weeks, from zero to a robot that understands you</h1>
-<p class="lede">You'll build <strong>Robo-Helper</strong>, a robot in a simulated room that understands <em>"put the red block in the bin"</em>, plans a route, notices a cat in the way, and reports honestly how well it works. Every idea starts from first principles, and every lesson ends with real code you write and real-world practice away from the screen.</p>
+<h1>Build a Robot Brain: 16 weeks, from zero to a robot that understands you</h1>
+<p class="lede">You build your own robot, one piece a week. It moves, senses, reads real phone data, drives on wheels, draws a map, finds itself when lost, and understands <em>"put the red block in the bin"</em>.</p>
+
+<div class="room" data-robot="7,6" data-cat="4,1" data-mark="4,1" data-blocks="green:1,5" data-path="1,1 2,1 3,1 2,1 2,2 2,3 2,4 2,5 3,5 3,6 4,6 5,6 6,6 7,6 7,5 7,4 7,3 6,3 7,3 7,4 7,5 7,6" data-label="Week 16: &quot;put the red and blue blocks away&quot;. It stops for the cat, drives round, and bins both blocks."></div>
+<pre><code>Zippy&gt; put the red and blue blocks away
+  (I think you meant: 'put the red and blue block away')
+  (I thought for 0.34 ms, so I'd roll 0.34 mm meanwhile.)
+  Something is in the way at (4, 1)! I stopped just in time (stop chance 0.99, my safe threshold 0.17).
+  The red block is in the bin. The blue block is in the bin.</code></pre>
+<p class="meta">Real output from a finished <code>my_robot.py</code> (ours is called Zippy). The thinking time changes a little every run.</p>
 
 <section class="kid" id="start">
 <h2>Start here</h2>
-<p class="big">People don't learn by reading. They learn by building, getting stuck, and fixing it. So that's how this course works.</p>
-<h3>How every lesson goes</h3>
-<ol>
-<li><b>A real problem.</b> Something the robot can't do yet.</li>
-<li><b>First principles.</b> We build the idea from nothing, with pen-and-paper examples.</li>
-<li><b>Play.</b> A small interactive demo in your browser to poke at the idea.</li>
-<li><b>Homework.</b> You write the real Python code, and <code>check.py</code> marks it.</li>
-<li><b>Real-world challenge.</b> Try the idea on something real: your phone, a ramp, a friend.</li>
-<li><b>Add it to your robot.</b> Fill this week's gap in <em>your</em> robot file, <code>my_robot.py</code>, then run it: it can do one new thing.</li>
+<p class="big">You learn by building. Every week you write a few real lines of Python, and your robot can do one new thing.</p>
+<ol class="steps">
+<li><b>💡 The idea</b>, with a picture, before any code.</li>
+<li><b>🎮 Play</b> with it in your browser.</li>
+<li><b>🛠 Build</b> the homework, with ✅ checkpoints that show exactly what you should see.</li>
+<li><b>🤖 Add it to your robot</b>: fill this week's gap in <code>my_robot.py</code>.</li>
+<li><b>🌍 Try it for real</b>: your phone, a ramp, a friend.</li>
 </ol>
-<h3>What you need to know already</h3>
-<p>Very basic Python: variables, <code>if</code>, <code>for</code> loops, and functions. If you can write a loop that prints 1 to 10, you're ready. Week 1 helps you set up. Anything new, like classes and <code>self</code>, is explained on the page where you first need it. Start with <a href="00-setup.html#robot-file">How your robot file works</a> in week 1.</p>
-<h3>Time</h3>
-<p>12 weeks. Most weeks have two parts (A and B) and take about 4–7 hours. Weeks 4, 6, 8, 10 and 11 have one part and take about 2–4 hours. If a week takes longer, take two weeks: that's normal. Weeks 1–7 build the robot; weeks 8–12 are harder. A grown-up helps with setup in week 1.</p>
+<p><b>You need:</b> very basic Python (variables, <code>if</code>, <code>for</code>, functions). If you can print 1 to 10 with a loop, you're ready. A grown-up helps with setup in week 1.</p>
+<p><b>Time:</b> 16 weeks. Half the weeks have two parts (A and B). Each page says how long it takes. If a week takes two, that's normal.</p>
 </section>
 
-<h2>What you'll have built at the end</h2>
-<pre><code>Zippy&gt; put the red and blue blocks away
-  (I think you meant: 'put the red and blue block away')
-  (I thought for 0.35 ms, so I'd roll 0.35 mm meanwhile.)
-  Something is in the way at (4, 1)! I stopped just in time (stop chance 0.99, my safe threshold 0.17).
-##########
-#***c....#
-#.*##....#
-#.*#..**.#
-#.*..##*.#
-#g**...*.#
-#.#****R.#
-##########
-  The red block is in the bin. The blue block is in the bin.
-
-Zippy&gt; exam
-  ✓ 'put the red block in the bin'
-  ...
-  ✓ "put away the block that's closest to the bin"
-  ...
-  I passed 12 of 12.</code></pre>
-<p class="meta">Real output from <em>your</em> robot, <code>my_robot.py</code>, with every week's gap filled (we called ours Zippy). R = robot, c = the cat, g = the green block, * = the route it drove, B = the bin (under the R). It fixed a typo, wrote a two-step plan, stopped for the cat, drove round it, and passed all 12 exam tasks. The thinking time changes a little every run.</p>
+<h2 id="learn">What you'll learn</h2>
+<div class="learn">
+<div class="box play"><span class="tag">🦾 The robot's body</span>
+<ul>
+<li><b>Sensors:</b> noisy distances, real phone data, gyro drift and fusion (weeks 2, 3, 6)</li>
+<li><b>Motion:</b> grids, routes with A*, wheels and odometry (weeks 1, 5, 9)</li>
+<li><b>Control:</b> PID steering that doesn't overshoot (week 9)</li>
+<li><b>Maps:</b> a laser scan, its own map, and finding itself when lost (weeks 11, 12)</li>
+</ul></div>
+<div class="box idea"><span class="tag">🧠 The robot's brain</span>
+<ul>
+<li><b>Learning:</b> shrinking the error, a neuron, honest tests (weeks 2, 4)</li>
+<li><b>Language:</b> words as numbers, commands, a tiny language model (weeks 7, 8)</li>
+<li><b>AI engineering:</b> safety checks, speed, cost, LoRA, Claude, a bake-off (weeks 10, 13–15)</li>
+<li><b>People:</b> learning what people prefer (week 16)</li>
+</ul></div>
+</div>
 
 <h2>Progress</h2>
 <div class="stats">
-  <div class="stat"><div class="k">Parts done</div><div class="v" id="done">0 / 21</div></div>
+  <div class="stat"><div class="k">Parts done</div><div class="v" id="done">0 / 26</div></div>
   <div class="stat"><div class="k">Next up</div><div class="v" id="next" style="font-size:1rem">–</div></div>
 </div>
 
-<h2>The 12 weeks</h2>
-<p class="meta">Follow the weeks, top to bottom; the Next button on every page does it for you. Each week has one or two parts (A and B), plus a few bonus pages. Each page starts with a strip saying what your robot can do so far and what it learns today. Badges show which side of AI each part builds. Tick a box when you finish a part.</p>
+<h2 id="weeks">The 16 weeks</h2>
+<p class="meta">Go top to bottom; every page's Next button does it for you. Tick a part when you finish it.</p>
+
 <h3 id="week-1">Week 1 · Moving</h3>
-<p class="meta">Set up, then make the robot move on a grid.</p>
-<div class="paper-row"><span class="d">1A</span><div><label><input type="checkbox" data-d="00" data-label="Week 1A"><a href="00-setup.html">Setup, and your first algorithm</a><span class="track both">LLM + Robotics</span></label><p>Install Python, run the robot world, write two tiny functions. <b>Adds:</b> your first robot script.</p></div></div>
-<div class="paper-row"><span class="d">1B</span><div><label><input type="checkbox" data-d="01" data-label="Week 1B"><a href="01-coordinates.html">Where am I? Coordinates and moving</a><span class="track robo">Robotics</span></label><p>(x, y), directions as small changes, walls. <b>Adds:</b> the robot can move.</p></div></div>
+<div class="paper-row"><span class="d">1A</span><div><label><input type="checkbox" data-d="00" data-label="Week 1A"><a href="00-setup.html">Setup, and your first algorithm</a><span class="track both">LLM + Robotics</span></label><p>Install Python, run the robot. <b>Adds:</b> your robot file.</p></div></div>
+<div class="paper-row"><span class="d">1B</span><div><label><input type="checkbox" data-d="01" data-label="Week 1B"><a href="01-coordinates.html">Where am I? Coordinates and moving</a><span class="track robo">Robotics</span></label><p>(x, y), directions, walls. <b>Adds:</b> it moves.</p></div></div>
+
 <h3 id="week-2">Week 2 · Sensing and learning</h3>
-<p class="meta">Noisy sensors, then the idea behind all AI: shrink the error.</p>
-<div class="paper-row"><span class="d">2A</span><div><label><input type="checkbox" data-d="02" data-label="Week 2A"><a href="02-sensors.html">Noisy senses</a><span class="track robo">Robotics</span></label><p>Measuring distance, why sensors are never exact, why averaging helps. <b>Adds:</b> a distance sensor.</p></div></div>
-<div class="paper-row"><span class="d">2B</span><div><label><input type="checkbox" data-d="03" data-label="Week 2B"><a href="03-learning-from-data.html">Learning from data</a><span class="track both">LLM + Robotics</span></label><p>Error, then gradient descent: how every AI learns. <b>Adds:</b> learns its own braking distance.</p></div></div>
-<h3 id="week-3">Week 3 · Neurons and honest tests</h3>
-<p class="meta">One artificial neuron, and how to test it so it's safe.</p>
-<div class="paper-row"><span class="d">3A</span><div><label><input type="checkbox" data-d="04" data-label="Week 3A"><a href="04-neuron.html">The artificial neuron</a><span class="track both">LLM + Robotics</span></label><p>Weights, a sum and a squash: the brick every neural network is built from. <b>Adds:</b> an obstacle detector.</p></div></div>
-<div class="paper-row"><span class="d">3B</span><div><label><input type="checkbox" data-d="05" data-label="Week 3B"><a href="05-evaluation.html">Is it any good?</a><span class="track both">LLM + Robotics</span></label><p>Test on data the model never saw. Precision, recall, and choosing a <em>safe</em> threshold. <b>Adds:</b> tested stop decisions.</p></div></div>
-<h3 id="week-4">Week 4 · Planning</h3>
-<p class="meta">Find the shortest route with BFS and A*.</p>
-<div class="paper-row"><span class="d">4</span><div><label><input type="checkbox" data-d="06" data-label="Week 4"><a href="06-pathfinding.html">Finding the way</a><span class="track robo">Robotics</span></label><p>Breadth-first search, then A*. <b>Adds:</b> route planning.</p></div></div>
-<h3 id="week-5">Week 5 · Words</h3>
-<p class="meta">Turn words into numbers; understand commands.</p>
-<div class="paper-row"><span class="d">5A</span><div><label><input type="checkbox" data-d="08" data-label="Week 5A"><a href="08-words-as-numbers.html">Words as numbers</a><span class="track llm">LLM</span></label><p>Tokens and next-word prediction, the core idea behind ChatGPT, put straight to work fixing typos the way a phone keyboard does. <b>Adds:</b> typo-proof commands (typo commands handled right: 6/9 → 9/9).</p></div></div>
-<div class="paper-row"><span class="d">5B</span><div><label><input type="checkbox" data-d="09" data-label="Week 5B"><a href="09-understanding-commands.html">Understanding commands</a><span class="track llm">LLM</span></label><p>A classifier that counts words, plus "slots" for which object. <b>Adds:</b> understands one action per command (5 of 12 on the bake-off, a test of 12 tasks you'll run in week 11).</p></div></div>
-<h3 id="week-6">Week 6 · A neural language model</h3>
-<p class="meta">Build a tiny LLM from zero.</p>
-<div class="paper-row"><span class="d">6</span><div><label><input type="checkbox" data-d="15" data-label="Week 6"><a href="15-tiny-lm.html">A tiny language model, from zero</a><span class="track llm">LLM</span></label><p>Embeddings, softmax and next-word prediction in a real (tiny) neural network that writes whole <b>plans</b> word by word ("put red blue"), asks when you're vague, and learns from 343 examples you generate from templates (never from the bake-off's commands). Stretch: add <b>attention</b>, the idea inside Transformers. <b>Adds:</b> multi-step plans (bake-off 5 → 8/12).</p></div></div>
-<h3 id="week-7">Week 7 · Capstone</h3>
-<p class="meta">Safety checks on AI output, then the whole robot, tested.</p>
-<div class="paper-row"><span class="d">7A</span><div><label><input type="checkbox" data-d="10" data-label="Week 7A"><a href="10-llm-safety.html">Using a real LLM safely</a><span class="track llm">LLM</span></label><p>Structured output, strict checks, and a fallback. <b>Adds:</b> a safety layer so AI output can't break the robot.</p></div></div>
-<div class="paper-row"><span class="d">7B</span><div><label><input type="checkbox" data-d="11" data-label="Week 7B"><a href="11-capstone.html">Capstone: Robo-Helper</a><span class="track both">LLM + Robotics</span></label><p>Put it all together and measure it honestly. <b>Adds:</b> the full robot.</p></div></div>
-<h3 id="week-8">Week 8 · Inference I: measure</h3>
-<p class="meta">Inference means a brain answering, not learning. This week: latency, tokens and cost.</p>
-<div class="paper-row"><span class="d">8</span><div><label><input type="checkbox" data-d="16" data-label="Week 8"><a href="16-speed.html">How fast is a brain?</a><span class="track llm">LLM</span></label><p>Latency, p50 vs p95, time to first token, tokens per second, and cost per command. How far does the robot roll while it thinks? <b>Adds:</b> a time budget for every brain.</p></div></div>
-<h3 id="week-9">Week 9 · Inference II: speed up</h3>
-<p class="meta">Caching, quantising, distilling, and LoRA fine-tuning.</p>
-<div class="paper-row"><span class="d">9A</span><div><label><input type="checkbox" data-d="17" data-label="Week 9A"><a href="17-faster.html">Faster and cheaper</a><span class="track llm">LLM</span></label><p>Caching, quantising weights to 8 and 4 bits, and distilling a teacher into a small student. <b>Adds:</b> a brain that learns new phrasings, then shrinks 8× (bake-off 10/12 in 1.4 KB).</p></div></div>
-<div class="paper-row"><span class="d">9B</span><div><label><input type="checkbox" data-d="13" data-label="Week 9B"><a href="13-lora.html">Teaching an old model a new trick (LoRA)</a><span class="track both">LLM + Robotics</span></label><p>Fine-tuning vs a tiny low-rank add-on: fix a big model by training a few numbers. <b>Adds:</b> adapts a factory model to your robot.</p></div></div>
-<h3 id="week-10">Week 10 · A world-class brain</h3>
-<p class="meta">Claude as planner and as agent, over the internet.</p>
-<div class="paper-row"><span class="d">10</span><div><label><input type="checkbox" data-d="18" data-label="Week 10"><a href="18-world-class.html">A world-class brain over the internet</a><span class="track both">LLM + Robotics</span></label><p>Claude as the robot's brain: a planner that writes a checked plan, and an agent that uses the robot's tools step by step. You stay in charge. Needs a grown-up's API key. <b>Adds:</b> world-class understanding.</p></div></div>
-<h3 id="bonus-mcp">Bonus after week 10 · MCP</h3>
-<p class="meta">Needs Python 3.11+ and one install (<code>pip install mcp</code>).</p>
-<div class="paper-row"><span class="d">+</span><div><label><input type="checkbox" data-d="20" data-label="Bonus"><a href="20-mcp.html">Give any AI app your robot: MCP</a><span class="track both">LLM + Robotics</span></label><p>Turn the robot's tools into an MCP server that Claude Desktop, Claude Code and other apps can drive, with safety rules no AI can talk its way past. <b>Adds:</b> a real MCP server.</p></div></div>
-<h3 id="week-11">Week 11 · The bake-off</h3>
-<p class="meta">Every brain, scored and replayed.</p>
-<div class="paper-row"><span class="d">11</span><div><label><input type="checkbox" data-d="19" data-label="Week 11"><a href="19-bakeoff.html">The bake-off</a><span class="track both">LLM + Robotics</span></label><p>Every brain, the same 12 tasks, the same cat. Score correctness, speed and cost, then watch the replays side by side. Stretch: use an <b>AI model as the judge</b>, catch it being fooled, and measure it honestly with kappa and error bars (<a href="../19-evals-field-guide.html">Module 19</a>). <b>Adds:</b> a scorecard showing your robot getting better: 5 → 8 → 10/12.</p></div></div>
-<h3 id="week-12">Week 12 · Teach it, show it</h3>
-<p class="meta">Learn from people's preferences; share your project.</p>
-<div class="paper-row"><span class="d">12A</span><div><label><input type="checkbox" data-d="12" data-label="Week 12A"><a href="12-preferences.html">Learning what people prefer (RLHF, by hand)</a><span class="track both">LLM + Robotics</span></label><p>Show two routes, ask which is better, learn a reward from the answers, pick what people like. The same recipe that trains chat assistants. <b>Adds:</b> picks the route you'd choose.</p></div></div>
-<div class="paper-row"><span class="d">12B</span><div><label><input type="checkbox" data-d="14" data-label="Week 12B"><a href="14-go-real.html">Going real</a><span class="track both">LLM + Robotics</span></label><p>The boss gap: your robot uses what it <em>sees</em> to pass the two exam tasks no small brain can (12/12). Then show your work, and (optionally) put it on real hardware. <b>Adds:</b> the boss gap, and a project you can show your teacher, your friends or a science fair.</p></div></div>
-<h3 id="bonus">Bonus, any time after week 4</h3>
-<div class="paper-row"><span class="d">+</span><div><label><input type="checkbox" data-d="07" data-label="Bonus"><a href="07-trial-and-error.html">Learning by trial and error</a><span class="track robo">Robotics</span></label><p>Rewards and Q-learning: no map, just practice. <b>Adds:</b> learns a maze by itself.</p></div></div>
+<div class="paper-row"><span class="d">2A</span><div><label><input type="checkbox" data-d="02" data-label="Week 2A"><a href="02-sensors.html">Noisy senses</a><span class="track robo">Robotics</span></label><p>Why sensors wobble, and why averaging helps. <b>Adds:</b> <code>look</code>.</p></div></div>
+<div class="paper-row"><span class="d">2B</span><div><label><input type="checkbox" data-d="03" data-label="Week 2B"><a href="03-learning-from-data.html">Learning from data</a><span class="track both">LLM + Robotics</span></label><p>Shrink the error: how every AI learns. <b>Adds:</b> its own braking distance.</p></div></div>
 
-<h2>How the project grows</h2>
-<pre><code>ROBOT BASICS                                   THE BRAIN (LLM side)
-wk1 moving ─┐                                  wk5 words ── commands ─┐
-wk2 sensors, braking ─┤                        wk6 tiny neural LM ────┤
-wk3 neuron, safe tests ┼─► wk7 Robo-Helper ◄── wk7 safety checks ─────┘
-wk4 A* planning ─┘          (the capstone)
-                                │
-             INFERENCE ENGINEERING: running brains well
-             wk8  measure: latency, tokens, cost
-             wk9  speed up: cache, quantise, distil, LoRA
-             wk10 world-class brain: Claude planner + agent
-             wk11 bake-off: every brain, same tasks ──► wk12 preferences + boss gap + show it off</code></pre>
+<h3 id="week-3">Week 3 · Real sensor data</h3>
+<div class="paper-row"><span class="d">3</span><div><label><input type="checkbox" data-d="21" data-label="Week 3"><a href="21-phone.html">Real sensor data from your phone</a><span class="track robo">Robotics</span></label><p>Smoothing, which way is down, counting steps, on a real recording. <b>Adds:</b> <code>phone</code>.</p></div></div>
 
-<h2 id="my-robot">Your robot, built by you: <code>my_robot.py</code></h2>
-<p>From week 1 you have <strong>one robot</strong>, and you build it. It's a single file, <code>homework/my_robot.py</code>, with your robot's name at the top and one gap for each week. Every lesson ends with <a href="01-coordinates.html#add-to-robot">"Add it to your robot"</a>: you write the 5–20 lines that connect what you just learned to your robot. Week 1, the arrow keys. Week 3, checking for the cat before every step. Week 5, turning sentences into actions. Week 6, plugging in the language brain you wrote, and so on. Until a gap is filled, your robot politely says "I can't do that yet".</p>
-<p><strong>New to classes and <code>self</code>?</strong> Read <a href="00-setup.html#robot-file">How your robot file works</a> in week 1 before your first gap. It takes two minutes.</p>
-<p>Only the boring parts are provided: drawing the room, the typing loop and the showcase. Everything that makes it clever is your code. <code>python3 check.py robot</code> drives <em>your</em> robot and checks each piece (1 of 15 checks after week 1, 15 of 15 at the end), and <code>solutions/my_robot.py</code> is there if you're really stuck.</p>
-<p>Here is the same robot at different weeks: real output, with the gaps filled up to that week. Decimals like 0.1 or 0.24 ms change a little every run.</p>
+<h3 id="week-4">Week 4 · Neurons and honest tests</h3>
+<div class="paper-row"><span class="d">4A</span><div><label><input type="checkbox" data-d="04" data-label="Week 4A"><a href="04-neuron.html">The artificial neuron</a><span class="track both">LLM + Robotics</span></label><p>Weights, a sum and a squash. <b>Adds:</b> an obstacle detector.</p></div></div>
+<div class="paper-row"><span class="d">4B</span><div><label><input type="checkbox" data-d="05" data-label="Week 4B"><a href="05-evaluation.html">Is it any good?</a><span class="track both">LLM + Robotics</span></label><p>Precision, recall and a <em>safe</em> threshold. <b>Adds:</b> it stops for the cat.</p></div></div>
+
+<h3 id="week-5">Week 5 · Planning</h3>
+<div class="paper-row"><span class="d">5</span><div><label><input type="checkbox" data-d="06" data-label="Week 5"><a href="06-pathfinding.html">Finding the way</a><span class="track robo">Robotics</span></label><p>BFS, then A*. <b>Adds:</b> <code>goto blue</code>.</p></div></div>
+<div class="paper-row"><span class="d">+</span><div><label><input type="checkbox" data-d="07" data-label="Bonus"><a href="07-trial-and-error.html">Bonus: learning by trial and error</a><span class="track robo">Robotics</span></label><p>Q-learning: no map, just practice. Any time after week 5.</p></div></div>
+
+<h3 id="week-6">Week 6 · Two sensors, one answer</h3>
+<div class="paper-row"><span class="d">6</span><div><label><input type="checkbox" data-d="22" data-label="Week 6"><a href="22-fusion.html">The gyroscope, drift and sensor fusion</a><span class="track robo">Robotics</span></label><p>A gyro drifts, an accelerometer wobbles; blend them. <b>Adds:</b> <code>steady</code>.</p></div></div>
+
+<h3 id="week-7">Week 7 · Words</h3>
+<div class="paper-row"><span class="d">7A</span><div><label><input type="checkbox" data-d="08" data-label="Week 7A"><a href="08-words-as-numbers.html">Words as numbers</a><span class="track llm">LLM</span></label><p>Next-word prediction, used to fix typos. <b>Adds:</b> typo-proof commands (6/9 → 9/9).</p></div></div>
+<div class="paper-row"><span class="d">7B</span><div><label><input type="checkbox" data-d="09" data-label="Week 7B"><a href="09-understanding-commands.html">Understanding commands</a><span class="track llm">LLM</span></label><p>A word-counting classifier. <b>Adds:</b> one action per sentence (bake-off 5/12).</p></div></div>
+
+<h3 id="week-8">Week 8 · A tiny language model</h3>
+<div class="paper-row"><span class="d">8</span><div><label><input type="checkbox" data-d="15" data-label="Week 8"><a href="15-tiny-lm.html">A tiny language model, from zero</a><span class="track llm">LLM</span></label><p>A real (tiny) neural network that writes whole plans. Stretch: <a href="15b-attention.html">attention</a>. <b>Adds:</b> multi-step plans (bake-off 8/12).</p></div></div>
+
+<h3 id="week-9">Week 9 · Wheels</h3>
+<div class="paper-row"><span class="d">9</span><div><label><input type="checkbox" data-d="23" data-label="Week 9"><a href="23-wheels.html">Wheels, odometry and PID</a><span class="track robo">Robotics</span></label><p>Counting wheel turns, drift, and steering that settles. <b>Adds:</b> <code>drive blue</code>.</p></div></div>
+
+<h3 id="week-10">Week 10 · Safety and the capstone</h3>
+<div class="paper-row"><span class="d">10A</span><div><label><input type="checkbox" data-d="10" data-label="Week 10A"><a href="10-llm-safety.html">Using a real LLM safely</a><span class="track llm">LLM</span></label><p>Never trust, always check. <b>Adds:</b> a safety layer.</p></div></div>
+<div class="paper-row"><span class="d">10B</span><div><label><input type="checkbox" data-d="11" data-label="Week 10B"><a href="11-capstone.html">Capstone: Robo-Helper</a><span class="track both">LLM + Robotics</span></label><p>Everything together, measured honestly (83%).</p></div></div>
+
+<h3 id="week-11">Week 11 · Its own map</h3>
+<div class="paper-row"><span class="d">11</span><div><label><input type="checkbox" data-d="24" data-label="Week 11"><a href="24-map.html">A laser scanner, frames and a map</a><span class="track robo">Robotics</span></label><p>Turn distances into dots on a map. <b>Adds:</b> <code>map</code>, its own map of the room.</p></div></div>
+
+<h3 id="week-12">Week 12 · Lost and found</h3>
+<div class="paper-row"><span class="d">12</span><div><label><input type="checkbox" data-d="25" data-label="Week 12"><a href="25-localise.html">Where am I? A particle filter</a><span class="track robo">Robotics</span></label><p>Many guesses, keep the ones that fit. <b>Adds:</b> <code>whereami</code>.</p></div></div>
+
+<h3 id="week-13">Week 13 · Inference I: measure</h3>
+<div class="paper-row"><span class="d">13</span><div><label><input type="checkbox" data-d="16" data-label="Week 13"><a href="16-speed.html">How fast is a brain?</a><span class="track llm">LLM</span></label><p>Latency, tokens and cost. <b>Adds:</b> how far it rolls while it thinks.</p></div></div>
+
+<h3 id="week-14">Week 14 · Inference II: speed up</h3>
+<div class="paper-row"><span class="d">14A</span><div><label><input type="checkbox" data-d="17" data-label="Week 14A"><a href="17-faster.html">Faster and cheaper</a><span class="track llm">LLM</span></label><p>Caching, quantising, distilling. <b>Adds:</b> a teacher-trained brain (bake-off 10/12 in 1.4 KB).</p></div></div>
+<div class="paper-row"><span class="d">14B</span><div><label><input type="checkbox" data-d="13" data-label="Week 14B"><a href="13-lora.html">Teaching an old model a new trick (LoRA)</a><span class="track both">LLM + Robotics</span></label><p>Fix a big model by training a few numbers.</p></div></div>
+
+<h3 id="week-15">Week 15 · A world-class brain, and the bake-off</h3>
+<div class="paper-row"><span class="d">15A</span><div><label><input type="checkbox" data-d="18" data-label="Week 15A"><a href="18-world-class.html">A world-class brain over the internet</a><span class="track both">LLM + Robotics</span></label><p>Optional: Claude as planner and agent. Needs a grown-up's API key.</p></div></div>
+<div class="paper-row"><span class="d">+</span><div><label><input type="checkbox" data-d="20" data-label="Bonus"><a href="20-mcp.html">Bonus: give any AI app your robot (MCP)</a><span class="track both">LLM + Robotics</span></label><p>Needs Python 3.11+ and <code>pip install mcp</code>.</p></div></div>
+<div class="paper-row"><span class="d">15B</span><div><label><input type="checkbox" data-d="19" data-label="Week 15B"><a href="19-bakeoff.html">The bake-off</a><span class="track both">LLM + Robotics</span></label><p>Every brain, the same 12 tasks, with replays. <b>Adds:</b> <code>exam</code>.</p></div></div>
+
+<h3 id="week-16">Week 16 · The boss</h3>
+<div class="paper-row"><span class="d">16A</span><div><label><input type="checkbox" data-d="12" data-label="Week 16A"><a href="12-preferences.html">Learning what people prefer</a><span class="track both">LLM + Robotics</span></label><p>RLHF by hand. <b>Adds:</b> picks the route you'd choose.</p></div></div>
+<div class="paper-row"><span class="d">16B</span><div><label><input type="checkbox" data-d="14" data-label="Week 16B"><a href="14-go-real.html">The boss, and going real</a><span class="track both">LLM + Robotics</span></label><p>Use what it <em>sees</em> (12/12), then <code>rescue blue</code>: lost, finds itself, drives there. Then show it off.</p></div></div>
+
+<h2 id="my-robot">Your robot, week by week</h2>
+<p>Your robot is one file, <code>homework/my_robot.py</code>, with one gap per week. Until a gap is filled it says "I can't do that yet". New to classes and <code>self</code>? Read <a href="00-setup.html#robot-file">How your robot file works</a> first.</p>
+<p>Real output with the gaps filled up to each week, typed straight after starting <code>python3 my_robot.py</code>. Decimals change a little every run.</p>
 <div class="table-wrap"><table>
-<tr><th>After week</th><th>You type</th><th>Your robot</th></tr>
-<tr><td>1 (arrows)</td><td><code>EEEE</code></td><td>BUMP! I walked into the cat. (It's not on my map, so I can't sense it yet: add week 3.)</td></tr>
-<tr><td>2 (look)</td><td><code>look</code></td><td>Walls (average of 16 readings): north 0.1, east 6.9, south 5.0, west 0.1. Safe speed: 0.25 m/s.</td></tr>
-<tr><td>3 (stop check)</td><td><code>EEEE</code></td><td>Something is in the way at (4, 1)! I stopped just in time (stop chance 0.99, my safe threshold 0.17).</td></tr>
-<tr><td>4 (route, goto)</td><td><code>goto blue</code></td><td>Something is in the way at (4, 1)! I stopped just in time (stop chance 0.99, my safe threshold 0.17).<br>I'm at (6, 3).</td></tr>
-<tr><td>5 (words, do)</td><td><code>put the red and blue blocks away</code></td><td>(I think you meant: 'put the red and blue block away')<br>The red block is in the bin. <em>(only one: it does one action at a time)</em></td></tr>
-<tr><td>6 (plans)</td><td><code>put the red and blue blocks away</code></td><td>(I think you meant: 'put the red and blue block away')<br>The red block is in the bin. The blue block is in the bin.</td></tr>
-<tr><td>7 (safety)</td><td><code>json: {"intent": "launch", "object": "red block"}</code> <em>(pretends an AI sent this exact answer)</em></td><td>Sorry, I won't do that: unknown intent 'launch'.</td></tr>
-<tr><td>8 (think time)</td><td><code>slowbrain on</code>, then <code>put the red block in the bin</code></td><td>(I thought for 506.01 ms, so I'd roll 506.01 mm meanwhile.) Too slow! I'd hit the cat before deciding to stop.<br>The red block is in the bin. <em>(this route misses the cat)</em></td></tr>
-<tr><td>8 (think time)</td><td><code>slowbrain on</code>, then <code>EEEE</code></td><td>BUMP! My slow brain was still thinking when I reached the cat. (Type 'slowbrain off'.)</td></tr>
-<tr><td>9 (teacher brain)</td><td><code>where's the green one?</code></td><td>The green block is at (1, 5).</td></tr>
-<tr><td>10 (Claude)</td><td><code>claude: tidy up the room</code></td><td>Without a key: Claude isn't reachable (ModuleNotFoundError). It needs `pip install anthropic` and an API key: ask an adult.<br><em>Claude's rows appear here after a grown-up records them with an API key (see week 10).</em><!-- CLAUDE-RESULTS --></td></tr>
-<tr><td>11 (exam)</td><td><code>exam</code></td><td>…<br>✗ 'tidy up the room' binned ['green block'], wanted ['blue block', 'green block', 'red block']<br>…<br>✗ "put away the block that's closest to the bin" binned nothing, wanted ['blue block']<br>…<br>I passed 10 of 12.</td></tr>
-<tr><td>12 (boss gap)</td><td><code>tidy up the room</code>, then <code>exam</code></td><td>… The red block is in the bin. The blue block is in the bin. The green block is in the bin.<br>…<br>I passed 12 of 12.</td></tr>
-<tr><td>12 (the show)</td><td><code>python3 my_robot.py --show</code></td><td>A demo of everything, the 12-task exam, then <strong>your own exam</strong> from <code>my_tasks.txt</code>.</td></tr>
+<tr><th>Week</th><th>You type</th><th>Your robot</th></tr>
+<tr><td>1</td><td><code>EEEE</code></td><td>BUMP! I walked into the cat. (It's not on my map, so I can't sense it yet: add week 4.)<div class="room" data-robot="3,1" data-path="1,1 2,1 3,1" data-cat="4,1" data-mark="4,1" data-blocks="red:2,1 blue:6,3 green:1,5"></div></td></tr>
+<tr><td>2</td><td><code>look</code></td><td>Walls (average of 16 readings): north 0.2, east 7.0, south 5.0, west 0.1. Safe speed: 0.25 m/s.</td></tr>
+<tr><td>3</td><td><code>phone</code></td><td>236 s of real data: tilted 13 degrees on average, 197 steps.</td></tr>
+<tr><td>4</td><td><code>EEEE</code></td><td>Something is in the way at (4, 1)! I stopped just in time (stop chance 0.99, my safe threshold 0.17).<div class="room" data-robot="3,1" data-path="1,1 2,1 3,1" data-cat="4,1" data-mark="4,1" data-blocks="red:2,1 blue:6,3 green:1,5"></div></td></tr>
+<tr><td>5</td><td><code>goto blue</code></td><td>Something is in the way at (4, 1)! I stopped just in time (…).<br>I'm at (6, 3).<div class="room" data-robot="6,3" data-path="1,1 2,1 3,1 2,1 2,2 2,3 2,4 3,4 4,4 4,3 5,3 6,3" data-cat="4,1" data-mark="4,1" data-blocks="red:2,1 blue:6,3 green:1,5"></div></td></tr>
+<tr><td>6</td><td><code>steady</code></td><td>Accelerometer alone wobbles 9.5 degrees; fused, 2.1.</td></tr>
+<tr><td>7</td><td><code>put the red and blue blocks away</code></td><td>(I think you meant: 'put the red and blue block away')<br>The red block is in the bin. <em>(only one: one action at a time)</em><div class="room" data-robot="7,6" data-path="1,1 2,1 2,2 2,3 2,4 2,5 3,5 3,6 4,6 5,6 6,6 7,6" data-cat="4,1" data-blocks="blue:6,3 green:1,5"></div></td></tr>
+<tr><td>8</td><td><code>put the red and blue blocks away</code></td><td>(I think you meant: 'put the red and blue block away')<br>The red block is in the bin. The blue block is in the bin.<div class="room" data-robot="7,6" data-path="1,1 2,1 2,2 2,3 2,4 2,5 3,5 3,6 4,6 5,6 6,6 7,6 7,5 7,4 7,3 6,3 7,3 7,4 7,5 7,6" data-cat="4,1" data-blocks="green:1,5"></div></td></tr>
+<tr><td>9</td><td><code>drive blue</code></td><td>Arrived. I think I'm at (3.20, 1.75); really I'm 0.94 m away from that. I scraped a wall on the way: my odometry drifted and I didn't notice. (Weeks 11-12 fix this.)</td></tr>
+<tr><td>10</td><td><code>json: {"intent": "launch", "object": "red block"}</code> <em>(pretends an AI sent this)</em></td><td>Sorry, I won't do that: unknown intent 'launch'.</td></tr>
+<tr><td>11</td><td><code>map</code></td><td>100% of 76 squares right (the 'c' square is the cat the official map doesn't know)<div class="room" data-room="####?#####|#...?....#|#..##....?|#..#...?.#|#....##..#|#........#|#.#......#|##########" data-cat="4,1" data-label="The map it drew itself (light ? squares: never seen). This run it got stuck behind a wall block and never saw the cat, so no 'c' square appears."></div></td></tr>
+<tr><td>12</td><td><code>whereami</code></td><td>I think I'm at (2.80, 1.14). Really (2.83, 1.11): 0.04 m off.<div class="room" data-robot="5,2" data-est="2.80,1.14" data-cat="4,1" data-blocks="red:2,1 blue:6,3 green:1,5" data-label="Dashed circle: its guess. 🤖: the square it's really in."></div></td></tr>
+<tr><td>13</td><td><code>slowbrain on</code>, then <code>EEEE</code></td><td>BUMP! My slow brain was still thinking when I reached the cat. (Type 'slowbrain off'.)</td></tr>
+<tr><td>14</td><td><code>where's the green one?</code></td><td>The green block is at (1, 5).</td></tr>
+<tr><td>15</td><td><code>claude: tidy up the room</code></td><td>Without a key: Claude isn't reachable (ModuleNotFoundError). It needs `pip install anthropic` and an API key: ask an adult.<!-- CLAUDE-RESULTS --></td></tr>
+<tr><td>15</td><td><code>exam</code></td><td>…<br>✗ 'tidy up the room' binned ['green block'], wanted ['blue block', 'green block', 'red block']<br>✗ "put away the block that's closest to the bin" binned nothing, wanted ['blue block']<br>…<br>I passed 10 of 12.</td></tr>
+<tr><td>16</td><td><code>tidy up the room</code>, then <code>exam</code></td><td>… The red block is in the bin. The blue block is in the bin. The green block is in the bin.<br>…<br>I passed 12 of 12.<div class="room" data-robot="7,6" data-path="1,1 2,1 3,1 2,1 2,2 2,3 2,4 2,5 3,5 3,6 4,6 5,6 6,6 7,6 7,5 7,4 7,3 6,3 7,3 7,4 7,5 7,6 6,6 5,6 4,6 3,6 3,5 2,5 1,5 2,5 3,5 3,6 4,6 5,6 6,6 7,6" data-cat="4,1" data-mark="4,1"></div></td></tr>
+<tr><td>16</td><td><code>rescue blue</code></td><td>Rescued the blue block: I started lost, found myself, and drove there. I'm 0.10 m from it.</td></tr>
 </table></div>
 
-<h2 id="report-card">Your robot's report card</h2>
-<p>Every lesson has to make Robo-Helper better at something you can measure. Run <code>python3 progress.py</code> from <code>project/</code> after any lesson. It runs <em>your</em> code, and rows you haven't built yet say "not built yet". This is the real output with every lesson finished (<code>--solutions</code>):</p>
-<pre><code>week  lesson      ability             measured
-1     01          moves               follows the commands EEEESSS from (1, 1) to (5, 3)
-2     02          senses              distance sensor error 0.50 -&gt; 0.12 by averaging 16 readings
-2     03          learns              learned its braking distance (error 0.33 -&gt; 0.0004); safe speed with 1 m free: 0.9 m/s
-3     04-05       decides to stop     stop detector catches 97% of obstacles on new data (precision 84%)
-4     06          finds the way       plans the shortest route to the bin: 11 steps (A* looked at 35 squares)
-bonus 07          learns by trying    learns a maze by trial and error: 58 steps on the first try -&gt; 10 on the last
-5     08          reads typos         typo commands handled like the correct spelling: 6/9 -&gt; 9/9 with the typo fixer
-5     09          understands         understands one action per command: bake-off 5/12
-6     15          writes plans        writes whole plans and asks when unsure: bake-off 8/12, new commands 92%
-6+    15 stretch  attention           attention: new commands 92% (tiny LM 92%; over 3 seeds 92% vs 89%), bake-off 8/12
-7     10          stays safe          checks every AI answer before moving: 5 broken answers caught, 3 good ones let through
-7     11          capstone            the whole robot, tested end to end: 83% of test commands done right
-8     16          speed               knows how long it thinks: tiny LM p95 0.2 ms = 0.2 mm rolled while thinking
-9     17          faster, smarter     learns new phrasings from a teacher: bake-off 10/12; 4-bit copy 10/12 at 1411 bytes (was 11288)
-9     13          adapts (LoRA)       fixes its leaky sensor with LoRA: danger error 0.067 -&gt; 0.000, training 12 numbers
-10    18          world-class brain   … needs recordings (see brains.py record)
-11    19          bake-off            the same 12 tasks for every brain: words 5/12, tinylm 8/12, distilled 10/12
-12    12          what people like    picks the route people prefer: wall brushes 10 -&gt; 8, turns 3 -&gt; 1 (same 11 steps)
-bonus 20          MCP                 any AI app can drive it over MCP, and the server's own rules hold</code></pre>
-<p class="meta">The "lesson" column is the homework file number (<code>16</code> is <code>lesson16_speed.py</code>). Speed numbers depend on your computer. The week 10 row needs Claude: Claude's rows appear here after a grown-up records them with an API key (see week 10).</p>
-<p>The brain you build climbs the bake-off week by week, on the same 12 tasks it never trained on: word counter <b>5/12</b> (week 5), plan-writing tiny LM <b>8/12</b> (week 6), plus a teacher's labels <b>10/12</b> (week 9), and still 10/12 squeezed into 1.4 KB. The two tasks every small brain still fails need the robot to <em>see the room</em> ("the block that's closest to the bin") or to know that "the room" means every block. In week 12 you fill the boss gap, <code>see_and_plan</code>, which uses what your robot can see, and your robot's exam goes from 10 of 12 to 12 of 12.</p>
+<h3 id="report-card">Is my robot right?</h3>
+<p>From <code>project/</code>, run <code>python3 check.py robot</code>. It drives <em>your</em> robot and checks each gap: 1 of 21 after week 1, 21 of 21 at the end.</p>
+<div class="table-wrap"><table>
+<tr><th>After week</th><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td><td>10</td><td>11</td><td>12</td><td>13</td><td>14</td><td>15</td><td>16</td></tr>
+<tr><th>Checks passed</th><td>1</td><td>3</td><td>4</td><td>6</td><td>7</td><td>8</td><td>10</td><td>11</td><td>12</td><td>13</td><td>14</td><td>15</td><td>16</td><td>17</td><td>18</td><td>21</td></tr>
+</table></div>
+<p>The brain you build climbs the bake-off, on 12 tasks it never trained on: <b>5/12</b> (week 7), <b>8/12</b> (week 8), <b>10/12</b> (week 14). The last two tasks need the robot to <em>see the room</em>, so in week 16 your robot uses what it sees and passes 12 of 12.</p>
 
-<p class="meta">Bonus, any time after week 4: <a href="../22-vector-fields.html">Module 22</a> steers the robot with a field of arrows (gradient, divergence, curl). Bonus: <a href="../21-robot-math.html">Module 21</a> pairs ten interactive maths explainers (Kalman, Bayes, A*, Fourier…) with <code>bonus_robot_math.py</code>, which uses each one on Robo-Helper and measures the difference.</p>
-
-<h2>Getting the code</h2>
-<ol>
-<li>The project lives in <code>topics/18-robot-brain/project/</code> inside this course folder. Copy that whole <code>project</code> folder somewhere you like.</li>
-<li>Read <code>project/README.md</code>.</li>
-<li>Your files are in <code>project/homework/</code>. Answers are in <code>project/solutions/</code>, but peek only after a real try.</li>
-<li>Check any part with <code>python3 check.py 3</code> (from inside <code>project/</code>). The number is the homework file's number: <code>3</code> checks <code>lesson03_learning.py</code> (week 2 Part B). Each page's facts box names its file. <code>python3 check.py robot</code> checks your robot.</li>
+<h2 id="code">Getting the code</h2>
+<ol class="steps">
+<li>The project is in <code>topics/18-robot-brain/project/</code>. Copy the whole <code>project</code> folder somewhere you like, and read its <code>README.md</code>.</li>
+<li>Your files are in <code>project/homework/</code>. Answers are in <code>project/solutions/</code>: peek only after a real try.</li>
+<li>Check a lesson from inside <code>project/</code>: <code>python3 check.py 21</code> checks <code>lesson21_phone.py</code> (week 3). Each page names its file.</li>
 </ol>
 
-<h2>For parents and teachers</h2>
+<details id="grown-ups">
+<summary>For parents and teachers</summary>
 <ul>
-<li><strong>Time, honestly:</strong> the lesson pages' own estimates add up to about 43–66 hours over the 12 weeks, not counting the real-world challenges or stretches. Week 1 includes 1.5–3 hours of setup. Week 6 (the tiny language model) is the longest page; let it take two weeks if needed.</li>
-<li><strong>What the later weeks are:</strong> weeks 1–7 build the robot and its first brains from zero. Weeks 8–11 are <b>inference engineering</b> (inference means a brain answering, not learning): measuring how fast and expensive a brain is, making it faster and cheaper, plugging in a world-class model (Claude) over the internet, and racing every brain on the same tasks. Week 12 teaches the robot what people prefer, adds the boss gap, and the learner shows off their work.</li>
-<li><strong>Installs and the API key:</strong> weeks 1–9 need only Python (standard library). Week 10 and the MCP bonus install one package each with pip, in a private folder; an adult should help. Weeks 10–11 can use a real world-class model (Claude), which needs an API key and costs a little per request (the whole bake-off is about a dollar). No Claude recordings are included yet. Without a key, the Claude parts are skipped: the rest of the course and all of <code>my_robot.py</code> except week 10's gap work without one. Claude's rows appear here after a grown-up records them with an API key (see week 10).</li>
-<li><strong>Self-marking:</strong> <code>check.py</code> gives specific hints. <code>python3 check.py all --solutions</code> verifies the reference solutions (all 115 checks pass). <code>python3 progress.py</code> shows what each finished lesson added to the robot.</li>
-<li><strong>Honest by design:</strong> the week 7 capstone (RoboHelper, a simpler twin of the learner's robot) scores 83% on its test set, not 100%. The small brains the learner builds climb from 5/12 to 10/12 on the bake-off but never reach 12/12. The learner's own robot reaches 12/12 only in week 12, by using what it sees rather than a smarter brain. Finding and explaining failures is part of the course.</li>
-<li><strong>Error bars:</strong> 12 tasks is few. The jump from 5/12 to 8/12 is "too close to call" with error bars; 5/12 to 10/12 is a real difference (week 11 shows how to tell).</li>
-<li>Want more depth? Each lesson links to the matching part of this course: <a href="../06-30u30/index.html">the 30 papers</a>, <a href="../09-inference-engineering/index.html">inference engineering</a>, <a href="../17-free-ai-curriculum.html#robotics">free robotics courses</a>.</li>
+<li><strong>Shape:</strong> the course alternates the robot's body (sensors, motion, control, maps) and its brain (learning, language, AI engineering). Weeks 13–15 are <b>inference engineering</b>: how fast and expensive a brain is, making it cheaper, and racing every brain on the same tasks.</li>
+<li><strong>Real data:</strong> week 3 uses a real smartphone recording from the UCI "Human Activities and Postural Transitions" dataset (Reyes-Ortiz, Anguita, Oneto, Parra; CC BY 4.0). Learners can record their own with the free phyphox app. Please help them install it.</li>
+<li><strong>Installs and the API key:</strong> weeks 1–14 need only Python (standard library). Week 15 and the MCP bonus install one package each with pip; an adult should help. Week 15 can use Claude, which needs an API key and costs a little per request (the whole bake-off is about a dollar). Without a key, the Claude parts are skipped, and everything else works.</li>
+<li><strong>Self-marking:</strong> <code>check.py</code> gives specific hints. <code>python3 check.py all --solutions</code> verifies the reference solutions: all 147 checks pass. <code>python3 progress.py</code> shows what each finished lesson adds.</li>
+<li><strong>Honest by design:</strong> the week 10 capstone scores 83%, not 100%. The small brains reach 10/12 but never 12/12. Odometry drifts until weeks 11–12 fix it. Finding and explaining failures is part of the course.</li>
+<li><strong>Error bars:</strong> 12 tasks is few. 5/12 to 8/12 is "too close to call"; 5/12 to 10/12 is a real difference (week 15 shows how to tell).</li>
+<li><strong>More depth:</strong> <a href="../06-30u30/index.html">the 30 papers</a>, <a href="../09-inference-engineering/index.html">inference engineering</a>, <a href="../17-free-ai-curriculum.html#robotics">free robotics courses</a>. Bonus after week 5: <a href="../21-robot-math.html">robot maths</a> and <a href="../22-vector-fields.html">steering with a field of arrows</a>.</li>
 </ul>
+</details>
 
-<footer>Module 18 · added 2026-11-04 · <a href="../../index.html">Back to course index</a></footer>
+<footer>Module 18 · added 2026-11-04 · updated 2026-11-10 · <a href="../../index.html">Back to course index</a></footer>
 </main>
 
+<script src="room.js"></script>
 <script>
 const KEY = 'lr-robot-brain-done';
 const boxes = [...document.querySelectorAll('input[data-d]')];

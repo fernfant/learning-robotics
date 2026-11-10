@@ -87,23 +87,34 @@ def to_map(votes, width, height):
 
 # ---------------- provided ----------------
 
-ROUTE = [centre(s) for s in [(1, 5), (3, 5), (4, 3), (5, 1), (7, 1), (8, 3), (8, 5), (5, 5), (3, 5), (1, 4), (1, 1)]]
+ROUTE = [centre(s) for s in [(1, 5), (4, 5), (4, 3), (7, 3), (7, 1), (5, 1), (7, 1), (8, 1), (8, 5), (3, 5), (1, 5), (1, 1), (2, 1)]]
+
+
+class TruePose:
+    """Cheating, for comparison: always knows exactly where the robot is (a real robot can't)."""
+
+    def __init__(self, body):
+        self.body = body
+
+    def update(self):
+        x, y, h = self.body.true_pose()
+        self.pose = (x, y, math.radians(h))
+        return self.pose
 
 
 def explore(use_true_pose, mismatch=0.02, seed=3):
-    """Drive the route, scanning every 10 control steps, and build a map. Returns (map, robot body)."""
+    """Drive the route, scanning every 10 control steps, and build a map. Returns (map, robot body).
+    use_true_pose=True cheats: it steers AND maps with the true pose. False uses only its own odometry."""
     from lesson23_wheels import Odometer, drive_to
     body = Body(start=(1, 5), mismatch=mismatch, seed=seed)
-    odo = Odometer(body, (*centre((1, 5)), 0.0))
-    votes, step = {}, 0
+    tracker = TruePose(body) if use_true_pose else Odometer(body, (*centre((1, 5)), 0.0))
+    tracker.update()
+    votes = {}
     for target in ROUTE:
         for _ in range(40):
-            if drive_to(body, odo, target, max_steps=10)[0] < 10:
+            if drive_to(body, tracker, target, max_steps=10)[0] < 10:
                 break
-            x, y, h = body.true_pose()
-            pose = (x, y, math.radians(h)) if use_true_pose else odo.pose
-            add_scan(votes, pose, body.scan())
-            step += 1
+            add_scan(votes, tracker.pose, body.scan())
     return to_map(votes, len(ROOM[0]), len(ROOM)), body
 
 

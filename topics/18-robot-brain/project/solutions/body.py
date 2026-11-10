@@ -8,7 +8,8 @@ The grid robot hopped from square to square and always knew exactly where it was
 
 Coordinates are in metres. One grid square is 0.5 m, so the room is 5 m wide and 4 m tall.
 x grows to the right, y grows DOWN the screen (like the grid). Heading 0 = facing east (right),
-90 degrees = facing south (down), 180 = west, -90 = north.
+90 degrees = facing south (down), 180 = west, -90 = north. Because y grows down, a bigger heading turns CLOCKWISE
+on screen: the robot's right. Like a real robot, a faster right wheel turns it LEFT (its heading gets smaller).
 
 The robot's TRUE pose is hidden inside Body. Your code only sees encoders and scans, like a real robot.
 true_pose() is there for checking your work, never for driving.
@@ -58,7 +59,7 @@ class Body:
         self.theta = math.radians(heading_deg)
         self.rng = random.Random(seed)
         self.slip, self.scan_noise, self.cat = slip, scan_noise, cat
-        self.mismatch = mismatch     # the right wheel is a little bigger than the left: a real, steady error
+        self.mismatch = mismatch     # the left wheel is a little bigger than the right: a real, steady error
         self.lag = lag               # motors take about this many seconds to reach a new speed (they have momentum)
         self.vl = self.vr = 0.0      # how fast the motors are really turning right now
         self.left_turned = self.right_turned = 0.0    # metres each wheel really rolled
@@ -67,16 +68,16 @@ class Body:
 
     def drive(self, v_left, v_right, dt):
         """Turn the motors so each wheel should roll at these speeds (metres per second) for dt seconds.
-        The encoders count what the MOTORS did. On the floor, the wheels slip a bit, and the right wheel is
+        The encoders count what the MOTORS did. On the floor, the wheels slip a bit, and the left wheel is
         slightly bigger, so the robot really moves a little differently."""
         k = min(1.0, dt / self.lag) if self.lag else 1.0
         self.vl += (v_left - self.vl) * k
         self.vr += (v_right - self.vr) * k
         self.left_turned += self.vl * dt
         self.right_turned += self.vr * dt
-        vl = self.vl * (1 + self.rng.gauss(0, self.slip))
-        vr = self.vr * (1 + self.mismatch) * (1 + self.rng.gauss(0, self.slip))
-        d, dtheta = (vl + vr) / 2 * dt, (vr - vl) / WHEEL_BASE * dt
+        vl = self.vl * (1 + self.mismatch) * (1 + self.rng.gauss(0, self.slip))
+        vr = self.vr * (1 + self.rng.gauss(0, self.slip))
+        d, dtheta = (vl + vr) / 2 * dt, (vl - vr) / WHEEL_BASE * dt    # right wheel faster -> turns LEFT (anticlockwise on screen)
         nx = self.x + d * math.cos(self.theta + dtheta / 2)
         ny = self.y + d * math.sin(self.theta + dtheta / 2)
         hit = any(is_wall(nx + RADIUS * math.cos(a), ny + RADIUS * math.sin(a), cat=self.cat)

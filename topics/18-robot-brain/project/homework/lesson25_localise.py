@@ -96,7 +96,7 @@ def best_guess(particles):
 def localise(body, rng, n=400, moves=None, report=None):
     """Kidnapped robot: spread guesses, then scan, score, pick, move... Returns the final estimate."""
     from lesson23_wheels import ticks_to_metres
-    moves = moves or [(0.25, 0.25)] * 6 + [(-0.1, 0.1)] * 4 + [(0.25, 0.25)] * 6
+    moves = moves or [(0.25, 0.25)] * 6 + [(0.1, -0.1)] * 4 + [(0.25, 0.25)] * 6
     particles = spread(n, rng)
     last = body.encoders()
     for i, (vl, vr) in enumerate(moves):

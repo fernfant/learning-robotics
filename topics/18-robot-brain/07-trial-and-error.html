@@ -4,129 +4,49 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bonus · Q-learning</title>
-<link rel="stylesheet" href="../../style.css">
+<link rel="stylesheet" href="../../style.css?v=16">
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Bonus side quest (after week 4)</nav>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Bonus side quest (after week 5)</nav>
 
-<div class="eyebrow"><span class="track robo">Robotics</span>Build a Robot Brain · Bonus side quest (after week 4)</div>
+<div class="eyebrow"><span class="track robo">Robotics</span>Build a Robot Brain · Bonus side quest (after week 5)</div>
 <h1>Learning by trial and error: Q-learning</h1>
-<p class="lede">No map, no planner, nobody telling it the answer. Just a robot that tries things, gets points, and slowly writes down which moves were worth it.</p>
-<div class="card note" id="journey"><strong>Bonus (optional side quest, after week 4).</strong> There's nothing to add to <code>my_robot.py</code> here, so skip to <a href="08-words-as-numbers.html">week 5</a> if you like. So far your robot: ✓ says hello ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes. <strong>Today</strong> it learns to learn a maze just by trying. Next: <a href="08-words-as-numbers.html">Week 5 · Part A: Words as numbers</a>. <a href="index.html#my-robot">Your robot, week by week</a>.</div>
-
-<div class="facts">
-  <div><b>Time</b>2–3 hours</div>
-  <div><b>You'll need</b>Python 3, your week 1 <code>safe_move</code>, paper and a pencil</div>
-  <div><b>New words</b>reward, episode, Q-value, explore vs exploit, learning rate, discount</div>
-  <div><b>Project piece</b>Learns a maze by itself (a side quest)</div>
-</div>
+<p class="lede">No map, nobody telling it the answer. Just a robot that tries things, gets points, and remembers which moves were worth it.</p>
+<div class="card note" id="journey"><strong>Bonus (optional, after week 5).</strong> Nothing to add to <code>my_robot.py</code> here, so skip to <a href="22-fusion.html">week 6</a> if you like. So far your robot: ✓ moves ✓ senses ✓ reads real phone data ✓ decides to stop ✓ is tested safe ✓ plans routes. <strong>Today</strong> it learns a maze just by trying. Next: <a href="22-fusion.html">Week 6: Two sensors, one steady angle</a>. <a href="index.html#my-robot">Your robot, week by week</a>.</div>
 
 <section class="kid" id="start">
 <h2>Start here</h2>
-<p class="big">If you can't see the map, you can still learn the way: try moves, notice which ones led to a reward, and keep a scoreboard of "how good is this move from here?"</p>
-
-<h3>The problem</h3>
-<p>In week 4 the robot planned perfect routes with A*. But A* cheated a little: it was handed the whole map of the room. Now drop the robot into a maze it has never seen. No map. All it knows is where it is standing, the four moves it can make, and a beep when it reaches the goal. How can it ever find the shortest way?</p>
-
-<h3>The idea in one picture</h3>
-<p>Think about the first week at a new school. You don't have a map, so on day one you wander, take wrong turns and arrive late. Each time you reach the classroom you remember which corridors got you there. By Friday you walk the quick way without thinking. Nobody gave you a map. You built a mental scoreboard of "from this corridor, turning left is good" by doing it again and again. That scoreboard is exactly what Q-learning builds.</p>
-
-<h3>Words to know</h3>
+<p class="big">First week at a new school: no map, so you wander and arrive late. Each time you reach the classroom you remember which corridors got you there. By Friday you walk the quick way. That memory is a Q-table.</p>
 <dl>
-<dt>Reward</dt><dd>Points the robot gets after a move. Here: −1 for every step (moving costs energy), +10 for reaching the goal.</dd>
-<dt>Episode</dt><dd>One attempt: start at S, move until you reach G (or give up after 200 steps).</dd>
-<dt>Q-value</dt><dd>A number for one square and one move: "how many points do I expect if I do this move here, then play well after?" Q stands for <em>quality</em>.</dd>
-<dt>Explore / exploit</dt><dd>Exploit = do the move you currently think is best. Explore = try a random move, in case there's something better you haven't found.</dd>
-<dt>Learning rate (α)</dt><dd>How far each new experience moves a Q-value. 0.5 means "move halfway towards the new evidence".</dd>
-<dt>Discount (γ)</dt><dd>How much a reward later is worth compared to one now. 0.95 means a point one step later is worth 0.95 points now.</dd>
+<dt>Reward</dt><dd>Points after a move: −1 per step, +10 for reaching the goal.</dd>
+<dt>Episode</dt><dd>One attempt, from start to goal (or 200 steps).</dd>
+<dt>Q-value</dt><dd>"How many points do I expect if I make this move here?"</dd>
+<dt>Explore / exploit</dt><dd>Try a random move, or do the best one you know.</dd>
 </dl>
 </section>
-<p class="deeper"><strong>Going deeper:</strong> everything below is the full lesson: the idea built from nothing, a demo, your homework, and a challenge away from the screen.</p>
 
-<h2 id="problem">1. The problem</h2>
-<p>Here is the maze from <code>lesson07_trial_error.py</code>. <code>S</code> is the start, <code>G</code> the goal, <code>#</code> a wall. Coordinates work just like week 1: <code>(x, y)</code>, with y growing downwards.</p>
-<pre><code>#######
-#S..#.#      S is at (1, 1)
-#.#.#.#      G is at (5, 4)
-#.#...#
-#...#G#
-#######</code></pre>
-<p>You can see the shortest way is 7 steps (E, E, S, S, E, E, S). The robot can't see this picture. It only knows the square it's on. If it moves into a wall, <code>safe_move</code> from week 1 keeps it where it was, and it has wasted a step.</p>
-<p><strong>Obvious idea 1: wander randomly until you hit G.</strong> It works, eventually. With random moves, the robot's very first attempt in our code took 58 steps. The second took 101. And it never gets better, because it remembers nothing.</p>
-<p><strong>Obvious idea 2: remember the whole route that worked, and repeat it.</strong> Better, but the first route that worked was a 58-step mess full of bumps into walls. Repeating a bad route doesn't make it good. We need to remember something smaller and smarter than "the route".</p>
+<h2 id="idea">1. The idea</h2>
+<div class="box idea"><span class="tag">💡 The idea: good news travels backwards</span>
+<p>In week 5, A* was handed the whole map. Now the robot can't see the maze. It only knows its square, its four moves, and a beep at the goal. So it keeps a score for every square and move, all starting at 0.</p>
+<p>When a move reaches the goal, that move scores 10. The square before learns from <em>that</em> square, and so on back (γ = 0.95):</p>
+<svg class="diagram" style="max-width:400px" viewBox="0 0 392 336" role="img" aria-label="The maze. Good news spreads back from the goal: 10 next to the goal, then 8.5, 7.1 and 5.7 on the squares before it."><defs><marker id="qarrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--ok)"/></marker></defs><rect x="0" y="0" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="56" y="0" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="112" y="0" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="168" y="0" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="224" y="0" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="280" y="0" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="336" y="0" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="0" y="56" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="56" y="56" width="56" height="56" style="fill:var(--floor);stroke:var(--line)"/><rect x="112" y="56" width="56" height="56" style="fill:var(--floor);stroke:var(--line)"/><rect x="168" y="56" width="56" height="56" style="fill:var(--floor);stroke:var(--line)"/><rect x="224" y="56" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="280" y="56" width="56" height="56" style="fill:var(--floor);stroke:var(--line)"/><rect x="336" y="56" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="0" y="112" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="56" y="112" width="56" height="56" style="fill:var(--floor);stroke:var(--line)"/><rect x="112" y="112" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="168" y="112" width="56" height="56" style="fill:var(--floor);stroke:var(--line)"/><rect x="224" y="112" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="280" y="112" width="56" height="56" style="fill:var(--floor);stroke:var(--line)"/><rect x="336" y="112" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="0" y="168" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="56" y="168" width="56" height="56" style="fill:var(--floor);stroke:var(--line)"/><rect x="112" y="168" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="168" y="168" width="56" height="56" style="fill:var(--floor);stroke:var(--line)"/><rect x="224" y="168" width="56" height="56" style="fill:var(--floor);stroke:var(--line)"/><rect x="280" y="168" width="56" height="56" style="fill:var(--floor);stroke:var(--line)"/><rect x="336" y="168" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="0" y="224" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="56" y="224" width="56" height="56" style="fill:var(--floor);stroke:var(--line)"/><rect x="112" y="224" width="56" height="56" style="fill:var(--floor);stroke:var(--line)"/><rect x="168" y="224" width="56" height="56" style="fill:var(--floor);stroke:var(--line)"/><rect x="224" y="224" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="280" y="224" width="56" height="56" style="fill:var(--floor);stroke:var(--line)"/><rect x="336" y="224" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="0" y="280" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="56" y="280" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="112" y="280" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="168" y="280" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="224" y="280" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="280" y="280" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><rect x="336" y="280" width="56" height="56" style="fill:var(--wall);stroke:var(--line)"/><text x="84.0" y="95.19999999999999" text-anchor="middle" font-size="28">🤖</text><text x="308.0" y="263.2" text-anchor="middle" font-size="28">⭐</text><rect x="283" y="171" width="50" height="50" rx="8" style="fill:var(--ok);opacity:0.85"/><line x1="308.0" y1="190.0" x2="308.0" y2="222.0" style="stroke:var(--ok)" stroke-width="3" marker-end="url(#qarrow)"/><text x="308.0" y="190.0" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--fg)">10.0</text><text x="328.16" y="181" text-anchor="end" font-size="10" style="fill:var(--muted)">1</text><rect x="227" y="171" width="50" height="50" rx="8" style="fill:var(--ok);opacity:0.75"/><line x1="238.0" y1="204.0" x2="270.0" y2="204.0" style="stroke:var(--ok)" stroke-width="3" marker-end="url(#qarrow)"/><text x="252.0" y="190.0" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--fg)">8.5</text><text x="272.16" y="181" text-anchor="end" font-size="10" style="fill:var(--muted)">2</text><rect x="171" y="171" width="50" height="50" rx="8" style="fill:var(--ok);opacity:0.65"/><line x1="182.0" y1="204.0" x2="214.0" y2="204.0" style="stroke:var(--ok)" stroke-width="3" marker-end="url(#qarrow)"/><text x="196.0" y="190.0" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--fg)">7.1</text><text x="216.16" y="181" text-anchor="end" font-size="10" style="fill:var(--muted)">3</text><rect x="171" y="115" width="50" height="50" rx="8" style="fill:var(--ok);opacity:0.55"/><line x1="196.0" y1="134.0" x2="196.0" y2="166.0" style="stroke:var(--ok)" stroke-width="3" marker-end="url(#qarrow)"/><text x="196.0" y="134.0" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--fg)">5.7</text><text x="216.16" y="125" text-anchor="end" font-size="10" style="fill:var(--muted)">4</text></svg>
+<pre><code>Q = reward + γ × (best Q at the next square)
+(4, 3) move E:  −1 + 0.95 × 10    = 8.5
+(3, 3) move E:  −1 + 0.95 × 8.5   = 7.075
+(3, 2) move S:  −1 + 0.95 × 7.075 ≈ 5.72</code></pre>
+<p>Squares further away score less, because there's more walking left. Following the higher score always leads closer to the goal. The −1 per step means "most points" and "shortest route" are the same thing.</p>
+</div>
 
-<h2 id="principles">2. First principles</h2>
+<div class="box idea"><span class="tag">💡 The idea: don't trust one try, and keep exploring</span>
+<p><strong>Go halfway.</strong> Early guesses are often wrong, so move the old score only part of the way to the new target, with α = 0.5: a score that keeps getting target 10 goes 0 → 5 → 7.5 → 8.75.</p>
+<p><strong>Explore sometimes.</strong> If it always picks its best move, it may lock onto the first route that worked. So 20% of the time (ε = 0.2) it picks a random move instead, like trying a new dish instead of your favourite.</p>
+</div>
 
-<h3>Step 1: give every move a score</h3>
-<p>Instead of remembering a route, keep a table. For each square and each of the 4 moves, store one number: the Q-value. At the start, everything is 0 because the robot knows nothing.</p>
-<pre><code>Q[((5, 3), "S")] = 0     # from (5, 3), moving South: worth 0 so far
-Q[((5, 3), "W")] = 0
-...</code></pre>
-<p>In Python that's a dictionary whose keys are <code>(square, move)</code> pairs. Missing keys count as 0, so we only store what we've learned.</p>
-
-<h3>Step 2: rewards say what we want</h3>
-<p>We never tell the robot the route. We only say what's good and bad:</p>
-<ul>
-<li>every step costs <strong>−1</strong> (so long, wandering routes score badly);</li>
-<li>reaching G gives <strong>+10</strong>, and the episode ends.</li>
-</ul>
-<p>A 7-step route scores −1 × 6 + 10 = <strong>+4</strong>. A 58-step route scores −57 + 10 = <strong>−47</strong>. So "get the most points" and "find the shortest route" are now the same goal. Choosing rewards like this is a real skill: you describe <em>what</em> you want, and let learning work out <em>how</em>.</p>
-
-<h3>Step 3: learn backwards from the goal (the simple version)</h3>
-<p>Let's pretend the learning rate is 1 for a moment (we just overwrite the old value). The rule is:</p>
-<pre><code>new Q = reward                                    if this move ended the episode
-new Q = reward + γ × (best Q at the next square)  otherwise</code></pre>
-<p>"Best Q at the next square" is the robot's current guess of how well things go from there. Watch it spread backwards along the bottom-right corridor, with γ = 0.95:</p>
-<pre><code>From (5, 3) move S reaches G:   Q = 10                       (done, so just the reward)
-From (4, 3) move E to (5, 3):   Q = −1 + 0.95 × 10   = 8.5
-From (3, 3) move E to (4, 3):   Q = −1 + 0.95 × 8.5  = 7.075
-From (3, 2) move S to (3, 3):   Q = −1 + 0.95 × 7.075 ≈ 5.72</code></pre>
-<p>Each square near the goal learns "this move is good", and then the square before it learns from <em>that</em>. Good news travels backwards, one square per visit. The robot never needed a map. It just needed to visit the squares enough times.</p>
-
-<details><summary>Predict first: why does each Q-value get smaller as we move away from G?</summary>
-<p>Two reasons. Each extra step costs −1, and γ = 0.95 shrinks future points a little at every step. So a square far from the goal is honestly worth less: you have more walking to do. That's exactly why the robot will prefer the shorter way. A move that leads somewhere with a higher Q is a move closer to the goal.</p>
-</details>
-
-<h3>Step 4: don't trust one experience too much (learning rate α)</h3>
-<p>Overwriting is risky. Early guesses are often wrong, and later we'll add random moves. So instead we move the old value <em>part of the way</em> towards the new target:</p>
-<pre><code>Q[(square, move)] += α × (target − Q[(square, move)])</code></pre>
-<p>With α = 0.5, this means "go halfway". Here's the exact example that <code>check.py</code> uses. The robot is at (1, 1), moves E to (2, 1), gets −1. It already believes <code>Q[((2, 1), "S")] = 4</code>, and every other Q is 0. Use γ = 0.9:</p>
-<pre><code>best Q at (2, 1)   = max(0, 4, 0, 0) = 4
-target             = −1 + 0.9 × 4    = 2.6
-old Q[(1,1), E]    = 0
-new Q[(1,1), E]    = 0 + 0.5 × (2.6 − 0) = 1.3</code></pre>
-<p>And the goal move, visited three times with α = 0.5: 0 → 5 → 7.5 → 8.75. It creeps towards 10 and never jumps there from one lucky try.</p>
-
-<h3>Step 5: explore, or you'll get stuck with your first idea</h3>
-<p>If the robot always picks its best-scoring move (exploit), it may lock onto the first route that worked, even if it's the long one down the left side. So sometimes it must try a random move (explore). We use a number ε (epsilon) = 0.2:</p>
-<pre><code>roll a random number between 0 and 1
-if it's below 0.2:  pick a random move        (explore, 20% of the time)
-otherwise:          pick the best-scoring move (exploit, 80% of the time)</code></pre>
-<p>This is called <strong>ε-greedy</strong>. It's the same choice you make picking food: your favourite (exploit) or something new that might be even better (explore).</p>
-<p>When all the Q-values for a square are tied (like at the start, when they're all 0), we pick the first move in the order <code>"NSEW"</code>. That rule matters: it makes the program behave the same every time, so the checker can test it.</p>
-
-<h3>Step 6: put it all together</h3>
-<pre><code>repeat for 300 episodes:
-    stand on S
-    until you reach G (or 200 steps pass):
-        choose a move (ε-greedy)
-        do it with safe_move, see where you land
-        reward = +10 if you landed on G, else −1
-        update Q for (square, move)
-        move to the new square</code></pre>
-<p>After training, to <em>use</em> what it learned, the robot turns exploring off and just follows the best move from every square. That's the "greedy path".</p>
-
-<details><summary>Predict first: during training the last episodes take 9–11 steps, but the greedy path is 7. Why the difference?</summary>
-<p>During training, ε = 0.2 is still switched on, so about one move in five is random. Random moves sometimes bump into walls or wander off, adding a few steps. When we follow the greedy path, nothing is random, so the robot takes the 7-step route it has learned. Exploring costs a little now and buys you knowledge for later.</p>
-</details>
-
-<div class="note"><strong>Honest note.</strong> Q-learning needed hundreds of attempts to learn a 7-step route in a tiny maze. A* (week 4) solved a bigger room instantly. When you <em>have</em> a map, plan with it. Trial and error shines when you <em>can't</em> write down the rules: how to balance on two legs, how hard to grip an egg, how to win a game.</div>
-
-<h2 id="play">3. Play with it</h2>
+<h2 id="play">2. Play</h2>
+<div class="box play"><span class="tag">🎮 Play</span>
+<p>The same maze, rewards and random numbers as the Python file (α = 0.5, γ = 0.95). With ε at 0.2, the first five episodes are 58, 101, 13, 46, 22 steps, exactly like your program. Brighter squares have a higher best Q. Arrows show the best move. The bars show steps per episode.</p>
 <div class="card demo">
-<h3>Interactive: Q-learning on the real MAZE</h3>
-<p class="legend">The same maze, rewards and settings as the Python file (α = 0.5, γ = 0.95, 200 steps max), with the same random numbers as Python's <code>random.Random(0)</code>. With ε at 0.2, the first five episodes are 58, 101, 13, 46, 22 steps, exactly like your program. Brighter squares have a higher best Q. Arrows show the best move from each square. The bar chart (right) shows steps per episode.</p>
 <canvas id="qmaze" width="700" height="300" style="height:auto" aria-label="The maze with Q-value shading and arrows, and a bar chart of steps per episode"></canvas>
 <p>
 <button id="b1">Run 1 episode (watch)</button>
@@ -134,7 +54,7 @@ otherwise:          pick the best-scoring move (exploit, 80% of the time)</code>
 <button id="ball">Train to 300</button>
 <button id="breset">Reset</button>
 </p>
-<label for="eps">Explore rate ε: <span id="epsv" class="num"></span> (change it, then Reset, and see how learning changes)</label>
+<label for="eps">Explore rate ε: <span id="epsv" class="num"></span> (change it, then Reset)</label>
 <input id="eps" type="range" min="0" max="1" step="0.05" value="0.2">
 <div class="stats">
   <div class="stat"><div class="k">Episodes</div><div class="v" id="sEp">0</div></div>
@@ -142,49 +62,90 @@ otherwise:          pick the best-scoring move (exploit, 80% of the time)</code>
   <div class="stat"><div class="k">Greedy route</div><div class="v" id="sRoute">–</div></div>
   <div class="stat"><div class="k">Q entries</div><div class="v" id="sQ">0</div></div>
 </div>
-<p class="legend">Things to try: run single episodes and watch the arrows appear near G first, then spread backwards. Set ε to 0 and Reset: with no exploring, does it still find 7? (Predict first, then check the answer in section 8.) Set ε to 1 and train to 300: every move is random, so the bars never get shorter. But look at "Greedy route". Surprised?</p>
+</div>
+<p><strong>Try:</strong> run single episodes and watch arrows appear near the goal first. Set ε to 1 and train to 300: the bars never shrink, but look at "Greedy route".</p>
 </div>
 
-<h2 id="homework">4. Homework</h2>
-<p>Open <code>homework/lesson07_trial_error.py</code>. The maze, <code>ACTIONS = "NSEW"</code> and <code>find_char</code> are written for you. It imports <code>safe_move</code> from <em>your</em> week 1 file (<code>lesson01_moving.py</code>), so week 1 must be finished. Write these five functions, in order. Q is a dictionary with keys like <code>((1, 1), "E")</code>.</p>
+<h2 id="build">3. Build</h2>
+<div class="box build"><span class="tag">🛠 Build</span>
+<p>Open <code>lesson07_trial_error.py</code> in <code>project/homework</code>. <code>MAZE</code>, <code>ACTIONS = "NSEW"</code> and <code>find_char</code> are written for you. It uses <code>safe_move</code> from your week 1 file. Q is a dictionary with keys like <code>((1, 1), "E")</code>; missing keys count as 0. Check each step with <code>python3 check.py 7</code> from <code>project</code>.</p>
+<ol class="steps">
+<li><strong><code>best_action(Q, pos)</code></strong>: the move with the highest Q at <code>pos</code>. On a tie, the first in <code>"NSEW"</code>. <code>best_action({}, (1, 1))</code> → <code>"N"</code>.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>Lesson 7: lesson07_trial_error.py
+  ✓ best_action
+  … choose_action: not written yet (Lesson 7: write this function)
+  … q_update: not written yet (Lesson 7: write this function)
+  … q_learn finds the shortcut: not written yet (Lesson 7: write this function)
+  1/4 passed</code></pre>
+<p>If you see <code>✗ best_action: all zeros: pick the first action, 'N'</code>, replace your best only when a value is strictly bigger (<code>&gt;</code>, not <code>&gt;=</code>).</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>Read a score safely with <code>Q.get((pos, a), 0.0)</code>.</p></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code>best = ACTIONS[0]
+for a in ACTIONS:
+    if Q.get((pos, a), 0.0) &gt; Q.get((pos, ____), 0.0):
+        best = a
+return best</code></pre></details>
+</div>
 
-<h3>4.1 <code>best_action(Q, pos)</code></h3>
-<p>Return the move (one letter) with the highest Q-value at <code>pos</code>. Missing values count as 0. On a tie, return the one that comes first in <code>"NSEW"</code>.</p>
-<p>Example: <code>best_action({}, (1, 1))</code> → <code>"N"</code> (all zeros, so the first). <code>best_action({((1, 1), "E"): 2.0}, (1, 1))</code> → <code>"E"</code>.</p>
-<details><summary>Hint 1</summary><p>Loop over the four letters in <code>ACTIONS</code> and keep track of the best one so far.</p></details>
-<details><summary>Hint 2</summary><p>Read a value safely with <code>Q.get((pos, a), 0.0)</code>. Only replace your "best so far" when a value is strictly bigger, and the first letter wins ties automatically.</p></details>
-<details><summary>Hint 3</summary><p>Start with <code>best = ACTIONS[0]</code>. For each <code>a</code> in ACTIONS: if Q-value of <code>a</code> &gt; Q-value of <code>best</code>, set <code>best = a</code>. Return <code>best</code>.</p></details>
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" style="counter-reset: step 1">
+<li><strong><code>choose_action(Q, pos, epsilon, rng)</code></strong>: with probability <code>epsilon</code> return <code>rng.choice(ACTIONS)</code>, otherwise <code>best_action(Q, pos)</code>. Call <code>rng.random()</code> exactly once, first.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>  ✓ best_action
+  ✓ choose_action
+  … q_update: not written yet (Lesson 7: write this function)
+  … q_learn finds the shortcut: not written yet (Lesson 7: write this function)
+  2/4 passed</code></pre>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint (fill in the blanks)</summary><pre><code>if rng.random() &lt; ____:
+    return rng.choice(ACTIONS)
+return best_action(Q, pos)</code></pre></details>
+</div>
 
-<h3>4.2 <code>choose_action(Q, pos, epsilon, rng)</code></h3>
-<p>ε-greedy. With probability <code>epsilon</code> return <code>rng.choice(ACTIONS)</code>, otherwise return <code>best_action(Q, pos)</code>.</p>
-<p>Example: with <code>epsilon = 0</code> it always exploits, so <code>choose_action({((1, 1), "W"): 5.0}, (1, 1), 0.0, rng)</code> → <code>"W"</code>.</p>
-<details><summary>Hint 1</summary><p><code>rng.random()</code> gives a number from 0 up to (not including) 1. How often is that below 0.2?</p></details>
-<details><summary>Hint 2</summary><p>Use <code>rng</code>, not the <code>random</code> module directly. That way the results repeat exactly, and the checker can test them.</p></details>
-<details><summary>Hint 3</summary><p>If <code>rng.random() &lt; epsilon</code>: return a random choice from ACTIONS. Otherwise: return the best action. Call <code>rng.random()</code> exactly once per choice, before anything else.</p></details>
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" style="counter-reset: step 2">
+<li><strong><code>q_update(Q, pos, action, reward, next_pos, alpha, gamma, done)</code></strong>: target = <code>reward</code> if done, else <code>reward + gamma × (best Q at next_pos)</code>. Then move the old score <code>alpha</code> of the way to the target. Example: <code>Q = {((2, 1), "S"): 4.0}</code>, then <code>q_update(Q, (1, 1), "E", -1.0, (2, 1), 0.5, 0.9, False)</code> leaves <code>Q[((1, 1), "E")] == 1.3</code>.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>  ✓ best_action
+  ✓ choose_action
+  ✓ q_update
+  … q_learn finds the shortcut: not written yet (Lesson 7: write this function)
+  3/4 passed</code></pre>
+<p>If you see <code>✗ q_update: target = -1 + 0.9 * 4; Q moves halfway there</code>, you wrote the target straight in. Use <code>old + alpha * (target - old)</code>.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint (fill in the blanks)</summary><pre><code>old = Q.get((pos, action), 0.0)
+if done:
+    target = reward
+else:
+    target = reward + gamma * max(Q.get((next_pos, a), 0.0) for a in ____)
+Q[(pos, action)] = old + alpha * (____ - old)</code></pre></details>
+</div>
 
-<h3>4.3 <code>q_update(Q, pos, action, reward, next_pos, alpha, gamma, done)</code></h3>
-<p>The learning rule from Step 4. It changes Q in place and returns nothing.</p>
-<p>Worked example (from above): <code>Q = {((2, 1), "S"): 4.0}</code>, then <code>q_update(Q, (1, 1), "E", -1.0, (2, 1), 0.5, 0.9, False)</code> leaves <code>Q[((1, 1), "E")] == 1.3</code>.</p>
-<details><summary>Hint 1</summary><p>Three numbers: the old value, the target, and then the new value. Work them out one per line.</p></details>
-<details><summary>Hint 2</summary><p>If <code>done</code> is True, the target is just the reward (there's no "next square" to look forward to). Otherwise it's reward plus γ times the biggest Q-value at <code>next_pos</code>, over all four moves.</p></details>
-<details><summary>Hint 3</summary><p><code>old = Q.get(...)</code>. Target: if done, <code>reward</code>, else <code>reward + gamma * max(</code>Q-value of <code>(next_pos, a)</code> for each <code>a</code> in ACTIONS<code>)</code>. Then store <code>old + alpha * (target - old)</code>.</p></details>
-
-<h3>4.4 <code>q_learn(room, start, goal, episodes=300, ...)</code></h3>
-<p>Run the whole training loop from Step 6. Return two things: the Q dictionary and a list with the number of steps each episode took.</p>
-<details><summary>Hint 1</summary><p>Two loops: an outer <code>for</code> over episodes, an inner <code>while</code> for the steps of one episode.</p></details>
-<details><summary>Hint 2</summary><p>Make Q and the step list <em>before</em> the outer loop. Q must survive from one episode to the next, otherwise the robot forgets everything. If <code>rng</code> is None, use <code>random.Random(0)</code>.</p></details>
-<details><summary>Hint 3</summary><p>Inside an episode: <code>pos = start</code>, <code>steps = 0</code>. While <code>steps &lt; max_steps</code>: choose a move, <code>nxt = safe_move(room, pos, a)</code>, <code>done = nxt == goal</code>, reward 10.0 if done else -1.0, call <code>q_update</code>, set <code>pos = nxt</code>, add 1 to steps, and <code>break</code> if done. After the while, append <code>steps</code> to the list.</p></details>
-
-<h3>4.5 <code>greedy_path(Q, room, start, goal, max_steps=100)</code></h3>
-<p>Use what was learned, with no exploring: from <code>start</code>, keep taking <code>best_action</code> until you reach <code>goal</code>. Return every square visited, including the start.</p>
-<details><summary>Hint 1</summary><p>This is very like <code>follow</code> from week 1, except the robot picks each move itself.</p></details>
-<details><summary>Hint 2</summary><p>Add a safety limit. If Q is untrained, the best move might be "N" into a wall forever, and your loop would never end.</p></details>
-<details><summary>Hint 3</summary><p><code>path = [start]</code>. While the last square isn't the goal and <code>len(path) &lt;= max_steps</code>: move with <code>safe_move</code> using <code>best_action</code>, append the new square. Return path.</p></details>
-
-<h3>Run it</h3>
-<pre><code>cd homework
-python3 lesson07_trial_error.py</code></pre>
-<p>What you should see (this is the real output of the reference solution):</p>
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" style="counter-reset: step 3">
+<li><strong><code>q_learn(room, start, goal, episodes=300, ...)</code></strong>: the training loop. Each episode: start at <code>start</code>; until the goal or <code>max_steps</code>: choose a move, <code>safe_move</code>, reward 10.0 at the goal else −1.0, <code>q_update</code>, move on. Return <code>(Q, steps_per_episode)</code>. If <code>rng</code> is None, use <code>random.Random(0)</code>.</li>
+<li><strong><code>greedy_path(Q, room, start, goal, max_steps=100)</code></strong>: no exploring. Keep taking <code>best_action</code> until the goal. Return every square, start included.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p>The last test checks both together:</p>
+<pre><code>  ✓ best_action
+  ✓ choose_action
+  ✓ q_update
+  ✓ q_learn finds the shortcut
+  4/4 passed  🎉 lesson complete!</code></pre>
+<p>If you see <code>✗ q_learn finds the shortcut: after training, the greedy route should be the shortest: 7 steps</code>, check you make <code>Q</code> once, <em>before</em> the episode loop, and that <code>greedy_path</code> uses <code>best_action</code>, not <code>choose_action</code>.</p>
+<p>Then <code>cd homework</code> and <code>python3 lesson07_trial_error.py</code>:</p>
 <pre><code>steps in first 5 episodes: [58, 101, 13, 46, 22] | last 5: [9, 9, 9, 11, 10]
 #######
 #S**#.#
@@ -193,73 +154,70 @@ python3 lesson07_trial_error.py</code></pre>
 #...#G#
 #######
 learned route length: 7</code></pre>
-<p>The <code>*</code> marks show the route the robot learned on its own. Your first-five numbers will match exactly only if you call <code>rng</code> in the same order as described (one <code>rng.random()</code> per choice, then <code>rng.choice</code> only when exploring). If they differ but the route is still 7, your code is probably fine.</p>
+<p>Your first five match only if you call <code>rng</code> in the same order. If they differ but the route is 7, your code is probably fine. The last episodes take 9–11 steps because exploring is still on.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>Two loops: <code>for _ in range(episodes):</code> outside, <code>while steps &lt; max_steps:</code> inside. <code>rng = rng or random.Random(0)</code>.</p></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code>rng = rng or random.Random(0)
+Q, steps_log = {}, []
+for _ in range(episodes):
+    pos, steps = start, 0
+    while steps &lt; max_steps:
+        a = choose_action(Q, pos, epsilon, rng)
+        nxt = safe_move(room, pos, a)
+        done = nxt == ____
+        q_update(Q, pos, a, 10.0 if done else -1.0, nxt, alpha, gamma, done)
+        pos, steps = nxt, steps + 1
+        if done:
+            break
+    steps_log.append(____)
+return Q, steps_log
 
-<h3>Check it</h3>
-<pre><code>cd ..
-python3 check.py 7</code></pre>
-<p>A green ✓ means that function passed. A red ✗ comes with a hint. For example:</p>
-<ul>
-<li><code>✗ best_action: all zeros: pick the first action, 'N'</code> means your tie-break is wrong (maybe you used <code>&gt;=</code>, so the <em>last</em> tied letter wins).</li>
-<li><code>✗ q_update: target = -1 + 0.9 * 4; Q moves halfway there</code> means your target or your α step is off. Work the 1.3 example on paper and compare.</li>
-</ul>
-<p>Yellow <code>…</code> means "not written yet". The checker runs 4 tests for your 5 functions: the last test, <code>q_learn finds the shortcut</code>, checks <code>q_learn</code> and <code>greedy_path</code> together. All four green and you'll see <code>4/4 passed</code>.</p>
+# greedy_path
+path, pos = [start], start
+while pos != goal and len(path) &lt;= max_steps:
+    pos = safe_move(room, pos, ____(Q, pos))
+    path.append(pos)
+return path</code></pre></details>
+</div>
 
-<h3>Stretch</h3>
-<ul>
-<li>Change the step reward from −1 to 0 and run again. Does the robot still find the 7-step route? (Think: if steps are free, why hurry? γ is the only thing left pushing it.)</li>
-<li>Make ε shrink over time: start at 1.0 and multiply it by 0.98 after each episode. Do the last episodes get down to 7?</li>
-<li>Draw your own bigger maze in the <code>MAZE</code> list (keep the walls round the edge) and train on it. How many episodes does it need now?</li>
-</ul>
-
-<h2 id="add-to-robot">Add it to your robot</h2>
-<p><strong>Bonus: nothing to add.</strong> Your robot has a map, so it keeps using your week 4 A*. There's no gap for this lesson in <code>my_robot.py</code>, and <code>check.py robot</code> doesn't look at it. Section 6 explains why.</p>
+<h2 id="add-to-robot">4. Add it to your robot</h2>
+<div class="box bot"><span class="tag">🤖 Add it to your robot</span>
+<p><strong>Nothing to add.</strong> Your robot has a map, so it keeps using your week 5 A*: faster, and always the shortest route. Don't learn by trial and error when you can plan. Trial and error shines where nobody can write the rules down: walking, balancing, gripping an egg. Real teams run the same loop millions of times in a simulator, then copy what was learned to the real robot.</p>
+</div>
 
 <h2 id="challenge">5. Real-world challenge: be the Q-learner</h2>
-<p>You'll learn a "maze" with no map, using only rewards, exactly like the robot.</p>
+<div class="card">
 <ol>
-<li>Ask someone to draw a secret 4 × 4 grid maze on paper (start in one corner, goal in another, a few walls), and keep it hidden from you.</li>
-<li>Draw your own empty 4 × 4 grid. This is your Q-table: in each square, leave room for four small numbers (N, S, E, W), all starting at 0.</li>
-<li>Play an episode. Say a move out loud. Your partner answers only "wall" (you stay put), "step" (−1) or "goal!" (+10). Keep count of your steps.</li>
-<li>After every move, update the number for that square and move with the simple rule: target = reward + 0.9 × (best number in the square you landed on). To keep the maths easy, use α = 1 (just write the target in).</li>
-<li>Play 6 to 8 episodes. Mostly pick your best-scoring move, but roll a die before each move: on a 1, pick a random direction (that's ε ≈ 0.17).</li>
-<li>Record the steps per episode in a little table and draw a quick bar chart.</li>
+<li>Someone draws a secret 4 × 4 maze and hides it. You draw an empty 4 × 4 grid with room for four numbers per square (N, S, E, W), all 0.</li>
+<li>Say a move. Your partner answers only "wall" (stay put), "step" (−1) or "goal!" (+10).</li>
+<li>Update that square's number: target = reward + 0.9 × (best number where you landed). Use α = 1 (just write the target in).</li>
+<li>Play 6 to 8 episodes. Before each move roll a die: on a 1, pick a random direction. Chart your steps per episode.</li>
 </ol>
-<p><strong>On your own (no partner needed):</strong> draw the secret maze yourself, then fold it over or turn it face down so you can't see it. Unfold and check only one square at a time, after you call each move. At the end, compare your steps-per-episode chart with the robot's, from the first line <code>python3 lesson07_trial_error.py</code> prints.</p>
-<p><strong>What to notice:</strong> the numbers fill in from the goal backwards, and your episodes get shorter even though you never saw the map. Also notice how annoying the die is when you already "know" the way, and think about when it saved you from a long route. Bonus: swap roles and see if your partner learns faster or slower than you.</p>
+<p><strong>On your own:</strong> draw the maze yourself, fold it face down, and unfold just one square after each move.</p>
+</div>
 
-<h2 id="project">6. Your Robo-Helper so far</h2>
-<p>Let's be honest: this lesson is a <strong>side quest</strong>. The finished Robo-Helper (week 7's capstone) does <em>not</em> use Q-learning to drive around the room. It has a map, so it uses <code>astar_path</code> from week 4, which is faster and always finds the shortest route. That's the right engineering choice. Don't use trial and error when you can plan.</p>
-<p>So why learn it? Because there's a whole family of robot skills where nobody can write the map or the rules down. Walking, running, picking up squishy things, balancing. For those, real robotics teams use the same loop you just wrote: try, get a reward, update, repeat. They run it millions of times inside a <strong>simulator</strong> (a video-game copy of the robot and the world), because a real robot falling over a million times would break. Then they copy what was learned to the real robot. The maths is fancier (a neural network instead of a table, and methods such as PPO instead of plain Q-learning), but the idea is yours now.</p>
-<p>What you built: <code>q_learn</code> and <code>greedy_path</code>, a robot that learns <code>MAZE</code> by itself. What comes next uses language instead: in <a href="08-words-as-numbers.html">week 5</a> the robot starts turning words into numbers, the first step towards understanding "put the red block in the bin".</p>
+<details id="check"><summary><strong>Check yourself</strong></summary>
+<p><strong>Why −1 per step instead of 0?</strong> So shorter routes earn more points. The reward says what you want; learning finds how.</p>
+<p><strong>A* or Q-learning?</strong> A* needs the map and plans instantly. Q-learning needs no map but many tries. If you have a map, use A*.</p>
+<p><strong><code>Q = {((3, 3), "E"): 6.0, ((3, 3), "S"): 6.0}</code>: what does <code>best_action(Q, (3, 3))</code> return?</strong> <code>"S"</code>: it ties with E and comes first in <code>"NSEW"</code>.</p>
+</details>
 
-<h2 id="mistakes">7. Common mistakes</h2>
+<details id="more"><summary><strong>Want to know more?</strong></summary>
+<p><strong>ε = 0 still works here.</strong> With no exploring, the first episodes take 79, 43, 48, 25, 30 steps, then it settles on 7. Every tried move drops below 0, so untried moves (still 0) look best: it explores by accident. In bigger worlds that trick fails, which is why real systems keep some ε.</p>
+<p><strong>ε = 1 also finds 7.</strong> Moving at random, it still learns about the best moves, because its target always uses the <em>best</em> Q at the next square.</p>
+<p><strong>Random wandering alone</strong> took 58 steps, then 101, and never improved: it remembered nothing.</p>
+<p><strong>Stretch:</strong> make the step reward 0: does it still find 7? Start ε at 1.0 and multiply by 0.98 each episode. Draw a bigger <code>MAZE</code>.</p>
 <ul>
-<li><strong>Wrong tie-break.</strong> Using <code>&gt;=</code> instead of <code>&gt;</code>, or <code>max</code> on values only, can return the wrong letter when values are equal. Checker hint: <em>"all zeros: pick the first action, 'N'"</em>.</li>
-<li><strong>Creating Q inside the episode loop.</strong> Then the robot forgets everything after each attempt and never improves. Checker hint: <em>"episodes should get shorter as the robot learns"</em>.</li>
-<li><strong>Looking ahead after the goal.</strong> When <code>done</code> is True the target is just the reward. Adding γ × (Q at the goal square) makes the goal look worth more than it is.</li>
-<li><strong>Using <code>Q[(pos, a)]</code> instead of <code>Q.get(...)</code>.</strong> Unvisited pairs aren't in the dictionary yet, so you'll get a <code>KeyError</code>.</li>
-<li><strong>Exploring when you should exploit.</strong> <code>greedy_path</code> must use <code>best_action</code>, never <code>choose_action</code>. Otherwise the route is random each time. Checker hint: <em>"after training, the greedy route should be the shortest: 7 steps"</em>.</li>
+<li><a href="../02-tensortonic.html#rl">TensorTonic: the RL ladder</a>: from discounted rewards to the Bellman equation (your <code>q_update</code>).</li>
+<li><a href="../06-30u30/29-ppo.html">30u30 Day 29: PPO</a>: the grown-up cousin many walking robots are trained with.</li>
+<li><a href="../12-training-inference-videos/06-grpo.html">GRPO</a>: rewards used to train language models to reason.</li>
 </ul>
-
-<h2 id="check">8. Check yourself</h2>
-<details><summary>Why is each step worth −1 instead of 0?</summary><p>So that shorter routes earn more points. With −1 per step, "get the most points" means "reach G in the fewest steps". The reward describes the goal; the learning finds the route.</p></details>
-<details><summary>What's the difference between A* (week 4) and Q-learning?</summary><p>A* needs the map and plans before moving. Q-learning needs no map. It learns from experience, but needs many attempts. If you have a map, A* is better.</p></details>
-<details><summary>Predict: <code>Q = {((3, 3), "E"): 6.0, ((3, 3), "S"): 6.0}</code>. What does <code>best_action(Q, (3, 3))</code> return?</summary><p><code>"S"</code>. N and W are 0. S and E tie at 6.0, and S comes before E in <code>"NSEW"</code>, so the tie-break picks S.</p></details>
-<details><summary>What would happen with ε = 0 from the very start?</summary><p>Surprise: in this maze it still learns the 7-step route (the first episodes take 79, 43, 48, 25, 30 steps, then it settles on 7). Here's why. Every move it tries costs −1, so its Q drops below 0. Moves it has <em>never</em> tried are still at 0, so they now look best. The robot ends up exploring "by accident". In big worlds, or with positive rewards along the way, that trick fails and the robot locks onto the first route that worked. That's why real systems keep some ε. (Bonus: with ε = 1, fully random, the greedy route is <em>also</em> 7. Q-learning learns about the best moves even while acting randomly, because its target always uses the <em>best</em> Q at the next square.)</p></details>
-<details><summary>With α = 0.5, a Q-value starts at 0 and gets the target 10 three times. What is it?</summary><p>0 → 5 → 7.5 → 8.75. Each time it moves halfway to 10.</p></details>
-
-<h2 id="deeper">9. Go deeper (optional)</h2>
-<ul>
-<li><a href="../02-tensortonic.html#rl">TensorTonic: the RL ladder</a>: practice problems that climb from discounted rewards (your γ) to the Bellman equation (your <code>q_update</code>) and beyond.</li>
-<li><a href="../06-30u30/29-ppo.html">30u30 Day 29: PPO</a>: the algorithm many walking robots (and ChatGPT's fine-tuning) are trained with. It's the grown-up cousin of what you just wrote.</li>
-<li><a href="../12-training-inference-videos/06-grpo.html">GRPO</a>: reinforcement learning used to train language models to reason, with rewards for correct answers.</li>
-<li><a href="../17-free-ai-curriculum.html#robotics">Free robotics courses</a>: where to learn more robotics, at no cost.</li>
-</ul>
+</details>
 
 <nav class="pager">
-  <a href="06-pathfinding.html"><small>Previous</small>Week 4 · Finding the way</a>
-  <a class="next" href="08-words-as-numbers.html"><small>Next</small>Week 5 · Part A: Words as numbers</a>
+  <a href="06-pathfinding.html"><small>Previous</small>Week 5 · Finding the way</a>
+  <a class="next" href="22-fusion.html"><small>Next</small>Week 6 · Two sensors, one steady angle</a>
 </nav>
 <footer>Build a Robot Brain · Bonus side quest (homework file: lesson07_trial_error.py)</footer>
 </main>

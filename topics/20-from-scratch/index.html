@@ -55,12 +55,12 @@
 <h2>The ladder</h2>
 <div class="table-wrap"><table>
 <tr><th>Rung</th><th>Repo</th><th>What you see built</th><th>Needs</th><th>After Robo-Helper lesson</th></tr>
-<tr><td>1</td><td><a href="01-micrograd.html">micrograd</a></td><td>Autograd: backprop (backpropagation: working out, for every number in the model, which way to nudge it to make the answer less wrong) done automatically, about 100 + 50 lines</td><td>Python only</td><td><a href="../18-robot-brain/04-neuron.html">Week 3 neuron</a> (gradients by hand)</td></tr>
-<tr><td>2</td><td><a href="02-mingpt.html">minGPT</a></td><td>A GPT in about 300 lines, plus GPT-2's tokenizer</td><td>PyTorch</td><td><a href="../18-robot-brain/15-tiny-lm.html">Week 6 tiny LM</a> + attention</td></tr>
-<tr><td>3</td><td><a href="03-nanogpt.html">nanoGPT → nanochat</a></td><td>The same GPT with teeth: trains Shakespeare, reproduces GPT-2</td><td>PyTorch, GPU helps</td><td><a href="../18-robot-brain/15b-attention.html">Week 6 attention stretch</a></td></tr>
-<tr><td>4</td><td><a href="04-llm-c.html">llm.c</a></td><td>GPT-2 forward and backward by hand in C/CUDA, no autograd</td><td>C compiler (GPU for speed)</td><td><a href="../18-robot-brain/16-speed.html">Week 8 speed</a>, <a href="../18-robot-brain/17-faster.html">week 9 faster</a></td></tr>
-<tr><td>5</td><td><a href="05-tinygrad.html">tinygrad</a></td><td>A whole small framework: tensors, laziness, kernel fusion, many chips</td><td>Python</td><td><a href="../18-robot-brain/17-faster.html">Week 9 faster</a></td></tr>
-<tr><td>6</td><td><a href="06-minimalrl.html">minimalRL</a></td><td>11 RL algorithms (REINFORCE → PPO, SAC), one file each</td><td>PyTorch, gymnasium</td><td><a href="../18-robot-brain/07-trial-and-error.html">Q-learning bonus</a>, <a href="../18-robot-brain/12-preferences.html">week 12 RLHF</a></td></tr>
+<tr><td>1</td><td><a href="01-micrograd.html">micrograd</a></td><td>Autograd: backprop (backpropagation: working out, for every number in the model, which way to nudge it to make the answer less wrong) done automatically, about 100 + 50 lines</td><td>Python only</td><td><a href="../18-robot-brain/04-neuron.html">Week 4 neuron</a> (gradients by hand)</td></tr>
+<tr><td>2</td><td><a href="02-mingpt.html">minGPT</a></td><td>A GPT in about 300 lines, plus GPT-2's tokenizer</td><td>PyTorch</td><td><a href="../18-robot-brain/15-tiny-lm.html">Week 8 tiny LM</a> + attention</td></tr>
+<tr><td>3</td><td><a href="03-nanogpt.html">nanoGPT → nanochat</a></td><td>The same GPT with teeth: trains Shakespeare, reproduces GPT-2</td><td>PyTorch, GPU helps</td><td><a href="../18-robot-brain/15b-attention.html">Week 8 attention stretch</a></td></tr>
+<tr><td>4</td><td><a href="04-llm-c.html">llm.c</a></td><td>GPT-2 forward and backward by hand in C/CUDA, no autograd</td><td>C compiler (GPU for speed)</td><td><a href="../18-robot-brain/16-speed.html">Week 13 speed</a>, <a href="../18-robot-brain/17-faster.html">week 14 faster</a></td></tr>
+<tr><td>5</td><td><a href="05-tinygrad.html">tinygrad</a></td><td>A whole small framework: tensors, laziness, kernel fusion, many chips</td><td>Python</td><td><a href="../18-robot-brain/17-faster.html">Week 14 faster</a></td></tr>
+<tr><td>6</td><td><a href="06-minimalrl.html">minimalRL</a></td><td>11 RL algorithms (REINFORCE → PPO, SAC), one file each</td><td>PyTorch, gymnasium</td><td><a href="../18-robot-brain/07-trial-and-error.html">Q-learning bonus</a>, <a href="../18-robot-brain/12-preferences.html">week 16 RLHF</a></td></tr>
 </table></div>
 
 <div class="unit">
@@ -99,7 +99,7 @@
 <li><b>minGPT.</b> Train the adder, then compare its tokenizer with Robo-Helper's word lists.</li>
 <li><b>nanoGPT.</b> Train the character-level Shakespeare model on a laptop; read nanochat's README for the full modern pipeline.</li>
 <li><b>minimalRL.</b> Run DQN and compare it with tabular Q-learning from the bonus lesson.</li>
-<li><b>tinygrad.</b> Watch operations fuse into kernels (<code>DEBUG=3</code>), and tie it to week 9's speed tricks.</li>
+<li><b>tinygrad.</b> Watch operations fuse into kernels (<code>DEBUG=3</code>), and tie it to week 14's speed tricks.</li>
 <li><b>llm.c.</b> Read one layer (layernorm) forward and backward in C; build the CPU version.</li>
 </ol>
 <p class="meta">Related: <a href="../06-30u30/index.html">Module 06</a> (the papers behind these: attention, GPT, PPO), <a href="../12-training-inference-videos/index.html">Module 12</a> (training and inference videos), <a href="../16-hands-on-llm-serving.html">Module 16</a> (serving, after you can train), <a href="../17-free-ai-curriculum.html">Module 17</a> (Karpathy's Zero to Hero lectures are the video companion to micrograd and nanoGPT).</p>

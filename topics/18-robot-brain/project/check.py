@@ -586,7 +586,7 @@ def lesson23(m):
     return [
         ("ticks_to_metres", lambda: expect(close(m.ticks_to_metres(360, 360, 0.03), 2 * math.pi * 0.03), "one full turn = 2 * pi * radius")),
         ("move_pose", lambda: [expect(all(close(a, b) for a, b in zip(m.move_pose((0, 0, 0), 1, 1, 0.2), (1, 0, 0))), "both wheels 1 m forward, facing east -> (1, 0, 0)"),
-                               expect(close(m.move_pose((0, 0, 0), -0.1, 0.1, 0.2)[2], 1.0), "wheels opposite ways: turns (0.1 - -0.1) / 0.2 = 1 radian"),
+                               expect(close(m.move_pose((0, 0, 0), -0.1, 0.1, 0.2)[2], -1.0), "left wheel back, right wheel forward: turns LEFT, (d_left - d_right) / 0.2 = -1 radian"),
                                expect(abs(m.move_pose((0, 0, 0), -0.1, 0.1, 0.2)[0]) < 1e-9, "turning on the spot doesn't move it")]),
         ("errors_to", lambda: [expect(all(close(a, b) for a, b in zip(m.errors_to((0, 0, 0), (3, 4)), (5, math.atan2(4, 3)))), "to (3, 4) from (0, 0) facing east: 5 m, atan2(4, 3)"),
                                expect(close(m.errors_to((0, 0, math.radians(170)), (-1, -0.1))[1], math.radians(-174.29), 1e-3) or

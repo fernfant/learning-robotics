@@ -3,132 +3,48 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Week 3 · Is it any good?</title>
-<link rel="stylesheet" href="../../style.css">
+<title>Week 4 · Is it any good?</title>
+<link rel="stylesheet" href="../../style.css?v=16">
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 3 of 12 · Part B</nav>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 4 of 16 · Part B</nav>
 
-<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 3 of 12 · Part B</div>
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 4 of 16 · Part B</div>
 <h1>Is it any good? Honest testing, precision and recall</h1>
-<p class="lede">Your stop-detector says it's 96% accurate. On what? Against which mistakes? This lesson is about testing a model honestly, counting the right kinds of mistakes, and choosing a threshold so the robot almost never fails to stop when it should.</p>
-<div class="card note" id="journey"><strong>Week 3 of 12 · Part B.</strong> So far your robot: ✓ says hello ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop. <strong>Today</strong> it learns to prove its stop decisions are safe. Next: <a href="06-pathfinding.html">Week 4 · Finding the way</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>EEEE</code>: it still stops just in time, and now it tells you its new, safer threshold.</div>
-
-<div class="facts">
-  <div><b>Time</b>2–3 hours, plus the challenge</div>
-  <div><b>You'll need</b>Python 3, Part A of this week finished, a ball, tape (a friend is optional)</div>
-  <div><b>New words</b>train/test split, confusion matrix, false positive, false negative, precision, recall, threshold</div>
-  <div><b>Project piece</b>Safe, tested stop decisions</div>
-</div>
+<p class="lede">Test on examples the robot never saw, count each kind of mistake, and make the dangerous one rare.</p>
+<div class="card note" id="journey"><strong>Week 4 of 16 · Part B.</strong> So far your robot: ✓ says hello ✓ moves ✓ senses walls ✓ knows its braking distance ✓ reads real phone data ✓ decides to stop. <strong>Today</strong> it learns to prove its stop decisions are safe. Next: <a href="06-pathfinding.html">Week 5: Finding the way</a>. <a href="index.html#my-robot">Your robot, week by week</a>.</div>
 
 <section class="kid" id="start">
 <h2>Start here</h2>
-<p class="big">Test a model on examples it has never seen, count each kind of mistake separately, and when one kind of mistake is dangerous, move the threshold to make that one rare.</p>
-
-<h3>The problem</h3>
-<p>In Part A the neuron got 96.2% of its 450 examples right. Sounds great. But those were the same examples it learned from. That's like a teacher handing out the exam answers, then setting the same exam. Also, "96% right" hides <em>which</em> 4% were wrong. A robot that stops for no reason is annoying. A robot that drives into the cat is a disaster. Those can't count the same.</p>
-
-<h3>The idea in one picture</h3>
-<p>Think of a smoke alarm. If it goes off when you burn toast, that's a <strong>false alarm</strong>: irritating, but nobody gets hurt. If it stays quiet during a real fire, that's a <strong>miss</strong>, and that's the one that matters. So smoke alarms are set to be jumpy on purpose. They trade lots of false alarms for almost no misses. We'll do the same with Robo-Helper's brakes.</p>
-
-<h3>Words to know</h3>
+<p class="big">A smoke alarm that beeps at burnt toast is annoying. One that stays quiet in a fire is a disaster. So alarms are jumpy on purpose. We'll make the robot's brakes jumpy too.</p>
 <dl>
-<dt>Training set / test set</dt><dd>Examples the model learns from, and different examples kept hidden until the end to check it.</dd>
-<dt>Confusion matrix</dt><dd>A 2×2 table counting the four outcomes: right stop, false alarm, missed stop, right go.</dd>
-<dt>False positive (false alarm)</dt><dd>Said "stop" but there was no need.</dd>
-<dt>False negative (miss)</dt><dd>Said "go" but should have stopped. The dangerous one.</dd>
-<dt>Precision</dt><dd>Of all the times the robot said stop, what fraction was right?</dd>
-<dt>Recall</dt><dd>Of all the times the robot should have stopped, what fraction did it catch?</dd>
-<dt>Threshold</dt><dd>The probability at which we switch from "go" to "stop". Part A used 0.5.</dd>
+<dt>Test set</dt><dd>Examples hidden from the model until the end, for a fair exam.</dd>
+<dt>False alarm</dt><dd>Said "stop", but there was no need. Annoying.</dd>
+<dt>Miss</dt><dd>Said "go", but should have stopped. Dangerous.</dd>
+<dt>Precision</dt><dd>Of the times it said stop, how many were real?</dd>
+<dt>Recall</dt><dd>Of the real stops, how many did it catch?</dd>
+<dt>Threshold</dt><dd>How sure it must be before it says stop. Part A used 0.5.</dd>
 </dl>
 </section>
-<p class="deeper"><strong>The rest is the full lesson:</strong> the problem in detail, the ideas built from nothing with real numbers, a demo, the homework and a challenge with a ball (and a friend, if one is around).</p>
 
-<h2 id="problem">1. The problem</h2>
-<p>Two questions decide whether Robo-Helper is safe to let loose:</p>
-<ol>
-<li><strong>Will it work on situations it hasn't seen?</strong> In the real room, every reading is new. Scoring the model on its own training examples tells you how well it memorised, not how well it works.</li>
-<li><strong>Which mistakes does it make?</strong> One number, accuracy, mixes harmless mistakes with dangerous ones.</li>
-</ol>
-<p>The obvious approach, "count how many it gets right on the data we have", fails both questions. Let's fix them one at a time.</p>
+<h2 id="idea">1. The idea</h2>
+<div class="box idea"><span class="tag">💡 The idea: hide some examples</span>
+<p>Part A's neuron got 96.2% right, but on the same examples it learned from. That's like seeing the exam answers first. So before training, shuffle the examples and lock 25% in a drawer (the <strong>test set</strong>). Train on the rest. Score on the drawer.</p>
+<p>And don't trust accuracy alone. In our 150 test examples, 37 need a stop. A lazy robot that <em>never</em> stops is right on the other 113: <strong>75.3% accurate</strong>, while hitting every single obstacle.</p>
+</div>
 
-<h2 id="principles">2. First principles</h2>
+<div class="box idea"><span class="tag">💡 The idea: count two kinds of right</span>
+<p>Here are the 150 test examples at two thresholds (real numbers from <code>lesson05_evaluate.py</code>). The dashed box is everything the robot said STOP to.</p>
+<svg class="diagram" style="max-width:640px" viewBox="0 0 640 330" role="img" aria-label="The 150 test examples at two thresholds: at 0.5, 35 real stops caught, 2 false alarms, 2 missed. At 0.22, 36 caught, 7 false alarms, 1 missed."><text x="150" y="20" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--fg)">Threshold 0.5</text><rect x="14" y="34" width="142" height="148" rx="10" fill="none" style="stroke:var(--build)" stroke-width="2.5" stroke-dasharray="6 4"/><text x="85.0" y="198" text-anchor="middle" font-size="12" style="fill:var(--build)">robot said STOP (37)</text><circle cx="31" cy="52" r="6" style="fill:var(--fail)"/><circle cx="49" cy="52" r="6" style="fill:var(--fail)"/><circle cx="67" cy="52" r="6" style="fill:var(--fail)"/><circle cx="85" cy="52" r="6" style="fill:var(--fail)"/><circle cx="103" cy="52" r="6" style="fill:var(--fail)"/><circle cx="121" cy="52" r="6" style="fill:var(--fail)"/><circle cx="139" cy="52" r="6" style="fill:var(--fail)"/><circle cx="31" cy="70" r="6" style="fill:var(--fail)"/><circle cx="49" cy="70" r="6" style="fill:var(--fail)"/><circle cx="67" cy="70" r="6" style="fill:var(--fail)"/><circle cx="85" cy="70" r="6" style="fill:var(--fail)"/><circle cx="103" cy="70" r="6" style="fill:var(--fail)"/><circle cx="121" cy="70" r="6" style="fill:var(--fail)"/><circle cx="139" cy="70" r="6" style="fill:var(--fail)"/><circle cx="31" cy="88" r="6" style="fill:var(--fail)"/><circle cx="49" cy="88" r="6" style="fill:var(--fail)"/><circle cx="67" cy="88" r="6" style="fill:var(--fail)"/><circle cx="85" cy="88" r="6" style="fill:var(--fail)"/><circle cx="103" cy="88" r="6" style="fill:var(--fail)"/><circle cx="121" cy="88" r="6" style="fill:var(--fail)"/><circle cx="139" cy="88" r="6" style="fill:var(--fail)"/><circle cx="31" cy="106" r="6" style="fill:var(--fail)"/><circle cx="49" cy="106" r="6" style="fill:var(--fail)"/><circle cx="67" cy="106" r="6" style="fill:var(--fail)"/><circle cx="85" cy="106" r="6" style="fill:var(--fail)"/><circle cx="103" cy="106" r="6" style="fill:var(--fail)"/><circle cx="121" cy="106" r="6" style="fill:var(--fail)"/><circle cx="139" cy="106" r="6" style="fill:var(--fail)"/><circle cx="31" cy="124" r="6" style="fill:var(--fail)"/><circle cx="49" cy="124" r="6" style="fill:var(--fail)"/><circle cx="67" cy="124" r="6" style="fill:var(--fail)"/><circle cx="85" cy="124" r="6" style="fill:var(--fail)"/><circle cx="103" cy="124" r="6" style="fill:var(--fail)"/><circle cx="121" cy="124" r="6" style="fill:var(--fail)"/><circle cx="139" cy="124" r="6" style="fill:var(--fail)"/><circle cx="31" cy="150" r="6" fill="none" style="stroke:var(--pass)" stroke-width="2"/><circle cx="49" cy="150" r="6" fill="none" style="stroke:var(--pass)" stroke-width="2"/><circle cx="186" cy="60" r="6" style="fill:var(--fail)"/><circle cx="186" cy="60" r="11" fill="none" stroke="#e5484d" stroke-width="2"/><circle cx="186" cy="86" r="6" style="fill:var(--fail)"/><circle cx="186" cy="86" r="11" fill="none" stroke="#e5484d" stroke-width="2"/><text x="186" y="112" text-anchor="middle" font-size="12" style="fill:var(--fail)">missed!</text><text x="14" y="222" font-size="13" style="fill:var(--fg)"><tspan font-weight="700">Precision</tspan> 35/37 = 0.946</text><text x="14" y="240" font-size="12" style="fill:var(--muted)">of its stops, how many were real</text><text x="14" y="262" font-size="13" style="fill:var(--fg)"><tspan font-weight="700">Recall</tspan> 35/37 = 0.946</text><text x="14" y="280" font-size="12" style="fill:var(--muted)">of the real stops, how many it caught</text><text x="470" y="20" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--fg)">Threshold 0.22</text><rect x="334" y="34" width="142" height="166" rx="10" fill="none" style="stroke:var(--build)" stroke-width="2.5" stroke-dasharray="6 4"/><text x="405.0" y="216" text-anchor="middle" font-size="12" style="fill:var(--build)">robot said STOP (43)</text><circle cx="351" cy="52" r="6" style="fill:var(--fail)"/><circle cx="369" cy="52" r="6" style="fill:var(--fail)"/><circle cx="387" cy="52" r="6" style="fill:var(--fail)"/><circle cx="405" cy="52" r="6" style="fill:var(--fail)"/><circle cx="423" cy="52" r="6" style="fill:var(--fail)"/><circle cx="441" cy="52" r="6" style="fill:var(--fail)"/><circle cx="459" cy="52" r="6" style="fill:var(--fail)"/><circle cx="351" cy="70" r="6" style="fill:var(--fail)"/><circle cx="369" cy="70" r="6" style="fill:var(--fail)"/><circle cx="387" cy="70" r="6" style="fill:var(--fail)"/><circle cx="405" cy="70" r="6" style="fill:var(--fail)"/><circle cx="423" cy="70" r="6" style="fill:var(--fail)"/><circle cx="441" cy="70" r="6" style="fill:var(--fail)"/><circle cx="459" cy="70" r="6" style="fill:var(--fail)"/><circle cx="351" cy="88" r="6" style="fill:var(--fail)"/><circle cx="369" cy="88" r="6" style="fill:var(--fail)"/><circle cx="387" cy="88" r="6" style="fill:var(--fail)"/><circle cx="405" cy="88" r="6" style="fill:var(--fail)"/><circle cx="423" cy="88" r="6" style="fill:var(--fail)"/><circle cx="441" cy="88" r="6" style="fill:var(--fail)"/><circle cx="459" cy="88" r="6" style="fill:var(--fail)"/><circle cx="351" cy="106" r="6" style="fill:var(--fail)"/><circle cx="369" cy="106" r="6" style="fill:var(--fail)"/><circle cx="387" cy="106" r="6" style="fill:var(--fail)"/><circle cx="405" cy="106" r="6" style="fill:var(--fail)"/><circle cx="423" cy="106" r="6" style="fill:var(--fail)"/><circle cx="441" cy="106" r="6" style="fill:var(--fail)"/><circle cx="459" cy="106" r="6" style="fill:var(--fail)"/><circle cx="351" cy="124" r="6" style="fill:var(--fail)"/><circle cx="369" cy="124" r="6" style="fill:var(--fail)"/><circle cx="387" cy="124" r="6" style="fill:var(--fail)"/><circle cx="405" cy="124" r="6" style="fill:var(--fail)"/><circle cx="423" cy="124" r="6" style="fill:var(--fail)"/><circle cx="441" cy="124" r="6" style="fill:var(--fail)"/><circle cx="459" cy="124" r="6" style="fill:var(--fail)"/><circle cx="351" cy="142" r="6" style="fill:var(--fail)"/><circle cx="351" cy="168" r="6" fill="none" style="stroke:var(--pass)" stroke-width="2"/><circle cx="369" cy="168" r="6" fill="none" style="stroke:var(--pass)" stroke-width="2"/><circle cx="387" cy="168" r="6" fill="none" style="stroke:var(--pass)" stroke-width="2"/><circle cx="405" cy="168" r="6" fill="none" style="stroke:var(--pass)" stroke-width="2"/><circle cx="423" cy="168" r="6" fill="none" style="stroke:var(--pass)" stroke-width="2"/><circle cx="441" cy="168" r="6" fill="none" style="stroke:var(--pass)" stroke-width="2"/><circle cx="459" cy="168" r="6" fill="none" style="stroke:var(--pass)" stroke-width="2"/><circle cx="506" cy="60" r="6" style="fill:var(--fail)"/><circle cx="506" cy="60" r="11" fill="none" stroke="#e5484d" stroke-width="2"/><text x="506" y="86" text-anchor="middle" font-size="12" style="fill:var(--fail)">missed!</text><text x="334" y="240" font-size="13" style="fill:var(--fg)"><tspan font-weight="700">Precision</tspan> 36/43 = 0.837</text><text x="334" y="258" font-size="12" style="fill:var(--muted)">of its stops, how many were real</text><text x="334" y="280" font-size="13" style="fill:var(--fg)"><tspan font-weight="700">Recall</tspan> 36/37 = 0.973</text><text x="334" y="298" font-size="12" style="fill:var(--muted)">of the real stops, how many it caught</text><circle cx="20" cy="316" r="6" style="fill:var(--fail)"/><text x="32" y="320" font-size="12" style="fill:var(--muted)">needed a stop</text><circle cx="150" cy="316" r="6" fill="none" style="stroke:var(--pass)" stroke-width="2"/><text x="162" y="320" font-size="12" style="fill:var(--muted)">fine to go (false alarm)</text><text x="330" y="320" font-size="12" style="fill:var(--muted)">The 111 or 106 correct "go"s are left out.</text></svg>
+<p>Lower the threshold and the box gets bigger: it catches more real stops (recall up) but also more false alarms (precision down). A false alarm costs a pause. A miss hits the cat. So the rule is: <strong>recall at least 0.97, and the highest threshold that manages it</strong>.</p>
+<p>Pick that threshold using the <strong>training</strong> examples only. If you tune anything on the test set, it isn't a fair exam any more.</p>
+</div>
 
-<h3>Step 1: hide some examples (the train/test split)</h3>
-<p>Before training, set aside some examples and don't let the model see them. Train on the rest. Then score on the hidden ones. That's a fair exam.</p>
-<pre><code>600 examples
-  shuffle them (in case they're in some order, e.g. all "stop" ones first)
-  first 25% → TEST  (150 examples, locked in a drawer)
-  the rest  → TRAIN (450 examples, the model learns from these)</code></pre>
-<p>Two details matter. <strong>Shuffle</strong>, because if the data were sorted, the test set might be all "go" examples. And shuffle a <strong>copy</strong>, because the caller might still need their list in its original order.</p>
-
-<h3>Step 2: why accuracy alone lies</h3>
-<details><summary>Predict first: the test set has 150 examples, and 37 of them need a stop. A lazy robot that <em>always</em> says "go" (never stops) gets what accuracy?</summary>
-<p>It's right on all 113 "go" examples and wrong on all 37 "stop" ones: 113 / 150 = <strong>75.3%</strong>. Three quarters right, while crashing into every single obstacle. Accuracy alone can't tell you if a robot is safe.</p>
-</details>
-
-<h3>Step 3: count the four outcomes</h3>
-<p>Every prediction falls into one of four boxes. 1 means "stop":</p>
-<pre><code>                       truth: stop (1)      truth: go (0)
-  robot said stop (1)   TP  true positive    FP  false positive (false alarm)
-  robot said go   (0)   FN  false negative   TN  true negative
-                            (MISSED STOP!)</code></pre>
-<p>A tiny worked example. Predictions <code>[1, 1, 0, 0, 1]</code>, true labels <code>[1, 0, 1, 0, 1]</code>. Go pair by pair:</p>
-<pre><code>pred 1, label 1 → TP
-pred 1, label 0 → FP
-pred 0, label 1 → FN
-pred 0, label 0 → TN
-pred 1, label 1 → TP
-(tp, fp, fn, tn) = (2, 1, 1, 1)</code></pre>
-
-<h3>Step 4: precision and recall</h3>
-<p>From those four counts we get three questions:</p>
-<pre><code>accuracy  = (tp + tn) / all       how often right overall?          (2+1)/5 = 0.6
-precision = tp / (tp + fp)        when it says stop, is it right?    2/3     = 0.667
-recall    = tp / (tp + fn)        of the needed stops, how many?     2/3     = 0.667</code></pre>
-<p>For brakes, <strong>recall</strong> is the safety number. Recall 0.95 means 1 in 20 needed stops is missed. One edge case: if the robot never says stop, <code>tp + fp = 0</code> and precision would divide by zero. Define it as 0 instead of crashing.</p>
-
-<h3>Step 5: the real numbers</h3>
-<p>Here's the same kind of neuron as in Part A, but trained only on the 450 TRAIN examples of a new 600-example set, and tested on the 150 TEST examples it never saw, at threshold 0.5:</p>
-<pre><code>TEST, threshold 0.5           truth: stop   truth: go
-  said stop                       35            2
-  said go                          2          111
-
-accuracy 0.973   precision 0.946   recall 0.946</code></pre>
-<p>Two needed stops were missed. One of them, reading <code>(2.51 m, 1.51 m/s)</code>, got a stop-probability of 0.499. It missed the 0.5 threshold by a thousandth. On a real robot, that's a bump into something.</p>
-
-<h3>Step 6: move the threshold</h3>
-<p>The neuron outputs a probability. The threshold is our choice. Lower it, and the robot stops more often: fewer misses, more false alarms. Here's the trade on TEST:</p>
-<pre><code>threshold   precision   recall   accuracy
-   0.9        1.000      0.784     0.947    never a false alarm, misses 8 stops
-   0.7        1.000      0.946     0.987
-   0.5        0.946      0.946     0.973
-   0.3        0.878      0.973     0.960
-   0.22       0.837      0.973     0.947
-   0.1        0.804      1.000     0.940    catches every stop, lots of false alarms</code></pre>
-<p>A missed stop and a false alarm don't cost the same. A false alarm: the robot pauses for a second. A miss: it hits the cat. So we pick a rule: <strong>recall must be at least 0.97, and among thresholds that manage that, take the highest one</strong> (the fewest false alarms while staying safe). Try 0.99, 0.98, 0.97 … downwards, and stop at the first that passes.</p>
-
-<h3>Step 7: choose on TRAIN, judge on TEST</h3>
-<p>Look at the table again: 0.7 has the best test accuracy. It's tempting to just pick that. Don't. If you choose anything by looking at the test set, the test set isn't hidden any more, and its score stops being honest. So <code>safest_threshold</code> searches using the <strong>training</strong> data. On TRAIN, 0.5 misses 11 of 110 stops (recall 0.900). The search lands on <strong>0.22</strong>, where TRAIN recall is 107/110 = 0.973.</p>
-
-<details><summary>Predict first: at threshold 0.22, will TEST accuracy go up or down compared to 0.5 (0.973)? And recall?</summary>
-<p>Accuracy goes <strong>down</strong> to 0.947, and recall goes <strong>up</strong> to 0.973:</p>
-<pre><code>TEST, threshold 0.22          truth: stop   truth: go
-  said stop                       36            7
-  said go                          1          106
-
-accuracy 0.947   precision 0.837   recall 0.973</code></pre>
-<p>The robot makes <em>more</em> mistakes overall (8 instead of 4), but now they are mostly harmless false alarms. Only one miss is left: reading <code>(2.79, 1.38)</code>, probability 0.186. The sensor noise made a dangerous situation look calm. No threshold above 0.186 can catch it, which is why real robots also have bumpers. An honest report says that out loud.</p>
-</details>
-
-<p class="note"><strong>Three numbers, explained.</strong> 96.7% was the perfect hand-made rule on Part A's 450 examples. 96.2% was Part A's trained neuron on those same 450 examples. 0.953 (95.3%) is a <em>different</em> neuron: this lesson's, trained only on the 450 TRAIN examples of a 600-example set. Different examples, so slightly different numbers.</p>
-<p class="note"><strong>Honest surprise:</strong> at 0.5, this neuron's TEST accuracy (0.973) is higher than its TRAIN accuracy (0.953). Usually it's the other way round. With only 150 test examples, luck in which ones landed in the drawer moves the score by a couple of percent. Small test sets give wobbly numbers. That's a reason to collect more test data, not to celebrate.</p>
-
-<h2 id="play">3. Play with it</h2>
+<h2 id="play">2. Play</h2>
+<div class="box play"><span class="tag">🎮 Play</span>
+<p>Every dot is one example, placed by its stop chance. Top row: truly needed a stop. Bottom row: fine to go. The robot stops for everything right of the line. Red rings are missed stops. Same neuron and split as the Python file.</p>
 <div class="card demo">
-<h3>Interactive: slide the stop threshold</h3>
-<p class="legend">Every dot is one example, placed by the stop-probability the neuron gave it. Top row: situations that truly needed a stop. Bottom row: fine to go. Everything right of the line, the robot stops for. Red-ringed dots in the top row are missed stops. This uses the exact neuron and the exact TRAIN/TEST split from <code>lesson05_evaluate.py</code>.</p>
 <canvas id="tcv" width="700" height="240" aria-label="Examples placed by stop-probability, with the threshold line"></canvas>
 <label for="th">Threshold: <span id="thv" class="num"></span></label>
 <input id="th" type="range" min="0.01" max="0.99" step="0.01" value="0.5">
@@ -149,150 +65,186 @@ accuracy 0.947   precision 0.837   recall 0.973</code></pre>
   <div class="stat"><div class="k">Missed stops</div><div class="v" id="smiss">–</div></div>
 </div>
 </div>
-<p>Things to try: find the threshold where TEST recall hits 1.000. How many false alarms does that cost? Then switch to TRAIN and press the button: it should land on 0.22, just like the Python.</p>
+<p><strong>Try:</strong> find the threshold where TEST recall hits 1.000. How many false alarms does it cost? Then switch to TRAIN and press the button: it lands on 0.22, like the Python.</p>
+</div>
 
-<h2 id="homework">4. Homework</h2>
-<p>Open <code>project/homework/lesson05_evaluate.py</code>. It imports your Part A code (<code>lesson04_neuron.py</code>), so finish that first. Write these, in order:</p>
-<div class="card note"><strong>New Python this time.</strong> Four small tricks the hints use:
-<pre><code>items[:3]      # slicing: the first 3 items       items[3:]  # everything from item 3 on
-"big" if n &gt; 5 else "small"     # a one-line if: picks one of two values
-c = (2, 1, 1, 1); accuracy(*c)  # * unpacks the tuple: same as accuracy(2, 1, 1, 1)
-for p, y in zip([1, 0], [1, 1]): print(p, y)   # zip walks two lists side by side: 1 1, then 0 1</code></pre></div>
+<h2 id="build">3. Build</h2>
+<div class="box build"><span class="tag">🛠 Build</span>
+<p>Open <code>lesson05_evaluate.py</code> in <code>project/homework</code>. It uses your Part A file, so finish that first. Check after each step with <code>python3 check.py 5</code> from <code>project</code>.</p>
+<ol class="steps">
+<li><strong><code>train_test_split(data, test_fraction, rng)</code></strong>: shuffle a <em>copy</em> with <code>rng</code>. The first <code>test_fraction</code> of it is test, the rest is train. Return <code>(train, test)</code>, train first.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>Lesson 5: lesson05_evaluate.py
+  ✓ train_test_split
+  … confusion: not written yet (Lesson 5: write this function)
+  … metrics: not written yet (Lesson 5: write this function)
+  … safest_threshold: not written yet (Lesson 5: write this function)
+  1/4 passed</code></pre>
+<p>If you see <code>✗ train_test_split: don't shuffle the original list: shuffle a copy</code>, use <code>items = list(data)</code> first. If you see <code>✗ train_test_split: test_fraction 0.25 of 100 -&gt; 25 test, 75 train</code>, you returned them the wrong way round.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p><code>list(data)</code> copies. <code>rng.shuffle(items)</code> shuffles in place and returns <code>None</code>. <code>items[:k]</code> is the first k, <code>items[k:]</code> the rest.</p></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code>items = list(data)
+rng.shuffle(items)
+k = int(len(items) * ____)
+return items[____], items[____]</code></pre></details>
+</div>
 
-<h3>4.1 <code>train_test_split(data, test_fraction, rng)</code></h3>
-<p>Shuffle a copy of <code>data</code> with <code>rng</code>. The first <code>test_fraction</code> of the shuffled copy is the test set, the rest is train. Return <code>(train, test)</code>, train first. Example: 100 items with <code>0.25</code> → 75 train, 25 test, and the original list is unchanged.</p>
-<details><summary>Hint 1</summary><p><code>list(data)</code> makes a copy. <code>rng.shuffle(items)</code> shuffles a list in place (it returns <code>None</code>, so don't assign its result).</p></details>
-<details><summary>Hint 2</summary><p>The number of test items is <code>int(len(items) * test_fraction)</code>. Call it <code>k</code>. Slicing gives you the two parts.</p></details>
-<details><summary>Hint 3</summary><p>Copy, shuffle the copy, compute k, then return (the slice from k to the end, the slice from the start up to k).</p></details>
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" style="counter-reset: step 1">
+<li><strong><code>confusion(predictions, labels)</code></strong>: count <code>(tp, fp, fn, tn)</code>, where 1 means stop. Example: <code>confusion([1, 1, 0, 0, 1], [1, 0, 1, 0, 1])</code> → <code>(2, 1, 1, 1)</code>.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>  ✓ train_test_split
+  ✓ confusion
+  … metrics: not written yet (Lesson 5: write this function)
+  … safest_threshold: not written yet (Lesson 5: write this function)
+  2/4 passed</code></pre>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p><code>for p, y in zip(predictions, labels):</code> walks both lists together. Each pair adds 1 to exactly one of four counters.</p></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code>tp = fp = fn = tn = 0
+for p, y in zip(predictions, labels):
+    if p == 1 and y == 1: tp += 1
+    elif p == 1 and y == 0: ____ += 1
+    elif p == 0 and y == 1: ____ += 1
+    else: tn += 1
+return tp, fp, fn, tn</code></pre></details>
+</div>
 
-<h3>4.2 <code>confusion(predictions, labels)</code></h3>
-<p>Count <code>(tp, fp, fn, tn)</code>. Example: <code>confusion([1, 1, 0, 0, 1], [1, 0, 1, 0, 1])</code> → <code>(2, 1, 1, 1)</code>, the worked example in Step 3.</p>
-<details><summary>Hint 1</summary><p>Walk through both lists together with <code>zip(predictions, labels)</code>.</p></details>
-<details><summary>Hint 2</summary><p>Keep four counters starting at 0. Each pair <code>(p, y)</code> adds 1 to exactly one of them.</p></details>
-<details><summary>Hint 3</summary><p>If p is 1 and y is 1 → tp. p 1, y 0 → fp. p 0, y 1 → fn. Otherwise → tn. Return the four counts in that order.</p></details>
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" style="counter-reset: step 2">
+<li><strong><code>accuracy</code>, <code>precision</code>, <code>recall</code></strong>, each taking <code>(tp, fp, fn, tn)</code>:
+<pre><code>accuracy  = (tp + tn) / all
+precision = tp / (tp + fp)      0.0 if tp + fp is 0
+recall    = tp / (tp + fn)      0.0 if tp + fn is 0</code></pre></li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p>The checker tests all three together, so the tick appears only when all three are written:</p>
+<pre><code>  ✓ train_test_split
+  ✓ confusion
+  ✓ metrics
+  … safest_threshold: not written yet (Lesson 5: write this function)
+  3/4 passed</code></pre>
+<p>If you see <code>✗ metrics: crashed with ZeroDivisionError: division by zero</code>, add the "0.0 if the bottom is 0" rule.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint (fill in the blanks)</summary><pre><code>return tp / (tp + fp) if ____ else 0.0</code></pre></details>
+</div>
 
-<h3>4.3 <code>accuracy</code>, <code>precision</code>, <code>recall</code></h3>
-<p>Each takes <code>(tp, fp, fn, tn)</code> and returns a number from 0 to 1, using the formulas in Step 4. Precision and recall return <code>0.0</code> when their bottom line would be 0. Example: <code>precision(0, 0, 3, 5)</code> → <code>0.0</code>, not a crash.</p>
-<details><summary>Hint 1</summary><p>Each is a one-liner. Write the formula from Step 4.</p></details>
-<details><summary>Hint 2</summary><p>For precision and recall, check the bottom first: <code>if tp + fp == 0: return 0.0</code>.</p></details>
-<details><summary>Hint 3</summary><p>Python's one-line form works too: return (top / bottom) if bottom else 0.0.</p></details>
-
-<h3>4.4 <code>evaluate(weights, bias, data, threshold)</code></h3>
-<p>For each <code>(x, label)</code> in <code>data</code>, predict 1 if <code>neuron(weights, bias, x) &gt;= threshold</code>, else 0. Build the confusion counts and return <code>{"accuracy": ..., "precision": ..., "recall": ...}</code>.</p>
-<details><summary>Hint 1</summary><p>You need two lists of the same length: your predictions and the true labels.</p></details>
-<details><summary>Hint 2</summary><p><code>neuron</code> is already imported from your Part A file. Pass the four counts to your metric functions. The <code>*</code> trick, <code>accuracy(*c)</code>, unpacks a tuple <code>c</code> into four arguments.</p></details>
-<details><summary>Hint 3</summary><p>preds = for each (x, _) in data, 1 if neuron(...) ≥ threshold else 0. labels = each y. c = confusion(preds, labels). Return a dict with the three metrics of c.</p></details>
-
-<h3>4.5 <code>safest_threshold(weights, bias, data, min_recall=0.97)</code></h3>
-<p>Try thresholds 0.99, 0.98, … 0.01. Return the first (highest) one whose recall on <code>data</code> is at least <code>min_recall</code>. If none passes, return 0.01.</p>
-<details><summary>Hint 1</summary><p>Avoid adding 0.01 over and over: floating-point drift gives you 0.21999999. Loop over whole numbers and divide.</p></details>
-<details><summary>Hint 2</summary><p><code>range(99, 0, -1)</code> counts 99, 98, … 1. Divide by 100 to get the threshold.</p></details>
-<details><summary>Hint 3</summary><p>For i from 99 down to 1: t = i / 100; if evaluate(weights, bias, data, t)["recall"] ≥ min_recall, return t. After the loop, return 0.01.</p></details>
-
-<h3>Run it</h3>
-<pre><code>cd homework
-python3 lesson05_evaluate.py</code></pre>
-<p>What you should see (real output from the reference solution):</p>
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" style="counter-reset: step 3">
+<li><strong><code>evaluate(weights, bias, data, threshold)</code></strong>: predict 1 if <code>neuron(weights, bias, x) &gt;= threshold</code>, else 0. Return <code>{"accuracy": ..., "precision": ..., "recall": ...}</code>.</li>
+<li><strong><code>safest_threshold(weights, bias, data, min_recall=0.97)</code></strong>: try 0.99, 0.98, … 0.01. Return the first one whose recall is at least <code>min_recall</code>. If none passes, return 0.01.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p><code>evaluate</code> has no tick of its own: the <code>safest_threshold</code> test uses it.</p>
+<pre><code>  ✓ train_test_split
+  ✓ confusion
+  ✓ metrics
+  ✓ safest_threshold
+  4/4 passed  🎉 lesson complete!</code></pre>
+<p>If you see <code>✗ safest_threshold: for safety the threshold should drop below 0.5 (got 0.99)</code>, check you test <code>["recall"]</code>, not precision.</p>
+<p>Then <code>cd homework</code> and <code>python3 lesson05_evaluate.py</code>:</p>
 <pre><code>at 0.5 on TEST: {'accuracy': 0.973, 'precision': 0.946, 'recall': 0.946}
 safest threshold (chosen on TRAIN): 0.22
 at that threshold on TEST: {'accuracy': 0.947, 'precision': 0.837, 'recall': 0.973}</code></pre>
-<p>Line 1: the honest score at the default threshold. Line 2: the threshold picked for safety, using only training data. Line 3: the honest score at that threshold. Recall went up, precision went down.</p>
+<p>Accuracy went <em>down</em> and the robot is safer: it swapped one miss for five false alarms.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>Don't add 0.01 again and again (you get 0.21999999). Loop over whole numbers: <code>for i in range(99, 0, -1): t = i / 100</code>. In <code>evaluate</code>, <code>accuracy(*c)</code> unpacks the four counts in <code>c</code>.</p></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code># evaluate
+preds = [1 if neuron(weights, bias, x) &gt;= threshold else 0 for x, _ in data]
+labels = [y for _, y in data]
+c = confusion(preds, ____)
+return {"accuracy": accuracy(*c), "precision": precision(*c), "recall": ____(*c)}
 
-<h3>Check it</h3>
-<pre><code>cd ..
-python3 check.py 5</code></pre>
-<p>Hints you might meet:</p>
-<pre><code>  ✗ train_test_split: don't shuffle the original list: shuffle a copy
-  ✗ metrics: precision with no 'stop' predictions should be 0, not a crash</code></pre>
-<p>If <code>safest_threshold</code> shows a yellow … saying <em>"Lesson 4: write this function"</em>, your Part A file (<code>lesson04_neuron.py</code>) isn't finished. This lesson stands on it. The checker runs 4 tests for the 5 parts above: <code>metrics</code> checks <code>accuracy</code>, <code>precision</code> and <code>recall</code> together, and the <code>safest_threshold</code> test also uses your <code>evaluate</code>. <code>4/4 passed  🎉 lesson complete!</code> means you're done.</p>
+# safest_threshold
+for i in range(99, 0, -1):
+    t = i / 100
+    if evaluate(weights, bias, data, t)[____] &gt;= min_recall:
+        return t
+return 0.01</code></pre></details>
+</div>
 
-<h3>Stretch</h3>
-<ul>
-<li>Run <code>safest_threshold</code> with <code>min_recall=0.99</code>. (The reference gets 0.14.) How many false alarms on TEST does that cost?</li>
-<li>Try different seeds for <code>random.Random(...)</code> in the main block. How much does TEST accuracy wobble from split to split? That wobble is why one test score is never the whole truth.</li>
-<li>Write <code>f1(tp, fp, fn, tn)</code> = 2 × precision × recall / (precision + recall). Which threshold has the best F1? Is it a safe one?</li>
-</ul>
-
-<h2 id="add-to-robot">Add it to your robot</h2>
-<p>Improve <code>should_stop_for</code> in <code>my_robot.py</code>: replace the 0.5 threshold with your <code>safest_threshold(w, b, data)</code>, so the robot catches at least 97% of obstacles. Keep <code>self.last_stop</code> up to date with the new threshold, so the robot shows you the difference.</p>
-<div class="card note"><strong>New Python this time: keeping three things together.</strong> A tuple can hold several values in one cache slot, and you can unpack them in one line:
+<h2 id="add-to-robot">4. Add it to your robot</h2>
+<div class="box bot"><span class="tag">🤖 Add it to your robot</span>
+<p>Improve <code>should_stop_for</code> in <code>my_robot.py</code>: swap the 0.5 for <code>safest_threshold(w, b, data)</code>. Keep all three in the cache as a tuple:</p>
 <pre><code>CACHE["stop"] = (w, b, 0.17)     # three things in one tuple
-w, b, t = CACHE["stop"]          # unpack: w, then b, then t</code></pre></div>
-<details><summary>Hint 1</summary><p>Add this import under your week 3 import from Part A:</p>
-<pre><code>from lesson05_evaluate import safest_threshold</code></pre>
-<p>Then store all three in the cache, instead of just <code>w, b</code>: <code>CACHE["stop"] = (w, b, safest_threshold(w, b, data))</code>.</p></details>
-<details><summary>Hint 2</summary><p>After the <code>if</code>, unpack three things: <code>w, b, t = CACHE["stop"]</code>. Then use <code>t</code> everywhere you used to write <code>0.5</code>: in <code>self.last_stop</code> and in <code>should_stop</code>.</p></details>
-<details><summary>Hint 3</summary><p>Fill in the blanks:</p>
-<pre><code>if "stop" not in CACHE:
+w, b, t = CACHE["stop"]          # unpack them</code></pre>
+<details><summary>Hint 1: the import</summary><pre><code>from lesson05_evaluate import safest_threshold</code></pre></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code>if "stop" not in CACHE:
     data = make_obstacle_data(450, random.Random(0))
     w, b = train_neuron(data)
     CACHE["stop"] = (w, b, ____(w, b, data))
 w, b, t = CACHE["stop"]
 self.last_stop = (neuron(w, b, (0.5, 0.5)), ____)
 return should_stop(w, b, (0.5, 0.5), ____)</code></pre></details>
-<p class="legend">Changed the code but the robot still says 0.50? The robot keeps <code>CACHE</code> for the whole run, so quit it and start it again.</p>
-<p>Check it: <code>cd ..</code> back to <code>project</code>, then <code>python3 check.py robot</code>. <em>"week 3: stops for the cat"</em> should stay green, and Part A's yellow line turns green too. Real output:</p>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p>From <code>project</code>, run <code>python3 check.py robot</code>:</p>
 <pre><code>Your robot: my_robot.py
   ✓ week 1: arrows
   ✓ week 2: look
   ✓ week 2 part B: look's safe speed
-  ✓ week 3: stops for the cat
-  ✓ week 3 part B: the safest threshold
-  … week 4: goto: not written yet (fill in route() first)
+  ✓ week 3: real phone data
+  ✓ week 4: stops for the cat
+  ✓ week 4 part B: the safest threshold
+  … week 5: goto: not written yet (fill in route() first)
   ...
-  5/15 passed</code></pre>
-<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
+  6/21 passed</code></pre>
+<p>Then in <code>python3 my_robot.py</code>:</p>
 <pre><code>Zippy&gt; EEEE
   Something is in the way at (4, 1)! I stopped just in time (stop chance 0.99, my safe threshold 0.17).</code></pre>
-<p>Last time it said <code>my safe threshold 0.50</code>. Now it says <code>0.17</code>: your robot brakes when it's only 17% sure, because missing the cat is worse than a pause. (Why 0.17 and not the 0.22 from the lesson file? The robot trains on different examples, made with <code>random.Random(0)</code>. Different data, a slightly different safe threshold.) This cat was easy: 0.99 is above both thresholds. The new one matters for the borderline readings, like the 0.499 miss in Step 5.</p>
+<p>Last time it said 0.50. Still says 0.50? The robot keeps <code>CACHE</code> for the whole run: quit and start it again. (Why 0.17, not 0.22? The robot trains on different examples, made with <code>random.Random(0)</code>.)</p>
+</div>
 
-<h2 id="challenge">5. Real-world challenge: test a friend's "will it cross?" calls</h2>
-<p>You'll measure a human detector's precision and recall, then change its threshold by changing the instructions.</p>
+<h2 id="challenge">5. Real-world challenge: will it cross?</h2>
+<div class="card">
+<p>Measure a human's precision and recall. Clear a safe stretch of floor and put tape across it about 2 m away. Use a soft ball or rolled-up socks.</p>
 <ol>
-<li><strong>Set up.</strong> Clear a stretch of floor, away from stairs and anything breakable. Put a strip of tape across the floor about 2 metres from where you'll roll from. Use a soft ball or a rolled-up pair of socks.</li>
-<li><strong>Round 1 (20 rolls).</strong> Roll the ball toward the line, varying how hard you push. As soon as it leaves your hand, your friend calls <strong>"crosses!"</strong> (1) or <strong>"stops!"</strong> (0). Then watch: did it actually cross the tape? Write down both, for example <code>call 1, truth 0</code>.</li>
-<li><strong>Score round 1.</strong> Fill in a confusion matrix (TP, FP, FN, TN). Work out accuracy, precision and recall by hand. Here "crosses" plays the role of "must stop".</li>
-<li><strong>Round 2 (20 rolls).</strong> Change the instructions: "Pretend a missed 'crosses' means the ball hits a baby. Only say 'stops!' if you're really sure." You've just lowered their threshold.</li>
-<li><strong>Compare.</strong> Did recall go up? Did precision go down? Did accuracy change much?</li>
+<li><strong>Round 1 (20 rolls).</strong> As the ball leaves your hand, a friend calls "crosses!" (1) or "stops!" (0). Write down the call and the truth.</li>
+<li>Fill in TP, FP, FN, TN. Work out accuracy, precision and recall.</li>
+<li><strong>Round 2.</strong> New rule: "a missed 'crosses' means the ball hits a baby, so only say 'stops!' if you're sure." You've lowered their threshold. Did recall go up and precision go down?</li>
 </ol>
-<p><strong>On your own (no friend needed):</strong> be the judge yourself. Before each roll, write down your call ("crosses" or "stops") from how hard you're about to push. Then roll and write the truth. For round 2, tell yourself the baby rule and call "stops!" only when you're sure. Score both rounds the same way.</p>
-<p><strong>What to record:</strong> two confusion matrices and three numbers for each round. <strong>What it teaches:</strong> precision and recall aren't computer things. They describe any yes/no judge, including people. And the threshold is a choice about which mistake you'd rather make.</p>
+<p><strong>On your own:</strong> before each roll, write your own call from how hard you're about to push. Then roll and score both rounds the same way.</p>
+</div>
 
-<h2 id="project">6. Your Robo-Helper so far</h2>
-<p>The obstacle detector from Part A now has a <strong>tested, safety-tuned threshold</strong>. Robo-Helper no longer brakes only when it's 50% sure. In the lesson file it brakes at 22% sure, and in your robot at 17%, because missing a stop is worse than a pause.</p>
+<details id="check"><summary><strong>Check yourself</strong></summary>
+<p><strong>A model has 0 false alarms. Is it safe?</strong> Its precision is 1.0, but it could miss lots of stops. At threshold 0.9 precision is 1.000 and 8 stops are missed. Safety is recall.</p>
+<p><strong><code>confusion([0, 0, 0], [1, 1, 0])</code>?</strong> <code>(0, 0, 2, 1)</code>: two misses, one correct go. Precision and recall are both 0.0.</p>
+<p><strong>Why choose the threshold on TRAIN?</strong> The test set stands in for brand-new situations. Tune on it and its score stops being honest.</p>
+</details>
+
+<details id="more"><summary><strong>Want to know more?</strong></summary>
+<p><strong>The full trade on TEST:</strong></p>
+<pre><code>threshold   precision   recall   accuracy
+   0.9        1.000      0.784     0.947
+   0.7        1.000      0.946     0.987
+   0.5        0.946      0.946     0.973
+   0.3        0.878      0.973     0.960
+   0.22       0.837      0.973     0.947
+   0.1        0.804      1.000     0.940</code></pre>
+<p>0.7 has the best test accuracy, but picking it by looking at the test set would be cheating. On TRAIN, 0.5 misses 11 of 110 stops (recall 0.900); 0.22 catches 107 of 110 (0.973).</p>
+<p><strong>The one miss left</strong> at 0.22 is the reading <code>(2.79, 1.38)</code>, stop chance 0.186: sensor noise made danger look calm. No threshold above 0.186 can catch it, which is why real robots also have bumpers.</p>
+<p><strong>A surprise:</strong> at 0.5, TEST accuracy (0.973) is higher than TRAIN accuracy (0.953). With only 150 test examples, luck moves the score by a couple of percent.</p>
+<p><strong>Stretch:</strong> run <code>safest_threshold</code> with <code>min_recall=0.99</code> (the reference gets 0.14). Write <code>f1 = 2 × precision × recall / (precision + recall)</code>.</p>
 <ul>
-<li><strong>Week 7's capstone</strong> calls <code>safest_threshold(self.stop_w, self.stop_b, data)</code> when Robo-Helper starts up, and passes that threshold to <code>should_stop</code> every time something unexpected appears on the route.</li>
-<li>The capstone's <code>evaluate()</code> uses the same habit you learned here: run the finished robot on a separate test set of commands and report the pass rate honestly (83%, not 100%).</li>
+<li><a href="../01-decision-model-evals.html">LLM Evals: Decision Models</a>: the grown-up version, used to test AI models. Start with <a href="../01-decision-model-evals.html#thresholds">decision thresholds</a>.</li>
+<li><a href="../03-shared-autonomy.html">Human–AI help levels</a>: when a robot should act, ask or wait.</li>
 </ul>
-
-<h2 id="mistakes">7. Common mistakes</h2>
-<ul>
-<li><strong>Shuffling the original list.</strong> The checker says <em>"don't shuffle the original list: shuffle a copy"</em>.</li>
-<li><strong>Returning <code>(test, train)</code></strong> instead of <code>(train, test)</code>. Then you train on 25% and test on 75%. Check: <em>"test_fraction 0.25 of 100 -&gt; 25 test, 75 train"</em>.</li>
-<li><strong>Dividing by zero</strong> in precision or recall when nothing was predicted as stop.</li>
-<li><strong>Stepping thresholds with <code>t -= 0.01</code></strong>, which drifts to values like 0.21999999999. Loop over integers.</li>
-<li><strong>Choosing the threshold on TEST.</strong> The code would still run, and the score would look better than it really is. That's the sneakiest mistake in all of machine learning.</li>
-</ul>
-
-<h2 id="check">8. Check yourself</h2>
-<details><summary>A model has 0 false positives. What's its precision, and does that make it safe?</summary><p>Precision is 1.0 (every stop it called was right), but it could still be missing lots of needed stops. Safety is recall. At threshold 0.9, precision is 1.000 but 8 stops are missed.</p></details>
-<details><summary>Predict: <code>confusion([0, 0, 0], [1, 1, 0])</code>?</summary><p><code>(0, 0, 2, 1)</code>: two missed stops, one correct go. Then <code>precision</code> is 0.0 (no stop predictions at all), <code>recall</code> is 0.0.</p></details>
-<details><summary>Why does lowering the threshold raise recall but lower precision?</summary><p>A lower threshold means more examples get called "stop". More of the real stops get caught (recall up), but more harmless ones get called stop too (more false alarms, so precision down).</p></details>
-<details><summary>Why must the threshold be chosen on TRAIN, not TEST?</summary><p>The test set is our only stand-in for brand-new situations. If we tune anything to it, our score is no longer a fair prediction of how the robot will do on truly new data.</p></details>
-<details><summary>Accuracy dropped from 0.973 to 0.947 when we moved to 0.22. Why is that the better robot?</summary><p>It traded 1 missed stop for 5 extra false alarms. A missed stop can hurt something. A false alarm costs a pause. Accuracy counts both the same, so it can't see the difference.</p></details>
-
-<h2 id="more">9. Go deeper (optional)</h2>
-<ul>
-<li><a href="../01-decision-model-evals.html">LLM Evals: Decision Models</a>: the grown-up version of this lesson, used to evaluate AI models in industry. Start with <a href="../01-decision-model-evals.html#thresholds">decision thresholds</a>, then <a href="../01-decision-model-evals.html#precision-recall">precision, recall and minimum bars</a> and <a href="../01-decision-model-evals.html#tuning">tuning without fooling yourself</a>.</li>
-<li><a href="../03-shared-autonomy.html">Human–AI help levels</a>: when a robot should act, ask, or wait, which is the same "how sure must I be?" question.</li>
-<li><a href="../17-free-ai-curriculum.html#robotics">Free robotics courses</a>, where safety-critical decisions show up again and again.</li>
-</ul>
+</details>
 
 <nav class="pager">
-  <a href="04-neuron.html"><small>Previous</small>Week 3 · The artificial neuron</a>
-  <a class="next" href="06-pathfinding.html"><small>Next</small>Week 4 · Finding the way</a>
+  <a href="04-neuron.html"><small>Previous</small>Week 4 · Part A: The artificial neuron</a>
+  <a class="next" href="06-pathfinding.html"><small>Next</small>Week 5 · Finding the way</a>
 </nav>
-<footer>Build a Robot Brain · Week 3 of 12 · Part B (homework file: lesson05_evaluate.py)</footer>
+<footer>Build a Robot Brain · Week 4 of 16 · Part B (homework file: lesson05_evaluate.py)</footer>
 </main>
 
 <script>

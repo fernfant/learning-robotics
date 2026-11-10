@@ -1,8 +1,11 @@
 # Robo-Helper: build a robot brain from scratch
 
-Over 12 weeks you'll build **Robo-Helper**, a robot in a simulated room that understands commands like
-*"put the red block in the bin"*, finds its way, notices unexpected obstacles, and reports how well it did.
-Every lesson adds one real piece, written by you.
+Over 16 weeks you'll build **Robo-Helper**, a robot in a simulated room. Its **body** half works on real sensor data
+from a phone (data/: a real recording, plus your own from the free phyphox app): smoothing, tilt, steps, gyroscope drift
+and sensor fusion. Then wheels with encoders and odometry, a PID controller, a laser scanner that builds a map, and a
+particle filter that finds the robot when it's lost. Its **brain** half understands commands like
+*"put the red block in the bin"*, writes plans, checks itself for safety, and is measured honestly against a world-class
+model. Every lesson adds one real piece to YOUR robot (`homework/my_robot.py`).
 
 ## What you need
 

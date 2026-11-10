@@ -4,31 +4,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LLMs &amp; Robotics</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=16">
 </head>
 <body>
 <main>
 <section class="kid" id="start">
-<div class="eyebrow"><span class="track both">LLM + Robotics</span>Ages 12+ · 12 weeks · start here</div>
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Ages 12+ · 16 weeks · start here</div>
 <h2 style="font-size:1.8rem">Build your own robot brain</h2>
-<p class="big">Build a robot that understands "put the red block in the bin". 12 weeks, basic Python.</p>
-<pre><code>##########
-#Rr.c....#
-#..##....#
-#..#..b..#
-#....##..#
-#g.......#
-#.#....B.#
-##########</code></pre>
-<p class="meta">R = your robot, r b g = blocks, c = the cat, B = the bin. By week 12, your robot does this (shortened from its real output):</p>
+<p class="big">Build a robot that reads real sensor data, drives on wheels, draws its own map and understands "put the red block in the bin". 16 weeks, basic Python.</p>
+<div class="room" data-robot="1,1" data-cat="4,1" data-blocks="red:2,1 blue:6,3 green:1,5" data-label="🤖 your robot, 🟥🟦🟩 blocks, 🐱 the cat, 🪣 the bin."></div>
+<p class="meta">By week 16, your robot does this (shortened from its real output):</p>
 <pre><code>Zippy&gt; put the red and blue blocks away
   Something is in the way at (4, 1)!
   I stopped just in time.
   The red block is in the bin.
   The blue block is in the bin.</code></pre>
-<p>You write every clever part yourself: moving, sensing, stopping for the cat, planning a route, understanding words. If you can write a Python loop that prints 1 to 10, you're ready.</p>
+<p>You write every clever part yourself: moving, sensing, reading your phone's sensors, stopping for the cat, planning a route, steering wheels, mapping the room, understanding words. <code>check.py</code> marks it as you go: 21 checks on your robot, 147 in the whole course. If you can write a Python loop that prints 1 to 10, you're ready.</p>
 <p style="margin:18px 0"><a href="topics/18-robot-brain/index.html" style="display:inline-block;font-size:1.2rem;font-weight:700;padding:12px 24px;border-radius:10px;background:var(--accent);color:var(--bg);text-decoration:none">Start the course →</a></p>
-<p class="meta">After the course, for fun: <a href="topics/21-robot-math.html">robot maths, by playing</a> and <a href="topics/22-vector-fields.html">steering with a field of arrows</a> (both fine after week 4), then <a href="topics/20-from-scratch/index.html">real code from the pros</a> (some installs; ask an adult).</p>
+<p class="meta">After the course, for fun: <a href="topics/21-robot-math.html">robot maths, by playing</a> and <a href="topics/22-vector-fields.html">steering with a field of arrows</a> (both fine after week 5), then <a href="topics/20-from-scratch/index.html">real code from the pros</a> (some installs; ask an adult).</p>
 </section>
 
 <div class="eyebrow">Personal course · living document</div>
@@ -37,7 +30,7 @@
 
 <div class="card"><p style="margin:0"><span class="track llm">LLM</span> how large language models are built, trained, evaluated and served. &nbsp; <span class="track robo">Robotics</span> how robots perceive, decide and act. &nbsp; <span class="track both">LLM + Robotics</span> shared foundations, or ideas that carry across both. Robot foundation models (VLAs) are built on LLM backbones, so the two tracks keep meeting.</p></div>
 <p><a href="sources.html"><strong>Sources &amp; summaries →</strong></a> every link added, its summary, the primary sources behind it, saved files and all external references.</p>
-<p class="meta">22 modules (109 pages) · last updated 2026-11-09</p>
+<p class="meta">22 modules (109 pages) · last updated 2026-11-10</p>
 
 <h2 id="grown-ups">For grown-ups and later</h2>
 <p>Notes on LLMs and robotics for grown-ups, and for later once you've finished the robot course. Each module still opens with a Start-here box you can read any time.</p>
@@ -184,8 +177,8 @@
 
 <a class="card module" href="topics/18-robot-brain/index.html">
   <div class="n">18 · our own course</div>
-  <h3><span class="track both">LLM + Robotics</span>Build a Robot Brain: 12 weeks, from zero to a robot that understands you (ages 12+, start here)</h3>
-  <p>Our own first-principles course, built from everything in modules 01–17. One lesson a week for 12 weeks, covering robot basics <em>and</em> inference engineering. A learner with basic Python builds <strong>Robo-Helper</strong>, a simulated robot that understands "put the red block in the bin", plans with A*, stops safely for surprises, and is honestly evaluated (83%). Then they build a tiny neural language model from zero, measure latency, tokens and cost, speed brains up (caching, quantising, distilling, LoRA), plug in Claude as a planner and as a tool-using agent, and race every brain on the same 12 tasks in a simulator with replays. Every lesson has to make the robot measurably better: <code>progress.py</code> shows each one's gain, and the brain the learner builds climbs from 5/12 (word counter) to 8/12 (a tiny LM that writes whole plans) to 10/12 (distilled from a teacher, still 10/12 at 4 bits in 1.4 KB). Extras: attention (how Transformers read), an AI model as judge, and an MCP server so any AI app can drive the robot. The learner's own robot reaches 12/12 in week 12 by using what it sees. Every lesson has a browser playground, real Python homework marked by <code>check.py</code> (115 checks; reference solutions included), hint ladders, and a real-world challenge away from the screen.</p>
+  <h3><span class="track both">LLM + Robotics</span>Build a Robot Brain: 16 weeks, from zero to a robot that understands you (ages 12+, start here)</h3>
+  <p>Our own first-principles course, built from everything in modules 01–17. Sixteen weeks that alternate the robot's body and its brain. A learner with basic Python builds their own robot, <code>my_robot.py</code>, one gap a week. The body: noisy sensors, <strong>real smartphone sensor data</strong> (tilt and step counting on a UCI recording, or their own from phyphox), gyro drift and sensor fusion, A* planning, wheels with odometry and PID, a laser-scan map that finds the cat, and a particle filter that finds the robot when it's kidnapped. The brain: gradient descent, a neuron with a safe threshold, typo fixing, a word-counting classifier, a tiny neural language model, safety checks on AI output, latency and cost, caching, quantising, distilling and LoRA, Claude as planner and agent, and a bake-off of every brain on the same 12 tasks. The brain the learner builds climbs from 5/12 to 8/12 to 10/12 (still 10/12 at 4 bits in 1.4 KB); their robot reaches 12/12 in week 16 by using what it sees, then rescues a block on wheels after starting lost. Every lesson has a picture-first idea, a browser playground, real Python homework with step-by-step checkpoints, and a real-world challenge. <code>check.py</code> marks it all: 21 checks on the robot, 147 in total (reference solutions included).</p>
   <span class="tag">course</span><span class="tag">hands-on</span><span class="tag">first principles</span><span class="tag">inference</span><span class="tag">agents</span><span class="tag">RLHF</span><span class="tag">LoRA</span><span class="tag">beginner-friendly</span>
   <p class="meta">Source: written for this course · Nov 2026</p>
 </a>
@@ -242,7 +235,7 @@
 <tr><td>15</td><td><span class="track llm">LLM</span></td><td><a href="topics/15-inference-engineering-companion.html">Inference Engineering, interactive</a></td><td>Read the book chapter, run its calculator, then cross-check against the course's own demo and explain any gap. Treat single-setup benchmarks as a starting point.</td></tr>
 <tr><td>16</td><td><span class="track llm">LLM</span></td><td><a href="topics/16-hands-on-llm-serving.html">Hands-On LLM Serving labs</a></td><td>Build a small server yourself (API, scheduler, worker process), then swap in real engines and optimise one change at a time on realistic data. Batching trades latency for throughput, and continuous batching mostly removes that trade.</td></tr>
 <tr><td>17</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/17-free-ai-curriculum.html">391 free AI courses, checked</a></td><td>A huge free list is only useful once it's filtered and verified. Keep the classics for foundations, add post-2022 courses for LLMs and robotics, and prefer courses with assignments over lectures alone.</td></tr>
-<tr><td>18</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/18-robot-brain/index.html">Build a Robot Brain (our course)</a></td><td>Learn by building: each idea from first principles, then real code, a self-check and a real-world challenge, growing into one working robot that's honestly tested. Then inference engineering: a tiny LM from zero, latency and cost, caching/quantising/distilling, Claude as planner and agent, and a bake-off of every brain.</td></tr>
+<tr><td>18</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/18-robot-brain/index.html">Build a Robot Brain (our course)</a></td><td>Learn by building, 16 weeks: each idea as a picture first, then real code with checkpoints, growing into one working robot that's honestly tested. Real sensor data, wheels, maps and a particle filter on the body side. Then inference engineering: a tiny LM from zero, latency and cost, caching/quantising/distilling, Claude as planner and agent, and a bake-off of every brain.</td></tr>
 <tr><td>19</td><td><span class="track llm">LLM</span></td><td><a href="topics/19-evals-field-guide.html">Evals field guide</a></td><td>An eval is input, system, grader, number. Read outputs before writing graders, use code for anything definite, and trust an AI judge only after measuring it (kappa, not raw agreement), with the evidence in front of it. Every score gets an error bar; agents get pass^k.</td></tr>
 <tr><td>20</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/20-from-scratch/index.html">Six from-scratch repos</a></td><td>Read tiny code that does the real thing, run it, then use it to try to make your own robot better, and measure whether it did. Bigger models need more data; a fast brain on a laptop can be too slow on a robot; learned control is great until the world changes.</td></tr>
 <tr><td>21</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/21-robot-math.html">Robot maths, played with</a></td><td>Play with each idea first, then use it on your own robot and measure it. Estimation (Bayes, Kalman, Fourier) beats plain averaging once the robot moves; a model of the world only helps if the world has patterns; π0 and GR00T are a scene-understanding Transformer plus a noise-to-motion head.</td></tr>
@@ -323,5 +316,6 @@
 
 <footer>Sources are kept in <code>sources/</code>. The change history is in <code>log.md</code>.</footer>
 </main>
+<script src="topics/18-robot-brain/room.js"></script>
 </body>
 </html>

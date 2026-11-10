@@ -3,119 +3,54 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Week 4 · Finding the way</title>
-<link rel="stylesheet" href="../../style.css">
+<title>Week 5 · Finding the way</title>
+<link rel="stylesheet" href="../../style.css?v=16">
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 4 of 12</nav>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 5 of 16</nav>
 
-<div class="eyebrow"><span class="track robo">Robotics</span>Build a Robot Brain · Week 4 of 12</div>
+<div class="eyebrow"><span class="track robo">Robotics</span>Build a Robot Brain · Week 5 of 16</div>
 <h1>Finding the way: BFS and A*</h1>
-<p class="lede">Robo-Helper knows where it is and where the bin is. Now it needs a route that doesn't go through walls, and the shortest one. You'll build breadth-first search, which explores like a ripple on a pond, then A*, which aims the ripple at the goal.</p>
-<div class="card note" id="journey"><strong>Week 4 of 12.</strong> So far your robot: ✓ says hello ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe. <strong>Today</strong> it learns to plan the shortest route around things. Next: <a href="08-words-as-numbers.html">Week 5 · Part A: Words as numbers</a> (or the optional side quest, <a href="07-trial-and-error.html">Bonus · Trial and error</a>). <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>goto blue</code>.</div>
-
-<div class="facts">
-  <div><b>Time</b>2–4 hours, plus the challenge</div>
-  <div><b>You'll need</b>Python 3, week 1 finished, squared paper and a pencil</div>
-  <div><b>New words</b>search, queue, frontier, breadth-first search (BFS), heuristic, A*, priority queue</div>
-  <div><b>Project piece</b>Route planning</div>
-</div>
+<p class="lede">The robot needs the shortest route that doesn't go through walls, and a new one when something gets in the way.</p>
+<div class="card note" id="journey"><strong>Week 5 of 16.</strong> So far your robot: ✓ says hello ✓ moves ✓ senses walls ✓ reads real phone data ✓ decides to stop ✓ is tested safe. <strong>Today</strong> it learns to plan the shortest route around things. Next: <a href="22-fusion.html">Week 6: Two sensors, one steady angle</a> (or the optional side quest, <a href="07-trial-and-error.html">Bonus · Trial and error</a>). <a href="index.html#my-robot">Your robot, week by week</a>.</div>
 
 <section class="kid" id="start">
 <h2>Start here</h2>
-<p class="big">To find the shortest route, explore every square 1 step away, then every square 2 steps away, and so on, remembering where you came from. A* does the same but tries the squares that look closer to the goal first.</p>
-
-<h3>The problem</h3>
-<p>Robo-Helper is in the top-left corner of the room at (1, 1). Someone says "put this in the bin". The bin is at (7, 6), and there are walls in between. The robot can step north, south, east or west, one square at a time. Which steps, in which order? It needs a plan before it moves, and the plan should be as short as possible, because every step costs battery.</p>
-
-<h3>The idea in one picture</h3>
-<p>Drop a stone in a pond. The ripple spreads out in rings: everything 1 metre away gets wet at the same moment, then everything 2 metres away. The first ring to touch the goal tells you its distance, and the ripple went around obstacles by itself. That's breadth-first search. A* is like tilting the pond toward the goal so the water runs mostly that way.</p>
-
-<h3>Words to know</h3>
+<p class="big">Drop a stone in a pond. The ripple reaches everything 1 step away, then 2 steps, and flows round walls by itself. The first ring to touch the goal tells you the shortest route. A* tilts the pond toward the goal.</p>
 <dl>
-<dt>Search</dt><dd>Systematically trying possibilities until you find one that works.</dd>
-<dt>Queue</dt><dd>A waiting line: first in, first out, like at a shop.</dd>
-<dt>Frontier</dt><dd>The squares we've found but haven't explored from yet: the edge of the ripple.</dd>
-<dt>BFS (breadth-first search)</dt><dd>Explore all squares at distance 1, then 2, then 3… using a queue. It always finds a shortest route.</dd>
-<dt>Heuristic</dt><dd>A quick guess. Here: the Manhattan distance to the goal, ignoring walls.</dd>
-<dt>A* ("A-star")</dt><dd>Search that always explores the square with the smallest "steps so far + guess of steps left".</dd>
-<dt>Priority queue</dt><dd>A waiting line where the smallest number always goes first, like a hospital A&amp;E where the most urgent case is seen next.</dd>
+<dt>Queue</dt><dd>A waiting line: first in, first out.</dd>
+<dt>BFS</dt><dd>Breadth-first search: explore 1 step away, then 2, then 3. Always finds a shortest route.</dd>
+<dt>Heuristic</dt><dd>A quick guess of the steps left, ignoring walls.</dd>
+<dt>A*</dt><dd>Search that tries the square with the smallest "steps so far + guess left" first.</dd>
 </dl>
 </section>
-<p class="deeper"><strong>The rest is the full lesson:</strong> the problem in detail, both algorithms built step by step on the real room, a demo that shows which squares each one explores, the homework, and a challenge in your own home.</p>
 
-<h2 id="problem">1. The problem</h2>
-<p>Here's the room from <code>world.py</code>. <code>#</code> is wall, <code>.</code> is floor, <code>R</code> is the robot, <code>B</code> is the bin:</p>
-<pre><code>  x: 0123456789
-y=0  ##########
-y=1  #R.......#
-y=2  #..##....#
-y=3  #..#.....#
-y=4  #....##..#
-y=5  #........#
-y=6  #.#....B.#
-y=7  ##########</code></pre>
-<p>The obvious approach is "always step toward the goal". It works in an empty room. But try it on this small map, where a wall sits between S and the goal G:</p>
-<pre><code>#######
-#S.#..#        Greedy: only take steps that get closer to G.
-#..#.G#        From S (1,1): east to (2,1), south to (2,2).
-#..#..#        At (2,2): east is a wall. North, south, west all
-#.....#        go FURTHER from G. Stuck, forever.
-#######</code></pre>
-<p>The real route goes down and around, which means moving <em>away</em> from the goal for a while. Greedy can't do that. We need a method that is guaranteed to find the shortest route whenever one exists.</p>
+<h2 id="idea">1. The idea</h2>
+<div class="box idea"><span class="tag">💡 The idea: why not just head for the goal?</span>
+<p>"Always step closer to the goal" fails as soon as a wall is in the way. Here the robot steps east, then south, and hits a wall at (2, 2). Every other move takes it <em>further</em> from the goal (red ring), so it is stuck for ever. The real route goes down and round, away from the goal for a while.</p>
+<div class="room" data-room="#######|#..#..#|#..#..#|#..#..#|#.....#|#######" data-robot="2,2" data-path="1,1 2,1 2,2" data-mark="5,2" data-label="Greedy gets stuck at (2, 2). The goal is the red ring."></div>
+</div>
 
-<h2 id="principles">2. First principles</h2>
+<div class="box idea"><span class="tag">💡 The idea: the ripple (BFS)</span>
+<p>Write 0 on the robot's square. Write 1 on its free neighbours, 2 on theirs, and so on. This is the real room from <code>world.py</code>, numbered:</p>
+<svg class="diagram" viewBox="0 0 400 320" role="img" aria-label="The room numbered by BFS: each square shows its number of steps from the robot. The bin is 11 steps away."><rect x="0" y="0" width="40" height="40" style="fill:var(--wall)"/><rect x="40" y="0" width="40" height="40" style="fill:var(--wall)"/><rect x="80" y="0" width="40" height="40" style="fill:var(--wall)"/><rect x="120" y="0" width="40" height="40" style="fill:var(--wall)"/><rect x="160" y="0" width="40" height="40" style="fill:var(--wall)"/><rect x="200" y="0" width="40" height="40" style="fill:var(--wall)"/><rect x="240" y="0" width="40" height="40" style="fill:var(--wall)"/><rect x="280" y="0" width="40" height="40" style="fill:var(--wall)"/><rect x="320" y="0" width="40" height="40" style="fill:var(--wall)"/><rect x="360" y="0" width="40" height="40" style="fill:var(--wall)"/><rect x="0" y="40" width="40" height="40" style="fill:var(--wall)"/><rect x="40" y="40" width="40" height="40" style="fill:var(--play);opacity:0.85"/><rect x="80" y="40" width="40" height="40" style="fill:var(--play);opacity:0.79"/><rect x="120" y="40" width="40" height="40" style="fill:var(--play);opacity:0.74"/><rect x="160" y="40" width="40" height="40" style="fill:var(--play);opacity:0.68"/><rect x="200" y="40" width="40" height="40" style="fill:var(--play);opacity:0.63"/><rect x="240" y="40" width="40" height="40" style="fill:var(--play);opacity:0.57"/><rect x="280" y="40" width="40" height="40" style="fill:var(--play);opacity:0.52"/><rect x="320" y="40" width="40" height="40" style="fill:var(--play);opacity:0.46"/><rect x="360" y="40" width="40" height="40" style="fill:var(--wall)"/><rect x="0" y="80" width="40" height="40" style="fill:var(--wall)"/><rect x="40" y="80" width="40" height="40" style="fill:var(--play);opacity:0.79"/><rect x="80" y="80" width="40" height="40" style="fill:var(--play);opacity:0.74"/><rect x="120" y="80" width="40" height="40" style="fill:var(--wall)"/><rect x="160" y="80" width="40" height="40" style="fill:var(--wall)"/><rect x="200" y="80" width="40" height="40" style="fill:var(--play);opacity:0.57"/><rect x="240" y="80" width="40" height="40" style="fill:var(--play);opacity:0.52"/><rect x="280" y="80" width="40" height="40" style="fill:var(--play);opacity:0.46"/><rect x="320" y="80" width="40" height="40" style="fill:var(--play);opacity:0.41"/><rect x="360" y="80" width="40" height="40" style="fill:var(--wall)"/><rect x="0" y="120" width="40" height="40" style="fill:var(--wall)"/><rect x="40" y="120" width="40" height="40" style="fill:var(--play);opacity:0.74"/><rect x="80" y="120" width="40" height="40" style="fill:var(--play);opacity:0.68"/><rect x="120" y="120" width="40" height="40" style="fill:var(--wall)"/><rect x="160" y="120" width="40" height="40" style="fill:var(--play);opacity:0.46"/><rect x="200" y="120" width="40" height="40" style="fill:var(--play);opacity:0.52"/><rect x="240" y="120" width="40" height="40" style="fill:var(--play);opacity:0.46"/><rect x="280" y="120" width="40" height="40" style="fill:var(--play);opacity:0.41"/><rect x="320" y="120" width="40" height="40" style="fill:var(--play);opacity:0.35"/><rect x="360" y="120" width="40" height="40" style="fill:var(--wall)"/><rect x="0" y="160" width="40" height="40" style="fill:var(--wall)"/><rect x="40" y="160" width="40" height="40" style="fill:var(--play);opacity:0.68"/><rect x="80" y="160" width="40" height="40" style="fill:var(--play);opacity:0.63"/><rect x="120" y="160" width="40" height="40" style="fill:var(--play);opacity:0.57"/><rect x="160" y="160" width="40" height="40" style="fill:var(--play);opacity:0.52"/><rect x="200" y="160" width="40" height="40" style="fill:var(--wall)"/><rect x="240" y="160" width="40" height="40" style="fill:var(--wall)"/><rect x="280" y="160" width="40" height="40" style="fill:var(--play);opacity:0.35"/><rect x="320" y="160" width="40" height="40" style="fill:var(--play);opacity:0.30"/><rect x="360" y="160" width="40" height="40" style="fill:var(--wall)"/><rect x="0" y="200" width="40" height="40" style="fill:var(--wall)"/><rect x="40" y="200" width="40" height="40" style="fill:var(--play);opacity:0.63"/><rect x="80" y="200" width="40" height="40" style="fill:var(--play);opacity:0.57"/><rect x="120" y="200" width="40" height="40" style="fill:var(--play);opacity:0.52"/><rect x="160" y="200" width="40" height="40" style="fill:var(--play);opacity:0.46"/><rect x="200" y="200" width="40" height="40" style="fill:var(--play);opacity:0.41"/><rect x="240" y="200" width="40" height="40" style="fill:var(--play);opacity:0.35"/><rect x="280" y="200" width="40" height="40" style="fill:var(--play);opacity:0.30"/><rect x="320" y="200" width="40" height="40" style="fill:var(--play);opacity:0.24"/><rect x="360" y="200" width="40" height="40" style="fill:var(--wall)"/><rect x="0" y="240" width="40" height="40" style="fill:var(--wall)"/><rect x="40" y="240" width="40" height="40" style="fill:var(--play);opacity:0.57"/><rect x="80" y="240" width="40" height="40" style="fill:var(--wall)"/><rect x="120" y="240" width="40" height="40" style="fill:var(--play);opacity:0.46"/><rect x="160" y="240" width="40" height="40" style="fill:var(--play);opacity:0.41"/><rect x="200" y="240" width="40" height="40" style="fill:var(--play);opacity:0.35"/><rect x="240" y="240" width="40" height="40" style="fill:var(--play);opacity:0.30"/><rect x="280" y="240" width="40" height="40" style="fill:var(--play);opacity:0.24"/><rect x="320" y="240" width="40" height="40" style="fill:var(--play);opacity:0.19"/><rect x="360" y="240" width="40" height="40" style="fill:var(--wall)"/><rect x="0" y="280" width="40" height="40" style="fill:var(--wall)"/><rect x="40" y="280" width="40" height="40" style="fill:var(--wall)"/><rect x="80" y="280" width="40" height="40" style="fill:var(--wall)"/><rect x="120" y="280" width="40" height="40" style="fill:var(--wall)"/><rect x="160" y="280" width="40" height="40" style="fill:var(--wall)"/><rect x="200" y="280" width="40" height="40" style="fill:var(--wall)"/><rect x="240" y="280" width="40" height="40" style="fill:var(--wall)"/><rect x="280" y="280" width="40" height="40" style="fill:var(--wall)"/><rect x="320" y="280" width="40" height="40" style="fill:var(--wall)"/><rect x="360" y="280" width="40" height="40" style="fill:var(--wall)"/><polyline points="300.0,260.0 260.0,260.0 220.0,260.0 180.0,260.0 140.0,260.0 140.0,220.0 100.0,220.0 60.0,220.0 60.0,180.0 60.0,140.0 60.0,100.0 60.0,60.0" fill="none" style="stroke:var(--path)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/><text x="60.0" y="66.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">0</text><text x="60.0" y="106.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">1</text><text x="100.0" y="66.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">1</text><text x="60.0" y="146.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">2</text><text x="100.0" y="106.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">2</text><text x="140.0" y="66.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">2</text><text x="60.0" y="186.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">3</text><text x="100.0" y="146.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">3</text><text x="180.0" y="66.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">3</text><text x="60.0" y="226.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">4</text><text x="100.0" y="186.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">4</text><text x="220.0" y="66.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">4</text><text x="60.0" y="266.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">5</text><text x="100.0" y="226.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">5</text><text x="140.0" y="186.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">5</text><text x="220.0" y="106.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">5</text><text x="260.0" y="66.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">5</text><text x="140.0" y="226.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">6</text><text x="180.0" y="186.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">6</text><text x="220.0" y="146.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">6</text><text x="260.0" y="106.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">6</text><text x="300.0" y="66.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">6</text><text x="140.0" y="266.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">7</text><text x="180.0" y="226.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">7</text><text x="180.0" y="146.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">7</text><text x="260.0" y="146.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">7</text><text x="300.0" y="106.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">7</text><text x="340.0" y="66.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">7</text><text x="180.0" y="266.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">8</text><text x="220.0" y="226.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">8</text><text x="300.0" y="146.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">8</text><text x="340.0" y="106.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">8</text><text x="220.0" y="266.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">9</text><text x="260.0" y="226.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">9</text><text x="300.0" y="186.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">9</text><text x="340.0" y="146.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">9</text><text x="260.0" y="266.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">10</text><text x="300.0" y="226.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">10</text><text x="340.0" y="186.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">10</text><text x="300.0" y="266.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">11</text><text x="340.0" y="226.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">11</text><text x="340.0" y="266.4" text-anchor="middle" font-size="16" font-weight="700" style="fill:var(--fg)">12</text><circle cx="300.0" cy="260.0" r="18.400000000000002" fill="none" style="stroke:var(--ok)" stroke-width="3"/><rect x="0" y="0" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="40" y="0" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="80" y="0" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="120" y="0" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="160" y="0" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="200" y="0" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="240" y="0" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="280" y="0" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="320" y="0" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="360" y="0" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="0" y="40" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="40" y="40" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="80" y="40" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="120" y="40" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="160" y="40" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="200" y="40" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="240" y="40" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="280" y="40" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="320" y="40" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="360" y="40" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="0" y="80" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="40" y="80" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="80" y="80" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="120" y="80" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="160" y="80" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="200" y="80" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="240" y="80" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="280" y="80" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="320" y="80" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="360" y="80" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="0" y="120" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="40" y="120" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="80" y="120" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="120" y="120" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="160" y="120" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="200" y="120" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="240" y="120" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="280" y="120" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="320" y="120" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="360" y="120" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="0" y="160" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="40" y="160" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="80" y="160" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="120" y="160" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="160" y="160" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="200" y="160" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="240" y="160" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="280" y="160" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="320" y="160" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="360" y="160" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="0" y="200" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="40" y="200" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="80" y="200" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="120" y="200" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="160" y="200" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="200" y="200" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="240" y="200" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="280" y="200" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="320" y="200" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="360" y="200" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="0" y="240" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="40" y="240" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="80" y="240" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="120" y="240" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="160" y="240" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="200" y="240" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="240" y="240" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="280" y="240" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="320" y="240" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="360" y="240" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="0" y="280" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="40" y="280" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="80" y="280" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="120" y="280" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="160" y="280" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="200" y="280" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="240" y="280" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="280" y="280" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="320" y="280" width="40" height="40" fill="none" style="stroke:var(--line)"/><rect x="360" y="280" width="40" height="40" fill="none" style="stroke:var(--line)"/></svg>
+<p class="room-caption">The bin got <strong>11</strong>, so the shortest route is 11 steps. Square (4, 3) says 7, though it's only 3 squares right of the start: the ripple went round the wall.</p>
+<p>In code, a <strong>queue</strong> does the numbering: take the square at the front, put its new neighbours at the back. Every time you find a square, write down which square found it (<code>came_from</code>). At the goal, follow <code>came_from</code> backwards to get the route.</p>
+</div>
 
-<h3>Step 1: neighbours</h3>
-<p>From any square, the possible next squares are its 4 neighbours (north, south, east, west) that aren't walls. Using week 1's <code>move</code>: from (1, 1), north is (1, 0), a wall. South is (1, 2), free. East is (2, 1), free. West is (0, 1), a wall. So <code>neighbors(ROOM, (1, 1))</code> is <code>[(1, 2), (2, 1)]</code>, in the order N, S, E, W. The order matters: it decides which of several equally short routes we find.</p>
+<div class="box idea"><span class="tag">💡 The idea: aim the ripple (A*)</span>
+<p>BFS spreads in every direction, even away from the bin. A* gives each square a score:</p>
+<pre><code>f = g + h      g = steps taken so far
+               h = Manhattan distance to the goal (ignores walls)</code></pre>
+<p>It always explores the smallest <code>f</code> next, using a priority queue (<code>heapq</code>). Because <code>h</code> never guesses too high, the route is still the shortest. This is the route both find:</p>
+<div class="room" data-robot="1,1" data-path="1,1 1,2 1,3 1,4 1,5 2,5 3,5 3,6 4,6 5,6 6,6 7,6" data-blocks="red:2,1 blue:6,3 green:1,5" data-label="11 steps: SSSSEESEEEE. BFS takes 40 squares off the queue to find it, A* only 35."></div>
+</div>
 
-<h3>Step 2: rings (breadth-first search)</h3>
-<p>Write 0 on the start. Write 1 on its free neighbours. Write 2 on <em>their</em> unnumbered neighbours. Keep going. This is the whole room, numbered:</p>
-<pre><code>## ## ## ## ## ## ## ## ## ##
-##  0  1  2  3  4  5  6  7 ##
-##  1  2 ## ##  5  6  7  8 ##
-##  2  3 ##  7  6  7  8  9 ##
-##  3  4  5  6 ## ##  9 10 ##
-##  4  5  6  7  8  9 10 11 ##
-##  5 ##  7  8  9 10 11 12 ##
-## ## ## ## ## ## ## ## ## ##</code></pre>
-<p>The bin at (7, 6) got the number <strong>11</strong>. So the shortest route is 11 steps. Look at (4, 3): it says 7, even though it's only 3 squares right of the start, because the ripple had to go around the wall.</p>
-<p>To do the numbering in code, use a <strong>queue</strong>. Take the square at the front, add its new neighbours to the back. Because squares join the back of the line, all the 1s are handled before any 2, all the 2s before any 3. Here are the first three turns:</p>
-<pre><code>queue: [(1,1)]
-take (1,1) → neighbours (1,2), (2,1) are new     queue: [(1,2), (2,1)]
-take (1,2) → (1,1) seen; (1,3), (2,2) are new    queue: [(2,1), (1,3), (2,2)]
-take (2,1) → (2,2) seen; (3,1) is new            queue: [(1,3), (2,2), (3,1)]</code></pre>
-
-<h3>Step 3: remember where you came from</h3>
-<p>The numbers tell you the distance but not the route. So every time a square is discovered, write down which square discovered it, in a dictionary <code>came_from</code>. For example <code>came_from[(1, 2)] = (1, 1)</code>. The start gets <code>None</code>. When you reach the goal, follow <code>came_from</code> backwards to the start, then reverse the list:</p>
-<pre><code>(7,6) ← (6,6) ← (5,6) ← (4,6) ← (3,6) ← (3,5) ← (2,5) ← (1,5) ← (1,4) ← (1,3) ← (1,2) ← (1,1)</code></pre>
-<p>Twelve squares, eleven steps. As commands: <code>SSSSEESEEEE</code>. The same <code>came_from</code> dictionary also works as the "already seen" list: if a square is in it, don't add it again.</p>
-
-<details><summary>Predict first: the room has 42 free squares (including the bin). How many does BFS take off the queue before it reaches the bin?</summary>
-<p><strong>40.</strong> The bin is one of the farthest squares from the start. Only (8, 5), also 11 steps away, and (8, 6), 12 steps away, are never taken off the queue. BFS doesn't know where the bin is; it just explores everything closer first. That's thorough, but wasteful when the goal is in an obvious direction.</p>
-</details>
-
-<h3>Step 4: aim the ripple (A*)</h3>
-<p>BFS explores in every direction equally, even away from the goal. Let's give it a hint: the <strong>Manhattan distance</strong> from week 1, <code>|x1 − x2| + |y1 − y2|</code>. It ignores walls, so it's never more than the true number of steps left. It's an optimistic guess.</p>
-<p>For every square we track <code>g</code> = steps taken so far, and <code>h</code> = the Manhattan guess of steps left. Then:</p>
-<pre><code>f = g + h      "the best this route could possibly be, if it goes through here"</code></pre>
-<p>A* always explores the square with the <strong>smallest f</strong> next. To find the smallest quickly, it uses a <strong>priority queue</strong> (Python's <code>heapq</code>). Worked example from the start, with the bin at (7, 6):</p>
-<pre><code>start (1,1):  g = 0, h = |1−7| + |1−6| = 6 + 5 = 11, f = 11
-  (1,2):      g = 1, h = 6 + 4 = 10,               f = 11
-  (2,1):      g = 1, h = 5 + 5 = 10,               f = 11
-  (4,3) later: reached in g = 7, h = 3 + 3 = 6,    f = 13   ← worse than 11, try it last</code></pre>
-<p>Any square where moving there means heading <em>away</em> from the bin gets a bigger f, so A* puts it off. Because <code>h</code> never overestimates, A* still always finds a shortest route. (If the guess were sometimes too big, A* could skip the real best route.)</p>
-<p>One more detail: the same square can enter the priority queue twice, with different <code>g</code>. When you take one out and its <code>g</code> is bigger than the best known cost for that square, it's an out-of-date entry. Skip it, and don't count it.</p>
-
-<details><summary>Predict first: BFS took 40 squares off the queue. How many does A* take, for the same 11-step route?</summary>
-<p><strong>35</strong>, a saving of only 5. Surprised? The robot is in one corner and the bin is in the opposite one, so almost every square is on <em>some</em> 11-step route (any mix of south and east moves). A* skips just (8, 1), (8, 2), (8, 3), (8, 4) and (4, 3). Start the robot at (4, 1) instead, and BFS takes 35 squares while A* takes only 13. A* helps most when the goal is in a clear direction and lots of the map is behind you.</p>
-</details>
-
-<h2 id="play">3. Play with it</h2>
+<h2 id="play">2. Play</h2>
+<div class="box play"><span class="tag">🎮 Play</span>
+<p>The real room. Press a search and watch which squares it takes off the queue, numbered in order. Shaded squares are still waiting. Click a floor square to drop a box (a surprise obstacle), or switch the click mode to move the robot.</p>
 <div class="card demo">
-<h3>Interactive: BFS vs A* on the real room</h3>
-<p class="legend">The room from <code>world.py</code>. Press a search and watch which squares it takes off the queue, numbered in order. Shaded squares are still waiting in the frontier. The final route is drawn as a line. Click a floor square to drop a box there (a surprise obstacle), or switch the click mode to move the robot.</p>
 <canvas id="gcv" width="600" height="480" aria-label="The robot room grid showing search expansion order and the route"></canvas>
 <p>
 <button id="runbfs">Run BFS</button>
@@ -135,39 +70,115 @@ Click to:
   <div class="stat"><div class="k">Commands</div><div class="v" id="gcmd" style="font-size:0.9rem">–</div></div>
 </div>
 </div>
-<p>Things to try: run BFS, then A*, from the start corner (40 vs 35). Move the robot to (4, 1) and compare again. Drop a box at (1, 5) and watch both find a different 11-step route. Box the robot in completely: both should report no route.</p>
+<p><strong>Try:</strong> BFS then A* from the corner (40 vs 35). Move the robot to (4, 1) and compare again. Box the robot in: both should report no route.</p>
+</div>
 
-<h2 id="homework">4. Homework</h2>
-<p>Open <code>project/homework/lesson06_paths.py</code>. It imports <code>move</code> and <code>manhattan</code> from your week 1 file (<code>lesson01_moving.py</code>), so finish that first. Write these four, in order:</p>
+<h2 id="build">3. Build</h2>
+<div class="box build"><span class="tag">🛠 Build</span>
+<p>Open <code>lesson06_paths.py</code> in <code>project/homework</code>. It uses <code>move</code> and <code>manhattan</code> from your week 1 file. Check after each step with <code>python3 check.py 6</code> from <code>project</code>.</p>
+<ol class="steps">
+<li><strong><code>neighbors(room, pos, blocked=())</code></strong>: the free squares one step N, S, E, W of <code>pos</code>, in that order, skipping any in <code>blocked</code>. Example: <code>neighbors(ROOM, (1, 1))</code> → <code>[(1, 2), (2, 1)]</code>.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>Lesson 6: lesson06_paths.py
+  ✓ neighbors
+  … bfs_path: not written yet (Lesson 6: write this function)
+  … bfs unreachable: not written yet (Lesson 6: write this function)
+  … astar_path: not written yet (Lesson 6: write this function)
+  … path_to_commands: not written yet (Lesson 6: write this function)
+  1/5 passed</code></pre>
+<p>If you see <code>✗ neighbors: neighbors of (1, 1) are (1, 2) then (2, 1), checking N, S, E, W</code>, loop over <code>"NSEW"</code> in exactly that order.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>You have <code>move(pos, direction)</code> from week 1 and <code>is_free(room, pos)</code> from <code>world.py</code>. <code>for d in "NSEW":</code> loops over the four letters.</p></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code>out = []
+for d in "NSEW":
+    p = move(pos, d)
+    if is_free(room, p) and p not in ____:
+        out.append(____)
+return out</code></pre></details>
+</div>
 
-<h3>4.1 <code>neighbors(room, pos, blocked=())</code></h3>
-<p>Return the free squares one step N, S, E, W of <code>pos</code>, in that order, skipping any in <code>blocked</code>. Example: <code>neighbors(ROOM, (1, 1))</code> → <code>[(1, 2), (2, 1)]</code>; with <code>blocked={(2, 1)}</code> → <code>[(1, 2)]</code>.</p>
-<details><summary>Hint 1</summary><p>You already have <code>move(pos, direction)</code> from week 1 and <code>is_free(room, pos)</code> from <code>world.py</code>.</p></details>
-<details><summary>Hint 2</summary><p>A string is a sequence: <code>for d in "NSEW":</code> loops over the four directions in the right order.</p></details>
-<details><summary>Hint 3</summary><p>Make an empty list. For each direction d in "NSEW": p = move(pos, d); if p is free and p not in blocked, append it. Return the list.</p></details>
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" style="counter-reset: step 1">
+<li><strong><code>bfs_path(room, start, goal, blocked=())</code></strong>: the ripple, with a <code>deque</code> and a <code>came_from</code> dictionary. Return the list of squares from start to goal (both included), or <code>None</code> if there's no way.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p>BFS gets two tests: a normal route and a boxed-in robot.</p>
+<pre><code>  ✓ neighbors
+  ✓ bfs_path
+  ✓ bfs unreachable
+  … astar_path: not written yet (Lesson 6: write this function)
+  … path_to_commands: not written yet (Lesson 6: write this function)
+  3/5 passed</code></pre>
+<p>If you see <code>✗ bfs_path: the path must start at the start and end at the goal</code>, you forgot to reverse the path. If you see <code>✗ bfs unreachable: a boxed-in robot should get None</code>, return <code>None</code>, not <code>[]</code>.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p><code>from collections import deque</code> is already at the top. <code>queue = deque([start])</code>, <code>queue.popleft()</code> takes from the front, <code>queue.append(x)</code> adds to the back. Start with <code>came_from = {start: None}</code>.</p></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code>queue = deque([start])
+came_from = {start: None}
+while queue:
+    cur = queue.popleft()
+    if cur == goal:
+        path = []
+        while cur is not None:
+            path.append(cur)
+            cur = came_from[____]
+        return path[::-1]
+    for nxt in neighbors(room, cur, blocked):
+        if nxt not in came_from:
+            came_from[nxt] = ____
+            queue.append(nxt)
+return None</code></pre></details>
+</div>
 
-<h3>4.2 <code>bfs_path(room, start, goal, blocked=())</code></h3>
-<p>Breadth-first search with a <code>deque</code> and a <code>came_from</code> dictionary. Return the list of squares from start to goal (both included), or <code>None</code> if the goal can't be reached. Example: from <code>ROBOT_START</code> to the bin, the list has 12 squares (11 steps).</p>
-<details><summary>Hint 1</summary><p><code>deque([start])</code> makes a queue holding the start. <code>queue.popleft()</code> takes from the front, <code>queue.append(x)</code> adds to the back. Set <code>came_from = {start: None}</code>.</p></details>
-<details><summary>Hint 2</summary><p>Loop <code>while queue:</code>. Take the front square. If it's the goal, build the path. Otherwise, for each neighbour not yet in <code>came_from</code>, record where it came from and add it to the queue. If the loop ends without finding the goal, return <code>None</code>.</p></details>
-<details><summary>Hint 3</summary><p>To build the path: start with an empty list and cur = goal. While cur is not None: append cur, then cur = came_from[cur]. That list runs goal → start, so return it reversed (<code>path[::-1]</code>).</p></details>
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" style="counter-reset: step 2">
+<li><strong><code>astar_path(room, start, goal, blocked=())</code></strong>: like BFS, but a priority queue of <code>(f, g, square)</code> with <code>heapq</code>, and a <code>cost</code> dictionary of the best <code>g</code> for each square. Return <code>(path, expanded)</code>, where <code>expanded</code> counts squares taken off the queue. Skip (and don't count) an entry whose <code>g</code> is bigger than <code>cost[square]</code>: it's out of date.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>  ✓ neighbors
+  ✓ bfs_path
+  ✓ bfs unreachable
+  ✓ astar_path
+  … path_to_commands: not written yet (Lesson 6: write this function)
+  4/5 passed</code></pre>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p><code>heapq.heappush(frontier, (f, g, square))</code> adds; <code>heapq.heappop(frontier)</code> takes the smallest f. Start with <code>frontier = [(manhattan(start, goal), 0, start)]</code>, <code>cost = {start: 0}</code>, <code>came_from = {start: None}</code>, <code>expanded = 0</code>. <code>float("inf")</code> is bigger than every number.</p></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code>while frontier:
+    _, g, cur = heapq.heappop(frontier)
+    if g &gt; cost[cur]:
+        continue
+    expanded += 1
+    if cur == goal:
+        ...build the path like BFS...
+        return path[::-1], expanded
+    for nxt in neighbors(room, cur, blocked):
+        ng = g + 1
+        if ng &lt; cost.get(nxt, float("inf")):
+            cost[nxt] = ng
+            came_from[nxt] = cur
+            heapq.heappush(frontier, (ng + manhattan(____, goal), ng, nxt))
+return None, expanded</code></pre></details>
+</div>
 
-<h3>4.3 <code>astar_path(room, start, goal, blocked=())</code></h3>
-<p>Like BFS, but use a priority queue of <code>(f, g, square)</code> tuples with <code>heapq</code>, and keep a <code>cost</code> dictionary of the best <code>g</code> found for each square. Return <code>(path, expanded)</code>, where <code>expanded</code> counts the squares you took off the queue (not counting out-of-date ones). Example: from the start to the bin, the path is 11 steps and <code>expanded</code> is 35.</p>
-<details><summary>Hint 1</summary><p><code>heapq.heappush(frontier, (f, g, square))</code> adds; <code>heapq.heappop(frontier)</code> removes the tuple with the smallest f (ties broken by g, then by the square). Start the frontier as <code>[(manhattan(start, goal), 0, start)]</code> and <code>cost = {start: 0}</code>.</p></details>
-<details><summary>Hint 2</summary><p>After popping <code>(_, g, cur)</code>: if <code>g &gt; cost[cur]</code>, skip it with <code>continue</code>. Otherwise add 1 to <code>expanded</code>, check for the goal, and look at neighbours.</p></details>
-<details><summary>Hint 3</summary><p>For each neighbour nxt: new_g = g + 1. If new_g is smaller than <code>cost.get(nxt, float('inf'))</code> (<code>float('inf')</code> is Python's infinity: bigger than every number, so a square you've never reached always gets updated): set cost[nxt] = new_g, came_from[nxt] = cur, and push (new_g + manhattan(nxt, goal), new_g, nxt). If the frontier runs out, return (None, expanded).</p></details>
-
-<h3>4.4 <code>path_to_commands(path)</code></h3>
-<p>Turn a list of squares into a string of letters. Example: <code>[(1, 1), (2, 1), (2, 2), (1, 2)]</code> → <code>"ESW"</code>.</p>
-<details><summary>Hint 1</summary><p>Look at each pair of neighbouring squares in the path. <code>zip(path, path[1:])</code> gives you <code>(a, b)</code> pairs.</p></details>
-<details><summary>Hint 2</summary><p>The change from a to b is <code>(b[0] − a[0], b[1] − a[1])</code>, for example <code>(1, 0)</code>. Week 1's <code>DIRECTIONS</code> maps letters to changes. You need the reverse.</p></details>
-<details><summary>Hint 3</summary><p>Build a reversed dictionary {change: letter} from DIRECTIONS. For each pair, look up the change and collect the letter. Join the letters into one string.</p></details>
-
-<h3>Run it</h3>
-<pre><code>cd homework
-python3 lesson06_paths.py</code></pre>
-<p>What you should see (real output from the reference solution; <code>*</code> marks the route, <code>r b g</code> are the blocks):</p>
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" style="counter-reset: step 3">
+<li><strong><code>path_to_commands(path)</code></strong>: squares to letters. <code>[(1, 1), (2, 1), (2, 2), (1, 2)]</code> → <code>"ESW"</code>.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>  ✓ neighbors
+  ✓ bfs_path
+  ✓ bfs unreachable
+  ✓ astar_path
+  ✓ path_to_commands
+  5/5 passed  🎉 lesson complete!</code></pre>
+<p>Then <code>cd homework</code> and <code>python3 lesson06_paths.py</code> (<code>*</code> is the route; the green block <code>g</code> is drawn on top of it):</p>
 <pre><code>##########
 #Rr......#
 #*.##....#
@@ -178,55 +189,25 @@ python3 lesson06_paths.py</code></pre>
 ##########
 BFS steps: 11 | commands: SSSSEESEEEE
 A* steps: 11 | squares expanded: 35</code></pre>
-<p>The route passes over the green block at (1, 5), which is drawn on top. Blocks don't block the path in this lesson; surprise obstacles do, through <code>blocked</code>.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p><code>zip(path, path[1:])</code> gives neighbouring pairs <code>(a, b)</code>. The change is <code>(b[0] - a[0], b[1] - a[1])</code>. Week 1's <code>DIRECTIONS</code> maps letters to changes; you need the reverse.</p></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code>names = {v: k for k, v in DIRECTIONS.items()}
+return "".join(names[(b[0] - a[0], ____)] for a, b in zip(path, path[1:]))</code></pre></details>
+</div>
 
-<h3>Check it</h3>
-<pre><code>cd ..
-python3 check.py 6</code></pre>
-<p>Hints you might see:</p>
-<pre><code>  ✗ neighbors: neighbors of (1, 1) are (1, 2) then (2, 1), checking N, S, E, W
-  ✗ bfs unreachable: a boxed-in robot should get None</code></pre>
-<p>The checker runs 5 tests for 4 functions: <code>bfs_path</code> gets two (one for a normal route, one for a robot that's boxed in). <code>5/5 passed  🎉 lesson complete!</code> means you're done.</p>
-
-<h3>Stretch</h3>
-<ul>
-<li>Change <code>astar_path</code> to use <code>h = 0</code> instead of the Manhattan distance. How many squares does it expand now? (It turns into a slower BFS. Why?)</li>
-<li>Try a cheating heuristic: <code>h = 3 × manhattan</code>. Is the route still always 11 steps? Is it ever wrong from other starting squares?</li>
-<li>Write <code>bfs_expanded</code> that returns how many squares BFS took off the queue. Check you get 40.</li>
-</ul>
-
-<h2 id="add-to-robot">Add it to your robot</h2>
-<p>Two gaps in <code>my_robot.py</code> this week.</p>
-<ol>
-<li><code>route(self, target)</code>: the shortest path from <code>self.pos</code> to <code>target</code> with your <code>astar_path()</code>, avoiding the squares in <code>self.blocked</code>. Return just the path.</li>
-<li><code>goto(self, target)</code>: follow the route square by square with <code>self.step()</code>. If the robot stops for the cat, plan again. (When it stops, the provided <code>step()</code> adds the cat's square to <code>self.blocked</code>, so the new route goes round it.)</li>
+<h2 id="add-to-robot">4. Add it to your robot</h2>
+<div class="box bot"><span class="tag">🤖 Add it to your robot</span>
+<p>Two gaps in <code>my_robot.py</code>:</p>
+<ol class="steps">
+<li><code>route(self, target)</code>: your <code>astar_path()</code> from <code>self.pos</code> to <code>target</code>, avoiding <code>self.blocked</code>. Return just the path.</li>
+<li><code>goto(self, target)</code>: follow the route with <code>self.step(square)</code>. If the robot stops for the cat, plan again (the provided <code>step()</code> adds the cat's square to <code>self.blocked</code>, so the new route goes round).</li>
 </ol>
-<p>This is the plan for <code>goto</code>, from its docstring. Notice the outer loop: it lets the robot plan up to 6 times.</p>
-<pre><code>for attempt in range(6):
-    path = self.plan_route(target)          # PROVIDED: calls your route()
-    if path is None: return "I can't find a way there."
-    for square in path[1:]:                 # path[0] is where you are now
-        result = self.step(square)
-        "bump" (or "late") → return self.step_message(result, square)
-        "stopped" → self.say(self.step_message("stopped", square)), then break (plan again)
-    if every step worked: return ""
-return "Too many surprises, giving up."</code></pre>
-<p>("late" only happens in week 8, when you make the robot's brain slow on purpose. Treat it like a bump.) <code>self.say(msg)</code> is provided: it prints a message straight away, while the robot keeps going. <code>return</code> hands back the robot's final answer.</p>
-<div class="card note"><strong>New Python this time: <code>for … else</code>.</strong> A loop can have an <code>else</code>. It runs only if the loop finished <em>without</em> hitting <code>break</code>:
-<pre><code>for n in [2, 4, 6]:
-    if n == 5:
-        break
-else:
-    print("no 5 anywhere")      # runs: the loop never hit break</code></pre>
-<p>Put <code>5</code> in the list and nothing is printed. In <code>goto</code>, "the loop never hit <code>break</code>" means "every step worked".</p></div>
-<details><summary>Hint 1</summary><p>Start <code>route</code> with this import:</p>
-<pre><code>from lesson06_paths import astar_path</code></pre>
-<p><code>astar_path</code> returns two things, <code>(path, expanded)</code>. <code>route</code> only needs the path, so catch the second one in <code>_</code> (Python's name for "I don't need this"). Pass <code>blocked=self.blocked</code>.</p></details>
-<details><summary>Hint 2</summary><p>In <code>goto</code>, put the inner <code>for square in path[1:]:</code> loop inside the outer <code>for attempt in range(6):</code> loop. Check <code>result in ("bump", "late")</code> and <code>result == "stopped"</code> with two <code>if</code>s. Then give the <em>inner</em> loop an <code>else: return ""</code>.</p></details>
-<details><summary>Hint 3</summary><p>Fill in the blanks:</p>
-<pre><code>path, _ = astar_path(ROOM, self.pos, ____, blocked=self.blocked)
-return path</code></pre>
-<pre><code>for attempt in range(6):
+<p>A loop can have an <code>else</code>: it runs only if the loop finished without <code>break</code>. In <code>goto</code>, that means "every step worked".</p>
+<details><summary>Hint 1: the import and route()</summary><pre><code>from lesson06_paths import astar_path
+path, _ = astar_path(ROOM, self.pos, target, blocked=self.blocked)
+return path</code></pre><p><code>astar_path</code> returns two things; <code>_</code> means "I don't need this one".</p></details>
+<details><summary>Hint 2: goto() (fill in the blanks)</summary><pre><code>for attempt in range(6):
     path = self.plan_route(target)
     if path is None:
         return "I can't find a way there."
@@ -240,61 +221,68 @@ return path</code></pre>
     else:
         return ____
 return "Too many surprises, giving up."</code></pre></details>
-<p>Check it: <code>cd ..</code> back to <code>project</code>, then <code>python3 check.py robot</code>. Your new check is <em>"week 4: goto"</em>.</p>
-<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
+</div>
+<div class="room" data-robot="6,3" data-path="1,1 2,1 3,1 2,1 2,2 2,3 2,4 3,4 4,4 4,3 5,3 6,3" data-cat="4,1" data-blocks="red:2,1 blue:6,3 green:1,5" data-mark="4,1" data-label="goto blue: it stops before the cat, plans again and goes round."></div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p>From <code>project</code>, run <code>python3 check.py robot</code>:</p>
+<pre><code>Your robot: my_robot.py
+  ✓ week 1: arrows
+  ✓ week 2: look
+  ✓ week 2 part B: look's safe speed
+  ✓ week 3: real phone data
+  ✓ week 4: stops for the cat
+  ✓ week 4 part B: the safest threshold
+  ✓ week 5: goto
+  … week 6: steady: not written yet (fill in steady() first)
+  ...
+  7/21 passed</code></pre>
+<p>Then in <code>python3 my_robot.py</code>:</p>
 <pre><code>Zippy&gt; goto blue
   Something is in the way at (4, 1)! I stopped just in time (stop chance 0.99, my safe threshold 0.17).
   I'm at (6, 3).</code></pre>
-<p>It drives off, finds the cat, stops, plans a way round and gets there. The first line is your <code>self.say(...)</code>. The second is what the <code>goto</code> command prints when your <code>goto</code> returns <code>""</code>.</p>
+<p>If the robot says <code>I'm at 14.</code>, your <code>route()</code> returned both things from <code>astar_path</code>. Return just the path.</p>
+</div>
 
 <h2 id="challenge">5. Real-world challenge: route-plan your home</h2>
+<div class="card">
 <ol>
-<li><strong>Draw a map.</strong> On squared paper, draw the floor of two or three rooms of your home, one square ≈ one big step (about 50 cm). Shade furniture and walls. Leave doorways open.</li>
-<li><strong>Pick a start and a goal</strong>, e.g. your bed and the fridge.</li>
-<li><strong>Run BFS by hand.</strong> Write 0 on the start, 1 on its free neighbours, 2 on theirs… in pencil, until you number the goal. Count how many squares you numbered.</li>
-<li><strong>Read the route backwards.</strong> From the goal, step to any neighbour with a number one smaller, until you reach 0. Mark the route.</li>
-<li><strong>Run A* on a fresh copy.</strong> For each square you explore, write <code>g + h</code>. Always continue from the smallest. Count squares again. Which method numbered fewer?</li>
-<li><strong>Walk it.</strong> Walk the planned route counting your steps. Does it match the number on the goal? Then put a bag in the middle of the route (a surprise obstacle) and replan from where you're standing.</li>
+<li>On squared paper, draw two or three rooms of your home (one square ≈ one big step). Shade furniture. Pick a start and a goal, like your bed and the fridge.</li>
+<li>Run BFS in pencil: 0 on the start, 1 on its neighbours, and so on until you reach the goal. Read the route backwards.</li>
+<li>On a fresh copy, run A*: write <code>g + h</code> and always continue from the smallest. Which numbered fewer squares?</li>
+<li>Walk the route counting steps. Then put a bag in the way and replan from where you stand.</li>
 </ol>
-<p><strong>On your own:</strong> this one already works alone. If you can't walk around right now, do steps 1 to 5 on paper and "walk" the route with a coin on the map.</p>
-<p><strong>What to record:</strong> your map, the BFS and A* square counts, the planned and walked step counts. <strong>What it teaches:</strong> BFS really is a ripple, the heuristic really does save work, and real routes need replanning when the world surprises you, which is exactly what Robo-Helper does in week 7's capstone.</p>
+<p><strong>On your own:</strong> this already works alone. If you can't walk around, "walk" the route with a coin on the map.</p>
+</div>
 
-<h2 id="project">6. Your Robo-Helper so far</h2>
-<p>Robo-Helper can now <strong>plan routes</strong>. Given where it is, where it wants to go, and which squares are blocked, <code>astar_path</code> gives it the shortest route, and <code>path_to_commands</code> turns that into moves like the ones you wrote in week 1.</p>
+<details id="check"><summary><strong>Check yourself</strong></summary>
+<p><strong>Why does BFS always find a shortest route?</strong> It finishes every square at distance 1 before any at distance 2. So the first time it reaches the goal, no shorter way exists.</p>
+<p><strong><code>bfs_path(ROOM, (1, 1), (1, 1))</code>?</strong> <code>[(1, 1)]</code>: zero steps.</p>
+<p><strong>Why must the guess never be too big?</strong> A* might put off the square on the best route because it looked too expensive, and finish with a longer route.</p>
+<p><strong><code>path_to_commands([(3, 3), (3, 2), (2, 2)])</code>?</strong> <code>"NW"</code>.</p>
+</details>
+
+<details id="more"><summary><strong>Want to know more?</strong></summary>
+<p><strong>BFS vs A* in numbers.</strong> The room has 42 free squares. BFS takes 40 off the queue before the bin; only (8, 5) and (8, 6) are left. A* takes 35: the robot and the bin are in opposite corners, so almost every square is on <em>some</em> 11-step route. Start at (4, 1) instead and BFS takes 35 while A* takes 13. A* helps most when the goal is in a clear direction.</p>
+<p><strong>The queue's first three turns:</strong></p>
+<pre><code>queue: [(1,1)]
+take (1,1) → (1,2), (2,1) are new     queue: [(1,2), (2,1)]
+take (1,2) → (1,3), (2,2) are new     queue: [(2,1), (1,3), (2,2)]
+take (2,1) → (3,1) is new             queue: [(1,3), (2,2), (3,1)]</code></pre>
+<p><strong>Common slip:</strong> <code>queue.pop()</code> takes from the back, which turns BFS into depth-first search: no promise of the shortest route.</p>
+<p><strong>Stretch:</strong> use <code>h = 0</code> in A*: how many squares now? Try a cheating <code>h = 3 × manhattan</code>: is the route always 11?</p>
 <ul>
-<li><strong>Week 7's capstone</strong>: <code>drive_to</code> calls <code>astar_path(self.room, self.pos, target, blocked=self.known_blocked)</code>. When week 3's stop detector spots a surprise (say a cat at (4, 1)), that square goes into <code>known_blocked</code> and the robot replans from where it stands.</li>
-<li><strong>The bonus side quest</strong> (<a href="07-trial-and-error.html">trial and error</a>): what if the robot has <em>no map</em> at all? Then it can't search like this, and has to learn the way by trial and error.</li>
+<li><a href="../17-free-ai-curriculum.html#robotics">Free robotics courses</a>: motion planning, from grids to robot arms.</li>
+<li><a href="../06-30u30/18-pointer-networks.html">Day 18 · Pointer Networks</a>: a network that learns routes instead of searching.</li>
+<li><a href="../06-30u30/21-message-passing.html">Day 21 · Message Passing</a>: networks that pass information between neighbours, like the ripple.</li>
 </ul>
-
-<h2 id="mistakes">7. Common mistakes</h2>
-<ul>
-<li><strong>Wrong neighbour order.</strong> The checker wants N, S, E, W: <em>"neighbors of (1, 1) are (1, 2) then (2, 1), checking N, S, E, W"</em>.</li>
-<li><strong>Marking squares as seen when you take them out instead of when you put them in.</strong> The same square then joins the queue many times. It still works, but slowly. Add to <code>came_from</code> as soon as you discover a square.</li>
-<li><strong>Forgetting to reverse the path</strong>, so it starts at the goal. Check: <em>"the path must start at the start and end at the goal"</em>.</li>
-<li><strong>Returning <code>[]</code> or crashing when there's no route.</strong> Return <code>None</code>: <em>"a boxed-in robot should get None"</em>.</li>
-<li><strong>Using <code>queue.pop()</code> instead of <code>popleft()</code>.</strong> <code>pop()</code> takes from the back, which turns BFS into a different search (depth-first) that doesn't promise the shortest route.</li>
-</ul>
-
-<h2 id="check">8. Check yourself</h2>
-<details><summary>Why does BFS always find a shortest route?</summary><p>It handles all squares at distance 1 before any at distance 2, and so on. So the first time it reaches the goal, it's through the smallest possible number of steps.</p></details>
-<details><summary>Predict: what does <code>bfs_path(ROOM, (1, 1), (1, 1))</code> return?</summary><p><code>[(1, 1)]</code>. The first square taken off the queue is already the goal, and the path is just the start: zero steps.</p></details>
-<details><summary>What does <code>f = g + h</code> mean in plain words?</summary><p>"Steps I've already taken to get here, plus an optimistic guess of the steps left." It's the best total this route could possibly have.</p></details>
-<details><summary>Why must the heuristic never overestimate?</summary><p>If it overestimated, A* might put off the square that's actually on the best route because it looked too expensive, and finish with a longer route. Manhattan distance can't overestimate on a grid where you only move N/S/E/W.</p></details>
-<details><summary>Predict: <code>path_to_commands([(3, 3), (3, 2), (2, 2)])</code>?</summary><p><code>"NW"</code>. y went from 3 to 2 (up, so N), then x went from 3 to 2 (W).</p></details>
-
-<h2 id="more">9. Go deeper (optional)</h2>
-<ul>
-<li><a href="../17-free-ai-curriculum.html#robotics">Free robotics courses</a>: motion planning is a whole subject, from grids like this to robot arms with many joints.</li>
-<li><a href="../06-30u30/18-pointer-networks.html">Day 18 · Pointer Networks</a>: a neural network that learns to produce routes for problems like the travelling salesman, instead of searching.</li>
-<li><a href="../06-30u30/21-message-passing.html">Day 21 · Message Passing</a>: neural networks that work on graphs, passing information between neighbours, much like the ripple in BFS.</li>
-</ul>
+</details>
 
 <nav class="pager">
-  <a href="05-evaluation.html"><small>Previous</small>Week 3 · Part B: Honest testing</a>
-  <a class="next" href="08-words-as-numbers.html"><small>Next</small>Week 5 · Part A: Words as numbers</a>
+  <a href="05-evaluation.html"><small>Previous</small>Week 4 · Part B: Honest testing</a>
+  <a class="next" href="22-fusion.html"><small>Next</small>Week 6 · Two sensors, one steady angle</a>
 </nav>
-<p class="legend">Optional side quest before week 5: <a href="07-trial-and-error.html">Bonus · Trial and error</a>. It adds nothing to <code>my_robot.py</code>, so skip it if you like.</p>
-<footer>Build a Robot Brain · Week 4 of 12 (homework file: lesson06_paths.py)</footer>
+<p class="legend">Optional side quest: <a href="07-trial-and-error.html">Bonus · Trial and error</a>. It adds nothing to <code>my_robot.py</code>, so skip it if you like.</p>
+<footer>Build a Robot Brain · Week 5 of 16 (homework file: lesson06_paths.py)</footer>
 </main>
 
 <script>
@@ -443,5 +431,6 @@ cv.onclick = e => {
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
 stats();
 </script>
+<script src="room.js"></script>
 </body>
 </html>

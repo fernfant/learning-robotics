@@ -28,6 +28,39 @@ CAT = (4, 1)                 # the cat at (4, 1) is drawn for you, but it's NOT 
 CACHE = {}                   # brains you've trained, so the robot only trains them once per run
 
 
+PLAIN = "--plain" in sys.argv     # python3 my_robot.py --plain: the old # . letters picture
+
+
+def picture(robot, objects, path=()):
+    """PROVIDED: draw the room. Each square is 2 characters wide so emoji fit. --plain gives the old text version."""
+    if PLAIN:
+        return render(ROOM, robot, {**objects, "cat": CAT}, list(path))
+    icons = {"red block": "🟥", "blue block": "🟦", "green block": "🟩"}
+    grey, yellow, end = ("\033[90m", "\033[33m", "\033[0m") if sys.stdout.isatty() else ("", "", "")
+    rows = []
+    for y, row in enumerate(ROOM):
+        line = ""
+        for x, ch in enumerate(row):
+            here = (x, y)
+            obj = next((icons[k] for k, v in objects.items() if v == here and k in icons), None)
+            if here == robot:
+                line += "🤖"
+            elif ch == "#":
+                line += f"{grey}██{end}"
+            elif here == CAT:
+                line += "🐱"
+            elif obj:
+                line += obj
+            elif ch == "B":
+                line += "🪣"
+            elif here in path:
+                line += f"{yellow}• {end}"
+            else:
+                line += "· "
+        rows.append(line)
+    return "\n".join(rows)
+
+
 class Robot:
     def __init__(self, quiet=False, animate=False):
         self.pos = ROBOT_START
@@ -176,6 +209,7 @@ class Robot:
         """Drive around the room scanning, and build a map with your week 11 add_scan and to_map (explore() does
         the driving). Return the map rows plus a last line saying how many squares are right:
           rows, _ = explore(True); right, total = score(rows)
+          mark the cat: in row 1, if square 4 is "#", make it "c" (the official map says floor there)
           return rows + [f"{right:.0%} of {total} squares right (the 'c' square is the cat the official map doesn't know)"]"""
         # TODO week 11: fill in this gap (see 'Add it to your robot' on the week 11 page). Read the docstring above.
         raise NotImplementedError("week 11. Fill in this gap in my_robot.py")
@@ -315,7 +349,7 @@ class Robot:
         if self.animate:
             print("\033[2J\033[H", end="")
         visible = {k: v for k, v in self.objects.items() if k not in self.binned}
-        print(render(ROOM, self.pos, {**visible, "cat": CAT}, self.last_path))
+        print(picture(self.pos, visible, self.last_path))
         if self.animate:
             time.sleep(0.12)
 
@@ -439,7 +473,7 @@ def banner(robot):
         print(f"  Next gap to fill: week {todo[0][1]}, the {todo[0][0]}() method in my_robot.py (see 'Add it to your robot' on the week {todo[0][1]} page).")
     try:
         from lesson11_robohelper import evaluate
-        print(f"  Your week-7 capstone (RoboHelper, its simpler twin) passes {evaluate()[0]:.0%} of its final test.")
+        print(f"  Your week-10 capstone (RoboHelper, its simpler twin) passes {evaluate()[0]:.0%} of its final test.")
     except NotImplementedError:
         pass
 

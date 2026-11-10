@@ -3,246 +3,106 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Week 6 · A tiny language model</title>
-<link rel="stylesheet" href="../../style.css">
+<title>Week 8 · A tiny language model</title>
+<link rel="stylesheet" href="../../style.css?v=16">
+<style>main p code, main li code, main dd code { overflow-wrap: anywhere; }</style>
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 6 of 12</nav>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 8 of 16</nav>
 
-<div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 6 of 12</div>
+<div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 8 of 16</div>
 <h1>A tiny language model, built from zero</h1>
-<p class="lede">In week 5 your robot counted which word comes next (to fix typos), and counted words to sort commands into piles. Now you'll build a small neural network that learns its own numbers for every word, reads your whole command, and <em>writes</em> a whole plan one word at a time: "put the red and blue blocks away" becomes <code>put red blue</code>. That loop is the beating heart of every LLM, including Claude.</p>
-<div class="card note" id="journey"><strong>Week 6 of 12.</strong> So far your robot: ✓ says hello ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ fixes typos ✓ understands commands. <strong>Today</strong> it learns to write whole plans, and ask when you're vague. Next: <a href="10-llm-safety.html">Week 7 · Part A: Using a real AI safely</a>. <a href="index.html#my-robot">Your robot, week by week</a>. Optional stretch: <a href="15b-attention.html">attention</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>put the red and blue blocks away</code>.</div>
+<p class="lede">A small neural network that reads your whole command and <em>writes</em> a plan, one word at a time. "put the red and blue blocks away" becomes <code>put red blue</code>. That loop is the heart of every LLM, including Claude.</p>
+<div class="card note" id="journey"><strong>Week 8 of 16.</strong> So far your robot: ✓ moves ✓ looks around ✓ reads real phone data ✓ stops for the cat ✓ plans routes ✓ fuses two sensors ✓ fixes typos ✓ understands one action at a time. <strong>Today</strong> it learns to write whole plans, and to ask when you're vague. Next: <a href="23-wheels.html">Week 9 · Wheels, odometry and PID</a>. Optional stretch: <a href="15b-attention.html">attention</a>. <a href="index.html#my-robot">Your robot, week by week</a>.</div>
 
 <div class="facts">
   <div><b>Time</b>3–4 hours</div>
-  <div><b>You'll need</b>Python 3, your finished week 5 files, a calculator, and someone to play a guessing game with</div>
-  <div><b>New words</b>embedding, softmax, loss, parameter (and a few more, explained as you meet them)</div>
-  <div><b>Project piece</b>A neural brain that writes whole plans, and asks when you're vague</div>
+  <div><b>You'll need</b>Python 3 and your finished week 7 files</div>
+  <div><b>New words</b>embedding, softmax, loss, parameter</div>
+  <div><b>Homework file</b><code>lesson15_tiny_lm.py</code></div>
 </div>
 
 <section class="kid" id="start">
 <h2>Start here</h2>
-<p class="big">A language model does one thing, over and over: read everything so far, give every possible next word a probability, pick one, and repeat. Ours is small enough to build by hand, and it still does exactly that.</p>
-
-<h3>The problem</h3>
-<p>Your robot's week 5 brain counts words and picks <em>one</em> action. Say "put the red and blue blocks away" and it bins the red block and forgets the blue one. Say "put the block away" and it can't ask "which block?". It can only pick a pile. Real LLMs don't sort into piles. They write their answer, word by word, as long as it needs to be. Can we build one of those ourselves, from nothing, in one Python file?</p>
-
-<h3>The idea in one picture</h3>
-<p>Think of a game of "finish my sentence" with a friend. You say "put the red block in the…" and they say "bin" without thinking. They're not looking anything up. They've heard enough sentences that the next word just feels <em>likely</em>. Now imagine they had to give a percentage for every word they could say: bin 90%, box 6%, sea 1%… That list of percentages is exactly what our model produces at every step. Then it says the top one, adds it to the answer, and goes again, until it says "I'm done".</p>
-
-<h3>Words to know</h3>
+<p class="big">A language model does one thing, over and over: read everything so far, give every possible next word a chance, pick one, repeat.</p>
+<p>Last week's brain sorts a command into one pile, so "put the red and blue blocks away" bins only the red block. This week's brain <em>writes</em> its answer, as long as the job needs. Think of a friend finishing your sentence: "put the red block in the…" "bin!" They've heard enough sentences that the next word just feels likely.</p>
 <dl>
-<dt>Embedding</dt><dd>A short list of numbers that stands for a word. Ours are 12 numbers long. The model learns them; we never choose them.</dd>
-<dt>Softmax</dt><dd>The recipe that turns any list of scores into probabilities that add up to 1.</dd>
-<dt>Loss (surprise)</dt><dd>How surprised the model was by the right answer. Low probability for the right word = big surprise. Training makes this small.</dd>
-<dt>Parameter</dt><dd>One of the model's learnable numbers. Ours has 2,702. Big LLMs have billions.</dd>
+<dt>Embedding</dt><dd>A short list of numbers (12 here) that stands for a word. The model learns them.</dd>
+<dt>Softmax</dt><dd>Turns any list of scores into chances that add up to 1.</dd>
+<dt>Loss (surprise)</dt><dd>How surprised the model was by the right answer. Training makes it small.</dd>
+<dt>Parameter</dt><dd>One learnable number. Ours has 2,702. Big LLMs have billions.</dd>
 </dl>
-<details><summary>More words you'll meet below (look them up when you get there)</summary>
-<dl>
-<dt>Average</dt><dd>Add the lists up position by position, then divide by how many there are. It's how our model "reads" a whole command.</dd>
-<dt>Hidden layer</dt><dd>A row of 32 neurons (like week 3's) sitting between the input and the answer. Nobody tells them what to do; they learn it.</dd>
-<dt>tanh</dt><dd>A squash function. Any number goes in, a number between −1 and 1 comes out. Like week 3's sigmoid, but centred on 0.</dd>
-<dt>Score</dt><dd>A raw number for each possible next word. Bigger means "more likely", but it isn't a probability yet.</dd>
-<dt>Greedy decoding</dt><dd>Writing by always picking the single most likely next word.</dd>
-<dt>Synthetic data</dt><dd>Training examples made by a program instead of written one by one. We fill in sentence templates to make hundreds.</dd>
-<dt>Held-out test</dt><dd>Examples kept away from training, used only to check whether the model learned the idea or just memorised.</dd>
-<dt>Hallucination</dt><dd>A fluent, confident answer that isn't backed by the input. The model makes something up because it must say <em>something</em>.</dd>
-</dl>
-</details>
 </section>
-<p class="deeper"><strong>Going deeper:</strong> everything below is the full lesson: the idea built from nothing, a demo with the real trained model, your homework, and a challenge away from the screen.</p>
 
-<div class="card note"><strong>What this adds to your robot:</strong> a brain that writes whole plans. Last week, "put the red and blue blocks away" binned only the red block. After this week both go in the bin, and "put the block away" makes your robot ask "Which block do you mean?". In week 11 your robot sits a 12-task exam (the <a href="19-bakeoff.html">bake-off</a>): the week 5 word counter passes 5 of the 12 tasks, and this brain passes 8.</div>
+<h2 id="principles">1. The idea</h2>
+<div class="box idea"><span class="tag">💡 The idea: write one word, then the next</span>
+<p>The model writes from a menu of 10 words: <code>put go find stop ask none red blue green &lt;end&gt;</code>. At every step it looks at your command plus the last two words it wrote, turns that into numbers, gives each menu word a chance, and writes the top one. Real numbers for "put the red and blue blocks away":</p>
+<svg class="diagram" viewBox="0 0 520 330" role="img" aria-label="The command and the words written so far become numbers, then chances for each menu word; the top word is written and the loop repeats">
+  <g style="font:16px sans-serif">
+    <rect x="8" y="10" width="150" height="58" rx="10" style="fill:var(--card);stroke:var(--line)"/>
+    <text x="83" y="34" text-anchor="middle" style="fill:var(--fg);font-weight:700">your command</text>
+    <text x="83" y="54" text-anchor="middle" style="fill:var(--muted)">+ last 2 words written</text>
+    <path d="M160 39 H 186" style="stroke:var(--idea);stroke-width:3"/><path d="M186 33 L198 39 L186 45 Z" style="fill:var(--idea)"/>
+    <rect x="200" y="10" width="130" height="58" rx="10" style="fill:var(--idea-soft);stroke:var(--idea)"/>
+    <text x="265" y="34" text-anchor="middle" style="fill:var(--fg);font-weight:700">36 numbers</text>
+    <text x="265" y="54" text-anchor="middle" style="fill:var(--muted)">→ 32 neurons</text>
+    <path d="M332 39 H 358" style="stroke:var(--idea);stroke-width:3"/><path d="M358 33 L370 39 L358 45 Z" style="fill:var(--idea)"/>
+    <rect x="372" y="10" width="140" height="58" rx="10" style="fill:var(--build-soft);stroke:var(--build)"/>
+    <text x="442" y="34" text-anchor="middle" style="fill:var(--fg);font-weight:700">10 chances</text>
+    <text x="442" y="54" text-anchor="middle" style="fill:var(--muted)">pick the top word</text>
+  </g>
+  <g style="font:16px sans-serif">
+    <text x="8" y="104" style="fill:var(--muted)">step</text><text x="60" y="104" style="fill:var(--muted)">looks at</text><text x="250" y="104" style="fill:var(--muted)">writes</text>
+    <text x="8" y="142" style="fill:var(--fg)">1</text><text x="60" y="142" style="fill:var(--fg)">&lt;start&gt; &lt;start&gt;</text>
+    <rect x="250" y="126" width="252" height="22" rx="4" style="fill:var(--line)"/><rect x="250" y="126" width="252" height="22" rx="4" style="fill:var(--ok)"/><text x="258" y="142" style="fill:var(--card);font-weight:700">put 1.0000</text>
+    <text x="8" y="186" style="fill:var(--fg)">2</text><text x="60" y="186" style="fill:var(--fg)">&lt;start&gt; put</text>
+    <rect x="250" y="170" width="252" height="22" rx="4" style="fill:var(--line)"/><rect x="250" y="170" width="250" height="22" rx="4" style="fill:var(--ok)"/><text x="258" y="186" style="fill:var(--card);font-weight:700">red 0.9941</text>
+    <text x="8" y="230" style="fill:var(--fg)">3</text><text x="60" y="230" style="fill:var(--fg)">put red</text>
+    <rect x="250" y="214" width="252" height="22" rx="4" style="fill:var(--line)"/><rect x="250" y="214" width="245" height="22" rx="4" style="fill:var(--ok)"/><text x="258" y="230" style="fill:var(--card);font-weight:700">blue 0.9705</text>
+    <text x="8" y="274" style="fill:var(--fg)">4</text><text x="60" y="274" style="fill:var(--fg)">red blue</text>
+    <rect x="250" y="258" width="252" height="22" rx="4" style="fill:var(--line)"/><rect x="250" y="258" width="250" height="22" rx="4" style="fill:var(--ok)"/><text x="258" y="274" style="fill:var(--card);font-weight:700">&lt;end&gt; 0.9921</text>
+    <text x="8" y="316" style="fill:var(--fg);font-weight:700">plan: put red blue → bin the red block, then the blue block</text>
+  </g>
+</svg>
+<p>Each written word goes back in as "the last word" for the next step. <code>&lt;end&gt;</code> means "I've finished". With the random numbers it starts with, the same machine writes nonsense. Training is the only difference.</p>
+</div>
 
-<h2 id="problem">1. The problem</h2>
-<p>Here's what our earlier models can and can't do:</p>
-<ul>
-<li><strong>Week 5's next-word counts</strong> (the ones your typo fixer uses) look at <em>one</em> previous word. It can write, but it forgets everything except the last word. It could never read a seven-word command and answer it.</li>
-<li><strong>Week 5's word counter</strong> reads the whole command, but treats every word as a separate clue. "halt" and "freeze" are as different to it as "halt" and "bin". And it picks one of four piles, so every answer is exactly one action.</li>
-</ul>
-<p>One action isn't enough for a tidying robot. Real output from the week 11 exam: for "put the red and blue blocks away" the word counter replies <code>The red block is in the bin.</code> and stops. For "bin everything except the green block" it bins the <em>green</em> block, the one you said to leave. For "put the block away" it replies <code>Sorry, I can't do that: 'put' needs an object</code> instead of asking which block.</p>
-<p>We want one model that <strong>reads</strong> the whole command and <strong>writes</strong> a plan, however long:</p>
-<pre><code>"put the red and blue blocks away"  →  put  red  blue  &lt;end&gt;
-"clean up everything"               →  put  red  blue  green  &lt;end&gt;
-"everything except green"           →  put  red  blue  &lt;end&gt;
-"put the block away"                →  ask  &lt;end&gt;            (which block? it asks you)
-"make me a cup of tea"              →  none  &lt;end&gt;           (not a robot job)
-"halt"                              →  stop  &lt;end&gt;</code></pre>
-<p>The model writes from a menu of 10 words: <code>put go find stop ask none red blue green &lt;end&gt;</code>. The <code>&lt;end&gt;</code> word means "I've finished". The longest plan, <code>put red blue green &lt;end&gt;</code>, is 5 words, so it never writes more than <code>MAX_WORDS = 5</code>. This is the same job as week 5's next-word model (predict the next word, repeat) but now the prediction depends on the whole command too.</p>
-<p><strong>Why not just one action?</strong> We measured that too. A model like this one that writes only one action, like <code>put red &lt;end&gt;</code>, is a cleverer pile-sorter, nothing more. On the exam it scores 4/12: <em>worse</em> than the word counter's 5/12. A brain that can write should write what the job needs.</p>
+<div class="box idea"><span class="tag">💡 The idea: words as dots on a map</span>
+<p>Every word gets 12 numbers, like a position on a map. They start random. Training nudges them, and words that lead to the same answers drift together. Here are 10 real trained words, with their 12 numbers squashed flat to 2 so we can draw them:</p>
+<svg class="diagram" viewBox="0 0 520 320" role="img" aria-label="Map of trained word embeddings: halt, stop and freeze close together; everything and all together; except and but together; red, blue and green far apart">
+  <rect x="1" y="1" width="518" height="318" rx="12" style="fill:var(--card);stroke:var(--line)"/>
+  <ellipse cx="162" cy="173" rx="34" ry="18" style="fill:var(--ok-soft);stroke:var(--ok)"/>
+  <ellipse cx="70" cy="123" rx="32" ry="16" style="fill:var(--play-soft);stroke:var(--play)"/>
+  <ellipse cx="170" cy="140" rx="22" ry="14" style="fill:var(--build-soft);stroke:var(--build)"/>
+  <g style="fill:var(--fg)">
+    <circle cx="167" cy="173" r="5"/><circle cx="152" cy="176" r="5"/><circle cx="170" cy="170" r="5"/>
+    <circle cx="81" cy="126" r="5"/><circle cx="58" cy="120" r="5"/>
+    <circle cx="168" cy="138" r="5"/><circle cx="171" cy="142" r="5"/>
+  </g>
+  <circle cx="251" cy="43" r="9" fill="#e5484d"/><circle cx="463" cy="96" r="9" fill="#3e7bfa"/><circle cx="300" cy="290" r="9" fill="#30a46c"/>
+  <g style="font:17px sans-serif;fill:var(--fg)">
+    <text x="120" y="212">halt · stop · freeze</text>
+    <text x="22" y="98">everything · all</text>
+    <text x="198" y="136">except · but</text>
+    <text x="266" y="48">red</text><text x="420" y="124">blue</text><text x="316" y="295">green</text>
+  </g>
+</svg>
+<p>Nobody told it that "halt" means stop. It worked that out because they led to the same plans. How alike are two words' 12 numbers? On a scale from −1 to 1: halt and stop went from 0.27 before training to <strong>0.92</strong> after; everything and all from −0.56 to <strong>0.91</strong>. Every LLM starts with this step.</p>
+</div>
 
-<h2 id="principles">2. First principles</h2>
-
-<h3>Step 1: give every word a list of numbers</h3>
-<p>Week 5's word counter stored a count per word per intent. That's a big table full of separate numbers, with nothing shared. Here's a different idea: give each word its own short list of numbers, like a character card in a game. Imagine the card had columns like "how stop-ish", "how all-ish", "how red". Then "halt" and "stop" would have similar cards, and anything the model learns about one would partly carry over to the other.</p>
-<p>The twist: <strong>we don't decide the columns</strong>. Each word starts with 12 random numbers between −0.3 and 0.3, and training nudges them until they're useful. That list is called an <strong>embedding</strong>. Here are the first 4 of the 12 numbers for "red", from the real model:</p>
-<pre><code>"red" before training:  [−0.14, −0.27, −0.20, −0.30, …]   (random)
-"red" after training:   [−0.20, −0.76,  0.94, −2.75, …]   (learned)</code></pre>
-<p>Do similar words really end up with similar lists? We can measure how much two lists "point the same way" with a score from −1 (opposite) to 1 (identical direction). Real numbers from our model:</p>
-<div class="table-wrap"><table>
-<tr><th>pair</th><th>before training</th><th>after training</th></tr>
-<tr><td>halt, stop</td><td class="num">0.27</td><td class="num">0.92</td></tr>
-<tr><td>halt, freeze</td><td class="num">0.04</td><td class="num">0.92</td></tr>
-<tr><td>everything, all</td><td class="num">−0.56</td><td class="num">0.91</td></tr>
-<tr><td>except, but</td><td class="num">−0.14</td><td class="num">0.57</td></tr>
-<tr><td>tea, joke</td><td class="num">−0.13</td><td class="num">0.10</td></tr>
-</table></div>
-<p>Nobody told it that "halt" means stop, or that "except" and "but" do the same job. It worked that out because those words led to the same answers in training. ("tea" and "joke" both lead to <code>none</code>, but each appears in only one command, so they barely moved.) That's the big idea behind embeddings, and every LLM starts with exactly this step.</p>
-
-<h3>Step 2: read a command by averaging</h3>
-<p>A command has several words, so several lists. We need one list for the whole thing. The simplest way: <strong>average</strong> them, position by position. Pretend the lists were only 3 numbers long:</p>
-<pre><code>"red"    →  [1, 0, 2]
-"block"  →  [3, 2, 0]
-average  →  [(1+3)/2, (0+2)/2, (2+0)/2]  =  [2, 1, 1]</code></pre>
-<p>Two rules. Words the model has never seen (not in its 88-word vocabulary) are skipped, because there's no list for them. And if <em>no</em> word is known, the result is 12 zeros. That's what <code>read</code> does, and you'll write it.</p>
-<details><summary>Predict first: does averaging care about word order?</summary>
-<p>No. Adding up doesn't care about order, so "put the red block away" and "away block red the put" give exactly the same average. The real model writes <code>['put', 'red']</code> for both. For our robot that's mostly fine. For "go to the blue block, not the red one" it's a disaster: "not" can't tell which colour it belongs to. Real LLMs fix part of this with <strong>attention</strong>, which you can build in the <a href="15b-attention.html">attention stretch</a>.</p>
-</details>
-
-<h3>Step 3: also look at what you've already written</h3>
-<p>When writing the third word, the model needs to know what it has written so far. So at each step it also looks at the last two words it wrote. Those get their own embeddings (12 numbers each). At the very beginning there's nothing written, so we use a pretend word, <code>&lt;start&gt;</code>. For "put the red and blue blocks away", the four steps look at:</p>
-<pre><code>step   the command   2 words back   last word    → should write
-1      (average)     &lt;start&gt;        &lt;start&gt;      put
-2      (average)     &lt;start&gt;        put          red
-3      (average)     put            red          blue
-4      (average)     red            blue         &lt;end&gt;</code></pre>
-<p>Joined end to end, that's 12 + 12 + 12 = <strong>36 numbers</strong> going in at every step. In Python, <code>list + list</code> joins two lists, so this is one line. Notice step 3: "put red" so far, and the command mentions blue, so the next word is blue. Step 4: red and blue are written, so it's time to stop.</p>
-
-<div class="card note"><strong>You don't need every number in Steps 4–8.</strong> They show what happens inside, and they're all real, but you can skim them. For the homework you need four ideas: a neuron adds up inputs times weights (Step 4), <code>softmax</code> with the subtract-the-biggest trick (Step 5), averaging (Step 2) and joining lists (Step 3). The rest is there for when you're curious.</div>
-
-<h3>A bridge: from 2 inputs to 36</h3>
-<p>Week 3's neuron had 2 inputs. Here's one with 3, using made-up numbers so you can check them with a calculator. It works the same way: multiply each input by its weight, add them up, add the bias, then squash. This time the squash is <code>tanh</code> (any number in, a number between −1 and 1 out) instead of sigmoid:</p>
-<pre><code>inputs   x = [1,    0,  2   ]
-weights  w = [0.5, −1,  0.25]     bias 0.1
-sum      = 0.5×1 + (−1)×0 + 0.25×2 + 0.1 = 1.1
-output   = tanh(1.1) ≈ 0.80</code></pre>
-<p>Now put a second neuron next to it. It reads the <em>same</em> 3 inputs, with its own weights <code>[−0.5, 2, 0]</code> and bias 0: −0.5×1 + 2×0 + 0×2 + 0 = −0.5, and tanh(−0.5) ≈ −0.46. Two neurons side by side are called a <strong>layer</strong>, and this layer turns 3 numbers into 2: <code>[0.80, −0.46]</code>. Our model's hidden layer is exactly this, only bigger: 36 inputs and 32 neurons side by side.</p>
-
-<h3>Step 4: from 36 numbers to 10 scores</h3>
-<p>Now the full-size version of the bridge. Each of 32 hidden neurons takes all 36 inputs, multiplies each by its own weight, adds them up, adds a bias, and squashes the result with <code>tanh</code> into the range −1 to 1:</p>
-<pre><code>hidden[j] = tanh( W1[j][0]×x[0] + W1[j][1]×x[1] + … + W1[j][35]×x[35] + b1[j] )</code></pre>
-<p>Then 10 output neurons, one per menu word, each take all 32 hidden values and do the same weighted sum (without the squash). Those 10 numbers are the <strong>scores</strong>. A tiny check of tanh: <code>math.tanh(0)</code> is 0, <code>math.tanh(2)</code> ≈ 0.96, <code>math.tanh(−2)</code> ≈ −0.96, and <code>math.tanh(100)</code> is 1.0. Big numbers get flattened.</p>
-
-<h3>Step 5: from scores to probabilities (softmax)</h3>
-<p>Scores can be any numbers, even negative. We want probabilities: all positive, adding up to 1. The recipe: raise <em>e</em> (about 2.718) to the power of each score, which makes everything positive and makes bigger scores <em>much</em> bigger, then divide each by the total. In Python that's <code>math.exp</code>. By hand, with three scores:</p>
+<div class="box idea"><span class="tag">💡 The idea: scores into chances (softmax)</span>
+<p>The network gives each menu word a raw score. Softmax raises <em>e</em> (about 2.718) to each score, so all are positive and big scores get much bigger, then divides by the total:</p>
 <pre><code>scores           2        1        0
-math.exp(score)  7.389    2.718    1.000      total = 11.107
-divide by total  0.665    0.245    0.090      ← adds up to 1</code></pre>
-<p>Now a problem. <code>math.exp(1000)</code> is too big for a computer and Python crashes with <code>OverflowError: math range error</code>. The trick: <strong>subtract the biggest score from all of them first</strong>. Scores 2, 1, 0 become 0, −1, −2:</p>
-<pre><code>math.exp(score)  1.000    0.368    0.135      total = 1.503
-divide by total  0.665    0.245    0.090      ← exactly the same answer!</code></pre>
-<p>Same answer, because shifting every score by the same amount doesn't change their ratios. And now the biggest thing you ever compute is <code>math.exp(0) = 1</code>. No crash. Every real LLM uses this trick.</p>
+math.exp(score)  7.389    2.718    1.000      total 11.107
+chance           0.665    0.245    0.090      ← adds up to 1</code></pre>
+<p>One trap: <code>math.exp(1000)</code> crashes. So <strong>subtract the biggest score first</strong> (2, 1, 0 becomes 0, −1, −2). You get exactly the same chances, and nothing is ever bigger than <code>math.exp(0) = 1</code>.</p>
+</div>
 
-<h3>Step 6: how wrong was it? Loss, or "surprise"</h3>
-<p>Training needs one number that says how badly the model did. Ours is <strong>surprise</strong>: if the model gave the right word probability <em>p</em>, the surprise is <code>−math.log(p)</code>.</p>
-<div class="table-wrap"><table>
-<tr><th>probability it gave the right word</th><th>surprise −log(p)</th><th>in words</th></tr>
-<tr><td class="num">1.00</td><td class="num">0.00</td><td>"obviously"</td></tr>
-<tr><td class="num">0.99</td><td class="num">0.01</td><td>"I was sure"</td></tr>
-<tr><td class="num">0.50</td><td class="num">0.69</td><td>"coin flip"</td></tr>
-<tr><td class="num">0.10</td><td class="num">2.30</td><td>"no idea" (1 in 10)</td></tr>
-<tr><td class="num">0.01</td><td class="num">4.61</td><td>"I was sure it was something else"</td></tr>
-</table></div>
-<p>Being confidently wrong is punished hardest. The grown-up name is <strong>cross-entropy loss</strong>. We add up the surprise for every word of an answer, including the <code>&lt;end&gt;</code>.</p>
-<details><summary>Predict first: before any training, roughly what's the surprise per word?</summary>
-<p>A random model spreads its bets about evenly over 10 words, so each right word gets about 1/10. Surprise ≈ 2.30 per word. An answer has 2 to 5 words counting <code>&lt;end&gt;</code>, so a few units per example. The real program prints <code>first epoch 3.59</code> (the average per example over the first pass, while it's already learning). By the last pass it's <code>0.049</code>.</p>
-</details>
-
-<h3>Step 7: where do the examples come from? (synthetic data)</h3>
-<p>Week 5's word counter learned from 34 example commands. That's nowhere near enough to learn plans: it has no "red and blue" commands and no "everything except" at all. Writing hundreds of examples by hand is slow and boring. So we do what real AI labs do: <strong>make the data with a program</strong>.</p>
-<p>Take a sentence template like <code>"bin {x}"</code>. Fill the gap <code>{x}</code> with every colour, every pair of colours, every "all" phrase, and every "except" phrase, and write the right plan next to each. Real output of <code>plan_examples(["bin {x}"], ["everything except the {c}"], random.Random(0))</code>:</p>
-<pre><code>('bin the red one', ['put', 'red'])
-('bin the blue one', ['put', 'blue'])
-('bin the green block', ['put', 'green'])
-('bin the red block and the blue block', ['put', 'red', 'blue'])
-('bin the red and the green one', ['put', 'red', 'green'])
-('bin the blue block and the red block', ['put', 'red', 'blue'])
-...                                                   (6 pairs in all)
-('bin everything', ['put', 'red', 'blue', 'green'])
-...                                                   (4 "all" phrases)
-('bin everything except the red', ['put', 'blue', 'green'])
-('bin everything except the blue', ['put', 'red', 'green'])
-('bin everything except the green', ['put', 'red', 'blue'])</code></pre>
-<p>One template gives 3 + 6 + 4 + 3 = 16 examples. Plans always list colours in the same order (red, blue, green), so "the blue block and the red block" is <code>put red blue</code>. That way there's only one right answer to learn. The <code>rng</code> picks between wordings like "the red block" and "the red one", so the examples don't all look identical.</p>
-<p>The training set, from <code>training_data()</code>:</p>
-<pre><code>8 put templates × (3 colours + 6 pairs + 4 "all" + 4 except × 3 colours)  = 200
-week 5's 34 commands, repeated 3 times                                    = 102
-7 vague commands → ask, repeated 3 times                                  =  21
-9 not-a-robot-job commands → none, repeated 3 times                       =  27
-                                                                            350
-minus every copy of a bake-off command (the robot's exam)                 −   7
-                                                                    total = 343</code></pre>
-<p><strong>Keep the exam out of the lessons.</strong> The 12 bake-off tasks (<a href="19-bakeoff.html">week 11</a>) are the robot's exam. Three of them would sneak into the training data word for word: "put the red block in the bin" and "stop" are among week 5's 34 examples (3 copies each), and the "bin {x}" template happens to make "bin everything except the green block". So <code>training_data()</code> removes every bake-off command, and 343 examples are left. Why it matters: a model can pass a test question it has already seen just by remembering the answer. Then the score tells you about its memory, not about whether it understands new commands. A test is only honest if the questions are new.</p>
-<p>Why repeat the small groups 3 times? Otherwise the 200 template examples drown them out, and the model learns that almost everything is a put.</p>
-<p><strong>Held-out test.</strong> To check it learned the <em>idea</em>, <code>test_data()</code> builds 50 examples it never trains on, from <em>different</em> templates ("chuck {x} in the trash", "please put {x} in the bin", "all of them except the {c} one"), week 5's 12 <code>TEST</code> commands, and new ask and none commands like "put it in the bin" and "what time is it".</p>
-<p><strong>Data matters.</strong> Trained on only about 66 hand-written examples, this same model gets just 20–40% of new plans right. The model is the same; the data is the problem. Generating examples from templates fixes it.</p>
-
-<h3>Step 8: learning = nudging 2,702 numbers</h3>
-<p>Where do the good numbers come from? The same trick as week 2's line fitting: <strong>gradient descent</strong>. For each example, work out which way to nudge each number to make the surprise a bit smaller, then nudge it a little (the learning rate is 0.05). Week 2 nudged 2 numbers. This nudges all of them:</p>
-<pre><code>word embeddings      88 words × 12      = 1,056
-written-word embs    11 words × 12      =   132   (10 menu words + &lt;start&gt;)
-hidden weights       32 × 36            = 1,152
-hidden biases        32                 =    32
-output weights       10 × 32            =   320
-output biases        10                 =    10
-                                  total = 2,702 parameters</code></pre>
-<p>Working out the nudges uses the <em>chain rule</em> from calculus, so <code>train_step</code> is written for you. Read it if you're curious: the comment <code>softmax + cross-entropy</code> marks the neat line where the "how wrong" for each word is just <code>probability − 1</code> for the right word and <code>probability − 0</code> for the others. Training goes through all 343 examples 25 times (25 <strong>epochs</strong>), in a shuffled order each time. That's 8,575 examples, and it took 10 seconds on our laptop.</p>
-
-<h3>Step 9: writing the answer, one word at a time</h3>
-<p>Once trained, writing is a loop. Read the command once. Then: predict, pick the most likely word, stop if it's <code>&lt;end&gt;</code>, otherwise add it and shift the "last two words" along. Always picking the top word is called <strong>greedy decoding</strong>. Here are the real probabilities for "put the red and blue blocks away":</p>
-<pre><code>step  looks at             top word   its probability
-1     &lt;start&gt; &lt;start&gt;      put        1.0000
-2     &lt;start&gt; put          red        0.9941   (blue 0.0057)
-3     put red              blue       0.9705   (green 0.0148)
-4     red blue             &lt;end&gt;      0.9921
-→ ['put', 'red', 'blue']  →  [{'intent': 'put', 'object': 'red block'}, {'intent': 'put', 'object': 'blue block'}]</code></pre>
-<p><code>words_to_plan</code> turns the words into a list of actions, and the robot does them one after the other. Before training, the same loop with the random starting numbers writes nothing at all: its very first pick is <code>&lt;end&gt;</code>, with only 0.1181 (green was 0.1123). Same machine, random numbers, no answer. Training is the only difference.</p>
-<p>After training it writes exactly the right plan for all 343 training examples (100%) and for 46 of the 50 held-out ones (<strong>92%</strong>).</p>
-
-<h3>Step 10: now break it (this is the important part)</h3>
-<p>The 4 held-out examples it gets wrong tell you a lot:</p>
-<pre><code>'please put everything in the bin'      wanted put red blue green   wrote put red blue
-'drive to the block'                    wanted ask                  wrote go red
-'where is the block'                    wanted ask                  wrote find red
-'wash the dishes'                       wanted none                 wrote find red</code></pre>
-<p>It forgets the third colour once, and three times it invents a colour (always red) for a command that has none.</p>
-<details><summary>Predict first: what does it write for "where's the green one?"</summary>
-<p>Just <code>put</code>, then <code>&lt;end&gt;</code> (0.9461, with green at 0.0529). Our tokenizer keeps "where's" as one word, which isn't in the vocabulary, so it's skipped. What's left ("the green one") looks like the start of a put command. But <code>["put"]</code> with no colour isn't a plan, so <code>words_to_plan</code> returns <code>None</code> and your robot says <code>Sorry, my answer made no sense.</code> A broken answer, caught before the robot moved. That's what <code>words_to_plan</code>'s strict rules are for.</p>
-</details>
-<details><summary>Predict first: what does it write for "wash the dishes"?</summary>
-<p><code>find red</code>. A complete, well-formed answer, and nonsense. Only "the" is in the vocabulary, and "the" appears in almost every robot command, so the model guesses a robot job and a colour. Compare "what time is it": only "what", "is" and "it" are known. "what" appears in a none example ("what is the weather like"), but "is" appears in find commands ("where is the red block"). Step 1 is a close race, and this time it comes out right: none 0.5250, find 0.3150. Greedy decoding takes the top word even when it barely won, and the final answer hides how unsure it was.</p>
-</details>
-<p>That's a <strong>hallucination</strong>: a fluent, confident-looking answer that the input doesn't support. Our model now has words for "I don't know" (<code>ask</code> and <code>none</code>), and it uses them for commands that look like its ask and none examples: "make me a sandwich" gives <code>none</code> (0.9950). But it must still pick <em>something</em>. Give it "zzz" (no known words, so it reads 12 zeros) and it writes <code>put red</code>, and it nearly added blue too (<code>&lt;end&gt;</code> 0.5177, blue 0.4672).</p>
-<p>Two more, and these matter for a robot:</p>
-<ul>
-<li>"tidy up the room" gives <code>put red blue</code>. It never saw "room", so it bins two blocks and forgets the green one.</li>
-<li>"stop the red block" gives <code>go red</code> (go 0.5092, find 0.4839, stop only 0.0034). "stop" is outnumbered by "the red block" in the average. You said stop and the robot drove off. A brain like this must never be trusted on its own. Next week, <a href="10-llm-safety.html">week 7</a> builds a safety layer that blocks <em>impossible</em> actions. But watch out: <code>go red</code> is a perfectly allowed action, so the safety layer will <strong>not</strong> catch this one. Catching it needs a confidence check (try the confidence alarm in the Stretch below).</li>
-</ul>
-<p><strong>Is the bake-off fair?</strong> Yes: none of its 12 commands is in the training data (Step 7 removes them). So 8/12 is a real score on unseen commands, and so is the 92% on the 50 held-out ones.</p>
-
-<h3>Step 11: from our tiny model to Claude</h3>
-<p>Here's the honest comparison. The <em>loop</em> is the same. Everything else is bigger.</p>
-<div class="table-wrap"><table>
-<tr><th></th><th>our TinyLM</th><th>a real LLM</th></tr>
-<tr><td>What a "word" is</td><td>a whole word; 88 it can read, 10 it can write</td><td>a <strong>token</strong>: a common word or a piece of a rarer one, from a vocabulary of tens of thousands or more, the same list for reading and writing</td></tr>
-<tr><td>Embeddings</td><td>12 numbers per word</td><td>thousands of numbers per token</td></tr>
-<tr><td>Reading the context</td><td>a flat average of the command + the last 2 written words</td><td><strong>attention</strong> (<a href="15b-attention.html">try it in the stretch</a>): every token decides how much to look at every other token, so order and "not" matter; the context can be a whole book</td></tr>
-<tr><td>Layers</td><td>1 hidden layer of 32</td><td>dozens of attention + neuron layers stacked</td></tr>
-<tr><td>Parameters</td><td>2,702</td><td>billions</td></tr>
-<tr><td>Training</td><td>343 examples (mostly made from templates), 25 epochs, about 10 seconds</td><td>trillions of tokens, weeks or months on thousands of chips, then extra training to follow instructions (<a href="13-lora.html">week 9</a> and <a href="12-preferences.html">week 12</a> show two pieces of that). Labs also make synthetic data, on a vastly bigger scale.</td></tr>
-<tr><td>Loss</td><td>surprise at the right next word</td><td>the same</td></tr>
-<tr><td>Writing</td><td>greedy, at most 5 words</td><td>the same loop, often picking with some randomness instead of always the top word, for thousands of tokens</td></tr>
-<tr><td>Saying "I don't know"</td><td>only when the command looks like its ask or none examples</td><td>possible only if training taught it to. It still sometimes hallucinates.</td></tr>
-</table></div>
-<p>When Claude writes a reply, it is running Step 9: read everything, score every token, softmax, pick, append, repeat. You've now built that loop yourself.</p>
-
-<h2 id="play">3. Play with it</h2>
-<div class="card demo">
-<h3>Interactive: watch the trained model write</h3>
-<p class="legend">These are the <em>real</em> 2,702 trained numbers from <code>train_tiny_lm()</code>, copied out of Python, with <code>read</code>, <code>forward</code>, <code>softmax</code>, <code>generate</code> and <code>words_to_plan</code> written in JavaScript exactly like the Python. Type a command, then press "Write the next word" and watch the 10 probabilities at each step. Words in <b style="color:var(--fail)">red</b> aren't in its vocabulary, so it can't read them.</p>
-<p><label for="lmIn">Command: </label><input id="lmIn" value="put the red and blue blocks away" size="34"></p>
+<h2 id="play">2. Play with it</h2>
+<div class="box play"><span class="tag">🎮 Play: watch the trained model write</span>
+<p class="legend">The <em>real</em> 2,702 trained numbers, copied out of Python, run with the same steps in JavaScript. Press "Write the next word" and watch the 10 chances at each step. Words in <b style="color:var(--fail)">red</b> aren't in its vocabulary.</p>
+<p><label for="lmIn">Command: </label><input id="lmIn" value="put the red and blue blocks away" size="30"></p>
 <p>
 <button data-c="put the red and blue blocks away">put the red and blue blocks away</button>
 <button data-c="clean up everything">clean up everything</button>
@@ -253,7 +113,7 @@ output biases        10                 =    10
 </p>
 <p><b>What it reads:</b> <span id="lmRead">–</span></p>
 <p><button id="lmNext">Write the next word</button> <button id="lmAll">Write it all</button> <button id="lmReset">Start again</button></p>
-<div id="lmSteps"></div>
+<div id="lmSteps" class="demo"></div>
 <p><b>Written so far:</b> <code id="lmOut">[]</code></p>
 <p><b>words_to_plan:</b> <code id="lmAct">–</code></p>
 <p class="legend" id="lmWarn"></p>
@@ -263,130 +123,155 @@ output biases        10                 =    10
   <div class="stat"><div class="k">Held-out plans right</div><div class="v" id="lmAcc">–</div></div>
 </div>
 </div>
-<p>Things to try: "halt halt halt" (same as "halt": the average of identical lists is the same list). "blocks blue and red the put away" (order doesn't matter). "hello robot" and "zzz" (nothing useful known, yet a confident plan). "tidy up the room". Then try to find a command where one step is a close race.</p>
+<p><strong>Now break it.</strong> Try "stop the red block". It writes <code>go red</code>: go 0.5092, find 0.4839, stop only 0.0034. You said stop and the robot drove off. Try "zzz": it knows no word, yet still writes a confident plan. A fluent answer the input doesn't support is called a <strong>hallucination</strong>. A brain like this must never be trusted on its own.</p>
 
-<h2 id="homework">4. Homework</h2>
-<p>Open <code>homework/lesson15_tiny_lm.py</code>. It imports <code>tokenize</code> from <em>your</em> <code>lesson08_words.py</code>, and <code>TRAIN</code>, <code>TEST</code> and <code>extract_object</code> from <em>your</em> <code>lesson09_commands.py</code> (both week 5), so those must be finished. The templates, <code>TinyLM.__init__</code>, <code>train_step</code>, <code>make_targets</code>, <code>training_data</code>, <code>test_data</code>, <code>train_tiny_lm</code> and <code>accuracy</code> are written for you. You write six things, in order.</p>
+<h2 id="homework">3. Build it</h2>
+<div class="box build"><span class="tag">🛠 Build</span>
+<p>Open <code>project/homework/lesson15_tiny_lm.py</code>. It imports your week 7 files, so finish those first. The training code (<code>train_step</code>, <code>train_tiny_lm</code> and friends) is written for you. You write six things, in order, testing each from the <code>homework</code> folder.</p>
+</div>
 
-<h3>4.1 <code>softmax(scores)</code></h3>
-<p>Turn any list of scores into probabilities that add up to 1, using Step 5, <em>with</em> the subtract-the-biggest trick.</p>
-<p>Example: <code>softmax([2, 1, 0])</code> → about <code>[0.665, 0.245, 0.090]</code>. <code>softmax([1000, 1000])</code> → <code>[0.5, 0.5]</code>, with no crash.</p>
-<details><summary>Hint 1</summary><p>Three stages: find the biggest score, make a list of <code>math.exp(score − biggest)</code>, divide each by the total.</p></details>
-<details><summary>Hint 2</summary><p><code>max(scores)</code> and <code>sum(...)</code> do the first and last stages. A list comprehension does the middle one.</p></details>
-<details><summary>Hint 3</summary><p><code>m = max(scores)</code>; <code>exps = [math.exp(s - m) for s in scores]</code>; then return each <code>e / total</code> where <code>total = sum(exps)</code>.</p></details>
+<ol class="steps">
+<li><p><strong><code>softmax(scores)</code></strong>: chances that add up to 1, <em>with</em> the subtract-the-biggest trick.</p>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>python3 -c "from lesson15_tiny_lm import *; print([round(p, 3) for p in softmax([2, 1, 0])], softmax([1000, 1000]))"</code></pre>
+<pre><code>[0.665, 0.245, 0.09] [0.5, 0.5]</code></pre>
+<p>If you see <code>OverflowError: math range error</code>, you skipped the trick: subtract <code>max(scores)</code> first.</p></div>
+<details class="box stuck"><summary>🆘 Stuck?</summary>
+<p><b>Hint 1.</b> Three stages: <code>m = max(scores)</code>, a list of <code>math.exp(s - m)</code>, then divide each by the total.</p>
+<p><b>Hint 2.</b> Fill in:</p>
+<pre><code>m = max(scores)
+exps = [math.exp(s - ____) for s in scores]
+total = sum(exps)
+return [e / ____ for e in exps]</code></pre></details></li>
 
-<h3>4.2 <code>TinyLM.read(self, command)</code></h3>
-<p>The average embedding of the command's <em>known</em> words (Step 2). Tokenize the command, keep only words in <code>self.word_emb</code>, and average their lists position by position. If no word is known, return <code>[0.0] * E</code>.</p>
-<p>Example: for a model with vocabulary <code>{"red", "block"}</code>, <code>read("red block")</code> is the average of the "red" and "block" lists, and <code>read("zzz qqq")</code> is twelve <code>0.0</code>s.</p>
-<details><summary>Hint 1</summary><p>First collect a list of the embeddings you'll average. Unknown words must be skipped, not crash with a <code>KeyError</code>.</p></details>
-<details><summary>Hint 2</summary><p>Handle "nothing known" before dividing, or you'll divide by zero. For the average, position <code>i</code> of the result is the sum of position <code>i</code> of every list, divided by how many lists.</p></details>
-<details><summary>Hint 3</summary><p><code>vecs = [self.word_emb[w] for w in tokenize(command) if w in self.word_emb]</code>. If <code>vecs</code> is empty return zeros; otherwise build a list where item <code>i</code> is <code>sum(v[i] for v in vecs) / len(vecs)</code>, for <code>i</code> in <code>range(E)</code>.</p></details>
+<li><p><strong><code>TinyLM.read(self, command)</code></strong>: the average of the 12 numbers of every <em>known</em> word, position by position. Skip unknown words. Nothing known → <code>[0.0] * E</code>.</p>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>python3 -c "from lesson15_tiny_lm import *; m = TinyLM(['red', 'block']); print(len(m.read('red block')), m.read('zzz qqq'))"</code></pre>
+<pre><code>12 [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]</code></pre>
+<p>If you see <code>KeyError: 'zzz'</code>, you looked up a word that isn't in <code>self.word_emb</code>. Keep only known words.</p></div>
+<details class="box stuck"><summary>🆘 Stuck?</summary>
+<p><b>Hint 1.</b> <code>vecs = [self.word_emb[w] for w in tokenize(command) if w in self.word_emb]</code></p>
+<p><b>Hint 2.</b> Fill in:</p>
+<pre><code>vecs = [self.word_emb[w] for w in tokenize(command) if w in self.word_emb]
+if not vecs:
+    return [0.0] * ____
+return [sum(v[i] for v in vecs) / len(____) for i in range(E)]</code></pre></details></li>
 
-<h3>4.3 <code>TinyLM.forward(self, ctx, prev2, prev1)</code></h3>
-<p>One prediction step (Steps 3–5). Join <code>ctx</code> with the written-word embeddings of <code>prev2</code> and <code>prev1</code> (from <code>self.out_emb</code>) into 36 numbers, <code>x</code>. Compute the 32 hidden values, then the 10 scores, then softmax. Return <code>(x, hidden, probs)</code>: <code>train_step</code> needs all three.</p>
-<p>Example: <code>forward(model.read("red block"), START, START)</code> returns an <code>x</code> of length 36, a <code>hidden</code> of length 32, and 10 probabilities adding to 1.</p>
-<div class="card note"><strong>New Python this time: <code>zip</code>, and <code>sum</code> of a loop.</strong> <code>zip</code> walks two lists side by side, and <code>sum(...)</code> can add up a whole loop in one line. Together they do the bridge's "inputs times weights, added up":
-<pre><code>w, x = [0.5, -1, 0.25], [1, 0, 2]
-print(sum(a * b for a, b in zip(w, x)))      # 0.5*1 + -1*0 + 0.25*2 = 1.0</code></pre></div>
-<details><summary>Hint 1</summary><p><code>self.W1</code> is a list of 32 rows, each with 36 weights, and <code>self.b1</code> has 32 biases. <code>self.W2</code> is 10 rows of 32, and <code>self.b2</code> has 10. Start with <code>x = ctx + self.out_emb[prev2] + self.out_emb[prev1]</code> (three 12-number lists joined into 36).</p></details>
-<details><summary>Hint 2</summary><p>Make it easy on yourself: write a tiny helper for <em>one</em> neuron first, just like the bridge. You can put it inside <code>forward</code>:</p>
+<li><p><strong><code>TinyLM.forward(self, ctx, prev2, prev1)</code></strong>: join <code>ctx</code> with the embeddings of the last two written words into 36 numbers <code>x</code>. Each of 32 hidden neurons: inputs times weights, added up, plus a bias, squashed with <code>math.tanh</code>. Then 10 scores the same way (no squash), then softmax. Return <code>(x, hidden, probs)</code>.</p>
+<p><strong>New Python:</strong> <code>sum(a * b for a, b in zip(w, x))</code> multiplies two lists pair by pair and adds up. For <code>w = [0.5, -1, 0.25]</code> and <code>x = [1, 0, 2]</code> that's 1.0.</p>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>python3 -c "from lesson15_tiny_lm import *; m = TinyLM(['red', 'block']); x, h, p = m.forward(m.read('red block'), START, START); print(len(x), len(h), len(p), round(sum(p), 6))"</code></pre>
+<pre><code>36 32 10 1.0</code></pre>
+<p>If the first number is 12, you added the three lists number by number. Join them with <code>+</code> instead.</p></div>
+<details class="box stuck"><summary>🆘 Stuck?</summary>
+<p><b>Hint 1.</b> <code>x = ctx + self.out_emb[prev2] + self.out_emb[prev1]</code>. <code>self.W1</code> is 32 rows of 36 weights with biases <code>self.b1</code>; <code>self.W2</code> is 10 rows of 32 with <code>self.b2</code>.</p>
+<p><b>Hint 2.</b> Write a helper for one neuron inside <code>forward</code>:</p>
 <pre><code>def neuron(row, inputs, bias):
     return sum(w * v for w, v in zip(row, inputs)) + bias</code></pre>
-<p>A hidden value is <code>math.tanh(neuron(row, x, b))</code>, once for each <code>row, b</code> in <code>zip(self.W1, self.b1)</code>. A score is <code>neuron(row, hidden, b)</code> (no tanh), once for each <code>row, b</code> in <code>zip(self.W2, self.b2)</code>.</p></details>
-<details><summary>Hint 3</summary><p>Fill in the blanks (under your <code>neuron</code> helper):</p>
+<p><b>Hint 3.</b> Fill in:</p>
 <pre><code>x = ctx + self.out_emb[prev2] + self.out_emb[____]
 hidden = [math.tanh(neuron(row, ____, b)) for row, b in zip(self.W1, self.b1)]
 scores = [neuron(row, ____, b) for row, b in zip(self.W2, self.b2)]
-return x, hidden, ____(scores)</code></pre></details>
+return x, hidden, ____(scores)</code></pre></details></li>
 
-<h3>4.4 <code>TinyLM.generate(self, command, max_words=MAX_WORDS)</code></h3>
-<p>Greedy decoding (Step 9). Read the command once. Start with <code>prev2 = prev1 = START</code>. Up to <code>max_words</code> times (5 by default): forward, take the word in <code>OUT_WORDS</code> with the biggest probability, stop if it's <code>"&lt;end&gt;"</code>, otherwise append it and shift. Return the words, without <code>"&lt;end&gt;"</code>.</p>
-<p>Example (after training): <code>generate("put the red and blue blocks away")</code> → <code>['put', 'red', 'blue']</code>.</p>
-<details><summary>Hint 1</summary><p>Call <code>self.read</code> once, before the loop. The command doesn't change while you write.</p></details>
-<details><summary>Hint 2</summary><p>The position of the biggest probability is <code>probs.index(max(probs))</code>, and <code>OUT_WORDS</code> at that position is the word.</p></details>
-<details><summary>Hint 3</summary><p>Loop <code>for _ in range(max_words)</code>: get <code>probs</code> from <code>self.forward(ctx, prev2, prev1)</code> (you only need the third thing it returns), pick the word, <code>break</code> on <code>"&lt;end&gt;"</code>, else append it and do <code>prev2, prev1 = prev1, word</code>.</p></details>
+<li><p><strong><code>TinyLM.generate(self, command, max_words=MAX_WORDS)</code></strong>: read once, start with <code>prev2 = prev1 = START</code>, and up to 5 times: forward, take the top word, stop on <code>"&lt;end&gt;"</code>, else append it and shift.</p>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint (untrained, so it writes nonsense)</span>
+<pre><code>python3 -c "from lesson15_tiny_lm import *; m = TinyLM(['red', 'block']); print(m.generate('red block'))"</code></pre>
+<pre><code>['blue', 'blue', 'ask', 'go', 'ask']</code></pre>
+<p>Random numbers, random words: that's right for now. If you see <code>['blue', 'blue', 'blue', 'blue', 'blue']</code>, you forgot to shift: <code>prev2, prev1 = prev1, word</code>.</p></div>
+<details class="box stuck"><summary>🆘 Stuck?</summary>
+<p><b>Hint 1.</b> The top word is <code>OUT_WORDS[probs.index(max(probs))]</code>.</p>
+<p><b>Hint 2.</b> Fill in:</p>
+<pre><code>ctx = self.read(command)
+prev2, prev1, out = START, START, []
+for _ in range(max_words):
+    probs = self.forward(ctx, prev2, prev1)[____]
+    word = OUT_WORDS[probs.index(max(probs))]
+    if word == "&lt;end&gt;":
+        break
+    out.append(word)
+    prev2, prev1 = ____, word
+return out</code></pre></details></li>
 
-<h3>4.5 <code>words_to_plan(words)</code></h3>
-<p>Turn the model's words into something the robot can do: a list of action dictionaries (the same shape as week 5's <code>parse_command</code>), or the word <code>"ask"</code> or <code>"none"</code>. Return <code>None</code> if the words don't make sense.</p>
-<pre><code>["ask"]                 → "ask"
-["none"]                → "none"
-["stop"]                → [{"intent": "stop", "object": None}]
-["go", "red"]           → [{"intent": "go", "object": "red block"}]      (go and find: exactly one colour)
-["put", "red", "blue"]  → [{"intent": "put", "object": "red block"}, {"intent": "put", "object": "blue block"}]
-["go", "red", "blue"]   → None   (go can't go to two places)
-["put", "red", "red"]   → None   (a repeated colour)
-["red", "put"], ["put", "purple"], ["put"], [], ["stop", "red"]  → None</code></pre>
-<details><summary>Hint 1</summary><p>Deal with the three one-word answers first (<code>["ask"]</code>, <code>["none"]</code>, <code>["stop"]</code>). Python can compare whole lists: <code>words == ["stop"]</code>.</p></details>
-<details><summary>Hint 2</summary><p>Everything else must start with put, go or find, followed by at least one colour. <code>colours = words[1:]</code>. Every colour must be in <code>COLOURS</code>, and <code>len(set(colours)) != len(colours)</code> means there's a repeat. Only put may have more than one colour.</p></details>
-<details><summary>Hint 3</summary><p>After the one-word checks: if <code>not words</code> or <code>words[0]</code> isn't in <code>("put", "go", "find")</code>, return None. Check the colours as in Hint 2, and that a go/find has exactly one. Then <code>return [{"intent": words[0], "object": f"{c} block"} for c in colours]</code>.</p></details>
+<li><p><strong><code>words_to_plan(words)</code></strong>: turn words into actions. <code>["ask"]</code> → <code>"ask"</code>, <code>["none"]</code> → <code>"none"</code>, <code>["stop"]</code> → a stop action. Otherwise put, go or find followed by colours: one action per colour. go and find take exactly one colour. Anything else (repeats, no colour, unknown words) → <code>None</code>.</p>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>python3 -c "from lesson15_tiny_lm import *; print(words_to_plan(['put', 'red', 'blue'])); print(words_to_plan(['go', 'red', 'blue']), words_to_plan(['put', 'red', 'red']), words_to_plan(['ask']))"</code></pre>
+<pre><code>[{'intent': 'put', 'object': 'red block'}, {'intent': 'put', 'object': 'blue block'}]
+None None ask</code></pre></div>
+<details class="box stuck"><summary>🆘 Stuck?</summary>
+<p><b>Hint 1.</b> Python compares whole lists: <code>words == ["stop"]</code>.</p>
+<p><b>Hint 2.</b> <code>len(set(colours)) != len(colours)</code> means a repeat.</p>
+<p><b>Hint 3.</b> Fill in:</p>
+<pre><code>if words in (["ask"], ["none"]):
+    return words[0]
+if words == ["stop"]:
+    return [{"intent": "stop", "object": None}]
+if not words or words[0] not in ("put", "go", "find"):
+    return None
+colours = words[1:]
+if not colours or any(c not in COLOURS for c in colours) or len(set(colours)) != len(colours):
+    return None
+if words[0] != "put" and len(colours) != ____:
+    return None
+return [{"intent": words[0], "object": f"{c} block"} for c in ____]</code></pre></details></li>
 
-<h3>4.6 <code>plan_examples(put_templates, except_templates, rng)</code></h3>
-<p>Make the synthetic data from Step 7. For <em>every</em> template in <code>put_templates</code>, add, in this order:</p>
-<ol>
-<li>each colour <code>c</code>: the template with <code>x = rng.choice(["the c block", "the c one"])</code> → <code>["put", c]</code>;</li>
-<li>each ordered pair <code>(a, b)</code> of different colours (6 pairs): <code>x = rng.choice(["the a and b blocks", "the a block and the b block", "the a and the b one"])</code> → <code>["put", a, b]</code> with the colours in <code>COLOURS</code> order;</li>
-<li>each phrase in <code>ALL_PHRASES</code>: <code>x</code> = the phrase → <code>["put", "red", "blue", "green"]</code>;</li>
-<li>each except template <code>e</code> and each colour <code>c</code>: <code>x = e.format(c=c)</code> → <code>["put"]</code> + the other two colours, in <code>COLOURS</code> order.</li>
-</ol>
-<p>Return a list of <code>(command, plan words)</code> pairs. Loop in exactly this order (colours in <code>COLOURS</code> order) so your <code>rng</code> choices match the checker's.</p>
-<p>Example: <code>plan_examples(["bin {x}"], ["everything except the {c}"], random.Random(0))</code> gives the 16 examples printed in Step 7, starting with <code>('bin the red one', ['put', 'red'])</code> and ending with <code>('bin everything except the green', ['put', 'red', 'blue'])</code>.</p>
-<details><summary>Hint 1</summary><p>Fill a template with <code>t.format(x=...)</code>. One outer loop over <code>put_templates</code>, with four loops inside it, one per numbered step.</p></details>
-<details><summary>Hint 2</summary><p>For the pairs, loop <code>a</code> over <code>COLOURS</code>, then <code>b</code> over <code>COLOURS</code>, and skip <code>a == b</code>. To write the colours in <code>COLOURS</code> order, don't use <code>[a, b]</code>: use <code>[k for k in COLOURS if k in (a, b)]</code>. The except plan is <code>[k for k in COLOURS if k != c]</code>.</p></details>
-<details><summary>Hint 3</summary><p>Call <code>rng.choice</code> exactly once per colour in step 1 and once per pair in step 2, and nowhere else. An extra or missing call shifts every later choice, and the checker's "first: the red block" test will fail. Use f-strings for the choices, e.g. <code>[f"the {c} block", f"the {c} one"]</code>.</p></details>
-
-<h3>Run it</h3>
-<pre><code>cd homework
-python3 lesson15_tiny_lm.py</code></pre>
-<p>What you should see (real output of the reference solution). The last line is wrong on purpose: it's a failure from Step 10. "what time is it" is right, but only just (Step 10).</p>
+<li><p><strong><code>plan_examples(put_templates, except_templates, rng)</code></strong>: make training data from templates. For <em>each</em> put template, in this order: (1) each colour, <code>x = rng.choice(["the c block", "the c one"])</code> → <code>["put", c]</code>; (2) each ordered pair of different colours, <code>x = rng.choice(["the a and b blocks", "the a block and the b block", "the a and the b one"])</code> → <code>["put"]</code> + the pair in <code>COLOURS</code> order; (3) each phrase in <code>ALL_PHRASES</code> → all three colours; (4) each except template and colour, <code>e.format(c=c)</code> → the other two colours.</p>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>python3 -c "import random; from lesson15_tiny_lm import *; ex = plan_examples(['bin {x}'], ['everything except the {c}'], random.Random(0)); print(len(ex), ex[0], ex[-1])"</code></pre>
+<pre><code>16 ('bin the red one', ['put', 'red']) ('bin everything except the green', ['put', 'red', 'blue'])</code></pre>
+<p>If <code>check.py</code> later says <code>the pair (blue, red) must be written in COLOURS order</code>, you wrote <code>[a, b]</code>. Use <code>[k for k in COLOURS if k in (a, b)]</code>.</p></div>
+<details class="box stuck"><summary>🆘 Stuck?</summary>
+<p><b>Hint 1.</b> Fill a template with <code>t.format(x=...)</code>. Call <code>rng.choice</code> once per colour and once per pair, nowhere else, or every later choice shifts.</p>
+<p><b>Hint 2.</b> Fill in:</p>
+<pre><code>out = []
+for t in put_templates:
+    for c in COLOURS:
+        out.append((t.format(x=rng.choice([f"the {c} block", f"the {c} one"])), ["put", c]))
+    for a in COLOURS:
+        for b in COLOURS:
+            if a == b:
+                continue
+            x = rng.choice([f"the {a} and {b} blocks", f"the {a} block and the {b} block", f"the {a} and the {b} one"])
+            out.append((t.format(x=x), ["put"] + [k for k in COLOURS if k in (a, b)]))
+    for p in ALL_PHRASES:
+        out.append((t.format(x=p), ["put"] + ____))
+    for e in except_templates:
+        for c in COLOURS:
+            out.append((t.format(x=e.format(c=c)), ["put"] + [k for k in COLOURS if k != ____]))
+return out</code></pre></details>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint: train it and run the whole file</span>
+<pre><code>python3 lesson15_tiny_lm.py</code></pre>
 <pre><code>343 training examples (made from templates), 50 held-out test examples
-loss: first epoch 3.59 -&gt; last epoch 0.049   (10 s)
+loss: first epoch 3.59 -&gt; last epoch 0.049   (5 s)
 exact plan accuracy: train 100%, held-out test 92%
   'put the green and red blocks away'          -&gt; put red green      -&gt; [{'intent': 'put', 'object': 'red block'}, {'intent': 'put', 'object': 'green block'}]
   'throw out all of them except the blue one'  -&gt; put red green      -&gt; [{'intent': 'put', 'object': 'red block'}, {'intent': 'put', 'object': 'green block'}]
   'put it in the bin'                          -&gt; ask                -&gt; ask
   'what time is it'                            -&gt; none               -&gt; none
   "where's the green one?"                     -&gt; put                -&gt; None</code></pre>
-<p>Your numbers should match exactly (the seconds will differ): the starting numbers and the shuffling come from a fixed random seed (0), so everyone's model trains the same way.</p>
+<p>Your numbers should match exactly (the seconds will differ): the random seed is fixed. The last line is a failure on purpose: "where's" is unknown, so it writes just <code>put</code>, and <code>words_to_plan</code> rejects it. Then <code>cd ..</code> and <code>python3 check.py 15</code>:</p>
+<pre><code>Lesson 15: lesson15_tiny_lm.py
+  ✓ softmax
+  ✓ read
+  ✓ forward
+  ✓ words_to_plan
+  ✓ plan_examples
+  ✓ trains and writes plans
+  6/6 passed  🎉 lesson complete!</code></pre>
+<p>If you see <code>held-out plan accuracy should be at least 80% (got 72%)</code> together with a <code>plan_examples</code> ✗, it's one bug, not two: fix the pair order and both turn green.</p></div></li>
+</ol>
 
-<h3>Check it</h3>
-<pre><code>cd ..
-python3 check.py 15</code></pre>
-<p>Six checks: <code>softmax</code>, <code>read</code>, <code>forward</code>, <code>words_to_plan</code>, <code>plan_examples</code>, and <code>trains and writes plans</code> (which trains the model, so it needs everything else, and takes a little while). Green ✓ = passed, red ✗ = read the hint, yellow <code>…</code> = not written yet. If the last one says <code>not written yet (Lesson 9: write this function)</code>, it's your week 5 file <code>lesson09_commands.py</code> that's unfinished. Real hints:</p>
-<ul>
-<li><code>✗ softmax: softmax([1000, 1000]) crashed or was wrong: subtract the biggest score first</code>. You skipped the trick from Step 5.</li>
-<li><code>✗ read: no known words -&gt; a list of E zeros</code>. You crashed, or returned an empty list, when nothing in the command was known.</li>
-<li><code>✗ words_to_plan: go/find take exactly one colour</code>. Only put may list several colours.</li>
-<li><code>✗ plan_examples: the pair (blue, red) must be written in COLOURS order -&gt; ['put', 'red', 'blue'], not [a, b] (sort the pair by COLOURS)</code>. The pair (blue, red) should give <code>['put', 'red', 'blue']</code>. You probably wrote <code>[a, b]</code> instead of sorting into red, blue, green order (Hint 2 of 4.6).</li>
-<li><code>✗ trains and writes plans: held-out plan accuracy should be at least 80% (got 72%)</code>. If you see this together with the <code>plan_examples</code> ✗ above, it's the same bug, not a second one: the model learned from wrongly ordered plans. Fix <code>plan_examples</code> first and both turn green. (72% is what the <code>[a, b]</code> mistake really gives.)</li>
-</ul>
-
-<h3>Stretch</h3>
-<ul>
-<li><strong>A confidence alarm.</strong> Change <code>generate</code> (in a copy) so it gives up and returns <code>[]</code> if any picked word had probability below 0.7. Try the five commands in the file and "stop the red block". Which get caught? Which <em>wrong</em> answer slips through, and why does that matter?
-<details><summary>Compare with ours</summary><p>Caught: "what time is it" (none won with only 0.5250, and it was <em>right</em>) and "stop the red block" (go won with 0.5092, wrong). Not caught: "where's the green one?" writes <code>put</code> with its lowest step at 0.8647, but <code>words_to_plan</code> already rejects that. Over all 343 training and 50 held-out examples, 5 get caught, and only one of them, "where is the block" (0.5134), was wrong. The other 4 were right: false alarms. The other 3 wrong held-out answers slip through with their lowest step between 0.80 and 0.98. Confidence is a clue, not a guarantee.</p></details></li>
-<li><strong>Teach it a new phrase.</strong> "tidy up the room" fails because "room" was never seen. Add <code>"the room"</code> to <code>ALL_PHRASES</code> (in a copy), retrain, and test it. Does it fix that command? Does it now bin everything for "tidy up the red block in the room"? Adding data fixes one thing and can break another.</li>
-<li><strong>Shrink it.</strong> Set <code>E</code> to 2 and <code>H</code> to 4 and retrain. How many parameters now? Does held-out accuracy survive? Where's the smallest model that still gets at least 80%?</li>
-</ul>
-
-<h3 id="attention">Stretch 2: attention</h3>
-<p>A bigger, optional stretch with its own page: <a href="15b-attention.html">Week 6 stretch · Attention</a>. Your model learns where to look at every step, the idea at the centre of every real LLM. Do it after the homework and after adding this week's piece to your robot.</p>
-
-<h2 id="add-to-robot">Add it to your robot</h2>
-<p>Fill in <code>understand_plans(self, text)</code>: your language model writes a whole plan, and your <code>words_to_plan()</code> turns the words into actions. Once this gap is filled, your robot uses it instead of the word counter. The docstring is the spec:</p>
+<h2 id="add-to-robot">4. Add it to your robot</h2>
+<div class="box bot"><span class="tag">🤖 Add it to your robot</span>
+<p>Fill in <code>understand_plans(self, text)</code>. Your model writes the words, <code>words_to_plan()</code> turns them into actions. <code>self.brain()</code> is provided: it trains your tiny LM once (10–20 seconds) and hands back the trained model. The docstring:</p>
 <pre><code>words = self.brain().generate(text), then plan = words_to_plan(words)
   None   -&gt; return "Sorry, my answer made no sense."
   "ask"  -&gt; return "Which block do you mean: red, blue or green?"
   "none" -&gt; return "Sorry, that's not something I can do."
   otherwise return the plan (a list of actions)</code></pre>
-<p><code>self.brain()</code> is provided: it trains your tiny LM the first time (10–20 seconds) and then keeps it, and it hands back the trained model.</p>
-<div class="card note"><strong>New Python this time: calling a method on what a method gives back.</strong> <code>self.brain()</code> gives back your trained <code>TinyLM</code>, so you can call its <code>generate</code> straight away:
-<pre><code>model = self.brain()                 # the trained TinyLM
-words = model.generate("halt")       # ['stop']   (same as self.brain().generate("halt"))</code></pre></div>
-<details><summary>Hint 1</summary><p>Start the method with this import (your week 6 file):</p>
-<pre><code>from lesson15_tiny_lm import words_to_plan</code></pre>
-<p>Then one line writes and checks the plan: <code>plan = words_to_plan(self.brain().generate(text))</code>.</p></details>
-<details><summary>Hint 2</summary><p>Handle the three special answers with three <code>if</code>s, each one <code>return</code>ing the sentence from the docstring. Check for <code>None</code> with <code>plan is None</code>, and for the words with <code>plan == "ask"</code> and <code>plan == "none"</code>. If none of them matched, <code>return plan</code>.</p></details>
-<details><summary>Hint 3</summary><p>Fill in the blanks:</p>
+<details class="box stuck"><summary>🆘 Stuck?</summary>
+<p><b>Hint 1.</b> Start with <code>from lesson15_tiny_lm import words_to_plan</code>, then <code>plan = words_to_plan(self.brain().generate(text))</code>.</p>
+<p><b>Hint 2.</b> Fill in:</p>
 <pre><code>from lesson15_tiny_lm import words_to_plan
 plan = words_to_plan(self.brain().generate(____))
 if plan is None:
@@ -396,8 +281,17 @@ if plan == ____:
 if plan == "none":
     return ____
 return plan</code></pre></details>
-<p>Check it: <code>cd ..</code> back to <code>project</code>, then <code>python3 check.py robot</code>. Your new check is <em>"week 6: plans"</em>.</p>
-<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output:</p>
+</div>
+<div class="room" data-robot="7,6" data-cat="4,1" data-blocks="green:1,5" data-label="After 'put the red and blue blocks away': both blocks binned, green left"></div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p>From <code>project</code>, <code>python3 check.py robot</code>:</p>
+<pre><code>  ✓ week 7: fixes typos
+  ✓ week 7: understands and does
+  ✓ week 8: plans
+  … week 9: drives on wheels: not written yet (fill in drive() first)
+  …
+  11/21 passed</code></pre>
+<p>Then <code>cd homework</code>, <code>python3 my_robot.py</code>. Real replies:</p>
 <pre><code>Zippy&gt; put the red and blue blocks away
   (I think you meant: 'put the red and blue block away')
   (Training my language brain. About 10-20 seconds, once...)
@@ -407,68 +301,93 @@ Zippy&gt; put the block away
 Zippy&gt; make me a cup of tea
   (I think you meant: 'make me a up of tea')
   Sorry, that's not something I can do.</code></pre>
-<p>Same first command as last week. Now both blocks go in the bin, because your robot writes a whole plan. The <code>(I think you meant …)</code> lines are your week 5 typo fixer at work. It only knows the words in week 5's 34 commands, so it "fixes" words it has never seen into ones it has: "blocks" becomes "block", and "cup" becomes "up". Your code isn't broken: that's what a fixer with a small word list does. The plan comes out right anyway.</p>
+<p>Last week, the first command binned only the red block. Now both go. The "(I think you meant …)" lines are your week 7 typo fixer: it only knows 52 words, so "cup" becomes "up". The plan comes out right anyway.</p>
+</div>
 
 <h2 id="challenge">5. Real-world challenge: be the language model</h2>
-<p>You'll play the model, with a friend or family member, and measure your own loss and your own hallucinations. You need 10 coins (or beans, or Lego bricks), paper and a pencil.</p>
+<div class="box play"><span class="tag">🌍 Real-world challenge</span>
 <ol>
-<li><strong>Round 1: next word, with bets.</strong> Your partner secretly writes a short, ordinary sentence of 6–8 words (e.g. something they'd text you). They tell you the first word. Before each next word, you split your 10 coins between up to three guesses. Then they reveal the real word.</li>
-<li><strong>Score your surprise</strong> for each word from the coins you put on the right word, using this table (it's <code>−log(coins/10)</code> from Step 6): 10 coins → 0, 8 → 0.22, 5 → 0.69, 3 → 1.20, 2 → 1.61, 1 → 2.30, 0 → 4.6 (a penalty, as if you'd bet 1 coin in 100). Add up the sentence. Do 3 sentences, then swap roles.</li>
-<li><strong>Notice how you bet.</strong> After "put the kettle", were you nearly sure of "on"? After "I", were your coins spread out? That's softmax: a sharp or a flat spread of probability.</li>
-<li><strong>Round 2: no "I don't know" allowed.</strong> Your partner asks 5 questions you can't possibly know the answer to, like "What's the name of my teacher's dog?" or "What did I eat on 3 March last year?" Rule: you must answer instantly, with one confident specific answer. Write down each answer and whether it was right.</li>
-<li><strong>Round 3: same game, but "I don't know" is allowed.</strong> Ask 5 new unknowable questions. Count how often you use it.</li>
+<li>A partner secretly writes a 6–8 word sentence and tells you the first word. Before each next word, split 10 coins between up to three guesses. Then they reveal it.</li>
+<li>Score your surprise from the coins on the right word: 10 → 0, 8 → 0.22, 5 → 0.69, 3 → 1.20, 2 → 1.61, 1 → 2.30, 0 → 4.6. Add up each sentence. Swap roles.</li>
+<li>Then they ask 5 questions you can't know ("What's my teacher's dog called?"). You must answer instantly and confidently. Then 5 more where "I don't know" is allowed.</li>
 </ol>
-<p><strong>On your own (no partner needed):</strong> for Round 1, open a book you haven't read at a random page and cover everything below the first line with a card. Read the first word of a sentence, bet your coins on the next word, then slide the card along to check. For Rounds 2 and 3, open an atlas or a fact book at a random page and cover the facts. Ask yourself 5 things you can't know (the height of a mountain, the year a town was founded): in Round 2 answer instantly with a specific guess, in Round 3 you may say "I don't know". Then check.</p>
-<p><strong>Record:</strong> your total surprise for each sentence (who was the better "model"?), your 5 forced answers from Round 2 and how many were right, and how Round 3 felt different. <strong>What it should teach you:</strong> a good language model isn't one that's always sure; it's one whose surprise is low on <em>real</em> text. And when you take away the "I don't know" option, you get confident nonsense, every time. That's not a bug in you, or in TinyLM. It's what happens to any system that must always answer.</p>
+<p><strong>On your own:</strong> cover a page of an unread book with a card, bet your coins on each next word, and slide the card to check. <strong>The lesson:</strong> a good model has low surprise on real text, and taking away "I don't know" makes confident nonsense. That's hallucination.</p>
+</div>
 
+<h2 id="check">6. Check yourself</h2>
+<details><summary>What is an embedding, and who chooses its numbers?</summary><p>A short list of numbers for a word. Nobody chooses them: they start random and training nudges them. Words used the same way end up close.</p></details>
+<details><summary>Predict: <code>softmax([5, 5, 5, 5])</code>?</summary><p><code>[0.25, 0.25, 0.25, 0.25]</code>. Only differences between scores matter.</p></details>
+<details><summary>Predict: <code>generate("halt halt halt")</code> after training?</summary><p><code>['stop']</code>, the same as "halt". The average of identical lists is that list.</p></details>
+<details><summary>Why test on held-out examples?</summary><p>It gets 100% of its training examples, which only shows memory. On 50 new ones it gets 92%: that's the honest number.</p></details>
+<details><summary>Why does "stop the red block" give <code>go red</code>?</summary><p>The average mixes "stop" with "the red block", which looks like go or find. Step 1 is a near tie (go 0.5092, find 0.4839) and greedy writing hides it.</p></details>
 
-<h2 id="project">6. Your Robo-Helper so far</h2>
-<p>Robo-Helper now has a second brain. Week 5's brain sorts commands into piles and does one thing. This one writes a plan, word by word, and <code>words_to_plan</code> turns it into a list of the same <code>{"intent": ..., "object": ...}</code> actions the rest of the robot already uses, or into "ask" (the robot asks "Which block do you mean: red, blue or green?") or "none" (it says that's not something it can do). In the simulator, <code>brains.py</code>'s <code>tinylm</code> brain first runs your <a href="08-words-as-numbers.html#typos">week 5 typo fixer</a> on the command, then runs every action through week 7's safety check.</p>
-<div class="card note"><strong>What this adds to your robot:</strong> on the 12 exam tasks of week 11, the word counter passes <strong>5</strong> and this brain <strong>8</strong>. It newly passes "put the red and blue blocks away", "bin everything except the green block" and "put the block away" (it asks). It still fails "where's the green one?", "tidy up the room", "put away the block that's closest to the bin" (a language-only model can't see where the blocks are) and "hmm what about the blue". The <a href="15b-attention.html">attention stretch</a> scores the same 8 of 12 on the robot.</div>
-<p>It keeps coming back:</p>
+<h2 id="deeper">7. Want to know more?</h2>
+<details><summary>Inside one step: averaging, 36 inputs and tanh</summary>
+<p><strong>Reading by averaging.</strong> With 3-number lists: "red" [1, 0, 2] and "block" [3, 2, 0] average to [2, 1, 1]. Averaging ignores order, so "away block red the put" gives the same plan as "put the red block away". For "go to the blue block, not the red one" that's a disaster. Attention fixes part of this: see the <a href="15b-attention.html">stretch</a>.</p>
+<p><strong>A neuron with 3 inputs</strong> (made-up numbers): inputs [1, 0, 2], weights [0.5, −1, 0.25], bias 0.1. Sum 0.5 + 0 + 0.5 + 0.1 = 1.1, and tanh(1.1) ≈ 0.80. tanh squashes any number into −1 to 1: <code>math.tanh(2)</code> ≈ 0.96, <code>math.tanh(100)</code> is 1.0. Our hidden layer is 32 of these side by side, each reading all 36 inputs (the command's 12 + two written words' 12 each).</p></details>
+<details><summary>Surprise (loss) and how training works</summary>
+<div class="table-wrap"><table>
+<tr><th>chance given to the right word</th><th>surprise −log(p)</th></tr>
+<tr><td class="num">1.00</td><td class="num">0.00</td></tr>
+<tr><td class="num">0.50</td><td class="num">0.69</td></tr>
+<tr><td class="num">0.10</td><td class="num">2.30</td></tr>
+<tr><td class="num">0.01</td><td class="num">4.61</td></tr>
+</table></div>
+<p>Confidently wrong is punished hardest. Training is gradient descent, like <a href="03-learning-from-data.html">week 2</a>'s line fitting, but nudging all 2,702 numbers (learning rate 0.05), 25 passes through 343 examples. Surprise per example falls from 3.59 to 0.049.</p>
+<pre><code>word embeddings      88 words × 12      = 1,056
+written-word embs    11 words × 12      =   132
+hidden weights       32 × 36            = 1,152
+hidden biases        32                 =    32
+output weights       10 × 32            =   320
+output biases        10                 =    10
+                                  total = 2,702</code></pre></details>
+<details><summary>Where the examples come from (synthetic data)</summary>
+<pre><code>8 put templates × (3 colours + 6 pairs + 4 "all" + 4 except × 3 colours)  = 200
+week 7's 34 commands, repeated 3 times                                    = 102
+7 vague commands → ask, repeated 3 times                                  =  21
+9 not-a-robot-job commands → none, repeated 3 times                       =  27
+minus every copy of a bake-off command (the robot's exam)                 −   7
+                                                                    total = 343</code></pre>
+<p>The exam commands are removed so the <a href="19-bakeoff.html">week 15</a> score is honest. The small groups are repeated so the 200 put examples don't drown them. Trained on only about 66 hand-written examples, the same model gets just 20–40% of new plans right: the data was the problem.</p></details>
+<details><summary>All four held-out mistakes, and more ways it breaks</summary>
+<pre><code>'please put everything in the bin'      wanted put red blue green   wrote put red blue
+'drive to the block'                    wanted ask                  wrote go red
+'where is the block'                    wanted ask                  wrote find red
+'wash the dishes'                       wanted none                 wrote find red</code></pre>
+<p>"tidy up the room" gives <code>put red blue</code> ("room" is unknown). In <a href="10-llm-safety.html">week 10</a> a safety layer blocks <em>impossible</em> actions, but <code>go red</code> for "stop the red block" is allowed, so it won't be caught. That needs a confidence check (see the stretch ideas).</p></details>
+<details><summary>Our tiny model versus Claude</summary>
+<div class="table-wrap"><table>
+<tr><th></th><th>our TinyLM</th><th>a real LLM</th></tr>
+<tr><td>Words</td><td>88 to read, 10 to write</td><td>tens of thousands of tokens (word pieces)</td></tr>
+<tr><td>Embeddings</td><td>12 numbers</td><td>thousands of numbers</td></tr>
+<tr><td>Reading</td><td>a flat average + last 2 words</td><td>attention over everything so far</td></tr>
+<tr><td>Parameters</td><td>2,702</td><td>billions</td></tr>
+<tr><td>Training</td><td>343 examples, seconds</td><td>trillions of tokens, months, then instruction training (<a href="13-lora.html">week 14</a>, <a href="12-preferences.html">week 16</a>)</td></tr>
+<tr><td>Writing</td><td>greedy, at most 5 words</td><td>the same loop, often with some randomness</td></tr>
+</table></div>
+<p>When Claude replies, it runs your <code>generate</code> loop: score every token, softmax, pick, append, repeat.</p></details>
+<details><summary>Stretch ideas</summary>
 <ul>
-<li><strong><a href="10-llm-safety.html">Week 7</a>:</strong> <code>validate_action</code> checks every action before the robot moves. It refuses impossible actions, like a made-up purple block. It can't tell that <code>go red</code> wasn't what you meant by "stop the red block", because that action is allowed.</li>
-<li><strong><a href="16-speed.html">Week 8</a>:</strong> puts a stopwatch on this brain and compares it with a brain running far away on the internet.</li>
-<li><strong><a href="17-faster.html">Week 9</a>:</strong> shrinks your best small model's numbers (<code>count_weights</code>, <code>quantized_copy</code>) and retrains it with a teacher's labels on new phrasings (<code>distill_examples</code>). If you did the attention stretch, that's the attention model; if not, it's this one.</li>
-<li><strong><a href="19-bakeoff.html">Week 11</a>:</strong> runs <code>tinylm</code> against every other brain on the same 12 tasks.</li>
-</ul>
-
-<h2 id="mistakes">7. Common mistakes</h2>
+<li><strong>A confidence alarm:</strong> in a copy, return <code>[]</code> if any picked word had a chance below 0.7. Over all 393 examples, 5 get caught and only one of them was wrong. Confidence is a clue, not a guarantee.</li>
+<li><strong>Teach it a phrase:</strong> add <code>"the room"</code> to <code>ALL_PHRASES</code> and retrain. What breaks?</li>
+<li><strong>Shrink it:</strong> set <code>E = 2</code>, <code>H = 4</code>. Where's the smallest model that still gets 80%?</li>
+<li><strong>Attention:</strong> the bigger stretch on <a href="15b-attention.html" id="attention">its own page</a>.</li>
+</ul></details>
+<details><summary>Where this goes next, and further reading</summary>
+<p><a href="10-llm-safety.html">Week 10</a> checks every action before the robot moves. <a href="16-speed.html">Week 13</a> times this brain. <a href="17-faster.html">Week 14</a> shrinks it and retrains it with a teacher. On the 12-task exam in <a href="19-bakeoff.html">week 15</a>, the word counter passes 5 and this brain 8.</p>
 <ul>
-<li><strong>Not subtracting the biggest score in softmax.</strong> Fine for small scores, then <code>OverflowError</code> on big ones. Checker hint: <em>"subtract the biggest score first"</em>.</li>
-<li><strong>Averaging over all tokens instead of known ones</strong>, or looking up unknown words (<code>KeyError</code>), or dividing by zero when none are known. Checker hint: <em>"no known words -&gt; a list of E zeros"</em>.</li>
-<li><strong>Making <code>x</code> the wrong length.</strong> <code>ctx + emb + emb</code> joins three 12-number lists into 36. If you add them number by number you get 12, and the weights won't line up. Checker hint: <em>"x has 3*E numbers, hidden has H"</em>.</li>
-<li><strong>Forgetting to shift <code>prev2, prev1</code> in <code>generate</code>.</strong> Then every step sees the same input and writes the same word again and again.</li>
-<li><strong>Accepting nonsense in <code>words_to_plan</code>.</strong> <code>["put", "red", "red"]</code> and <code>["go", "red", "blue"]</code> must be <code>None</code>. Checker hints: <em>"a repeated colour makes no sense -&gt; None"</em> and <em>"go/find take exactly one colour"</em>.</li>
-<li><strong>Colours in the wrong order in <code>plan_examples</code>.</strong> "the blue block and the red block" is <code>["put", "red", "blue"]</code>. Checker hint: <em>"the pair (blue, red) must be written in COLOURS order -&gt; ['put', 'red', 'blue'], not [a, b] (sort the pair by COLOURS)"</em>.</li>
-<li><strong>Calling <code>rng.choice</code> in the wrong places.</strong> One call per colour and one per pair, nothing for the "all" and except examples. Otherwise the wordings don't match. Checker hint: <em>"first: the red block, plan ['put', 'red']"</em>.</li>
-</ul>
-
-<h2 id="check">8. Check yourself</h2>
-<details><summary>What is an embedding, and who chooses its numbers?</summary><p>A short list of numbers standing for a word (12 here). Nobody chooses them: they start random and training nudges them. Words used the same way end up with similar lists, like "halt" and "stop", or "everything" and "all".</p></details>
-<details><summary>Predict: what does <code>softmax([5, 5, 5, 5])</code> return?</summary><p><code>[0.25, 0.25, 0.25, 0.25]</code>. Equal scores, equal chances. Only the differences between scores matter, which is also why subtracting the biggest is safe.</p></details>
-<details><summary>Predict: what does <code>model.generate("halt halt halt")</code> return, after training?</summary><p><code>['stop']</code>, exactly the same as <code>generate("halt")</code>. The average of three identical lists is that same list, so the model reads exactly the same 12 numbers.</p></details>
-<details><summary>Why do we make training examples from templates instead of using week 5's 34 commands?</summary><p>34 commands have no "red and blue" or "everything except" examples at all, so there's nothing to learn plans from. Templates give 200 plan examples in seconds. The catch: the model only learns the wordings the templates contain, which is why "tidy up the room" still fails.</p></details>
-<details><summary>Why test on held-out examples instead of the training examples?</summary><p>The model gets 100% of its training examples right, which only shows it memorised them. On 50 examples written with different templates it gets 92%. That's the number that tells you how it will do on commands people actually type.</p></details>
-<details><summary>If the model gives the right word probability 0.5, what's the surprise? And 0.99?</summary><p><code>−log(0.5)</code> ≈ 0.69 and <code>−log(0.99)</code> ≈ 0.01. Training pushes the right words towards probability 1, so surprise towards 0.</p></details>
-<details><summary>The model has a "stop" word. Why does "stop the red block" get <code>go red</code>?</summary><p>The average mixes "stop" with "the", "red" and "block", which together look like a go or find command. Step 1 is a near tie between go (0.5092) and find (0.4839), and stop gets only 0.0034. Greedy decoding writes go, and the final answer hides how close it was. Week 7's safety layer won't catch it either, because <code>go red</code> is an allowed action. Only a confidence check (or a person) would notice.</p></details>
-
-<h2 id="deeper">9. Go deeper (optional)</h2>
-<ul>
-<li><a href="15b-attention.html">Week 6 stretch: attention</a>, then <a href="../06-30u30/13-attention.html">30u30 Day 13: Attention</a>: the fix for our flat average. Each word decides how much to look at every other word.</li>
-<li><a href="../06-30u30/14-annotated-transformer.html">30u30 Day 14: The annotated Transformer</a>: the full machine real LLMs use, built from the same pieces you just used (embeddings, softmax, cross-entropy).</li>
-<li><a href="../06-30u30/01-rnn-effectiveness.html">30u30 Day 1: RNN effectiveness</a>: a neural network that writes text one letter at a time. Same loop, a cleverer memory.</li>
-<li><a href="../02-tensortonic.html">TensorTonic</a>: practise writing softmax, cross-entropy and friends yourself.</li>
-<li><a href="../09-inference-engineering/index.html">Inference engineering</a>: what it takes to run the "predict, pick, append, repeat" loop fast for millions of people. Weeks 8 and 9 start on this.</li>
-</ul>
+<li><a href="../06-30u30/13-attention.html">30u30 Day 13: Attention</a> and <a href="../06-30u30/14-annotated-transformer.html">Day 14: The annotated Transformer</a>.</li>
+<li><a href="../06-30u30/01-rnn-effectiveness.html">30u30 Day 1: RNN effectiveness</a>: writing one letter at a time.</li>
+<li><a href="../02-tensortonic.html">TensorTonic</a>: practise softmax and cross-entropy.</li>
+<li><a href="../09-inference-engineering/index.html">Inference engineering</a>: running this loop fast for millions.</li>
+</ul></details>
 
 <nav class="pager">
-  <a href="09-understanding-commands.html"><small>Previous</small>Week 5 · Part B: Understanding commands</a>
-  <a class="next" href="10-llm-safety.html"><small>Next</small>Week 7 · Part A: Using a real AI safely</a>
+  <a href="09-understanding-commands.html"><small>Previous</small>Week 7 · Part B: Understanding commands</a>
+  <a class="next" href="23-wheels.html"><small>Next</small>Week 9 · Wheels, odometry and PID</a>
 </nav>
-<footer>Build a Robot Brain · Week 6 of 12 (homework file: lesson15_tiny_lm.py)</footer>
+<footer>Build a Robot Brain · Week 8 of 16 (homework file: lesson15_tiny_lm.py)</footer>
 </main>
-
 <script>
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
@@ -593,5 +512,6 @@ if (typeof document !== 'undefined') {
   module.exports = { softmax, read, forward, generate, wordsToPlan, pyPlan, countParams, accuracy, TEST, OUT_WORDS };
 }
 </script>
+<script src="room.js"></script>
 </body>
 </html>

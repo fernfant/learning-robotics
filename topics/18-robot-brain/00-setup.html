@@ -4,28 +4,69 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Week 1 Part A · Setup and algorithms</title>
-<link rel="stylesheet" href="../../style.css">
+<link rel="stylesheet" href="../../style.css?v=16">
 </head>
 <body>
 <main>
 <nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 1 · Part A</nav>
 
-<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 1 of 12 · Part A</div>
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Build a Robot Brain · Week 1 of 16 · Part A</div>
 <h1>Setup, and your first algorithm</h1>
-<p class="lede">Get Python running on your computer, meet the robot's room, and write your first two functions. On the way you'll learn the most important idea in all of computing: an algorithm is a list of exact steps.</p>
-<div class="card note" id="journey"><strong>Week 1 of 12 · Part A.</strong> Your robot starts from nothing. <strong>Today</strong> you set up Python, write your first two functions, and your robot says hello. Next: <a href="01-coordinates.html">Week 1 · Part B: Moving on a grid</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> open <code>homework/my_robot.py</code>, give your robot a name, and run it. Once your <code>introduce()</code> works, it greets you by name. Every week after that, <em>you</em> add a new power.<br><strong>Ask an adult today:</strong> installing Python (you may need an admin password).</div>
+<p class="lede">Get Python running, meet the robot's room, and write your first two functions.</p>
+<div class="card note" id="journey"><strong>Week 1 of 16 · Part A.</strong> Your robot starts from nothing. <strong>Today</strong> you set up Python, write two functions, and your robot says hello by name. Next: <a href="01-coordinates.html">Week 1 · Part B: Moving on a grid</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Ask an adult today:</strong> installing Python (you may need an admin password).</div>
 
 <div class="facts">
   <div><b>Time</b>1.5–3 h (setup is most of it)</div>
-  <div><b>You'll need</b>A computer, the course folder (and, for the challenge, a friend and some bread, or just paper)</div>
-  <div><b>New words</b>Algorithm, terminal, folder path, function, loop</div>
-  <div><b>Project piece</b>Your robot says hello</div>
+  <div><b>You'll need</b>A computer and the course folder</div>
+  <div><b>New words</b>Algorithm, terminal, function, loop</div>
   <div><b>Homework file</b><code>lesson00_hello.py</code></div>
 </div>
 
+<section class="kid" id="start">
+<h2>Start here</h2>
+<p class="big">A computer does exactly what you tell it, step by step, and nothing else. A list of exact steps is called an <strong>algorithm</strong>.</p>
+<dl>
+<dt>Terminal</dt><dd>A window where you type commands instead of clicking.</dd>
+<dt>Function</dt><dd>A named block of code. It takes inputs and gives back an answer with <code>return</code>.</dd>
+<dt>Loop</dt><dd>Code that repeats. <code>while</code> repeats as long as something is true.</dd>
+</dl>
+</section>
+
+<h2 id="idea">1. The idea</h2>
+<div class="box idea"><span class="tag">💡 The idea</span>
+<p>Write instructions for a jam sandwich and give them to someone who follows them <em>exactly</em>. "Put jam on the bread." They put the closed jar on the loaf. You never said "open the jar". A computer is that person. It isn't stupid, it's literal.</p>
+<p>So a robot can't "just look" and see that the wall is 3 squares away. It has to <strong>look at the next square, step, and look again</strong>, counting as it goes:</p>
+<svg class="diagram" viewBox="0 0 520 200" role="img" aria-label="A corridor of squares 0 to 5. The robot is on square 1, the wall on square 5. Three arrows show three steps, then the robot sees the wall and stops.">
+  <defs><marker id="ah0" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--build)"/></marker></defs>
+  <g font-size="14" text-anchor="middle" style="fill:var(--muted)">
+    <text x="55" y="38">0</text><text x="135" y="38">1</text><text x="215" y="38">2</text><text x="295" y="38">3</text><text x="375" y="38">4</text><text x="455" y="38">5</text>
+  </g>
+  <g style="fill:var(--floor);stroke:var(--line)" stroke-width="2">
+    <rect x="20" y="48" width="70" height="70" rx="6"/><rect x="100" y="48" width="70" height="70" rx="6"/><rect x="180" y="48" width="70" height="70" rx="6"/><rect x="260" y="48" width="70" height="70" rx="6"/><rect x="340" y="48" width="70" height="70" rx="6"/>
+  </g>
+  <rect x="420" y="48" width="70" height="70" rx="6" style="fill:var(--wall)"/>
+  <text x="455" y="90" font-size="15" text-anchor="middle" fill="#fff" font-weight="700">wall</text>
+  <text x="135" y="96" font-size="34" text-anchor="middle">🤖</text>
+  <g fill="none" stroke-width="3" style="stroke:var(--build)" marker-end="url(#ah0)">
+    <path d="M145,124 Q175,152 205,124"/><path d="M225,124 Q255,152 285,124"/><path d="M305,124 Q335,152 365,124"/>
+  </g>
+  <g font-size="15" text-anchor="middle" font-weight="700" style="fill:var(--build)">
+    <text x="175" y="172">step 1</text><text x="255" y="172">step 2</text><text x="335" y="172">step 3</text>
+  </g>
+  <text x="455" y="150" font-size="14" text-anchor="middle" style="fill:var(--fg)">next is the</text>
+  <text x="455" y="168" font-size="14" text-anchor="middle" style="fill:var(--fg)">wall: stop</text>
+  <text x="260" y="196" font-size="15" text-anchor="middle" font-weight="700" style="fill:var(--ok)">answer: 3 steps</text>
+</svg>
+<p>Three things make a good algorithm: every step is exact, the order is right, and it stops.</p>
+</div>
+
+<p>Here is the room your robot lives in. It's a grid of squares: grey walls, three coloured blocks, a bin. By week 16, you type "put the red block in the bin" and it plans the route and does it.</p>
+<div class="room" data-robot="1,1" data-blocks="red:2,1 blue:6,3 green:1,5" data-label="The robot's room. The robot starts top left, the bin 🪣 is bottom right."></div>
+
+<h2 id="play">2. Play</h2>
+<div class="box play"><span class="tag">🎮 Play</span>
+<p><strong>Drive it before you build it.</strong> Right now <em>you</em> are the robot's brain. Press the arrows (or click a square next to the robot). Can you reach the bin in 11 moves, the fewest possible?</p>
 <div class="card demo" id="warmup">
-<h2 style="margin-top:0">2-minute warm-up: drive it before you build it</h2>
-<p class="legend">This is the robot you'll build. Press the arrow buttons (or click a square next to the robot) to drive it. Grey squares are walls, the coloured squares are blocks, <code>B</code> is the bin, and <code>c</code> is the cat. Can you reach the bin? The fewest moves possible is 11.</p>
 <canvas id="wuGrid" width="700" height="400" style="height:auto" aria-label="The robot's room; drive the robot with the buttons"></canvas>
 <p><button id="wuN">↑ N</button> <button id="wuS">↓ S</button> <button id="wuW">← W</button> <button id="wuE">→ E</button> <button id="wuReset">Back to start</button></p>
 <div class="stats">
@@ -34,177 +75,9 @@
   <div class="stat"><div class="k">Bumps</div><div class="v" id="wuBumps">–</div></div>
 </div>
 <p class="legend" id="wuMsg"></p>
-<p class="legend">Right now <em>you</em> are the robot's brain. By week 12 your robot drives itself: you type "put the red block in the bin" and it plans the route, stops for the cat, and does it. Week 1 Part B has a bigger version of this demo.</p>
 </div>
-
-<section class="kid" id="start">
-<h2>Start here</h2>
-<p class="big">A computer does exactly what you tell it, step by step, and nothing else. A list of exact steps is called an algorithm.</p>
-<p><b>Grown-up help today:</b> an adult helps install Python. The computer may ask for an admin password.</p>
-<h3>The problem</h3>
-<p>Robo-Helper lives in a room made of squares. Right now it can't do anything at all. It can't even say hello. It also can't work out how far it can walk before it bumps into a wall. You're going to give it both skills. But first you need a way to talk to it: Python, and a terminal.</p>
-<h3>The idea in one picture</h3>
-<p>Imagine writing instructions for making a jam sandwich, then handing them to someone who follows them <em>exactly</em>, word for word. "Put jam on the bread." They put the closed jar on top of the loaf. You never said open the jar, or use a knife, or which slice. A computer is that person. It isn't stupid. It's literal. Your job is to write steps so exact that even a literal follower gets it right.</p>
-<h3>Words to know</h3>
-<dl>
-<dt>Algorithm</dt><dd>An exact list of steps that solves a problem. A recipe is a loose algorithm. Code is a strict one.</dd>
-<dt>Terminal</dt><dd>A window where you type commands to your computer instead of clicking. Also called the command line, shell, Command Prompt or PowerShell.</dd>
-<dt>Folder path</dt><dd>The address of a folder, like <code>Documents/Learning robotics/topics</code>.</dd>
-<dt>Function</dt><dd>A named, reusable block of code. You give it inputs, it gives back an answer with <code>return</code>.</dd>
-<dt>Loop</dt><dd>Code that repeats. <code>while</code> repeats as long as something is true.</dd>
-</dl>
-</section>
-<p class="deeper"><strong>Going deeper:</strong> everything below is the full lesson. Set aside time for the setup part: once it works, it works for every lesson after this one.</p>
-
-<h2 id="problem">1. The problem</h2>
-<p>Here is the robot's world. It's a grid of characters. <code>#</code> is a wall, <code>.</code> is floor, <code>B</code> is the bin, <code>R</code> is the robot, and the small letters are coloured blocks (red, blue, green):</p>
-<pre><code>##########
-#Rr......#
-#..##....#
-#..#..b..#
-#....##..#
-#g.......#
-#.#....B.#
-##########</code></pre>
-<p class="meta">Real output of <code>python3 world.py</code>, which you'll run in a minute.</p>
-<p>By the end of the course the robot will put the red block in the bin when you ask it to. Today it needs two tiny skills:</p>
-<ol>
-<li>Say hello with its name.</li>
-<li>Count how many steps it can walk to the right before the next square is a wall.</li>
-</ol>
-<p>Before any of that, you need Python working. Let's do setup first, carefully. Most beginners who give up on programming give up here, at setup, not at the code. So go slowly, and if something doesn't match what you see, read the "If it goes wrong" boxes.</p>
-
-<h3 id="install">Step A. Install Python 3</h3>
-<p>Python is the programming language we'll use. "Installing" it puts a program on your computer that reads your <code>.py</code> files and runs them. You need <strong>version 3.8 or newer</strong>. The newest one is fine.</p>
-<p>If you're on a family or school computer, you may need a parent or teacher to type an admin password during install. That's normal.</p>
-
-<details open><summary>Windows</summary>
-<ol>
-<li>Open a web browser and go to <strong>python.org</strong>. Click <b>Downloads</b>. The site detects Windows and offers a big yellow button, "Download Python 3.x.x". Click it.</li>
-<li>Open the file you downloaded (it's in your Downloads folder, named something like <code>python-3.x.x-amd64.exe</code>).</li>
-<li><strong>Before you click anything else:</strong> at the bottom of the first screen there is a checkbox labelled <b>"Add python.exe to PATH"</b> (older versions say "Add Python to PATH"). <strong>Tick it.</strong> This lets you type <code>python</code> in any terminal. Forgetting it is the number one setup problem on Windows.</li>
-<li>Click <b>Install Now</b>. Say yes if Windows asks for permission. Wait for "Setup was successful", then click <b>Close</b>.</li>
-<li>Check it worked (you'll learn how to open a terminal in Step B): type <code>py --version</code> and press Enter. You should see something like <code>Python 3.13.1</code>.</li>
-</ol>
-<div class="card note"><strong>If it goes wrong on Windows:</strong> if typing <code>python</code> opens the Microsoft Store, Windows is using a shortcut instead of your install. Use <code>py</code> instead of <code>python3</code> everywhere in this course (for example <code>py check.py 0</code>). If <code>py</code> isn't found either, run the installer again, choose <b>Modify</b> or <b>Repair</b>, and make sure "Add to PATH" is ticked. Then close and reopen the terminal.</div>
-</details>
-
-<details><summary>macOS</summary>
-<ol>
-<li>Go to <strong>python.org</strong>, click <b>Downloads</b>, and click "Download Python 3.x.x" (it detects macOS).</li>
-<li>Open the downloaded <code>.pkg</code> file and click <b>Continue</b> through the screens, then <b>Install</b>. Type your Mac password if asked.</li>
-<li>When it finishes, a Finder window opens. You can close it.</li>
-<li>Check it worked: open Terminal (Step B) and type <code>python3 --version</code>. You should see something like <code>Python 3.13.1</code>.</li>
-</ol>
-<div class="card note"><strong>If it goes wrong on a Mac:</strong> if typing <code>python3</code> pops up a box asking to install "command line developer tools", you can click Install. That also gives you a working <code>python3</code>. Always type <code>python3</code>, not <code>python</code>: on some Macs <code>python</code> doesn't exist.</div>
-</details>
-
-<details><summary>Linux (Ubuntu, Debian, Fedora, Raspberry Pi OS…)</summary>
-<ol>
-<li>Python 3 is almost always already installed. Open a terminal (Step B) and type <code>python3 --version</code>.</li>
-<li>If you see <code>Python 3.8</code> or higher, you're done.</li>
-<li>If it says "command not found", install it. On Ubuntu, Debian or Raspberry Pi OS type <code>sudo apt install python3</code>. On Fedora type <code>sudo dnf install python3</code>. It asks for your password. Nothing appears while you type a password: that's normal, just type it and press Enter.</li>
-</ol>
-</details>
-
-<h3 id="terminal">Step B. Open a terminal</h3>
-<ul>
-<li><strong>Windows:</strong> press the Windows key, type <code>powershell</code> (or <code>cmd</code>), press Enter. A dark window with a blinking cursor appears.</li>
-<li><strong>macOS:</strong> press <kbd>Cmd</kbd>+<kbd>Space</kbd>, type <code>Terminal</code>, press Enter.</li>
-<li><strong>Linux:</strong> press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd>, or find "Terminal" in your apps menu.</li>
-</ul>
-<p>The terminal shows a <em>prompt</em>, something like <code>C:\Users\Sam&gt;</code> or <code>sam@laptop ~ %</code>. That tells you which folder you're "standing in" right now. You type a command after it and press Enter. Try typing <code>python3 --version</code> (on Windows, <code>py --version</code>).</p>
-
-<h3 id="cd">Step C. Go into the project folder with <code>cd</code></h3>
-<p><code>cd</code> means "change directory" (directory is another word for folder). The project lives in <code>topics/18-robot-brain/project/</code> inside the course folder. You need the terminal to be standing in that <code>project</code> folder.</p>
-<ul>
-<li><strong>The easy way on macOS and Linux:</strong> type <code>cd</code> and a space, then drag the <code>project</code> folder from Finder or your file manager into the terminal window. The path appears. Press Enter.</li>
-<li><strong>The easy way on Windows:</strong> open the <code>project</code> folder in File Explorer. Click in the address bar at the top, type <code>cmd</code>, press Enter. A terminal opens already inside that folder.</li>
-<li><strong>Typing it yourself:</strong> the folder name has a space in it, so put the whole path in quotes. For example:
-<pre><code># macOS / Linux (change the start to wherever your course folder is)
-cd "/Users/sam/Learning robotics/topics/18-robot-brain/project"
-
-# Windows
-cd "C:\Users\Sam\Documents\Learning robotics\topics\18-robot-brain\project"</code></pre></li>
-</ul>
-<p>Check you're in the right place. Type <code>ls</code> (macOS/Linux) or <code>dir</code> (Windows) to list the files. You should see <code>check.py</code>, <code>homework</code>, <code>solutions</code> and <code>README.md</code>. If you don't, you're in the wrong folder: try again.</p>
-<div class="card note"><strong>Useful extras:</strong> <code>cd ..</code> goes up one folder. <code>cd homework</code> goes down into <code>homework</code>. Press the <kbd>↑</kbd> key to bring back the last command instead of retyping it. Press <kbd>Tab</kbd> halfway through a folder name and the terminal finishes it for you.</div>
-
-<h3 id="firstrun">Step D. Run the checker for the first time</h3>
-<p>Inside the <code>project</code> folder, type:</p>
-<pre><code>python3 check.py 0          # macOS and Linux
-py check.py 0               # Windows</code></pre>
-<p>You haven't written anything yet, so you should see yellow dots. This is real output:</p>
-<pre><code>Lesson 0: lesson00_hello.py
-  … introduce: not written yet (Lesson 0: write this function)
-  … steps_to_wall: not written yet (Lesson 0: write this function)
-  0/2 passed</code></pre>
-<p><strong>That's a success.</strong> Python works, the checker works, and it found your homework file. (The checker names each lesson by its file number: "Lesson 0" means <code>lesson00_hello.py</code>, today's file.) Yellow <code>…</code> means "not written yet". Later you'll see green <code>✓</code> (correct) and red <code>✗</code> (wrong, with a hint).</p>
-<p>Now look at the robot's room. Go into the homework folder and run the world file:</p>
-<pre><code>cd homework
-python3 world.py            # Windows: py world.py
-cd ..</code></pre>
-<p>You should see the room picture from the top of this page.</p>
-<div class="card note"><strong>If it goes wrong:</strong> "No such file or directory" or "can't open file" means the terminal isn't in the folder you think. Use <code>ls</code> or <code>dir</code> to look around. "command not found" or "not recognized" means Python isn't on the PATH: go back to Step A. On old Windows terminals the colours may show as odd codes like <code>[32m</code>. That's harmless. Windows Terminal or PowerShell shows them properly.</div>
-
-<h3 id="editor">Step E. Pick a code editor</h3>
-<p>You write code in an editor and run it in the terminal. Two good free choices:</p>
-<ul>
-<li><strong>IDLE</strong> came with Python. Open it from your apps, then File → Open, and pick <code>homework/lesson00_hello.py</code>. Save with <kbd>Ctrl</kbd>+<kbd>S</kbd> (<kbd>Cmd</kbd>+<kbd>S</kbd> on a Mac).</li>
-<li><strong>VS Code</strong> (code.visualstudio.com) is what many professionals use. Open the <code>project</code> folder with File → Open Folder. It even has a built-in terminal (Terminal → New Terminal), already in the right folder.</li>
-</ul>
-<p>Avoid Word or Pages: they add hidden formatting that breaks code.</p>
-
-<h2 id="principles">2. First principles: what is an algorithm?</h2>
-<h3>Steps, exact steps</h3>
-<p>An <strong>algorithm</strong> is a finite list of exact steps that, followed one at a time, solves a problem. Three things make a list of steps a good algorithm:</p>
-<ol>
-<li><strong>Every step is exact.</strong> No "you know what I mean". "Spread some jam" is vague. "Use the knife to scoop one spoonful of jam and spread it over the top face of slice 1" is exact.</li>
-<li><strong>The order is right.</strong> Open the jar <em>before</em> scooping.</li>
-<li><strong>It stops.</strong> "Keep spreading jam" never ends. "Spread until the whole face is covered" does.</li>
-</ol>
-<p>A computer is the perfect literal follower. That's both its superpower (it never gets bored, never skips a step) and its weakness (it never fills in the gaps for you).</p>
-
-<h3>Your first robot algorithm, on paper</h3>
-<p>Here's a corridor. The robot <code>R</code> stands on square 1. The wall is on square 5. Squares are numbered from 0, left to right:</p>
-<pre><code>square:  0   1   2   3   4   5
-         .   R   .   .   .   #</code></pre>
-<p>The robot walks right, one square at a time, and must stop on the last free square, just before the wall. How many steps does it take?</p>
-<p>A human just looks and says "3". But a robot can't "just look". It only knows where it is and can check one thing at a time. So write it as exact steps:</p>
-<pre><code>1. Set steps to 0. Set x to the start square.
-2. Look at the next square, x + 1. Is it the wall?
-3.   If it's NOT the wall: move there (x goes up by 1), add 1 to steps, go back to step 2.
-4.   If it IS the wall: stop. The answer is steps.</code></pre>
-<p>Follow it by hand, like a computer would, writing down x and steps each time:</p>
-<pre><code>x = 1, steps = 0   next square is 2. Wall is 5. 2 is not 5 → move
-x = 2, steps = 1   next square is 3. Not the wall → move
-x = 3, steps = 2   next square is 4. Not the wall → move
-x = 4, steps = 3   next square is 5. That's the wall → stop
-answer: 3</code></pre>
-<p>This style of checking, writing every variable at every step, is called <strong>tracing</strong>. Professionals do it whenever code surprises them.</p>
-
-<details><summary>Predict first: the robot starts on square 4 and the wall is on square 5. What's the answer? Guess, then open.</summary>
-<p><strong>0.</strong> Trace it: x = 4, steps = 0, the next square is 5, which is the wall, so stop straight away. The loop body never runs even once. This "do nothing" case is called an <em>edge case</em>, and it's where most bugs hide. The checker tests exactly this case.</p>
-</details>
-
-<h3>Why not just subtract?</h3>
-<p>You might spot a shortcut: answer = wall − start − 1. For 1 and 5 that gives 3. Correct! So why does the homework say "use a loop, not subtraction"?</p>
-<p>Because a real robot doesn't know where the wall is in advance. It only knows "is the square in front of me free?" In Part B you'll replace "is it the wall square?" with a real check on the room map, and in week 2 that check becomes a <em>sensor</em>. Subtraction only works when you already know the answer. The loop works when you have to find out. That's how robots think: look, move, look again.</p>
-
-<h3>Turning steps into Python</h3>
-<p>Each line of the paper algorithm becomes a line of Python:</p>
-<table>
-<tr><th>Paper step</th><th>Python idea</th></tr>
-<tr><td>Set steps to 0</td><td>a variable: <code>steps = 0</code></td></tr>
-<tr><td>Repeat while the next square isn't the wall</td><td>a <code>while</code> loop with a condition</td></tr>
-<tr><td>Move, and count it</td><td>add 1 to two variables: <code>x += 1</code> means "x becomes x + 1"</td></tr>
-<tr><td>Stop and give the answer</td><td><code>return steps</code></td></tr>
-</table>
-
-<h2 id="play">3. Play with it</h2>
+<p><strong>Now run the algorithm.</strong> Pick a start square and a wall square, then press <b>Step</b>. Each press is one turn of the loop you're about to write.</p>
 <div class="card demo">
-<h3>Interactive: run the algorithm one step at a time</h3>
-<p class="legend">The same rule as the Python homework. Pick where the robot starts and where the wall is, then press <b>Step</b> to run one turn of the loop. Watch x and steps change, exactly like the trace above.</p>
 <canvas id="row" width="700" height="130" style="height:auto" aria-label="A corridor of squares with the robot and a wall"></canvas>
 <label for="sx">Start square: <span id="sxv" class="num"></span></label>
 <input id="sx" type="range" min="0" max="4" step="1" value="1">
@@ -218,146 +91,196 @@ answer: 3</code></pre>
 </div>
 <pre><code id="trace"></code></pre>
 </div>
-<p>Try these: start 4, wall 5 (the edge case). Start 0, wall 10. Does the answer always equal wall − start − 1? It does here, because the corridor is empty. In week 2 the corridor will have real walls in it, and only the "look, then move" version will still work.</p>
+<p>Try start 4, wall 5. The answer is 0: the loop never runs. That "do nothing" case is called an <em>edge case</em>, and it's where bugs hide.</p>
+</div>
 
-<h2 id="homework">4. Homework</h2>
-<p>Open <code>homework/lesson00_hello.py</code> in your editor. You'll see two functions. Each has a <em>docstring</em> (the text in triple quotes) that says exactly what it must do, and a line <code>raise NotImplementedError(...)</code>. That line means "not written yet". Delete it and write your code in its place.</p>
-
-<h3>Function 1: <code>introduce(name)</code></h3>
-<p><strong>What it does:</strong> takes a name and <em>returns</em> (not prints!) the robot's greeting as a string.</p>
-<p><strong>Example:</strong> <code>introduce("Robo")</code> must give back exactly <code>"Hello, I am Robo!"</code>. Capital H, a comma, one space after it, an exclamation mark at the end.</p>
-<details><summary>Hint 1</summary><p>You need to glue the name into the middle of some fixed text. Python has a neat way to do that called an f-string.</p></details>
-<details><summary>Hint 2</summary><p>An f-string starts with <code>f</code> before the quote, and anything inside <code>{ }</code> is replaced by its value. <code>f"I am {age} years old"</code> becomes <code>"I am 15 years old"</code> when <code>age</code> is 15.</p></details>
-<details><summary>Hint 3</summary><p>One line: <code>return</code> followed by an f-string that contains <code>Hello, I am </code>, then <code>{name}</code>, then <code>!</code>. Check the punctuation against the example character by character.</p></details>
-
-<h3>Function 2: <code>steps_to_wall(start_x, wall_x)</code></h3>
-<p><strong>What it does:</strong> the paper algorithm from section 2. Start at <code>start_x</code>, walk right one square at a time, stop on the square just before <code>wall_x</code>, and return how many steps that took. Use a loop, not subtraction.</p>
-<p><strong>Example:</strong> <code>steps_to_wall(1, 5)</code> → <code>3</code> (1 → 2 → 3 → 4, then the wall is next). Also <code>steps_to_wall(4, 5)</code> → <code>0</code>, and <code>steps_to_wall(0, 10)</code> → <code>9</code>.</p>
-<details><summary>Hint 1</summary><p>You need two variables that change: where the robot is now, and how many steps it has taken. Set both up before the loop.</p></details>
-<details><summary>Hint 2</summary><p>A <code>while</code> loop keeps going while its condition is true. The condition is "the next square is still before the wall". The next square is <code>x + 1</code>. "Before the wall" means less than <code>wall_x</code>.</p></details>
-<details><summary>Hint 3</summary><pre><code>steps = 0, x = start_x
-while (next square) is less than wall_x:
-    move x forward one
-    add one to steps
-return steps</code></pre></details>
-
-<h3>Run it and see</h3>
-<p>From the <code>project</code> folder:</p>
-<pre><code>cd homework
-python3 lesson00_hello.py          # Windows: py lesson00_hello.py
-cd ..</code></pre>
-<p>When both functions are right, you should see exactly this (real output):</p>
-<pre><code>Hello, I am Robo!
-Steps to wall: 3</code></pre>
-
-<h3>Check it</h3>
-<pre><code>python3 check.py 0                 # Windows: py check.py 0</code></pre>
-<p>Your first green ✓ looks like this. It's real output of the finished homework:</p>
+<h2 id="setup">3. Set up</h2>
+<div class="box build"><span class="tag">🛠 Build: get Python working</span>
+<p>Most people who give up on programming give up here, at setup. Go slowly. After every step there's a checkpoint: don't move on until yours matches.</p>
+<ol class="steps">
+<li id="install"><strong>Install Python 3</strong> (3.8 or newer). Open your system below.
+<details><summary>Windows</summary>
+<p>Go to <b>python.org</b> → <b>Downloads</b> → the yellow button. Open the downloaded file. <strong>Before anything else, tick "Add python.exe to PATH"</strong> at the bottom of the first screen. Then click <b>Install Now</b>. On Windows, type <code>py</code> everywhere this course says <code>python3</code>.</p>
+</details>
+<details><summary>macOS</summary>
+<p>Go to <b>python.org</b> → <b>Downloads</b> → "Download Python 3.x.x". Open the <code>.pkg</code> file and click through to <b>Install</b>. Always type <code>python3</code>, not <code>python</code>.</p>
+</details>
+<details><summary>Linux / Raspberry Pi</summary>
+<p>Python 3 is almost always there already. If not: <code>sudo apt install python3</code> (or <code>sudo dnf install python3</code> on Fedora). Nothing shows while you type a password. That's normal.</p>
+</details>
+</li>
+<li id="terminal"><strong>Open a terminal.</strong> Windows: press the Windows key, type <code>powershell</code>, Enter. Mac: <kbd>Cmd</kbd>+<kbd>Space</kbd>, type <code>Terminal</code>, Enter. Linux: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd>. Then type:
+<pre><code>python3 --version          # Windows: py --version</code></pre>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p>You see a version number. On our Mac it printed:</p>
+<pre><code>Python 3.14.5</code></pre>
+<p>Yours may differ. Anything from 3.8 up is fine. <strong>If you see</strong> "command not found" or "not recognized", Python isn't on the PATH: close the terminal, reopen it, and try again. On Windows, run the installer again, choose <b>Modify</b>, and tick "Add to PATH". If <code>python</code> opens the Microsoft Store, use <code>py</code>.</p>
+</div></li>
+<li id="cd"><strong>Go into the project folder.</strong> <code>cd</code> means "change directory" (folder). The project is <code>topics/18-robot-brain/project</code> in the course folder.
+<ul>
+<li><strong>Mac or Linux, the easy way:</strong> type <code>cd</code> and a space, drag the <code>project</code> folder into the terminal window, press Enter.</li>
+<li><strong>Windows, the easy way:</strong> open the <code>project</code> folder in File Explorer, click the address bar, type <code>cmd</code>, press Enter.</li>
+</ul>
+<p>Then list what's there: <code>ls</code> (Windows: <code>dir</code>).</p>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p>You see these six names: <code>README.md</code>, <code>check.py</code>, <code>homework</code>, <code>make_starters.py</code>, <code>progress.py</code>, <code>solutions</code>.</p>
+<p><strong>If you see</strong> something else, you're in the wrong folder. <code>cd ..</code> goes up one folder; <code>cd homework</code> goes down into one. Press <kbd>↑</kbd> to repeat the last command.</p>
+</div></li>
+<li id="firstrun"><strong>Run the checker</strong> for the first time:
+<pre><code>python3 check.py 0         # Windows: py check.py 0</code></pre>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p>Yellow dots. Real output:</p>
 <pre><code>Lesson 0: lesson00_hello.py
-  ✓ introduce
-  ✓ steps_to_wall
-  2/2 passed  🎉 lesson complete!</code></pre>
-<p>If something is off, you get a red ✗ with a hint. For example, if you forget the exclamation mark the checker says:</p>
-<pre><code>  ✗ introduce: introduce("Robo") should return exactly "Hello, I am Robo!"</code></pre>
-<p>And if your loop goes one step too far:</p>
-<pre><code>  ✗ steps_to_wall: steps_to_wall(1, 5) should be 3</code></pre>
-<p>Read the hint, change your code, save, and run the checker again. That loop (write, run, read, fix) is what programming actually is.</p>
-
-<h3>Stretch</h3>
-<p>Write <code>steps_to_wall_left(start_x, wall_x)</code> where the wall is on the <em>left</em> (so <code>wall_x</code> is smaller than <code>start_x</code>) and the robot walks left. Trace <code>steps_to_wall_left(6, 2)</code> on paper first. (The checker doesn't test this one; test it yourself with <code>print</code>.)</p>
-
-<h2 id="add-to-robot">Add it to your robot</h2>
-<p>Your robot is a file you'll build yourself, one piece a week: <code>homework/my_robot.py</code>. Open it now. At the top, change <code>NAME = "Robo-Helper"</code> to your robot's own name (ours is Zippy). Save it.</p>
-<p>You've already given it its first power. When <code>my_robot.py</code> starts, it calls <em>your</em> <code>introduce()</code> with its name. The line that does it is already in the file:</p>
-<pre><code>from lesson00_hello import introduce</code></pre>
-<p>Then run it: <code>cd homework</code>, then <code>python3 my_robot.py</code> (Windows: <code>py my_robot.py</code>). Type <code>help</code> to see what it can do, and <code>quit</code> to stop. Real output, after this lesson's homework:</p>
-<pre><code>Hello, I am Zippy!
-
-=== Zippy: built up to week 0 ===
-  · week  1: moves with arrows (EESS)
-  · week  2: looks around: 'look'
-  · week  3: stops before it bumps into the cat
-  ...
-  · week 12: the boss: uses what it SEES ('tidy up the room', 'the block closest to the bin')
-  Next gap to fill: week 1, the arrows() method in my_robot.py (see 'Add it to your robot' on the week 1 page).
-##########
-#Rr.c....#
+  … introduce: not written yet (Lesson 0: write this function)
+  … steps_to_wall: not written yet (Lesson 0: write this function)
+  0/2 passed</code></pre>
+<p><strong>That's a success.</strong> Yellow <code>…</code> means "not written yet". Later you'll get green <code>✓</code> (right) and red <code>✗</code> (wrong, with a hint). <strong>If you see</strong> "can't open file 'check.py'", you're not in the <code>project</code> folder: go back to step 3.</p>
+</div></li>
+<li><strong>Look at the room.</strong>
+<pre><code>cd homework
+python3 world.py           # Windows: py world.py
+cd ..</code></pre>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p>The room from the top of the page, drawn with letters: <code>#</code> wall, <code>R</code> robot, <code>r</code> <code>b</code> <code>g</code> blocks, <code>B</code> bin. Real output:</p>
+<pre><code>##########
+#Rr......#
 #..##....#
 #..#..b..#
 #....##..#
 #g.......#
 #.#....B.#
-##########
-Type commands like EESS, look, goto blue, put the red block in the bin, exam.   help / reset / quit
+##########</code></pre>
+</div></li>
+<li id="editor"><strong>Pick an editor.</strong> <strong>IDLE</strong> came with Python (File → Open). <strong>VS Code</strong> (code.visualstudio.com) is free and has its own terminal. Not Word or Pages: they break code. Open <code>homework/lesson00_hello.py</code>.</li>
+</ol>
+</div>
 
-Zippy&gt; EEEE
-  I can't do that yet: week 1. Fill in this gap in my_robot.py</code></pre>
-<p>Your robot says hello. If it doesn't, run <code>python3 check.py 0</code> first: the greeting only appears once <code>introduce</code> works. Each <code>·</code> is a locked power. It turns into a <code>✓</code> when you fill that week's gap. The <code>c</code> in the room is a cat. Your robot doesn't know it's there yet. You'll meet it in Part B.</p>
-<p>Every gap in the file is marked <code># TODO week N</code>. Until you fill it, your robot politely says "I can't do that yet".</p>
+<h2 id="homework">4. Build your first two functions</h2>
+<div class="box build"><span class="tag">🛠 Build</span>
+<p>Each function in <code>lesson00_hello.py</code> has a line <code>raise NotImplementedError(...)</code>. It means "not written yet". Delete it and write your code in its place. Save before every run.</p>
+<ol class="steps">
+<li><strong><code>introduce(name)</code></strong> <em>returns</em> (not prints!) the greeting. <code>introduce("Robo")</code> must give exactly <code>"Hello, I am Robo!"</code>: comma, one space, exclamation mark.
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>An f-string glues a value into text: <code>f"I am {age} years old"</code>.</p></details>
+<details><summary>Hint 2</summary><p>It's one line: <code>return</code> and an f-string with <code>{name}</code> inside it.</p></details>
+<details><summary>Hint 3: fill in the blank</summary><pre><code>return f"Hello, I am ____!"</code></pre></details>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p>Run <code>python3 check.py 0</code>. Real output:</p>
+<pre><code>Lesson 0: lesson00_hello.py
+  ✓ introduce
+  … steps_to_wall: not written yet (Lesson 0: write this function)
+  1/2 passed</code></pre>
+<p><strong>If you see</strong> <code>✗ introduce: introduce("Robo") should return exactly "Hello, I am Robo!"</code>, check every character, and check you used <code>return</code>, not <code>print</code>.</p>
+</div></li>
+<li><strong><code>steps_to_wall(start_x, wall_x)</code></strong> is the corridor algorithm from the picture. Walk right one square at a time, stop on the square just before the wall, return the number of steps. Use a loop, not subtraction: a real robot doesn't know where the wall is until it looks. <code>steps_to_wall(1, 5)</code> → <code>3</code>, <code>steps_to_wall(4, 5)</code> → <code>0</code>.
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>You need two variables that change: where the robot is (<code>x</code>) and how many steps it took (<code>steps</code>). Set both before the loop.</p></details>
+<details><summary>Hint 2</summary><p>Keep going while the <em>next</em> square, <code>x + 1</code>, is less than <code>wall_x</code>.</p></details>
+<details><summary>Hint 3: fill in the blanks</summary><pre><code>steps = 0
+x = start_x
+while ____ &lt; wall_x:
+    x += 1
+    steps += ____
+return steps</code></pre></details>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p>Run the lesson file:</p>
+<pre><code>cd homework
+python3 lesson00_hello.py
+cd ..</code></pre>
+<p>Real output:</p>
+<pre><code>Hello, I am Robo!
+Steps to wall: 3</code></pre>
+<p>Then <code>python3 check.py 0</code>:</p>
+<pre><code>Lesson 0: lesson00_hello.py
+  ✓ introduce
+  ✓ steps_to_wall
+  2/2 passed  🎉 lesson complete!</code></pre>
+<p><strong>If you see</strong> <code>✗ steps_to_wall: steps_to_wall(1, 5) should be 3</code>, you probably wrote <code>while x &lt; wall_x</code>. That walks onto the wall. Trace it on paper.</p>
+</div></li>
+</ol>
+</div>
 
-<div class="card note" id="robot-file"><strong>How your robot file works.</strong> You'll fill in the gaps, so here are the ideas the file uses.
+<h2 id="add-to-robot">5. Add it to your robot</h2>
+<div class="box bot"><span class="tag">🤖 Add it to your robot</span>
+<p>Your robot is one file you build yourself, a piece a week: <code>homework/my_robot.py</code>. Open it and change <code>NAME = "Robo-Helper"</code> to your robot's own name (ours is Zippy). Save.</p>
+<p>That's all for today: the file already calls <em>your</em> <code>introduce()</code> with that name (<code>from lesson00_hello import introduce</code>). Run it:</p>
+<pre><code>cd homework
+python3 my_robot.py        # Windows: py my_robot.py</code></pre>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p>It greets you, lists its powers, and draws the room. Each <code>·</code> is a locked power, one per week. Real output (shortened):</p>
+<pre><code>Hello, I am Zippy!
+
+=== Zippy: built up to week 0 ===
+  · week  1: moves with arrows (EESS)
+  · week  2: looks around: 'look'
+  · week  3: reads REAL phone sensor data: 'phone'
+  ...
+  · week 16: the body capstone: lost, finds itself, drives there on wheels: 'rescue blue'
+  Next gap to fill: week 1, the arrows() method in my_robot.py (see 'Add it to your robot' on the week 1 page).</code></pre>
+<div class="room" data-robot="1,1" data-cat="4,1" data-blocks="red:2,1 blue:6,3 green:1,5" data-label="How your robot draws its room. That's a cat 🐱 at (4, 1). Your robot can't sense it yet."></div>
+<p>Type <code>EEEE</code> and it answers <code>I can't do that yet: week 1. Fill in this gap in my_robot.py</code>. That's right for now. Type <code>quit</code> to stop.</p>
+<p>Then, from <code>project</code>, run <code>python3 check.py robot</code>. It ends with <code>0/21 passed</code>: 21 checks, one or more per week, all yellow for now.</p>
+<p><strong>If there's no "Hello"</strong>, your <code>introduce</code> isn't working yet: run <code>python3 check.py 0</code>.</p>
+</div>
+<div class="card note" id="robot-file"><strong>How your robot file works.</strong> You'll fill in its gaps, so here are the four ideas it uses.
 <ul>
-<li><strong>A class is a blueprint.</strong> <code>class Robot:</code> describes what every robot knows and can do. <code>Robot()</code> builds one real robot from it.</li>
-<li><strong>A method is a function that lives inside the class.</strong> <code>arrows</code>, <code>look</code> and <code>goto</code> are methods. You write them like any function, indented under the class.</li>
-<li><strong><code>self</code> means "this robot".</strong> Every method gets it as its first input. <code>self.pos</code> is where <em>this</em> robot is, and <code>self.binned</code> is the set of blocks <em>this</em> robot has put away.</li>
-<li><strong>Helpers we wrote for you.</strong> You call them with <code>self.</code> in front. For example, <code>self.step(square)</code> moves the robot one square and tells you what happened: <code>"moved"</code>, <code>"stopped"</code> or <code>"bump"</code>.</li>
+<li><strong>A class is a blueprint.</strong> <code>class Robot:</code> says what every robot knows and does. <code>Robot()</code> builds one.</li>
+<li><strong>A method is a function inside the class.</strong> <code>arrows</code> and <code>look</code> are methods.</li>
+<li><strong><code>self</code> means "this robot".</strong> <code>self.pos</code> is where <em>this</em> robot is.</li>
+<li><strong>Helpers are ready for you.</strong> <code>self.step(square)</code> moves one square and says <code>"moved"</code>, <code>"stopped"</code> or <code>"bump"</code>.</li>
 </ul>
-<p>A 3-line example. This method isn't in your file. It just shows the shape:</p>
 <pre><code>class Robot:
     def where(self):
         return f"I am at {self.pos}."</code></pre>
-<p>If <code>zippy = Robot()</code> and <code>zippy.pos</code> is <code>(1, 1)</code>, then <code>zippy.where()</code> returns <code>"I am at (1, 1)."</code>. You don't pass <code>self</code> yourself: Python fills it in with <code>zippy</code>. Every gap you fill is a method like this one.</p>
+<p>If <code>zippy.pos</code> is <code>(1, 1)</code>, <code>zippy.where()</code> returns <code>"I am at (1, 1)."</code>. Python fills in <code>self</code> for you. Every gap is marked <code># TODO week N</code>.</p>
+</div>
 </div>
 
-<h2 id="challenge">5. Real-world challenge: the literal friend</h2>
-<p>You'll feel what it's like to be a programmer whose computer does exactly what you wrote.</p>
-<ol>
-<li><strong>Pick a task</strong> that takes a minute: making a jam (or butter) sandwich, putting on a jacket, or drawing a house on paper. Use a blunt butter knife only, and ask an adult if you're using the kitchen.</li>
-<li><strong>Write the instructions</strong> on paper, numbered, without your friend watching. Aim for 8–15 steps.</li>
-<li><strong>Your friend follows them literally.</strong> Their job is to be a computer: do exactly what each line says, nothing more, and do something silly if a step is vague. "Put the bread on the plate" while the bread is still in the bag? The whole bag goes on the plate.</li>
-<li><strong>Record every bug.</strong> For each step that went wrong, write: step number, what you meant, what they did, and what kind of bug it was: <em>vague</em> (unclear words), <em>missing</em> (a step you forgot), <em>order</em> (right step, wrong place), or <em>never stops</em>.</li>
-<li><strong>Fix and run again.</strong> Write version 2 and repeat. Keep going until a run has zero bugs.</li>
+<h2 id="challenge">6. Real-world challenge: the literal friend</h2>
+<ol class="steps">
+<li>Write 8–15 numbered steps for making a sandwich (blunt knife, ask an adult) or drawing a house.</li>
+<li>A friend follows them <em>exactly</em>, and does something silly whenever a step is vague.</li>
+<li>Write down each bug: vague, missing, wrong order, or never stops. Fix it and run again until there are no bugs.</li>
 </ol>
-<div class="card note"><strong>On your own (no friend, no kitchen):</strong> write 8–15 numbered steps for drawing a house on paper. Put them away for an hour. Then follow them yourself, as literally and sillily as you can: if a step says "draw a square" without saying where or how big, draw it tiny in a corner. Record the bugs the same way, fix them, and try again.</div>
-<p><strong>What to record:</strong> the number of bugs in version 1, version 2 and version 3, and which kind was most common. Most people find 5–10 bugs in version 1. <strong>What it teaches:</strong> computers aren't clever about what you meant. Precision is the whole job, and testing (your friend) finds bugs you couldn't see while writing. That's exactly why this course has <code>check.py</code>.</p>
+<div class="card note"><strong>On your own:</strong> write the steps for drawing a house, wait an hour, then follow them yourself as literally as you can.</div>
+<p>Most people find 5–10 bugs in version 1. Testing finds bugs you can't see while writing. That's why this course has <code>check.py</code>.</p>
 
-<h2 id="project">6. Your Robo-Helper so far</h2>
-<pre><code>Week 1A  ✓ Python works, the checker works, the robot greets you by name and can count steps to a wall</code></pre>
-<p>The robot can't move yet, but you've learned its habit of mind: <em>look at the next square, decide, step, repeat</em>. That idea comes straight back:</p>
+<h2 id="check">Check yourself</h2>
+<details><summary>Predict: what does <code>steps_to_wall(3, 9)</code> return?</summary><p><strong>5.</strong> x goes 3 → 4 → 5 → 6 → 7 → 8. At 8 the next square is the wall.</p></details>
+<details><summary>If <code>introduce</code> uses <code>print</code> and no <code>return</code>, what does <code>x = introduce("Robo")</code> put in <code>x</code>?</summary><p><code>None</code>. The text appears on screen, but nothing comes back.</p></details>
+<details><summary>Why use a loop instead of <code>wall − start − 1</code>?</summary><p>Subtraction needs you to know where the wall is. A robot finds out by looking one square at a time. In week 2 that look becomes a sensor.</p></details>
+<details><summary>"can't open file 'check.py'". What's wrong?</summary><p>The terminal is in the wrong folder. <code>cd</code> into <code>project</code>, the folder with <code>check.py</code> in it.</p></details>
+
+<h2 id="deeper">Want to know more?</h2>
+<details><summary>Tracing: how professionals check a loop</summary>
+<p>Write every variable at every step. For <code>steps_to_wall(1, 5)</code>:</p>
+<pre><code>x = 1, steps = 0   next is 2, not the wall → move
+x = 2, steps = 1   next is 3 → move
+x = 3, steps = 2   next is 4 → move
+x = 4, steps = 3   next is 5, the wall → stop. Answer 3</code></pre>
+</details>
+<details><summary>Stretch: walk left</summary><p>Write <code>steps_to_wall_left(start_x, wall_x)</code> for a wall on the left. Trace <code>steps_to_wall_left(6, 2)</code> on paper first. The checker doesn't test it.</p></details>
+<details><summary>Common mistakes</summary>
 <ul>
-<li><a href="01-coordinates.html">Week 1 Part B</a> gives the robot real moves on the 2D grid (<code>move</code>, <code>safe_move</code>).</li>
-<li><a href="02-sensors.html">Week 2</a> turns your <code>steps_to_wall</code> loop into <code>distance_to_wall</code>: the same "step until blocked" loop, but in any direction on the real room map.</li>
-<li>In the <a href="11-capstone.html">week 7 capstone</a>, <code>RoboHelper.drive_to</code> calls that <code>distance_to_wall</code> before every move to decide how fast it's safe to go.</li>
-</ul>
-
-<h2 id="mistakes">7. Common mistakes</h2>
+<li><strong>Printing instead of returning.</strong> The function gives back <code>None</code>.</li>
+<li><strong>Off by one.</strong> <code>while x &lt; wall_x</code> gives 4 instead of 3.</li>
+<li><strong>Forgetting to save.</strong> The checker reads the file on disk.</li>
+<li><strong>Odd codes like <code>[32m</code></strong> on old Windows terminals are harmless colours. PowerShell shows them properly.</li>
+</ul></details>
+<details><summary>Where this goes next</summary>
 <ul>
-<li><strong>Printing instead of returning.</strong> <code>print(...)</code> shows text on screen but gives nothing back, so the function returns <code>None</code> and the checker says <code>introduce("Robo") should return exactly "Hello, I am Robo!"</code>.</li>
-<li><strong>Tiny text differences.</strong> <code>"Hello I am Robo!"</code> (no comma) or <code>"Hello, I am Robo"</code> (no !) are different strings to a computer. Literal, remember?</li>
-<li><strong>Off by one.</strong> Using <code>while x &lt; wall_x</code> walks the robot <em>onto</em> the wall square and gives 4 instead of 3. The checker says <code>steps_to_wall(1, 5) should be 3</code>. Trace it on paper to see why.</li>
-<li><strong>Running from the wrong folder.</strong> <code>check.py</code> lives in <code>project/</code>, the lesson files in <code>project/homework/</code>. "can't open file" means you're in the wrong one.</li>
-<li><strong>Forgetting to save.</strong> The checker reads the file on disk, not what's in your editor. Save first.</li>
-</ul>
-
-<h2 id="check">8. Check yourself</h2>
-<details><summary>In your own words, what makes a list of steps an algorithm?</summary><p>Every step is exact, the order is right, and it's guaranteed to stop with an answer. "Make a sandwich" isn't an algorithm. A numbered list a literal friend can follow without guessing is.</p></details>
-<details><summary>Predict: what does <code>steps_to_wall(3, 9)</code> return? Trace it.</summary><p><strong>5.</strong> x goes 3 → 4 → 5 → 6 → 7 → 8, which is five moves. At x = 8 the next square is 9, the wall, so it stops.</p></details>
-<details><summary>Predict: if <code>introduce</code> uses <code>print</code> and no <code>return</code>, what does <code>x = introduce("Robo")</code> put in <code>x</code>?</summary><p><code>None</code>. The greeting appears on screen, but the function hands back nothing. Every Python function without a <code>return</code> returns <code>None</code>.</p></details>
-<details><summary>Why does the homework forbid subtraction for <code>steps_to_wall</code>?</summary><p>Subtraction needs you to already know where the wall is. A robot finds out by checking one square at a time. The loop version still works when the corridor has unknown walls in it, which is exactly what week 2 needs.</p></details>
-<details><summary>You type <code>python3 check.py 0</code> and get "can't open file 'check.py'". What's wrong?</summary><p>The terminal is in the wrong folder. Use <code>ls</code> or <code>dir</code> to see where you are, then <code>cd</code> into the <code>project</code> folder (the one that contains <code>check.py</code>).</p></details>
-
-<h2 id="deeper">9. Go deeper (optional)</h2>
-<ul>
-<li><a href="../17-free-ai-curriculum.html#robotics">Free robotics courses</a>: a catalogue of free, high-quality courses for when you want more.</li>
-<li><a href="../02-tensortonic.html">TensorTonic</a>: a practice gym where you implement ML ideas from scratch, just like this course's homework, but many more.</li>
-<li><a href="../11-three-book-path.html">Three Books and a Gym</a>: a longer plan for young people who want to build AI, not just use it.</li>
-</ul>
+<li><a href="01-coordinates.html">Week 1 Part B</a> gives the robot real moves on the grid.</li>
+<li><a href="02-sensors.html">Week 2</a> turns <code>steps_to_wall</code> into <code>distance_to_wall</code>: the same loop, in any direction, on the real room.</li>
+<li><a href="../17-free-ai-curriculum.html#robotics">Free robotics courses</a>, <a href="../02-tensortonic.html">TensorTonic</a> and <a href="../11-three-book-path.html">Three Books and a Gym</a> for more.</li>
+</ul></details>
 
 <nav class="pager">
   <a href="index.html"><small>Previous</small>Course hub</a>
   <a class="next" href="01-coordinates.html"><small>Next</small>Week 1 · Part B: Moving on a grid</a>
 </nav>
-<footer>Build a Robot Brain · Week 1 of 12 · Part A</footer>
+<footer>Build a Robot Brain · Week 1 of 16 · Part A</footer>
 </main>
 
 <script>
@@ -440,7 +363,7 @@ reset();
     const n = [pos[0] + DIRS[d][0], pos[1] + DIRS[d][1]];
     moves++;
     if (ROOM[n[1]][n[0]] === '#') { bumps++; msg = `Bonk! ${fmt(n)} is a wall.`; }
-    else if (same(n, CAT)) { bumps++; msg = 'BUMP! You walked into the cat. Your robot will learn to stop for it in week 3.'; }
+    else if (same(n, CAT)) { bumps++; msg = 'BUMP! You walked into the cat. Your robot will learn to stop for it in week 4.'; }
     else { pos = n; trail.push(n); msg = same(n, BIN) ? `You reached the bin in ${moves} moves!` + (moves === 11 ? ' That is the fewest possible.' : ' Can you do it in 11?') : `Now at ${fmt(n)}.`; }
     draw();
   }
@@ -478,5 +401,6 @@ reset();
   reset();
 })();
 </script>
+<script src="room.js"></script>
 </body>
 </html>

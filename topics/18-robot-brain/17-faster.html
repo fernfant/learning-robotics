@@ -3,180 +3,112 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Week 9 · Faster and cheaper</title>
-<link rel="stylesheet" href="../../style.css">
+<title>Week 14 · Faster and cheaper</title>
+<link rel="stylesheet" href="../../style.css?v=16">
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 9 · Part A</nav>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 14 of 16 · Part A</nav>
 
-<div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 9 of 12 · Part A</div>
+<div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 14 of 16 · Part A</div>
 <h1>Faster and cheaper: caching, quantising and distilling</h1>
-<p class="lede">Last lesson you put a stopwatch and a price tag on every brain. Big brains are smart but slow and pricey; small brains are fast and free but make more mistakes. Every AI company in the world uses three tricks to get closer to "smart <em>and</em> fast". Today you build all three, and find the catch in each one.</p>
-<div class="card note" id="journey"><strong>Week 9 of 12 · Part A.</strong> So far your robot: ✓ says hello ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes ✓ fixes typos ✓ understands commands ✓ writes plans ✓ checks AI answers ✓ works as one robot ✓ knows its thinking speed. <strong>Today</strong> it learns to learn from a teacher, then shrink to 1/8 the size. Next: <a href="13-lora.html">Week 9 · Part B: fine-tuning and LoRA</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and type <code>where's the green one?</code>: its new teacher-trained brain answers instead of guessing.</div>
+<p class="lede">Three tricks every AI company uses to get closer to "smart <em>and</em> fast". You build all three, and find the catch in each.</p>
+<div class="card note" id="journey"><strong>Week 14 of 16 · Part A.</strong> So far your robot: ✓ moves ✓ looks ✓ reads phone data ✓ stops for the cat ✓ plans routes ✓ fuses sensors ✓ understands sentences ✓ writes plans ✓ drives on wheels ✓ checks every action ✓ maps the room ✓ finds itself ✓ times its thinking. <strong>Today</strong> it learns from a teacher, then shrinks to an eighth of its size. Next: <a href="13-lora.html">Week 14 · Part B: fine-tuning and LoRA</a>. <a href="index.html#my-robot">Your robot, week by week</a>.</div>
 
 <div class="facts">
-  <div><b>Time</b>2–3 hours</div>
-  <div><b>You'll need</b>Python 3, your finished weeks 5, 6 and 8, a tape measure, a notebook</div>
+  <div><b>Time</b>2 hours</div>
+  <div><b>You'll need</b>Python 3, your finished weeks 7, 8 and 13, a tape measure, a notebook</div>
   <div><b>Homework file</b><code>lesson17_faster.py</code></div>
-  <div><b>New words</b>cache, hit, miss, hit rate, cache key, stale, bit, quantise, scale, distil, teacher, student, label</div>
-  <div><b>Project piece</b>Learns new phrasings from a teacher, then shrinks 8× (10/12 in 1.4 KB)</div>
 </div>
 
 <section class="kid" id="start">
 <h2>Start here</h2>
-<p class="big">Don't think twice about the same question (caching), store the brain's numbers with fewer bits (quantising), and let a big brain teach a small one (distilling). Each trick saves a lot, and each has one way it can quietly go wrong.</p>
-
-<h3>The problem</h3>
-<p>Robo-Helper hears "stop" forty times a day, and its brain works out the answer from scratch every single time. Its tiny language model stores every number with 32 bits of precision, when maybe 4 would do. And it still gets "where's the green one?" wrong: it drives over and bins the block. A clever internet brain (you'll meet one next week, in week 10) would get it right, but it's slow and costs money per word, so you'd love a small local brain that's nearly as clever. Three kinds of waste. Three fixes.</p>
-
-<h3>The idea in one picture</h3>
-<p>Think of a student revising for a maths test. <strong>Caching</strong>: they learn their times tables by heart instead of working out 7 × 8 every time. <strong>Quantising</strong>: they write π as 3.14, not 3.14159265; it's nearly always close enough. <strong>Distilling</strong>: instead of reading the whole textbook, they learn from a top student's summary notes. But: a memorised fact can go out of date, 3.14 isn't good enough for a moon rocket, and if the top student's notes have a mistake, you'll learn the mistake too.</p>
-
-<h3>Words to know</h3>
+<p class="big">Don't think twice about the same question (caching). Store numbers with fewer marks (quantising). Let a big brain teach a small one (distilling). Each trick saves a lot, and each has one way it quietly goes wrong.</p>
+<p>Robo-Helper hears "stop" forty times a day and works it out from scratch every time. Its brain stores every number with 32 bits when 4 might do. And it still gets "where's the green one?" wrong. Three kinds of waste, three fixes.</p>
 <dl>
-<dt>Cache</dt><dd>A store of answers you've already worked out, so you can reuse them. (Say it "cash".)</dd>
-<dt>Hit, miss</dt><dd>A hit: the answer was in the cache. A miss: it wasn't, so you had to think.</dd>
-<dt>Hit rate</dt><dd>Hits divided by all questions. 3 hits out of 8 questions is 38%.</dd>
-<dt>Cache key</dt><dd>The label you file an answer under. Two questions with the same key get the same answer.</dd>
-<dt>Stale</dt><dd>An answer that was right when it was stored, but the world has changed since.</dd>
-<dt>Bit</dt><dd>A single 0 or 1. With b bits you can write 2<sup>b</sup> different patterns: 4 bits give 16.</dd>
-<dt>Quantise</dt><dd>Round numbers to a small set of allowed values, so each can be stored with fewer bits.</dd>
-<dt>Scale</dt><dd>The step size between allowed values. Whole number × scale gives back (roughly) the original.</dd>
-<dt>Distil</dt><dd>Train a small, fast "student" model on answers written by a big, slow "teacher" model.</dd>
-<dt>Label</dt><dd>The right answer attached to an example, like ("bin the red one", "put").</dd>
+<dt>Cache</dt><dd>A store of answers you've already worked out. Say it "cash".</dd>
+<dt>Hit / miss</dt><dd>Hit: the answer was stored. Miss: it wasn't, so you had to think.</dd>
+<dt>Quantise</dt><dd>Round numbers to a few allowed values, so each needs fewer bits.</dd>
+<dt>Distil</dt><dd>Train a small "student" on answers written by a big "teacher".</dd>
 </dl>
 </section>
-<p class="deeper"><strong>Going deeper:</strong> everything below is the full lesson: three tricks built from nothing, a demo where you squash the attention model's real numbers with a bits slider, your homework, and a challenge with a tape measure.</p>
 
-<h2 id="problem">1. The problem</h2>
-<p>Week 8 gave us the numbers that matter: latency (p50 and p95), and cost per token. Look at where the time and money go:</p>
-<ul>
-<li><strong>Repeated work.</strong> "stop", "STOP", "Stop!": three strings, one meaning, three times the thinking. For an internet brain, that's three waits and three bills.</li>
-<li><strong>Fat numbers.</strong> Our best small brain so far, week 6's attention model, has 2,702 numbers, each stored as a 32-bit decimal (4 bytes): 10,808 bytes. That's nothing. But a big open LLM can have 70 billion numbers: 280 billion bytes (280 GB), more than fits on any single graphics card. And to write each token, the computer has to read through all of those numbers. Fewer bytes means it fits on smaller machines <em>and</em> runs faster.</li>
-<li><strong>A giant brain for easy jobs.</strong> "go to the red block" doesn't need a model that can write poetry. But "where's the green one?" does trip up our small one: it writes <code>put green</code> and bins the block.</li>
-</ul>
-<p>The obvious fixes all have a trap: remember answers (but they go out of date), use rougher numbers (but the brain might get dumber), copy a big brain (but you copy its mistakes too). Let's build each fix carefully.</p>
+<h2 id="idea">1. The idea</h2>
+<div class="box idea"><span class="tag">💡 Caching: a notebook of answers</span>
+<p>Keep a notebook. Before thinking, look the question up. If it's there, read it out: instant and free. If not, think, then write it down. The catch: "where is the red block?" has a different answer once someone moves the block. So the notebook files every answer under <strong>the words <em>and</em> the world</strong>.</p>
+<svg class="diagram" viewBox="0 0 520 250" role="img" aria-label="A notebook of answers. Each line is filed under the tidied words plus the world. A question in the same world is a hit. The same words in a new world are a miss, so the brain thinks again.">
+  <rect x="60" y="20" width="400" height="200" rx="10" fill="var(--build-soft)" stroke="var(--build)" stroke-width="3"/>
+  <g fill="var(--build)"><circle cx="60" cy="50" r="6"/><circle cx="60" cy="100" r="6"/><circle cx="60" cy="150" r="6"/><circle cx="60" cy="200" r="6"/></g>
+  <line x1="300" y1="30" x2="300" y2="210" stroke="var(--build)" stroke-width="1.5" stroke-dasharray="4 4"/>
+  <text x="80" y="48" font-size="13" font-weight="700" fill="var(--fg)">key: words | world</text><text x="312" y="48" font-size="13" font-weight="700" fill="var(--fg)">answer</text>
+  <line x1="75" y1="58" x2="450" y2="58" stroke="var(--line)"/>
+  <text x="80" y="84" font-size="13" fill="var(--fg)">stop | red at (2,1)</text><text x="312" y="84" font-size="13" fill="var(--fg)">Stopping.</text>
+  <text x="80" y="114" font-size="13" fill="var(--fg)">where is the red block | red at (2,1)</text><text x="312" y="114" font-size="13" fill="var(--fg)">at (2, 1)</text>
+  <text x="80" y="144" font-size="13" fill="var(--fg)">where is the red block | red in the bin</text><text x="312" y="144" font-size="13" fill="var(--fg)">in the bin</text>
+  <text x="80" y="186" font-size="13" fill="var(--ok)" font-weight="700">"STOP", same world → hit: read it out</text>
+  <text x="80" y="206" font-size="13" fill="var(--build)" font-weight="700">same words, new world → miss: think again</text>
+</svg>
+<p>Tidying the words with week 7's <code>tokenize</code> means "Put the RED block!" and "put the red block" share a key: <code>"put the red block|w1"</code>.</p>
+</div>
 
-<h2 id="principles">2. First principles</h2>
-
-<h3>Part A · Caching</h3>
-<h4>Step 1: a cache is a dictionary</h4>
-<p>You already know the tool: a Python dictionary. The question goes in as the key, the answer is the value.</p>
-<pre><code>ask "stop"  → not in the dictionary   → MISS: think (slow), store {"stop": answer}
-ask "stop"  → in the dictionary       → HIT: return the stored answer (instant, free)</code></pre>
-<p>A hit costs nothing: no thinking, no tokens, no waiting. The <strong>hit rate</strong> (hits ÷ questions) tells you how much the cache is saving.</p>
-
-<h4>Step 2: choosing the key</h4>
-<p>If the key is the exact text, then "stop", "STOP" and "Stop!" are three different keys, and the cache misses three times. So we tidy the text first with week 5's <code>tokenize</code>: lower-case words, punctuation dropped (except full stops).</p>
-<pre><code>tokenize("Put the RED block!")    → ["put", "the", "red", "block"]
-joined with spaces                → "put the red block"</code></pre>
-<p>Now "Put the RED block!" and "put the red block" share a key. That's half the key.</p>
-
-<h4>Step 3: the stale-answer bug</h4>
-<p>Robo-Helper is asked "where is the red block". It thinks, and answers "at (2, 1)". The cache stores that. Then someone puts the red block in the bin. Five minutes later: "where is the red block". The text matches. <strong>Hit!</strong> The cache instantly answers "at (2, 1)", and the robot drives confidently to an empty square.</p>
-<p>That's a real bug, and real systems have it. The answer depends on the question <em>and on the state of the world</em>. So the world has to be part of the key:</p>
-<pre><code>cache_key("Put the RED block!", "w1")  →  "put the red block|w1"
-                                             └ the words ┘ └ the world</code></pre>
-<p>Same words in a different world: different key, so a miss, so the brain thinks again with fresh information. The <code>|</code> is just a separator so the two halves can't blur together.</p>
-<p>Here's what <code>lesson17_faster.py</code> asks, all in the world "red at (2,1)" except the last one. Work down the list and fill in hit or miss:</p>
-<pre><code>#  question                          world           key so far?   result
-1  put the red block in the bin      red at (2,1)    new           miss (think)
-2  Put the RED block in the bin!     red at (2,1)    same as 1     hit
-3  where is the blue block           red at (2,1)    new           miss (think)
-4  where is the blue block?          red at (2,1)    same as 3     hit
-5  stop                              red at (2,1)    new           miss (think)
-6  STOP                              red at (2,1)    same as 5     hit
-7  where is the red block            red at (2,1)    new           miss (think)
-8  where is the red block            red in the bin  new world!    miss (think)</code></pre>
-<details><summary>Predict first: how many times does the slow brain actually think, and what's the hit rate?</summary>
-<p>5 misses, so it thinks <strong>5 times</strong> instead of 8. Hits: 3 out of 8 = 0.375, which prints as <strong>38%</strong>. The program says exactly that: <code>real thinking calls: 5, hit rate 38%</code>. Question 8 is the important one: a miss is the <em>right</em> answer there.</p>
-</details>
-
-<h4>Step 4: how real companies cache</h4>
-<p>Remember from week 8 why a short command costs about 1,000 input tokens: the instructions and the room description are re-sent every time. LLM providers offer <strong>prompt caching</strong>: the server remembers its work on the <em>start</em> of your prompt, and when the next request starts with exactly the same text, it skips re-reading it. That part comes back faster and is charged at a fraction of the normal input price. The catch is the same as ours: it only matches if the start is <em>identical</em>. So you put the parts that never change (instructions, tool list) first, and the parts that change (the world, the command) at the end.</p>
-
-<h3>Part B · Quantising</h3>
-<h4>Step 5: how a computer stores a number</h4>
-<p>Computers store everything as <strong>bits</strong>: 0s and 1s. With 1 bit you have 2 patterns (0, 1). With 2 bits, 4 patterns (00, 01, 10, 11). Every extra bit doubles it: 4 bits give 16, 8 bits give 256. A normal Python decimal number uses 32 or 64 bits, enough to store something like <code>0.42139865</code> very precisely. The attention model's 2,702 numbers at 32 bits each:</p>
-<pre><code>2,702 numbers × 32 bits ÷ 8 bits per byte = 10,808 bytes</code></pre>
-<p>Does the robot need 8 decimal places? Probably not. What if we stored each number with 8 bits, or 4?</p>
-
-<h4>Step 6: a ruler with fewer marks</h4>
-<p>Imagine a ruler with only a few marks on it, evenly spaced, and you have to round each measurement to the nearest mark. That's quantising. With b bits we allow the whole numbers from <code>−top</code> to <code>+top</code>, where</p>
-<pre><code>top = 2^(b−1) − 1         8 bits: 127      4 bits: 7      3 bits: 3      2 bits: 1</code></pre>
-<p>(One bit is used for the sign, + or −. We skip the very last pattern so that the range is the same on both sides.) Then we pick the <strong>scale</strong>, the gap between marks, so that the biggest number in the list lands exactly on the top mark:</p>
-<pre><code>scale = (biggest absolute value) / top
-q     = round(v / scale)       ← a whole number, stored in b bits
-back  = q × scale              ← "dequantise": roughly the original</code></pre>
-<p>Worked example, the one from <code>check.py</code>: <code>quantize([1, −0.5, 0.25], 8)</code>.</p>
-<pre><code>top   = 127
-scale = 1 / 127 = 0.007874
-1     / 0.007874 = 127      → 127
-−0.5  / 0.007874 = −63.5    → −64     (Python's round() sends an exact half to the even neighbour)
-0.25  / 0.007874 = 31.75    → 32
-back: 127 × scale = 1.0,  −64 × scale = −0.5039,  32 × scale = 0.2520</code></pre>
-<p>Each number moved by less than 0.004. Now 4 bits: <code>quantize([0.7, −0.35], 4)</code> → top 7, scale 0.1, so 7 and −3.5 → <code>[7, −4]</code>. Back: 0.7 and −0.4. That one moved by 0.05: fewer marks, bigger jumps.</p>
-<details><summary>Predict first: <code>quantize([0.9, 0.4, −0.2], 2)</code>. What comes back after dequantising?</summary>
-<p>top = 1, scale = 0.9. 0.9 / 0.9 = 1 → 1. 0.4 / 0.9 = 0.44 → 0. −0.2 / 0.9 = −0.22 → 0. So the ints are <code>[1, 0, 0]</code> and back comes <code>[0.9, 0.0, 0.0]</code>. With only three marks (−0.9, 0, +0.9), the two smaller numbers are wiped out completely. At 4 bits the same list comes back as <code>[0.9, 0.386, −0.257]</code>: close.</p>
-</details>
-<p>One more detail: the Python gives <strong>every row of the model its own scale</strong> (that's what <code>quantized_copy</code> does). If one row has numbers around 1.5 and another has numbers around 0.01, a single shared scale would round the whole small row to zero.</p>
-
-<h4>Step 7: what happens to the attention model, and to the robot</h4>
-<p>Here's the real output. It quantises week 6's attention model (the best small brain so far) and tests each copy twice: on the 50 held-out plans it never trained on, and by putting it in charge of the robot for the 12 bake-off tasks from <a href="19-bakeoff.html">Week 11</a>:</p>
+<div class="box idea"><span class="tag">💡 Quantising: a ruler with fewer marks</span>
+<p>Imagine a ruler with only a few marks. You round every measurement to the nearest mark, and only write down which mark it was. Fewer marks means fewer bits, but bigger jumps. With <em>b</em> bits the marks are the whole numbers from −top to +top, where top = 2<sup>b−1</sup> − 1 (4 bits: 7). The <strong>scale</strong> is the gap between marks, chosen so the biggest number lands on the top mark.</p>
+<svg class="diagram" viewBox="0 0 520 220" role="img" aria-label="Two rulers from minus 0.7 to plus 0.7. The 4-bit ruler has 15 marks 0.1 apart, and minus 0.35 snaps to minus 0.4. The 2-bit ruler has 3 marks, and minus 0.35 snaps to 0, wiped out.">
+  <text x="10" y="30" font-size="14" font-weight="700" fill="var(--fg)">4 bits: 15 marks, scale 0.1</text>
+  <line x1="50" y1="70" x2="470" y2="70" stroke="var(--fg)" stroke-width="2"/>
+  <g stroke="var(--fg)" stroke-width="2"><line x1="50" y1="60" x2="50" y2="80"/><line x1="80" y1="62" x2="80" y2="78"/><line x1="110" y1="62" x2="110" y2="78"/><line x1="140" y1="60" x2="140" y2="80"/><line x1="170" y1="62" x2="170" y2="78"/><line x1="200" y1="62" x2="200" y2="78"/><line x1="230" y1="62" x2="230" y2="78"/><line x1="260" y1="58" x2="260" y2="82"/><line x1="290" y1="62" x2="290" y2="78"/><line x1="320" y1="62" x2="320" y2="78"/><line x1="350" y1="62" x2="350" y2="78"/><line x1="380" y1="62" x2="380" y2="78"/><line x1="410" y1="62" x2="410" y2="78"/><line x1="440" y1="62" x2="440" y2="78"/><line x1="470" y1="60" x2="470" y2="80"/></g>
+  <g font-size="12" fill="var(--muted)" text-anchor="middle"><text x="50" y="98">−0.7</text><text x="140" y="98">−0.4</text><text x="260" y="98">0</text><text x="470" y="98">0.7</text></g>
+  <circle cx="155" cy="48" r="6" fill="var(--idea)"/><text x="165" y="44" font-size="12" fill="var(--idea)">−0.35</text>
+  <path d="M155 54 L141 66" stroke="var(--ok)" stroke-width="2.5" marker-end="url(#ah17)"/>
+  <text x="300" y="44" font-size="13" fill="var(--ok)" font-weight="700">→ −0.4 (close)</text>
+  <text x="10" y="140" font-size="14" font-weight="700" fill="var(--fg)">2 bits: 3 marks, scale 0.7</text>
+  <line x1="50" y1="180" x2="470" y2="180" stroke="var(--fg)" stroke-width="2"/>
+  <g stroke="var(--fg)" stroke-width="2"><line x1="50" y1="168" x2="50" y2="192"/><line x1="260" y1="168" x2="260" y2="192"/><line x1="470" y1="168" x2="470" y2="192"/></g>
+  <g font-size="12" fill="var(--muted)" text-anchor="middle"><text x="50" y="208">−0.7</text><text x="260" y="208">0</text><text x="470" y="208">0.7</text></g>
+  <circle cx="155" cy="158" r="6" fill="var(--idea)"/><text x="120" y="154" font-size="12" fill="var(--idea)" text-anchor="end">−0.35</text>
+  <path d="M161 160 L254 176" stroke="var(--fail)" stroke-width="2.5" marker-end="url(#ah17)"/>
+  <text x="300" y="154" font-size="13" fill="var(--fail)" font-weight="700">→ 0 (wiped out)</text>
+  <defs><marker id="ah17" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="var(--muted)"/></marker></defs>
+</svg>
+<p>Real result on week 8's attention model (2,702 numbers):</p>
 <pre><code>32-bit:   10808 bytes   held-out plans  92%   robot bake-off  8/12
  8-bit:    2702 bytes   held-out plans  92%   robot bake-off  8/12
  4-bit:    1351 bytes   held-out plans  92%   robot bake-off  8/12
  3-bit:    1013 bytes   held-out plans  80%   robot bake-off  7/12
  2-bit:     676 bytes   held-out plans   8%   robot bake-off  4/12</code></pre>
-<p>Three things to notice:</p>
-<ol>
-<li><strong>8 bits and 4 bits are free wins.</strong> 4× and 8× smaller, with no loss on the held-out plans or on the robot. Neural networks are surprisingly robust to rounding: the decision usually depends on lots of numbers together, and the small rounding errors mostly cancel out.</li>
-<li><strong>At 3 bits it starts to slip.</strong> Held-out plans drop to 80%, and the robot loses one task. Colours are the first thing to go: "put the red and blue blocks away" now comes out as <code>put red green</code>, so the robot bins the wrong block. The close calls flip first.</li>
-<li><strong>2 bits breaks it.</strong> With only −1, 0 and +1 allowed, too many numbers get wiped out. It writes nonsense like <code>put put put put put</code> for "put the red and blue blocks away", and the robot falls to 4/12.</li>
-</ol>
-<p>Real companies do exactly this. Big LLMs are often served with 8-bit or 4-bit numbers (written int8 and int4), which is how a model that needs a room-sized computer at 32 bits can run on one graphics card, or even a laptop. And because writing each token means reading every number from memory, smaller numbers make every token faster too. They measure carefully at each step, just as we did.</p>
+<p>8 and 4 bits are free wins: 8× smaller, no loss. At 3 bits the close calls flip first (colours go wrong). At 2 bits it writes nonsense.</p>
+</div>
 
-<h3>Part C · Distilling</h3>
-<h4>Step 8: a teacher and a student</h4>
-<p>Our attention model learned from 343 examples: most were made from templates in week 6, plus week 5's 34 hand-labelled commands. Templates only cover the phrasings someone thought of. "where's …" isn't one of them, so it still gets "where's the green one?" wrong. More real examples would help. But labelling by hand is slow and boring. Idea: a big, clever, slow model labels lots of new commands for us. Then our small, fast model trains on those labels. That's <strong>distillation</strong>: the big model is the <strong>teacher</strong>, the small one the <strong>student</strong>. You get some of the teacher's smarts, at the student's speed and price.</p>
-<p>The teacher can also say "I don't know" (refuse, or ask a question back). Those commands have no label, so we leave them out:</p>
-<pre><code>teacher("where's the red one")    → "find"   keep  ("where's the red one", "find")
-teacher("make me a sandwich")     → None     skip</code></pre>
-<p>The teacher only gives the intent. Week 6's <code>make_targets</code> adds the colour from the command, so the student trains on <code>find red</code>.</p>
-
-<h4>Step 9: what our students learned</h4>
-<p><code>lesson17_faster.py</code> has 24 new commands nobody labelled (<code>UNLABELLED</code>). Two teachers label them, and a new attention-model student trains on the usual data plus those labels. Each student sits three tests: the 50 held-out plans, 6 harder commands ("hard-6", like "where's the green one?" and "bin the red one"), and the robot bake-off. Real output:</p>
+<div class="box idea"><span class="tag">💡 Distilling: teacher and student</span>
+<p>Labelling examples by hand is slow. So a big, clever teacher labels new commands, and our small, fast student trains on those labels. You get some of the teacher's smarts at the student's speed. The catch: <strong>a student copies its teacher's mistakes</strong>.</p>
+<svg class="diagram" viewBox="0 0 520 210" role="img" aria-label="A big teacher labels new commands, for example where's the red one becomes find, and make me a sandwich gets no label and is skipped. The labels go to a small student. A bad teacher who says put for where's the red one passes that mistake to the student.">
+  <circle cx="80" cy="70" r="46" fill="var(--idea-soft)" stroke="var(--idea)" stroke-width="3"/>
+  <text x="80" y="66" font-size="30" text-anchor="middle">🎓</text><text x="80" y="96" font-size="13" font-weight="700" text-anchor="middle" fill="var(--idea)">teacher</text>
+  <circle cx="472" cy="64" r="28" fill="var(--ok-soft)" stroke="var(--ok)" stroke-width="3"/>
+  <text x="472" y="72" font-size="22" text-anchor="middle">🧒</text><text x="472" y="110" font-size="13" font-weight="700" text-anchor="middle" fill="var(--ok)">student</text>
+  <rect x="140" y="30" width="270" height="80" rx="8" fill="var(--card)" stroke="var(--line)"/>
+  <text x="150" y="54" font-size="13" fill="var(--fg)">"where's the red one" → find ✓</text>
+  <text x="150" y="76" font-size="13" fill="var(--fg)">"hold it right there" → stop ✓</text>
+  <text x="150" y="98" font-size="13" fill="var(--muted)">"make me a sandwich" → None: skip</text>
+  <path d="M128 70 L136 70" stroke="var(--muted)" stroke-width="2.5" marker-end="url(#ah17b)"/>
+  <path d="M412 66 L440 66" stroke="var(--muted)" stroke-width="2.5" marker-end="url(#ah17b)"/>
+  <rect x="140" y="140" width="270" height="44" rx="8" fill="var(--card)" stroke="var(--fail)" stroke-dasharray="5 4"/>
+  <text x="150" y="160" font-size="13" fill="var(--fail)">bad teacher: "where's the red one" → put</text>
+  <text x="150" y="177" font-size="12" fill="var(--muted)">the student learns the mistake too</text>
+  <defs><marker id="ah17b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="var(--muted)"/></marker></defs>
+</svg>
+<p>Real result: three students, each also tested on 6 harder commands ("hard-6") and on the robot:</p>
 <pre><code>student (attention model) trained on       plans  hard-6  robot
 the usual data only                         92%    83%   8/12
 + 24 labels from word counter (Lesson 9)    94%    67%   8/12
 + 24 labels from a careful human            90%   100%  10/12</code></pre>
-<details><summary>Predict first: the word counter is a teacher too. Why might its student do <em>worse</em> than no teacher at all?</summary>
-<p>Because it got some labels wrong, and the student believed every one. The word counter labelled "where's the red one", "where's the blue one", "locate the green block" and "can you see the red block" as <strong>put</strong> (they're all <strong>find</strong>), and "visit the green block" as put (it's go). The student learned "where's … → put", so now it gets "where's the red block" wrong too, on top of "where's the green one?". 83% → 67%. <strong>A student copies its teacher's mistakes.</strong></p>
-</details>
-<p>The careful human's labels fixed both, and hard-6 went to 100%. On the robot, two more tasks now pass: "where's the green one?" (it finds the block and says where it is, instead of binning it) and "hmm what about the blue" (it looks instead of binning). That's <strong>8/12 → 10/12</strong>. Notice the held-out plans: 92%, 94%, 90%. The <em>worst</em> teacher's student scored highest, and the best teacher's student lowest. That test is made from templates, and none of its templates say "where's", so it couldn't tell a good teacher from a bad one. Differences of a few points on 50 examples are mostly noise. Only the harder tests showed the real difference.</p>
-<p><code>best_teacher()</code> picks the teacher the robot actually uses: Claude's recorded labels if you have them, otherwise the careful human's. <code>brains.py</code> uses it to build two new brains you can drive the robot with:</p>
-<ul>
-<li><strong>distilled</strong>: the attention model trained with the teacher's labels. Bake-off 10/12.</li>
-<li><strong>tinylm-4bit</strong>: the distilled model quantised to 4 bits. Still 10/12, in 1,411 bytes instead of 11,288. (The teacher's commands add a few new words, so this model has 2,822 numbers, a little more than 2,702.)</li>
-</ul>
-<p>Next, the big one: Claude as the teacher. Claude's rows appear here after a grown-up records them with an API key (see week 10). Until then, the careful human is the best teacher you have, and it already gets your robot to 10/12.</p>
-<!-- CLAUDE-RESULTS -->
+<p>The word counter labelled "where's …" commands as <em>put</em>, and its student believed it. The careful human's student gets 10/12. Notice the easy held-out test ranked the <em>worst</em> teacher first: only the harder tests showed the truth.</p>
+</div>
 
-<h4>Step 10: how this connects to LoRA, and to real companies</h4>
-<p>Our student is tiny, so we train all its numbers. But what if the student is itself a medium-sized LLM with a billion numbers? That's where <a href="13-lora.html">LoRA</a>, Part B of this week, comes in: <strong>LoRA</strong> trains a thin add-on instead of the whole model, so you can fine-tune a student on the teacher's labels cheaply. People even combine it with this lesson: QLoRA keeps the frozen big model in 4-bit numbers and trains a LoRA add-on on top.</p>
-<p>Put it all together and you have how real AI products are served:</p>
-<ul>
-<li>a big model writes examples, and a <strong>small distilled model</strong> handles the everyday requests;</li>
-<li>the model's numbers are <strong>quantised</strong> to 8 or 4 bits so it fits on fewer, cheaper machines and writes faster;</li>
-<li>the long, unchanging start of every prompt is <strong>cached</strong>;</li>
-<li>and everything is measured with week 8's tools: p50, p95, cost per token, plus quality on a hard test set, before and after.</li>
-</ul>
-
-<h2 id="play">3. Play with it</h2>
+<h2 id="play">2. Play</h2>
+<div class="box play"><span class="tag">🎮 Play: squash the real numbers</span>
+<p>These are the actual 2,702 trained numbers of week 8's attention model. The slider rounds every row with the same <code>quantize</code> and <code>dequantize</code> as the Python (each row has its own scale), then tests it on the 50 held-out plans in your browser. The score matches the Python at every bit width.</p>
 <div class="card demo">
-<h3>Interactive: squash the attention model's real numbers</h3>
-<p class="legend">These are the actual 2,702 trained numbers of the week 6 attention model (from <code>train_attn_lm()</code>, dumped from Python). The slider quantises every row with the same <code>quantize</code> and <code>dequantize</code> rules as <code>lesson17_faster.py</code> (each row gets its own scale, exact halves round to even like Python), then runs the model on the 50 held-out plans right here in your browser. The held-out score matches the Python at every bit width. (The robot bake-off column needs the simulator, so it isn't in the demo.) Top: one row's numbers <b>before</b> rounding (upper dots) and <b>after</b> (lower dots), with a line showing where each one moved. Bottom: how many numbers landed on each allowed whole number.</p>
 <canvas id="qzcv" width="700" height="330" style="width:100%;height:auto" aria-label="One row of weights before and after rounding, joined by lines, and a histogram of the rounded whole numbers"></canvas>
 <p><label for="qzBits">Bits per number: <b id="qzBitsV"></b></label><input type="range" id="qzBits" min="2" max="8" step="1" value="4"></p>
 <p>
@@ -197,153 +129,208 @@ the usual data only                         92%    83%   8/12
   <div class="stat"><div class="k">Row's biggest move</div><div class="v" id="qzErr">–</div></div>
 </div>
 <p class="legend" id="qzWrong"></p>
-<p class="legend">Things to try: start at 8 bits and step down. Watch the lower dots snap onto fewer and fewer marks. At which bit width does the held-out score first drop? At 3 bits, read the "Wrong on" list: which kind of command breaks first? Look at the "where" row at 2 bits: how many of its 12 numbers survive as non-zero? And keep an eye on "put the red and blue blocks away": it survives down to 4 bits, picks the wrong colour at 3, and turns to nonsense at 2.</p>
+</div>
+<p>Try: start at 8 bits and step down. Watch the lower dots snap onto fewer marks. Where does the score first drop? At 2 bits, how many of the "where" row's 12 numbers survive as non-zero?</p>
 </div>
 
-<h2 id="homework">4. Homework</h2>
-<p>Open <code>homework/lesson17_faster.py</code>. You need weeks 5, 6 and 8 finished. (The student is week 6's attention model if you did that stretch, or the plain tiny LM if you didn't. Both work.) The robot column needs the scorer you write in week 11, so until then it prints <code>?</code>. To see a robot score now, run <code>python3 ../progress.py</code> from <code>homework</code>: it has its own scorer. Already written for you: <code>Cache.__init__</code> and <code>hit_rate</code>, <code>weight_lists</code>, <code>quantized_copy</code>, <code>size_bytes</code>, the 24 <code>UNLABELLED</code> commands and the careful human's labels. Write these five pieces, in order.</p>
+<h2 id="homework">3. Build</h2>
+<div class="box build"><span class="tag">🛠 Build: the three tricks</span>
+<p>Open <code>project/homework/lesson17_faster.py</code>. You need weeks 7, 8 and 13 finished. Already written for you: <code>Cache.__init__</code>, <code>hit_rate</code>, <code>quantized_copy</code>, the 24 <code>UNLABELLED</code> commands and the careful human's labels. Run every checkpoint from inside <code>homework</code>.</p>
+<ol class="steps">
+<li><strong><code>cache_key(command, world)</code></strong>: the tidied words joined by spaces, then <code>"|"</code>, then the world.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint 1</span>
+<pre><code>python3 -c "from lesson17_faster import cache_key; print(cache_key('Put the RED block!', 'w1'))"</code></pre>
+<p>You should see:</p>
+<pre><code>put the red block|w1</code></pre>
+<p>If you see <code>['put', 'the', 'red', 'block']|w1</code> or a <code>TypeError</code>, you glued the list on directly. Turn it into one string with <code>" ".join(...)</code> first.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck on cache_key?</span>
+<details><summary>Hint 1</summary><p><code>tokenize</code> is already imported (<code>from lesson08_words import tokenize</code>). It gives a list of lower-case words.</p></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code>return " ".join(tokenize(____)) + "|" + ____</code></pre></details>
+</div>
 
-<h3>4.1 <code>cache_key(command, world)</code></h3>
-<p>The words of the command, tidied, then <code>"|"</code>, then the world (Steps 2 and 3). Example: <code>cache_key("Put the RED block!", "w1")</code> → <code>"put the red block|w1"</code>.</p>
-<details><summary>Hint 1</summary><p>Two halves glued together with a <code>"|"</code>. The first half comes from <code>tokenize</code>, which is already imported.</p></details>
-<details><summary>Hint 2</summary><p><code>tokenize</code> gives a list of words. <code>" ".join(a_list)</code> turns a list into one string with single spaces.</p></details>
-<details><summary>Hint 3</summary><p>Return <code>" ".join(tokenize(command)) + "|" + world</code>.</p></details>
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" start="2">
+<li><strong><code>Cache.ask(self, command, world)</code></strong>: if the key is in <code>self.store</code>, add 1 to <code>self.hits</code> and return the stored answer. Otherwise add 1 to <code>self.misses</code>, call <code>self.think(command, world)</code>, store it, return it.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint 2</span>
+<pre><code>python3 -c "
+from lesson17_faster import Cache
+c = Cache(lambda cmd, w: 'thought about ' + cmd)
+print(c.ask('Stop!', 'w'), '|', c.ask('stop', 'w'), '|', c.ask('stop', 'w2'))
+print(c.hits, c.misses)"</code></pre>
+<p>You should see:</p>
+<pre><code>thought about Stop! | thought about Stop! | thought about stop
+1 2</code></pre>
+<p>The second answer is the <em>stored</em> one, so it still says "Stop!". If the middle one says <code>thought about stop</code> and you get <code>0 3</code>, you call <code>think</code> even on a hit, or never store the answer.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck on ask?</span>
+<details><summary>Hint 1</summary><p>Work out <code>key = cache_key(command, world)</code> once. <code>if key in self.store:</code> checks the dictionary.</p></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code>key = cache_key(command, world)
+if key in self.store:
+    self.hits += 1
+    return self.store[____]
+self.misses += 1
+answer = self.think(command, ____)
+self.store[key] = ____
+return answer</code></pre></details>
+</div>
 
-<h3>4.2 <code>Cache.ask(self, command, world)</code></h3>
-<p>Look up the key. If it's in <code>self.store</code>: add 1 to <code>self.hits</code> and return the stored answer. If not: add 1 to <code>self.misses</code>, call <code>self.think(command, world)</code>, store the answer, return it. Example: ask "Stop!" then "stop" in world "w", then "stop" in world "w2": the slow brain thinks twice, hits = 1, misses = 2.</p>
-<details><summary>Hint 1</summary><p>Work out the key once, with your <code>cache_key</code>, and use it for both the look-up and the store.</p></details>
-<details><summary>Hint 2</summary><p><code>if key in self.store:</code> checks a dictionary. On a hit, return <code>self.store[key]</code> straight away. Don't call <code>self.think</code> on a hit: the whole point is not to.</p></details>
-<details><summary>Hint 3</summary><p>Miss branch: <code>self.misses += 1</code>, <code>answer = self.think(command, world)</code>, <code>self.store[key] = answer</code>, <code>return answer</code>.</p></details>
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" start="3">
+<li><strong><code>quantize(values, bits)</code></strong>: return <code>(list of whole numbers, scale)</code>, with top = 2<sup>bits−1</sup> − 1 and scale = biggest absolute value ÷ top (or 1.0 if everything is 0). <strong><code>dequantize(qs, scale)</code></strong>: each whole number × scale.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint 3</span>
+<pre><code>python3 -c "from lesson17_faster import quantize, dequantize; q, s = quantize([1, -0.5, 0.25], 8); print(q); print(dequantize(q, s))"</code></pre>
+<p>You should see:</p>
+<pre><code>[127, -64, 32]
+[1.0, -0.5039370078740157, 0.25196850393700787]</code></pre>
+<p>If you see <code>[127, -63, 31]</code>, you used <code>int()</code>, which chops decimals off. Use Python's <code>round()</code>.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck on quantize?</span>
+<details><summary>Hint 1</summary><p><code>top = 2 ** (bits - 1) - 1</code>. Biggest: <code>max(abs(v) for v in values)</code>.</p></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code>top = 2 ** (bits - 1) - 1
+biggest = max(abs(v) for v in values)
+scale = biggest / top if biggest else ____
+return [round(v / ____) for v in values], scale
 
-<h3>4.3 <code>quantize(values, bits)</code></h3>
-<p>Step 6, exactly. Return a pair: the list of whole numbers, and the scale. Examples: <code>quantize([1, -0.5, 0.25], 8)</code> → <code>([127, -64, 32], 1/127)</code>. <code>quantize([0.7, -0.35], 4)</code> ints → <code>[7, -4]</code>. <code>quantize([0, 0], 8)</code> → <code>([0, 0], 1.0)</code>.</p>
-<details><summary>Hint 1</summary><p>Three numbers to work out before the list: <code>top</code>, the biggest absolute value, and <code>scale</code>.</p></details>
-<details><summary>Hint 2</summary><p><code>top = 2 ** (bits - 1) - 1</code>. Biggest: <code>max(abs(v) for v in values)</code>. If that's 0, every value is 0 and you'd divide by zero, so use a scale of 1.0 instead.</p></details>
-<details><summary>Hint 3</summary><p><code>scale = biggest / top if biggest else 1.0</code>. Return <code>[round(v / scale) for v in values], scale</code>. Use Python's own <code>round</code>, not <code>int</code>: <code>int(-63.5)</code> chops to −63.</p></details>
+return [q * ____ for q in qs]</code></pre></details>
+</div>
 
-<h3>4.4 <code>dequantize(qs, scale)</code></h3>
-<p>Back to decimals: each whole number times the scale. Example: <code>dequantize([127, -64], 1/127)</code> → <code>[1.0, -0.5039…]</code>.</p>
-<details><summary>Hint 1</summary><p>One line. A list with one entry per item of <code>qs</code>.</p></details>
-<details><summary>Hint 2</summary><p>A list comprehension: <code>[… for q in qs]</code>.</p></details>
-<details><summary>Hint 3</summary><p><code>return [q * scale for q in qs]</code>.</p></details>
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" start="4">
+<li><strong><code>distill_examples(commands, teacher)</code></strong>: ask <code>teacher(c)</code> about each command; keep <code>(c, intent)</code> only when the answer is not <code>None</code>.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint 4</span>
+<pre><code>python3 -c "from lesson17_faster import distill_examples; print(distill_examples(['a', 'b', 'c'], {'a': 'put', 'c': 'stop'}.get))"</code></pre>
+<p>You should see:</p>
+<pre><code>[('a', 'put'), ('c', 'stop')]</code></pre>
+<p>If <code>('b', None)</code> is in your list, you kept the teacher's "I don't know".</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck on distill_examples?</span>
+<details><summary>Hint 1</summary><p><code>teacher</code> is a function: call it with <code>teacher(c)</code>.</p></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code>out = []
+for c in commands:
+    intent = teacher(____)
+    if intent is not ____:
+        out.append((c, intent))
+return out</code></pre></details>
+</div>
 
-<h3>4.5 <code>distill_examples(commands, teacher)</code></h3>
-<p>Ask the teacher about each command; keep the ones that got an intent (Step 8). <code>train_attn_lm</code> turns the intents into plan words for you. Example: with a teacher that knows only <code>{"a": "put", "c": "stop"}</code>, <code>distill_examples(["a", "b", "c"], teacher)</code> → <code>[("a", "put"), ("c", "stop")]</code>.</p>
-<details><summary>Hint 1</summary><p><code>teacher</code> is a function. Call it: <code>teacher(c)</code>. In the example, it's a dictionary's <code>.get</code>, which returns <code>None</code> for a missing key.</p></details>
-<details><summary>Hint 2</summary><p>Loop over the commands, ask once per command, and only append when the answer <code>is not None</code>.</p></details>
-<details><summary>Hint 3</summary><p>Inside the loop: <code>intent = teacher(c)</code>, then <code>if intent is not None: out.append((c, intent))</code>. Note the double brackets: you're appending one pair.</p></details>
-
-<h3>Run it</h3>
-<pre><code>cd homework
-python3 lesson17_faster.py</code></pre>
-<p>What you should see (this is the real output of the reference solution; it trains four attention models and drives the robot through the bake-off with each, so give it a minute or so):</p>
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" start="5">
+<li>Run the whole file: <code>python3 lesson17_faster.py</code>. It trains four models, so give it about half a minute.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint 5</span>
+<p>Real output at week 14, with the week 8 attention stretch done:</p>
 <pre><code>1) CACHING. 6 commands in a world where nothing changes, then the red block moves.
    real thinking calls: 5, hit rate 38%
 
 2) QUANTISING the Lesson 15 attention model (the best small brain so far), and driving the robot with it.
-   32-bit:   10808 bytes   held-out plans  92%   robot bake-off  8/12
-    8-bit:    2702 bytes   held-out plans  92%   robot bake-off  8/12
-    4-bit:    1351 bytes   held-out plans  92%   robot bake-off  8/12
-    3-bit:    1013 bytes   held-out plans  80%   robot bake-off  7/12
-    2-bit:     676 bytes   held-out plans   8%   robot bake-off  4/12
+   32-bit:   10808 bytes   held-out plans  92%   robot bake-off ? /12
+    8-bit:    2702 bytes   held-out plans  92%   robot bake-off ? /12
+    4-bit:    1351 bytes   held-out plans  92%   robot bake-off ? /12
+    3-bit:    1013 bytes   held-out plans  80%   robot bake-off ? /12
+    2-bit:     676 bytes   held-out plans   8%   robot bake-off ? /12
 
 3) DISTILLING: the student learns from a teacher's labels on 24 new commands.
    (no recorded Claude labels yet: run `python3 brains.py record` with an API key)
    student (attention model) trained on       plans  hard-6  robot
-   the usual data only                         92%    83%   8/12
-   + 24 labels from word counter (Lesson 9)    94%    67%   8/12
-   + 24 labels from a careful human            90%   100%  10/12</code></pre>
+   the usual data only                         92%    83%  ? /12
+   + 24 labels from word counter (Lesson 9)    94%    67%  ? /12
+   + 24 labels from a careful human            90%   100%  ? /12</code></pre>
+<p>The <code>?</code> becomes a robot score once you write the bake-off scorer in <a href="19-bakeoff.html">week 15</a>. The scores are the ones in the idea boxes above. Without the stretch, your student is the plain tiny LM and some rows differ (on our computer: 3-bit 74%, 2-bit 6%, and the careful human's student 82% plans, still 100% hard-6).</p>
+<p>Then <code>cd ..</code> and <code>python3 check.py 17</code>. All green ends with:</p>
+<pre><code>  ✓ distill_examples
+  6/6 passed  🎉 lesson complete!</code></pre>
+<p>If you see <code>✗ cache_key: a different world must give a different key</code>, you left the world out: that's the stale-answer bug.</p>
+</div>
+<!-- CLAUDE-RESULTS -->
 
-<h3>Check it</h3>
-<pre><code>cd ..
-python3 check.py 17</code></pre>
-<p>A green ✓ means that part passed. A red ✗ comes with a hint, for example:</p>
-<ul>
-<li><code>✗ cache_key: a different world must give a different key</code>: you left the world out of the key. That's the stale-answer bug from Step 3.</li>
-<li><code>✗ quantize: quantize([1, -0.5, 0.25], 8) ints should be [127, -64, 32], got [127, -63, 31]</code>: you used <code>int()</code>, which chops off the decimals. Use <code>round()</code>.</li>
-</ul>
-<p>All green shows <code>6/6 passed</code>.</p>
-
-<h3>Stretch</h3>
-<ul>
-<li>Wrap the attention model in your <code>Cache</code> (think = <code>lambda c, w: model.generate(c)</code>) and time 1,000 asks of the same 5 commands with week 8's <code>time_it</code>. What's the hit rate, and how much faster is p50?</li>
-<li>Give the whole model <em>one</em> shared scale instead of one per row (quantise all 2,702 numbers as a single list). At which bit width do the held-out plans drop now? Why?</li>
-<li>Count how many of the 2,702 numbers become exactly 0 at each bit width.</li>
-<li>Make a "noisy teacher": the careful human, but with 4 of the 24 labels deliberately wrong. Train the student with <code>train_attn_lm(extra)</code> and compare hard-6 and the robot score. How many wrong labels does it take to do worse than no teacher?</li>
-</ul>
-
-<h2 id="add-to-robot">Add it to your robot</h2>
-<p>Fill in <code>teacher_brain(self)</code>: train a smarter language brain on a teacher's labels, with your <code>distill_examples()</code>. Once it's filled, <code>self.brain()</code> uses it.</p>
-<details><summary>Hint 1</summary><p>Start the method with this import line:</p><pre><code>from lesson17_faster import distill_examples, UNLABELLED, best_teacher, best_student</code></pre><p>Those four names are all you need.</p></details>
-<details><summary>Hint 2</summary><p>Three steps, inside out: <code>best_teacher()</code> gives you a teacher. <code>distill_examples(UNLABELLED, teacher)</code> gives you the labelled examples. <code>best_student(examples)</code> trains the new brain on them. Return that brain.</p></details>
-<details><summary>Hint 3 (fill in the blanks)</summary><pre><code>return best_student(distill_examples(____, ____))</code></pre><p>The first blank is the list of 24 new commands. The second is the teacher (don't forget the brackets: you call it).</p></details>
-<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 9: teacher brain"</em>. If it's red, the hint says: <em>"with the teacher's labels it should understand "where's the green one?" and say (1, 5)"</em>.</p>
-<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). The first time, it trains its new brain, so wait a few seconds. Real output (your milliseconds will differ):</p>
+<h2 id="add-to-robot">4. Add it to your robot</h2>
+<div class="box bot"><span class="tag">🤖 Add it to your robot</span>
+<p>Before the teacher, your robot gets this wrong (real output):</p>
+<pre><code>Zippy&gt; where's the green one?
+  Sorry, my answer made no sense.</code></pre>
+<p>In <code>my_robot.py</code>, fill in <code>teacher_brain(self)</code>: train a smarter brain on a teacher's labels with your <code>distill_examples()</code>. Once it's filled, <code>self.brain()</code> uses it.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck on teacher_brain?</span>
+<details><summary>Hint 1</summary><p>Start the method with:</p><pre><code>from lesson17_faster import distill_examples, UNLABELLED, best_teacher, best_student</code></pre></details>
+<details><summary>Hint 2</summary><p>Inside out: <code>best_teacher()</code> gives a teacher. <code>distill_examples(UNLABELLED, teacher)</code> gives labelled examples. <code>best_student(examples)</code> trains the brain. Return it.</p></details>
+<details><summary>Hint 3 (fill in the blanks)</summary><pre><code>return best_student(distill_examples(____, ____))</code></pre><p>The second blank is the teacher. Don't forget the brackets: you call it.</p></details>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint: your robot</span>
+<p>From <code>project</code>, run <code>python3 check.py robot</code>. After the earlier ✓ lines:</p>
+<pre><code>  ✓ week 13: think_time
+  ✓ week 14: teacher brain
+  … week 15: exam: not written yet (fill in exam() first)
+  … week 16 boss: uses what it sees: not written yet (fill in see_and_plan() first)
+  … week 16: body capstone (rescue): not written yet (fill in rescue() first)
+  … week 16: nicer routes: not written yet (fill in nicest_route() first)
+  17/21 passed</code></pre>
+<p>If it's red, the hint says <em>with the teacher's labels it should understand "where's the green one?" and say (1, 5)</em>.</p>
+<p>Then <code>cd homework</code> and <code>python3 my_robot.py</code>. The first time it trains its new brain. Real output:</p>
 <pre><code>Zippy&gt; where's the green one?
   (Training my language brain. About 10-20 seconds, once...)
-  (I thought for 0.35 ms, so I'd roll 0.35 mm meanwhile.)
-  The green block is at (1, 5).</code></pre>
-<p>Before the teacher, the same question got <code>Sorry, my answer made no sense.</code> And <code>hmm what about the blue</code> used to bin the blue block. Now your robot says <code>The blue block is at (6, 3).</code></p>
-
-<h2 id="challenge">5. Real-world challenge: rounding and remembering, at home</h2>
-<p><strong>Part A: quantise your house.</strong></p>
-<ol>
-<li>With a tape measure, measure 8–10 things to the nearest millimetre: a doorway's width, a sofa or bed, a box, a gap between two pieces of furniture, a table, a suitcase.</li>
-<li>Write down 4 yes/no decisions that use these numbers, like "does the box fit through the doorway?" or "does the suitcase fit in the gap?". Answer them with the exact numbers.</li>
-<li>Now "quantise": round every measurement to the nearest 10 cm. Answer the decisions again. Then round to the nearest 50 cm, and then the nearest metre.</li>
-<li>Record, for each decision, the roughest rounding at which it still gives the right answer.</li>
-</ol>
-<p><strong>Part B: a cache for "where is it?"</strong></p>
-<ol>
-<li>For one week, keep a notebook page: "keys: hook by the door", "TV remote: sofa", "charger: kitchen".</li>
-<li>Whenever someone in your home asks where something is, check the notebook first. If it's there and right: a <strong>hit</strong>. If it isn't listed, go and look, then write it down: a <strong>miss</strong>. If the notebook was wrong because the thing moved: a <strong>stale hit</strong>.</li>
-<li>At the end of the week, work out the hit rate and how many hits were stale. Then add "last checked: day and time" to each entry. Does that help you decide when <em>not</em> to trust it?</li>
-</ol>
-<p><strong>What it should teach you:</strong> most decisions survive rough numbers, and the close calls flip first, exactly like the colours at 3 bits. And a cache is only as good as its key: "where are the keys" has a different answer after someone goes out, so the world (or at least the time) belongs in the key.</p>
-
-<h2 id="project">6. Your Robo-Helper so far</h2>
-<div class="card note">
-<p><strong>What this adds to your robot.</strong> Measured by <code>python3 progress.py --solutions</code> (row 17) and the bake-off:</p>
-<ul>
-<li><strong>Smarter:</strong> the attention model scores 8/12 on the bake-off. Re-trained with a careful teacher's labels (the <code>distilled</code> brain), it scores <strong>10/12</strong>. It stops binning blocks when you only ask where they are.</li>
-<li><strong>Smaller:</strong> the same brain at 4 bits (<code>tinylm-4bit</code>) still scores <strong>10/12</strong>, in 1,411 bytes instead of 11,288.</li>
-</ul>
+  (I thought for 0.23 ms, so I'd roll 0.23 mm meanwhile.)
+  The green block is at (1, 5).
+Zippy&gt; hmm what about the blue
+  (I thought for 0.22 ms, so I'd roll 0.22 mm meanwhile.)
+  The blue block is at (6, 3).</code></pre>
+<div class="room" data-robot="1,1" data-cat="4,1" data-blocks="red:2,1 blue:6,3 green:1,5" data-mark="1,5" data-label="&quot;where's the green one?&quot; It stays put and answers: (1, 5)."></div>
+<p>Last week, "hmm what about the blue" binned the blue block. Now it looks and tells you.</p>
 </div>
-<p>Robo-Helper now has <strong>a smaller, smarter brain</strong>. <code>Cache</code> can wrap any brain's thinking, so repeated commands in the same world are instant and free. <code>quantize</code> and <code>dequantize</code> (through <code>quantized_copy</code>) shrink the brain to an eighth of its size with no loss on the robot. <code>distill_examples</code> turns a teacher's answers into training data for a student, and <code>best_teacher()</code> picks the teacher.</p>
-<p>Next, in Part B of this week, <a href="13-lora.html">LoRA</a> shows how to fine-tune a bigger student cheaply with LoRA. Next week, in <a href="18-world-class.html">week 10</a>, the world-class planner can become the teacher. With a grown-up and an API key, <code>python3 brains.py record</code> asks it to label exactly these 24 <code>UNLABELLED</code> commands and saves them to <code>recordings/teacher_labels.json</code>, which <code>recorded_teacher()</code> in your file then loads, and <code>best_teacher()</code> prefers. Its plans also depend on the world, so if you cache them, your world-in-the-key rule is what keeps them safe. And in week 11, <a href="19-bakeoff.html">the bake-off</a> scores every brain on the same 12 tasks for passes, p50, p95 and cost.</p>
 
-<h2 id="mistakes">7. Common mistakes</h2>
+<h2 id="challenge">5. Real-world challenge: round and remember</h2>
+<div class="box play"><span class="tag">🌍 Real-world challenge</span>
+<p><strong>Quantise your house.</strong> Measure 8 things to the millimetre (a doorway, a box, a suitcase, a gap). Write 4 yes/no questions like "does the box fit through the door?". Answer them, then round every measurement to 10 cm, 50 cm and 1 m and answer again. At what rounding does each answer first flip?</p>
+<p><strong>A notebook cache.</strong> For a week, keep a page: "keys: hook by the door". When someone asks where something is, check the notebook first: hit, miss, or <em>stale</em> hit (it moved). Work out your hit rate. Does adding "last checked: day and time" help?</p>
+<p><strong>On your own:</strong> both parts work alone. Ask yourself the "where is it?" questions each evening.</p>
+<p>Most decisions survive rough numbers, and the close calls flip first, just like the colours at 3 bits.</p>
+</div>
+
+<h2 id="check">6. Check yourself</h2>
+<details><summary>You ask "Halt!", "halt", "HALT" (world "w"), then "halt" (world "w2"). Hits, misses, hit rate?</summary><p>The first three share the key "halt|w": 1 miss, 2 hits. "halt|w2" is new: another miss. 2 hits, 2 misses, 50%.</p></details>
+<details><summary>What does <code>quantize([0.9, -0.4, 0.2], 3)</code> give, and what comes back?</summary><p>top = 3, scale = 0.9 ÷ 3 = 0.3. Python says <code>([3, -1, 1], 0.3)</code>. Back: <code>[0.9, -0.3, 0.3]</code>. The biggest survives exactly; the others are 0.1 off.</p></details>
+<details><summary>The word counter's student did worse on hard-6 (83% → 67%). How do you protect against a bad teacher?</summary><p>Use a better teacher, check a sample of its labels by hand, and always test on a hard set. The easy held-out test even ranked the bad teacher first.</p></details>
+
+<h2 id="deeper">Want to know more?</h2>
+<details><summary>Why each row gets its own scale, and a floating-point surprise</summary>
+<p>If one row has numbers around 1.5 and another around 0.01, one shared scale would round the whole small row to zero. So <code>quantized_copy</code> gives every row its own.</p>
+<p>Try <code>quantize([0.6, -0.3, 0.1], 3)</code>. By hand 0.1 ÷ 0.2 = 0.5, which rounds to even, 0. But Python says <code>([3, -2, 1], 0.19999999999999998)</code>: a computer can't store 0.2 exactly. One more reason to test, not trust the maths.</p>
+</details>
+<details><summary>How real companies use all three</summary>
+<p><strong>Prompt caching:</strong> the server remembers its work on the unchanging <em>start</em> of your prompt (rules, tool list), so put those first and the changing parts last. <strong>Quantising:</strong> big models are often served at 8 or 4 bits, so they fit on fewer machines and write faster. <strong>Distilling:</strong> a big model writes examples and a small one handles everyday requests. Fine-tuning a big student cheaply is <a href="13-lora.html">Part B: LoRA</a>. With a grown-up and an API key, <code>python3 brains.py record</code> lets Claude label the 24 commands, and <code>best_teacher()</code> then prefers its labels.</p>
+</details>
+<details><summary>Stretch ideas</summary>
 <ul>
-<li><strong>Leaving the world out of the cache key</strong>, so the robot gets stale answers after things move. Checker hint: <em>"a different world must give a different key"</em>.</li>
-<li><strong>Calling <code>think</code> on a hit too</strong> (or forgetting to store the answer on a miss), so nothing is saved. Checker hint: <em>"'Stop!' then 'stop' in the same world should think once, then once more for a new world"</em>.</li>
-<li><strong>Using <code>int()</code> instead of <code>round()</code></strong> in <code>quantize</code>. <code>int</code> chops towards zero, so −63.5 becomes −63 instead of −64.</li>
-<li><strong>Dividing by zero</strong> when every value is 0. Checker hint: <em>"all zeros: scale 1.0, no dividing by zero"</em>.</li>
-<li><strong>Keeping the teacher's <code>None</code> answers</strong> in <code>distill_examples</code>, so the student trains on examples with no label. Checker hint: <em>"keep (command, intent) only where the teacher gave an intent"</em>.</li>
+<li>Wrap the attention model in your <code>Cache</code> and time 1,000 asks of 5 commands with week 13's <code>time_it</code>.</li>
+<li>Quantise all 2,702 numbers with one shared scale. Where does the score drop now?</li>
+<li>Make a noisy teacher with 4 wrong labels. How many wrong labels does it take to do worse than no teacher?</li>
 </ul>
-
-<h2 id="check">8. Check yourself</h2>
-<details><summary>Predict: with your <code>Cache</code>, you ask "Halt!", "halt", "HALT" (world "w"), then "halt" (world "w2"). How many hits, how many misses, what hit rate?</summary><p>All three in world "w" share the key "halt|w": 1 miss, then 2 hits. "halt" in "w2" is a new key: another miss. So 2 hits, 2 misses, hit rate 50%.</p></details>
-<details><summary>Why must the world be part of the cache key? Give a robot example.</summary><p>Because the right answer depends on the world, not just the words. "Where is the red block" cached before the block moved would send the robot to an empty square.</p></details>
-<details><summary>What are <code>quantize([0.9, -0.4, 0.2], 3)</code>'s whole numbers and scale? And what do you get back with <code>dequantize</code>?</summary><p>top = 2² − 1 = 3. The biggest value is 0.9, so scale = 0.9 / 3 = 0.3. Then 0.9 / 0.3 = 3, −0.4 / 0.3 ≈ −1.33 → −1, and 0.2 / 0.3 ≈ 0.67 → 1. Python says <code>([3, -1, 1], 0.3)</code>. Back to decimals: 3 × 0.3, −1 × 0.3, 1 × 0.3 = <code>[0.9, -0.3, 0.3]</code>. The biggest number survives exactly; the other two are each 0.1 off. That's the price of only having 7 whole numbers to choose from.</p></details>
-<div class="note"><strong>Weird but true.</strong> Try <code>quantize([0.6, -0.3, 0.1], 3)</code>. By hand: scale = 0.6 / 3 = 0.2, and 0.1 / 0.2 = 0.5, an exact half, which Python's <code>round</code> sends to the even neighbour, 0. But Python says <code>([3, -2, 1], 0.19999999999999998)</code>. A computer can't store 0.2 exactly, so 0.1 divided by it comes out as 0.5000000000000001: a hair above a half, which rounds up to 1. You did nothing wrong. It's one more reason to test a quantised model instead of trusting the maths.</div>
-<details><summary>Going from 32 to 4 bits kept both the held-out plans (92%) and the robot (8/12). Does that prove the 4-bit model behaves the same?</summary><p>No. Look at what it writes, not just the score: at 4 bits it gets a different set of held-out examples wrong (for example "where is the green one" becomes <code>put green</code>), even though the total is still 92%. A test set only checks what's in it. Engineers also measure how often the new model agrees with the old one on many more inputs, and keep a harder test set.</p></details>
-<details><summary>The word counter as a teacher made the student worse on hard-6 (83% → 67%). What's the general lesson, and how would you protect against it?</summary><p>A student copies its teacher's mistakes. Use a better teacher, check a sample of the teacher's labels by hand before training, and always test the student on a hard set, not just the easy one. Here the held-out plans barely moved (92%, 94%, 90%), and even ranked the bad teacher first; only hard-6 and the robot showed the real difference.</p></details>
-
-<h2 id="deeper">9. Go deeper (optional)</h2>
+</details>
+<details><summary>Go deeper (grown-up reading)</summary>
 <ul>
-<li><a href="../09-inference-engineering/04-prefix-caching-disaggregation.html#p8">Prefix caching and cache-aware routing</a>: prompt caching inside a real serving system.</li>
-<li><a href="../09-inference-engineering/06-quantization-hardware.html#p11">FP8 vs INT8 vs INT4: pick one and measure the loss</a>: the grown-up version of our bits slider.</li>
-<li><a href="../09-inference-engineering/10-scale-cost-capstone.html#p24">Cut cost per million tokens by 70% without hurting quality</a>: all three tricks working together.</li>
-<li><a href="../04-distill-small-models.html#distill">Big teacher, small student</a>: distillation for robots, with <a href="../04-distill-small-models.html#results">how to read the results honestly</a>.</li>
-<li><a href="../12-training-inference-videos/03-lora.html#qlora">QLoRA: a 4-bit frozen model plus a LoRA add-on</a>: this lesson and LoRA (Part B) in one trick.</li>
-<li><a href="../12-training-inference-videos/05-on-policy-distillation.html">On-policy distillation, explained with videos</a>: a smarter way for students to learn from teachers.</li>
+<li><a href="../09-inference-engineering/04-prefix-caching-disaggregation.html#p8">Prefix caching and cache-aware routing</a>.</li>
+<li><a href="../09-inference-engineering/06-quantization-hardware.html#p11">FP8 vs INT8 vs INT4: pick one and measure the loss</a>.</li>
+<li><a href="../09-inference-engineering/10-scale-cost-capstone.html#p24">Cut cost per million tokens by 70% without hurting quality</a>.</li>
+<li><a href="../04-distill-small-models.html#distill">Big teacher, small student</a>.</li>
+<li><a href="../12-training-inference-videos/03-lora.html#qlora">QLoRA: a 4-bit frozen model plus a LoRA add-on</a>.</li>
+<li><a href="../12-training-inference-videos/05-on-policy-distillation.html">On-policy distillation, explained with videos</a>.</li>
 </ul>
+</details>
 
 <nav class="pager">
-  <a href="16-speed.html"><small>Previous</small>Week 8 · How fast is a brain?</a>
-  <a class="next" href="13-lora.html"><small>Next</small>Week 9 · Fine-tuning and LoRA</a>
+  <a href="16-speed.html"><small>Previous</small>Week 13 · How fast is a brain?</a>
+  <a class="next" href="13-lora.html"><small>Next</small>Week 14 · Part B: Fine-tuning and LoRA</a>
 </nav>
-<footer>Build a Robot Brain · Week 9 of 12 · Part A</footer>
+<footer>Build a Robot Brain · Week 14 of 16 · Part A (homework file: lesson17_faster.py)</footer>
 </main>
 
 <script>
@@ -476,5 +463,6 @@ if (typeof document !== 'undefined') {
   module.exports = { WEIGHTS, TEST, SAMPLE, generate, accuracy, quantize, dequantize, quantizedCopy, countWeights, sizeBytes, fmtBytes, tokenize };
 }
 </script>
+<script src="room.js"></script>
 </body>
 </html>

@@ -4,99 +4,83 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Week 2 Part A · Noisy senses</title>
-<link rel="stylesheet" href="../../style.css">
+<link rel="stylesheet" href="../../style.css?v=16">
 </head>
 <body>
 <main>
 <nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 2 · Part A</nav>
 
-<div class="eyebrow"><span class="track robo">Robotics</span>Build a Robot Brain · Week 2 of 12 · Part A</div>
+<div class="eyebrow"><span class="track robo">Robotics</span>Build a Robot Brain · Week 2 of 16 · Part A</div>
 <h1>Noisy senses: measuring, noise and averaging</h1>
-<p class="lede">Real robots never know exactly where the wall is. Their sensors wobble. You'll build a distance sensor, add realistic wobble to it, and discover a simple trick that makes it more accurate: measure several times and average.</p>
-<div class="card note" id="journey"><strong>Week 2 of 12 · Part A.</strong> So far your robot: ✓ says hello ✓ moves. <strong>Today</strong> it learns to measure distances, even with a wobbly sensor. Next: <a href="03-learning-from-data.html">Week 2 · Part B: Learning from data</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>look</code>.</div>
+<p class="lede">Real sensors wobble. Measure several times and average, and the wobble mostly cancels.</p>
+<div class="card note" id="journey"><strong>Week 2 of 16 · Part A.</strong> So far your robot: ✓ says hello ✓ moves. <strong>Today</strong> it learns to measure how far the walls are, even with a wobbly sensor. Next: <a href="03-learning-from-data.html">Week 2 · Part B: Learning from data</a>. <a href="index.html#my-robot">Your robot, week by week</a>.</div>
 
 <div class="facts">
   <div><b>Time</b>2–3 h</div>
-  <div><b>You'll need</b>Week 1 done, a tape measure or ruler (friends or family are optional)</div>
-  <div><b>New words</b>Sensor, noise, random, seed, mean (average), error</div>
-  <div><b>Project piece</b>A distance sensor</div>
+  <div><b>You'll need</b>Week 1 done, a tape measure or ruler</div>
+  <div><b>New words</b>Sensor, noise, seed, mean, error</div>
   <div><b>Homework file</b><code>lesson02_sensors.py</code></div>
 </div>
 
 <section class="kid" id="start">
 <h2>Start here</h2>
-<p class="big">One measurement can be off by a lot. The average of many measurements is usually much closer to the truth.</p>
-<h3>The problem</h3>
-<p>Robo-Helper can now move. But it's driving blind: it only finds walls by bumping into them. It needs to <em>look ahead</em> and ask "how far is the wall in front of me?" And when it does, the answer is a little bit wrong every time, because real sensors are never perfect.</p>
-<h3>The idea in one picture</h3>
-<p>Ask five friends to guess how long a corridor is, in steps. One says 12, one says 16, one says 13, one says 15. Each guess is off. But some are too high and some are too low, so if you average them (14), the errors mostly cancel out. A robot does the same thing with its own sensor: it measures again and again, and averages.</p>
-<h3>Words to know</h3>
+<p class="big">One measurement can be off by a lot. The average of many is usually much closer to the truth.</p>
 <dl>
-<dt>Sensor</dt><dd>A part that measures something about the world: distance, light, speed, sound.</dd>
-<dt>Noise</dt><dd>Random wobble added to a measurement. Not a mistake you can fix, just how the world is.</dd>
-<dt>Random</dt><dd>Unpredictable. Python's <code>random</code> module gives you numbers you can't guess in advance.</dd>
-<dt>Seed</dt><dd>A starting number for the random generator. Same seed, same "random" numbers, every run. That's how your output can match this page exactly.</dd>
-<dt>Mean</dt><dd>The average: add up all the values, divide by how many there are.</dd>
-<dt>Error</dt><dd>How far a measurement is from the true value, ignoring whether it's too high or too low.</dd>
+<dt>Noise</dt><dd>Random wobble on a measurement. Sometimes up, sometimes down.</dd>
+<dt>Mean</dt><dd>The average: add them all up, divide by how many.</dd>
+<dt>Seed</dt><dd>A starting number for Python's random numbers. Same seed, same numbers, so your output can match this page.</dd>
 </dl>
 </section>
-<p class="deeper"><strong>Going deeper:</strong> everything below is the full lesson. You'll need a calculator (or Python) for a few sums.</p>
 
-<h2 id="problem">1. The problem</h2>
-<p>Robo-Helper is at (1, 1), facing east. How far can it drive before it hits the wall?</p>
-<pre><code>      x: 0 1 2 3 4 5 6 7 8 9
-  y = 1  # R . . . . . . . #</code></pre>
-<p>Counting by eye: squares 2, 3, 4, 5, 6, 7 and 8 are free. That's <strong>7</strong>. A robot can't "count by eye". It needs an algorithm, and you already wrote one in week 1 (<code>steps_to_wall</code>): <em>look at the next square; if it's free, count it and look further.</em></p>
-<p>But there's a second, sneakier problem. Real distance sensors (ultrasonic "bat ears", infrared, laser) don't return 7. They return 6.73, then 7.41, then 6.92… Every reading is slightly off. If the robot trusts one bad reading, it might think there's more room than there is, and crash. How do you get a trustworthy number out of an untrustworthy sensor?</p>
+<h2 id="idea">1. The idea</h2>
+<div class="box idea"><span class="tag">💡 The idea: look along a line</span>
+<p>Your robot only finds walls by bumping into them. It needs to <em>look ahead</em>. That's your week 1 loop again: look at the next square; if it's free, count it and look further.</p>
+<div class="room" data-robot="1,1" data-path="1,1 8,1" data-mark="9,1" data-blocks="red:2,1 blue:6,3 green:1,5" data-label="Facing east from (1, 1): 7 free squares, then the wall (red ring). The robot's own square doesn't count."></div>
+<p>Blocks don't stop the beam in this simple world. Only walls do.</p>
+</div>
 
-<h2 id="principles">2. First principles</h2>
-<h3>Step 1: measuring, the perfect way</h3>
-<p>Start from the robot's square and step in one direction, one square at a time, counting free squares until the next one is a wall. The robot's own square doesn't count. It's your week 1 loop, now on the real room, in any direction. (Distances here are in squares. In the robot's world one square is 0.5 m, which matters in Part B.)</p>
-<pre><code>from (1, 1) facing E:
-  look at (2, 1): free → count 1
-  look at (3, 1): free → count 2
-  ...
-  look at (8, 1): free → count 7
-  look at (9, 1): wall → stop.   distance = 7</code></pre>
-<p>Facing N from (1, 1)? The very first square (1, 0) is a wall, so the answer is 0 and the loop body never runs.</p>
-<details><summary>Predict first: from (1, 1) facing S, what's the distance? Use the room picture from week 1.</summary>
-<p><strong>5.</strong> Going down from (1, 1): (1, 2), (1, 3), (1, 4), (1, 5), (1, 6) are all free, and (1, 7) is the bottom wall. The green block at (1, 5) isn't a wall, so it doesn't stop the beam in this simple world.</p>
-</details>
+<div class="box idea"><span class="tag">💡 The idea: noise, and why averaging works</span>
+<p>Ask friends to guess how long a corridor is. Some guess too high, some too low. Average the guesses and the mistakes partly cancel. Real distance sensors (ultrasonic, infrared, laser) are the same: they never say exactly 7. Here are 8 real noisy readings of a true distance of 7:</p>
+<svg class="diagram" viewBox="0 0 520 170" role="img" aria-label="A number line from 5.5 to 8.5. Eight readings are scattered between 6.27 and 7.69. The true value 7 is a blue line. Their average, 7.10, is a red line, much closer to 7 than most single readings.">
+  <line x1="30" y1="120" x2="490" y2="120" stroke-width="2" style="stroke:var(--muted)"/>
+  <g font-size="14" text-anchor="middle" style="fill:var(--muted)">
+    <line x1="113" y1="114" x2="113" y2="126" style="stroke:var(--muted)" stroke-width="2"/><text x="113" y="144">6</text>
+    <line x1="407" y1="114" x2="407" y2="126" style="stroke:var(--muted)" stroke-width="2"/><text x="407" y="144">8</text>
+  </g>
+  <line x1="260" y1="40" x2="260" y2="126" stroke-width="4" style="stroke:var(--pass)"/>
+  <text x="252" y="162" font-size="14" text-anchor="end" font-weight="700" style="fill:var(--pass)">truth 7</text>
+  <line x1="274" y1="40" x2="274" y2="126" stroke-width="4" stroke-dasharray="6 4" style="stroke:var(--fail)"/>
+  <text x="282" y="162" font-size="14" font-weight="700" style="fill:var(--fail)">average 7.10</text>
+  <circle cx="153" cy="70" r="8" style="fill:var(--idea)" opacity=".85"/>
+  <circle cx="361" cy="92" r="8" style="fill:var(--idea)" opacity=".85"/>
+  <circle cx="338" cy="70" r="8" style="fill:var(--idea)" opacity=".85"/>
+  <circle cx="188" cy="92" r="8" style="fill:var(--idea)" opacity=".85"/>
+  <circle cx="259" cy="70" r="8" style="fill:var(--idea)" opacity=".85"/>
+  <circle cx="245" cy="92" r="8" style="fill:var(--idea)" opacity=".85"/>
+  <circle cx="304" cy="70" r="8" style="fill:var(--idea)" opacity=".85"/>
+  <circle cx="345" cy="92" r="8" style="fill:var(--idea)" opacity=".85"/>
+  <text x="30" y="30" font-size="14" style="fill:var(--idea)" font-weight="700">● 8 single readings: 6.27 to 7.69</text>
+</svg>
+<p>The worst single reading is off by 0.73. The average is off by 0.10. Bigger groups do better, but slowly. Here's the typical error from the homework file, over 500 tries each:</p>
+<svg class="diagram" viewBox="0 0 520 210" role="img" aria-label="Bar chart of typical error. Average of 1 reading: 0.503. Of 4: 0.227. Of 16: 0.117. Of 64: 0.056. Four times as many readings halves the error.">
+  <g font-size="14" text-anchor="end" style="fill:var(--fg)">
+    <text x="110" y="38">1 reading</text><text x="110" y="83">4 readings</text><text x="110" y="128">16 readings</text><text x="110" y="173">64 readings</text>
+  </g>
+  <g style="fill:var(--ok)">
+    <rect x="120" y="22" width="300" height="24" rx="4"/><rect x="120" y="67" width="135" height="24" rx="4"/><rect x="120" y="112" width="70" height="24" rx="4"/><rect x="120" y="157" width="33" height="24" rx="4"/>
+  </g>
+  <g font-size="14" font-weight="700" style="fill:var(--fg)">
+    <text x="428" y="39">0.503</text><text x="263" y="84">0.227</text><text x="198" y="129">0.117</text><text x="161" y="174">0.056</text>
+  </g>
+  <text x="120" y="204" font-size="13" style="fill:var(--muted)">4× as many readings → about half the error</text>
+</svg>
+<p>Why only half? The ups and downs only <em>partly</em> cancel. And averaging costs time: a moving robot can't wait for 64 readings. Engineers pick a balance. Your robot uses 16.</p>
+</div>
 
-<h3>Step 2: adding noise, the realistic way</h3>
-<p>We'll pretend our sensor adds a random wobble to the true distance. The wobble is any number between −1 and +1, every value equally likely. Python does this with <code>rng.uniform(-1, 1)</code>, where <code>rng</code> is a random number generator.</p>
-<p>A generator made with a <strong>seed</strong> gives the same numbers every time you start it again. Try it:</p>
-<pre><code>import random
-rng = random.Random(1); print(rng.uniform(-1, 1))   # -0.7312715117751976
-rng = random.Random(1); print(rng.uniform(-1, 1))   # -0.7312715117751976 again</code></pre>
-<p>Without a seed, <code>random.Random()</code> gives different numbers each run, like a real sensor.</p>
-<p>Here are eight real readings of the true distance 7 with noise 1.0 (from Python, seed 1):</p>
-<pre><code>6.27   7.69   7.53   6.51   6.99   6.90   7.30   7.58</code></pre>
-<p>Some are too low, some too high. The worst is off by 0.73. One more rule: a distance can't be negative. If the true distance is 0.2 and the wobble is −0.9, the sensor would say −0.7, which is nonsense. So we clip it: never return less than 0. Python's <code>max(0.0, value)</code> does that.</p>
-
-<h3>Step 3: averaging</h3>
-<p>The <strong>mean</strong> (average) of some numbers is their total divided by how many there are. Take the first four readings:</p>
-<pre><code>6.27 + 7.69 + 7.53 + 6.51 = 28.00
-28.00 / 4 = 7.00        error = |7.00 - 7| = 0.00</code></pre>
-<p>Perfect! But that was lucky. The next four:</p>
-<pre><code>6.99 + 6.90 + 7.30 + 7.58 = 28.77
-28.77 / 4 = 7.19        error = |7.19 - 7| = 0.19</code></pre>
-<p>Still better than the worst single reading in that group (7.58, off by 0.58). Why does averaging help? Because the wobble is just as likely to be up as down. When you add four wobbles together, the ups and downs partly cancel. It's like the friends guessing the corridor: the over-guessers and under-guessers balance each other.</p>
-
-<h3>Step 4: measuring "how wrong, usually"</h3>
-<p>One lucky or unlucky example proves nothing. To compare "1 reading" with "4 readings averaged" fairly, repeat the experiment many times (say 500) and average the <em>errors</em>. That number is the <strong>typical error</strong>. It answers: "if I trust this method, how far off am I, usually?"</p>
-<p>For a single reading with noise 1.0, the error is equally likely to be any size from 0 to 1, so on average it's about 0.5. Here's what Python measured (real output of the homework file):</p>
-<pre><code>average of  1 readings -> typical error 0.503
-average of  4 readings -> typical error 0.227</code></pre>
-<details><summary>Predict first: 4 readings roughly halved the error. What will 16 readings give? And 64?</summary>
-<p>About <strong>0.12</strong> for 16, and about <strong>0.06</strong> for 64. The real output says 0.117 and 0.056. The pattern: <em>four times as many readings halves the error</em>. Not four times better, only two times. (In maths this is the "square root rule": the error shrinks like 1 ÷ √n. √4 = 2, √16 = 4, √64 = 8.)</p>
-</details>
-<p>That pattern matters for real robots. Averaging costs time: 64 readings at 40 per second is 1.6 seconds, and a moving robot can't wait that long. Engineers pick a balance: enough readings to be safe, few enough to react in time.</p>
-
-<h2 id="play">3. Play with it</h2>
+<h2 id="play">2. Play</h2>
+<div class="box play"><span class="tag">🎮 Play</span>
+<p>Click a floor square to place the robot, pick a direction, and take readings. The true distance uses the same loop as your <code>distance_to_wall</code>; the noise is the same as your <code>noisy_reading</code>.</p>
 <div class="card demo">
-<h3>Interactive: a noisy distance sensor</h3>
-<p class="legend">Click any floor square to put the robot there, then pick a direction. The true distance is worked out with the same loop as your <code>distance_to_wall</code>. Each reading adds the same noise as <code>noisy_reading</code> (uniform, clipped at 0). Change N and press <b>Take a reading</b>.</p>
 <canvas id="room" width="700" height="400" style="height:auto" aria-label="The robot's room; click a floor square to place the robot"></canvas>
 <p><button id="dN">Face N</button> <button id="dS">Face S</button> <button id="dE">Face E</button> <button id="dW">Face W</button></p>
 <canvas id="line" width="700" height="150" style="height:auto" aria-label="Number line showing each reading, their average and the true distance"></canvas>
@@ -113,165 +97,166 @@ average of  4 readings -> typical error 0.227</code></pre>
 </div>
 <p class="legend">Dots: single readings. <b class="f">Red line</b>: their average. <b class="p">Blue line</b>: the truth.</p>
 </div>
-<p>Try: N = 1, press the button ten times and watch the red line jump. Then N = 16. Then N = 64. Then set noise to 2 and put the robot right next to a wall facing it. Why do the dots pile up at 0?</p>
+<p>Press ten times with N = 1 and watch the red line jump. Then N = 16, then 64. Then face a wall right next to the robot: why do the dots pile up at 0?</p>
+</div>
 
-<h2 id="homework">4. Homework</h2>
-<p>Open <code>homework/lesson02_sensors.py</code>. It imports your <code>move</code> from week 1 (<code>lesson01_moving.py</code>), so <strong>finish week 1 first</strong>. If you haven't, the checker will say <code>not written yet (Lesson 1: write this function)</code>: "Lesson 1" is the checker's name for <code>lesson01_moving.py</code>. Write five functions in order.</p>
-
-<h3>Function 1: <code>distance_to_wall(room, pos, direction)</code></h3>
-<p><strong>What it does:</strong> counts the free squares between <code>pos</code> and the next wall in that direction. The robot's own square doesn't count.</p>
-<p><strong>Example:</strong> <code>distance_to_wall(ROOM, (1, 1), "E")</code> → <code>7</code>, facing <code>"N"</code> → <code>0</code>, facing <code>"S"</code> → <code>5</code>.</p>
-<details><summary>Hint 1</summary><p>It's the <code>steps_to_wall</code> loop from week 1, except "is it the wall?" becomes <code>is_free(room, p)</code> and "x + 1" becomes <code>move(p, direction)</code>.</p></details>
-<details><summary>Hint 2</summary><p>Start by looking at the first square <em>in front</em> of the robot, not the robot's own square. Then loop while that square is free.</p></details>
-<details><summary>Hint 3</summary><pre><code>count = 0
-p = one step from pos in direction
-while p is free:
-    count goes up by 1
-    p = one more step in direction
+<h2 id="homework">3. Build</h2>
+<div class="box build"><span class="tag">🛠 Build</span>
+<p>Open <code>homework/lesson02_sensors.py</code>. It imports your <code>move</code> from week 1, so <strong>finish week 1 first</strong>. Run <code>python3 check.py 2</code> from <code>project</code> after each step.</p>
+<ol class="steps">
+<li><strong><code>distance_to_wall(room, pos, direction)</code></strong> counts free squares until the next wall, not counting the robot's own square. From (1, 1): <code>"E"</code> → <code>7</code>, <code>"N"</code> → <code>0</code>, <code>"S"</code> → <code>5</code>.
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>It's week 1's <code>steps_to_wall</code>, with <code>is_free(room, p)</code> as the test and <code>move(p, direction)</code> as the step.</p></details>
+<details><summary>Hint 2</summary><p>Look one step ahead <em>before</em> the loop, so the robot's own square isn't counted.</p></details>
+<details><summary>Hint 3: fill in the blanks</summary><pre><code>count = 0
+p = move(pos, direction)
+while is_free(room, ____):
+    count += 1
+    p = move(____, direction)
 return count</code></pre></details>
-
-<h3>Function 2: <code>noisy_reading(true_distance, noise, rng)</code></h3>
-<p><strong>What it does:</strong> returns the true distance plus <code>rng.uniform(-noise, noise)</code>, but never less than 0.</p>
-<p><strong>Example:</strong> with true distance 5 and noise 1.0, every result is between 4 and 6. With true distance 0.2 and noise 1.0, a result can be 0 but never negative.</p>
-<details><summary>Hint 1</summary><p>Use the <code>rng</code> you're given, not <code>random.uniform</code>. The checker passes in a seeded generator so results are repeatable.</p></details>
-<details><summary>Hint 2</summary><p><code>max(a, b)</code> returns the bigger of two numbers. So <code>max(0.0, x)</code> is <code>x</code> unless <code>x</code> is negative, and then it's 0.</p></details>
-<details><summary>Hint 3</summary><p>One line: return the max of 0.0 and (true distance + a uniform random number from −noise to +noise).</p></details>
-
-<h3>Function 3: <code>average(values)</code></h3>
-<p><strong>What it does:</strong> the mean of a list of numbers.</p>
-<p><strong>Example:</strong> <code>average([1, 2, 3, 4])</code> → <code>2.5</code> (10 ÷ 4).</p>
-<details><summary>Hint 1</summary><p>Total divided by how many.</p></details>
-<details><summary>Hint 2</summary><p>Python has <code>sum(list)</code> and <code>len(list)</code> built in.</p></details>
-<details><summary>Hint 3</summary><p>One line: <code>return</code> the sum of the values divided by the length of the values.</p></details>
-
-<h3>Function 4: <code>smoothed_reading(true_distance, noise, n, rng)</code></h3>
-<p><strong>What it does:</strong> takes <code>n</code> noisy readings and returns their average.</p>
-<p><strong>Example:</strong> with n = 4, it might take 6.27, 7.69, 7.53, 6.51 and return 7.0.</p>
-<details><summary>Hint 1</summary><p>Build a list of <code>n</code> readings, then pass it to your <code>average</code>.</p></details>
-<details><summary>Hint 2</summary><p>Start with an empty list and a <code>for _ in range(n):</code> loop. The <code>_</code> means "I don't need the loop counter".</p></details>
-<details><summary>Hint 3</summary><pre><code>readings = []
-repeat n times:
-    append noisy_reading(true_distance, noise, rng)
-return average(readings)</code></pre><p>(Once that works, try writing it as one line with a list comprehension: <code>[... for _ in range(n)]</code>.)</p></details>
-
-<h3>Function 5: <code>average_error(true_distance, noise, n, trials, rng)</code></h3>
-<p><strong>What it does:</strong> runs <code>smoothed_reading</code> <code>trials</code> times, works out the error of each one, <code>abs(reading - true_distance)</code>, and returns the average error.</p>
-<p><strong>Example:</strong> with true distance 7, noise 1.0, n = 1 and 500 trials, you get about 0.5.</p>
-<details><summary>Hint 1</summary><p>Same shape as <code>smoothed_reading</code>, but each item in your list is an error, not a reading.</p></details>
-<details><summary>Hint 2</summary><p>Error means "how far off, ignoring direction", so use <code>abs()</code>. Without it, too-high and too-low errors cancel and you'd wrongly get nearly 0.</p></details>
-<details><summary>Hint 3</summary><pre><code>errors = []
-repeat trials times:
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>Lesson 2: lesson02_sensors.py
+  ✓ distance_to_wall
+  … noisy_reading: not written yet (Lesson 2: write this function)
+  … average: not written yet (Lesson 2: write this function)
+  … averaging helps: not written yet (Lesson 2: write this function)
+  1/4 passed</code></pre>
+<p><strong>If you see</strong> <code>✗ distance_to_wall: from (1, 1) facing E there are 7 free squares</code>, you probably counted the robot's own square (8). If it says <code>not written yet (Lesson 1: ...)</code>, finish week 1.</p>
+</div></li>
+<li><strong><code>noisy_reading(true_distance, noise, rng)</code></strong> returns the true distance plus <code>rng.uniform(-noise, noise)</code>, but never less than 0 (a distance can't be negative).
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>Use the <code>rng</code> you're given, not <code>random.uniform</code>: the checker hands you a seeded one.</p></details>
+<details><summary>Hint 2: fill in the blank</summary><pre><code>return max(0.0, true_distance + rng.uniform(____, noise))</code></pre></details>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>  ✓ distance_to_wall
+  ✓ noisy_reading
+  … average: not written yet (Lesson 2: write this function)
+  … averaging helps: not written yet (Lesson 2: write this function)
+  2/4 passed</code></pre>
+<p><strong>If you see</strong> <code>✗ noisy_reading: never return a negative distance</code>, you forgot the <code>max</code>.</p>
+</div></li>
+<li><strong><code>average(values)</code></strong> is the mean. <code>average([1, 2, 3, 4])</code> → <code>2.5</code>. And <strong><code>smoothed_reading(true_distance, noise, n, rng)</code></strong> takes <code>n</code> noisy readings and returns their average.
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p><code>sum(values) / len(values)</code>. For the readings, <code>for _ in range(n):</code> repeats n times (<code>_</code> means "I don't need the counter").</p></details>
+<details><summary>Hint 2: fill in the blanks</summary><pre><code>readings = []
+for _ in range(n):
+    readings.append(noisy_reading(true_distance, noise, ____))
+return average(____)</code></pre></details>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>  ✓ distance_to_wall
+  ✓ noisy_reading
+  ✓ average
+  … averaging helps: not written yet (Lesson 2: write this function)
+  3/4 passed</code></pre>
+</div></li>
+<li><strong><code>average_error(true_distance, noise, n, trials, rng)</code></strong> runs <code>smoothed_reading</code> <code>trials</code> times and returns the average of <code>abs(reading - true_distance)</code>.
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>Same shape as <code>smoothed_reading</code>, but each item in your list is an error. Use <code>abs()</code>, or too-high and too-low cancel and the error looks like 0.</p></details>
+<details><summary>Hint 2: fill in the blanks</summary><pre><code>errors = []
+for _ in range(trials):
     r = smoothed_reading(true_distance, noise, n, rng)
-    append abs(r - true_distance)
-return average(errors)</code></pre></details>
-
-<h3>Run it and see</h3>
-<pre><code>cd homework
-python3 lesson02_sensors.py          # Windows: py lesson02_sensors.py
-cd ..</code></pre>
-<p>Real output from the finished file:</p>
+    errors.append(abs(____ - true_distance))
+return average(____)</code></pre></details>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p><code>cd homework</code>, then <code>python3 lesson02_sensors.py</code>. Real output (yours should be identical: the seed is fixed):</p>
 <pre><code>True distance east from (1, 1): 7
 average of  1 readings -> typical error 0.503
 average of  4 readings -> typical error 0.227
 average of 16 readings -> typical error 0.117
 average of 64 readings -> typical error 0.056</code></pre>
-<p>Your numbers should be identical, because the program uses a fixed seed (<code>random.Random(0)</code>), as long as you call <code>rng.uniform</code> exactly once per reading.</p>
-
-<h3>Check it</h3>
-<pre><code>python3 check.py 2                 # Windows: py check.py 2</code></pre>
+<p>Then <code>python3 check.py 2</code> from <code>project</code>:</p>
 <pre><code>Lesson 2: lesson02_sensors.py
   ✓ distance_to_wall
   ✓ noisy_reading
   ✓ average
   ✓ averaging helps
   4/4 passed  🎉 lesson complete!</code></pre>
-<p>The last check, "averaging helps", runs your <code>average_error</code> with 1 and with 16 readings and needs the error to drop by more than half. Two real ✗ messages you might meet:</p>
-<pre><code>  ✗ distance_to_wall: from (1, 1) facing E there are 7 free squares
-  ✗ noisy_reading: never return a negative distance</code></pre>
-<p>The first usually means you counted the robot's own square (you'd get 8). The second means you forgot the <code>max</code>.</p>
+<p><strong>If your numbers differ slightly</strong>, you called <code>rng.uniform</code> more than once per reading, or used <code>random.uniform</code>.</p>
+</div></li>
+</ol>
+</div>
 
-<h3>Stretch</h3>
-<p>Real sensors sometimes glitch badly: one reading in 20 is totally wrong (say, 0). Write <code>glitchy_reading</code> that does that, and see how much it ruins the average. Then write <code>median(values)</code> (sort the list, take the middle one) and compare. Which is more robust to glitches, mean or median? Robot engineers use both.</p>
-
-<h2 id="add-to-robot">Add it to your robot</h2>
-<p>Fill in the first half of <code>look(self)</code>: what the sensors see. A real sensor is noisy, so your robot does what you just learned. For each direction N, E, S and W, it works out the true distance with your <code>distance_to_wall()</code>, then takes 16 noisy readings of it with your <code>smoothed_reading()</code> (noise 0.5) and uses their average. The safe-speed half comes in <a href="03-learning-from-data.html#add-to-robot">Part B</a>, later this week.</p>
-<div class="card note"><strong>New Python this time.</strong> A dictionary can start empty and get filled one key at a time. And <code>:.1f</code> inside an f-string shows a number with 1 decimal place.
-<pre><code>d = {}; d["N"] = 0.13
-print(f"north {d['N']:.1f}")     # north 0.1</code></pre></div>
-<details><summary>Hint 1</summary><p>Start with this import, inside the method (<code>random</code> is already imported at the top of the file):</p><pre><code>from lesson02_sensors import distance_to_wall, smoothed_reading</code></pre></details>
-<details><summary>Hint 2</summary><p>Keep two dictionaries: the true distances (Part B needs them) and what the sensor sees.</p><pre><code>true = {}
+<h2 id="add-to-robot">4. Add it to your robot</h2>
+<div class="box bot"><span class="tag">🤖 Add it to your robot</span>
+<p>Fill in the first half of <code>look(self)</code>. For each of N, E, S and W, get the true distance with <code>distance_to_wall()</code>, then what the sensor sees with <code>smoothed_reading()</code> (noise 0.5, 16 readings). The safe speed comes in <a href="03-learning-from-data.html#add-to-robot">Part B</a>.</p>
+<p><strong>New Python:</strong> <code>f"{x:.1f}"</code> shows a number with 1 decimal place.</p>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>Put this import inside the method (<code>random</code> is already imported):</p><pre><code>from lesson02_sensors import distance_to_wall, smoothed_reading</code></pre></details>
+<details><summary>Hint 2</summary><p>Two dictionaries: the true distances (Part B needs them) and what the sensor sees.</p><pre><code>true = {}
 seen = {}
 for k in "NESW":
     true[k] = distance_to_wall(ROOM, self.pos, k)
-    seen[k] = smoothed_reading(true[k], 0.5, 16, random.Random())</code></pre><p>(Bonus: a <em>dictionary comprehension</em> does the same in one line: <code>true = {k: distance_to_wall(ROOM, self.pos, k) for k in "NESW"}</code>.)</p></details>
-<details><summary>Hint 3</summary><p>Fill in the blanks:</p><pre><code>return f"Walls (average of 16 readings): north {seen['N']:.1f}, east {____}, south {____}, west {____}."</code></pre></details>
-<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 2: look"</em>. The safe-speed check stays yellow until Part B. That's fine: yellow means "not written yet", not "wrong". Real output:</p>
+    seen[k] = smoothed_reading(true[k], 0.5, 16, random.Random())</code></pre></details>
+<details><summary>Hint 3: fill in the blanks</summary><pre><code>return f"Walls (average of 16 readings): north {seen['N']:.1f}, east {____}, south {____}, west {____}."</code></pre></details>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p><code>python3 check.py robot</code> from <code>project</code>. Real output:</p>
 <pre><code>Your robot: my_robot.py
   ✓ week 1: arrows
   ✓ week 2: look
   … week 2 part B: look's safe speed: not written yet (add the safe speed in week 2 Part B)
   ...
-  2/15 passed</code></pre>
-<p>If the walls are wrong, you get a red ✗ that starts like this: <code>✗ week 2: look: at the start the walls are about north 0, east 7, south 5, west 0 (averaged, so close but not exact)</code>.</p>
-<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output, from two <code>look</code>s in a row:</p>
+  2/21 passed</code></pre>
+<p>Yellow means "not written yet", not "wrong". Then <code>python3 my_robot.py</code> and type <code>look</code> twice. Real replies:</p>
 <pre><code>Zippy&gt; look
-  Walls (average of 16 readings): north 0.1, east 6.9, south 5.0, west 0.1.
+  Walls (average of 16 readings): north 0.1, east 7.0, south 4.9, west 0.1.
 
 Zippy&gt; look
-  Walls (average of 16 readings): north 0.1, east 6.9, south 5.1, west 0.1.</code></pre>
-<p>Your numbers will wobble a little too, because <code>random.Random()</code> has no seed. Look at north: the true distance is 0, but the robot sees 0.1. A reading can't go below 0, so next to a wall the wobble can only push it up. Averaging can't cancel that. It's a small <em>bias</em>, the thing the challenge below is about.</p>
+  Walls (average of 16 readings): north 0.1, east 7.0, south 5.0, west 0.1.</code></pre>
+<p>Yours will wobble a little too: <code>random.Random()</code> has no seed. Notice north says 0.1, not 0. A reading can't go below 0, so next to a wall the wobble can only push it up. That's a small <em>bias</em>, and averaging can't fix it.</p>
+<p><strong>If you see</strong> <code>✗ week 2: look: at the start the walls are about north 0, east 7, south 5, west 0</code>, check the order of your four numbers.</p>
+</div>
+</div>
 
-<h2 id="challenge">5. Real-world challenge: the corridor census</h2>
-<p>You'll be the noisy sensor, and see averaging work with your own eyes.</p>
-<ol>
-<li><strong>Pick a distance</strong> you can measure exactly later: a hallway, the garden, the length of a long table. Don't measure it yet.</li>
-<li><strong>Take 16 "readings".</strong> Pace it out in normal steps 16 times, writing down each count (half-steps allowed). Or ask 8 people to guess it in metres, twice each, without hearing each other's answers.</li>
-<li><strong>Now measure it exactly</strong> with a tape measure, and convert your step counts to metres (measure one of your steps too). That's the "true distance".</li>
-<li><strong>Work out the errors.</strong> For each single reading: |reading − true|. Then their average: that's the typical error for N = 1.</li>
-<li><strong>Group them.</strong> Split your 16 readings into four groups of 4. Average each group, then find each group's error. Average those four errors: that's the typical error for N = 4. Finally, the average of all 16 against the truth.</li>
-<li><strong>Record</strong> a little table: N = 1, N = 4, N = 16, and the typical error for each.</li>
+<h2 id="challenge">5. Real-world challenge: be the noisy sensor</h2>
+<ol class="steps">
+<li>Pick a hallway or garden. Pace it out 16 times, writing down each count. Don't measure it yet.</li>
+<li>Now measure it with a tape measure, and measure one of your steps. Turn each count into metres.</li>
+<li>Find the error of each single pace-out, |reading − true|, and average them: that's N = 1.</li>
+<li>Split the 16 into four groups of 4. Average each group, find its error, and average those: that's N = 4. Then all 16 together.</li>
 </ol>
-<div class="card note"><strong>On your own:</strong> pace out a hallway or the garden 16 times yourself (step 2's first option), or measure your desk 16 times with a short ruler you have to move along. Then do steps 3–6 as written.</div>
-<p><strong>What it should teach you:</strong> the error usually shrinks as N grows, roughly halving from 1 to 4. If it <em>doesn't</em> shrink, look for a <em>bias</em>: maybe all your guesses were too low. Averaging cancels random wobble but it can't fix a sensor that's always wrong in the same direction. That difference (noise vs bias) is one of the most important ideas in all of measurement and AI.</p>
+<div class="card note"><strong>On your own:</strong> this works alone. No hallway? Measure your desk 16 times with a short ruler you have to move along.</div>
+<p>The error should shrink as N grows. If it doesn't, look for a <em>bias</em>: maybe all your paces were short. Averaging cancels wobble, not a sensor that's always wrong the same way.</p>
 
-<h2 id="project">6. Your Robo-Helper so far</h2>
-<pre><code>Week 1A  ✓ greets you, counts steps
-Week 1B  ✓ moves around the room without crashing into walls
-Week 2A  ✓ distance_to_wall + smoothed_reading: looks ahead, and averages 16 noisy readings</code></pre>
+<h2 id="check">Check yourself</h2>
+<details><summary>What's the difference between noise and bias?</summary><p>Noise wobbles up and down; averaging cancels it. Bias pushes every reading the same way; you fix it by calibrating against a known true value.</p></details>
+<details><summary>Predict: <code>distance_to_wall(ROOM, (5, 3), "W")</code>?</summary><p><strong>1.</strong> (4, 3) is free, then (3, 3) is wall.</p></details>
+<details><summary>Predict: the typical error for 256 readings?</summary><p>About <strong>0.03</strong>. Four times as many as 64 halves 0.056.</p></details>
+<details><summary>Why might a fast robot not want 64 readings?</summary><p>By the time it has them, it has moved, and the wall is closer than its "accurate" answer.</p></details>
+
+<h2 id="deeper">Want to know more?</h2>
+<details><summary>Seeds: random numbers you can repeat</summary>
+<pre><code>import random
+rng = random.Random(1); print(rng.uniform(-1, 1))   # -0.7312715117751976
+rng = random.Random(1); print(rng.uniform(-1, 1))   # -0.7312715117751976 again</code></pre>
+<p>That's how your output can match this page. The 8 readings in the picture are <code>noisy_reading(7, 1.0, rng)</code> with seed 1.</p>
+</details>
+<details><summary>The square root rule</summary><p>The error shrinks like 1 ÷ √n. √4 = 2, √16 = 4, √64 = 8: so 4, 16 and 64 readings give about a half, a quarter and an eighth of the single-reading error.</p></details>
+<details><summary>Stretch: glitches, mean vs median</summary><p>Write <code>glitchy_reading</code> that returns 0 one time in 20. How much does that spoil the average? Then write <code>median(values)</code> (sort, take the middle) and compare. Which copes better with glitches?</p></details>
+<details><summary>Common mistakes</summary>
 <ul>
-<li><a href="03-learning-from-data.html">Part B</a> faces noise again: the braking measurements are noisy too, and learning a line through them is a smarter kind of averaging.</li>
-<li>In <a href="04-neuron.html">week 3</a> the obstacle detector learns from noisy sensor readings of distance and speed, just like the ones you made today.</li>
-<li>In the <a href="11-capstone.html">week 7 capstone</a>, <code>RoboHelper.drive_to</code> calls your <code>distance_to_wall</code> before every step, and feeds it to Part B's <code>max_safe_speed</code> to choose how fast to drive.</li>
-</ul>
-
-<h2 id="mistakes">7. Common mistakes</h2>
+<li><strong>Counting the robot's own square</strong>: 8 instead of 7.</li>
+<li><strong>Forgetting <code>abs()</code> in <code>average_error</code></strong>: the check <code>averaging should cut the typical error by more than half</code> fails.</li>
+<li><strong>Week 1 not done</strong>: you'll see <code>not written yet (Lesson 1: write this function)</code>.</li>
+</ul></details>
+<details><summary>Where this goes next</summary>
 <ul>
-<li><strong>Counting the robot's own square.</strong> You'd get 8 instead of 7. The checker says <code>from (1, 1) facing E there are 7 free squares</code>. Look one step ahead <em>before</em> the loop.</li>
-<li><strong>Forgetting the clip at 0.</strong> The checker says <code>never return a negative distance</code>.</li>
-<li><strong>Using <code>random.uniform</code> instead of <code>rng.uniform</code>.</strong> It may pass, but your output won't match the numbers on this page, and results change every run. Always use the <code>rng</code> you're handed.</li>
-<li><strong>Forgetting <code>abs()</code> in <code>average_error</code>.</strong> Positive and negative errors cancel, the "error" looks tiny for every N, and the check <code>averaging should cut the typical error by more than half</code> fails.</li>
-<li><strong>Week 1 not finished.</strong> This file imports <code>move</code> from <code>lesson01_moving.py</code>. You'll see <code>not written yet (Lesson 1: write this function)</code> even on this week's check.</li>
-</ul>
-
-<h2 id="check">8. Check yourself</h2>
-<details><summary>What's the difference between noise and a bias?</summary><p>Noise is random wobble, sometimes up, sometimes down. Averaging cancels it. A bias pushes every reading the same way (say, always 0.3 too high). Averaging can't remove a bias. You fix it by calibrating against a known true value.</p></details>
-<details><summary>Predict: what does <code>distance_to_wall(ROOM, (5, 3), "W")</code> return?</summary><p><strong>1.</strong> (4, 3) is free, then (3, 3) is part of the inside wall <code>#</code>.</p></details>
-<details><summary>Predict: if you average 256 readings with noise 1.0, roughly what typical error do you expect?</summary><p>About <strong>0.03</strong>. 64 gave 0.056. 256 is four times as many, which halves the error again.</p></details>
-<details><summary>Why does <code>average_error</code> need many trials, not just one?</summary><p>One trial can be lucky (like the four readings that averaged to exactly 7.00) or unlucky. Averaging over hundreds of trials gives the usual error, which is what you need to compare methods fairly.</p></details>
-<details><summary>Why might a fast robot not want to average 64 readings?</summary><p>Each reading takes time. By the time it has 64, it may have moved a long way and the wall may be closer than its "accurate" answer says. Speed and accuracy pull against each other.</p></details>
-
-<h2 id="deeper">9. Go deeper (optional)</h2>
-<ul>
-<li><a href="../01-decision-model-evals.html">LLM evals: decision models</a>: the same problem in AI testing. A model's score on a small test wobbles, just like a sensor, and you need enough examples to trust it.</li>
-<li><a href="../03-shared-autonomy.html">Human–AI help levels</a>: a robot that has to guess a person's goal from noisy, uncertain evidence.</li>
-<li><a href="../17-free-ai-curriculum.html#robotics">Free robotics courses</a>: look for "probabilistic robotics" and "Kalman filter", the grown-up version of averaging over time.</li>
-</ul>
+<li><a href="03-learning-from-data.html">Part B</a>: braking measurements are noisy too, and fitting a line is a smarter kind of averaging.</li>
+<li>Week 3: your phone's real sensors, smoothed with a moving average.</li>
+<li><a href="04-neuron.html">Week 4</a>: a neuron learns from noisy sensor readings like today's.</li>
+<li><a href="11-capstone.html">Week 10 capstone</a>: the robot calls your <code>distance_to_wall</code> before every step.</li>
+<li><a href="../01-decision-model-evals.html">LLM evals</a>: a model's test score wobbles like a sensor. <a href="../17-free-ai-curriculum.html#robotics">Free robotics courses</a>: look for "probabilistic robotics".</li>
+</ul></details>
 
 <nav class="pager">
   <a href="01-coordinates.html"><small>Previous</small>Week 1 · Part B: Moving on a grid</a>
   <a class="next" href="03-learning-from-data.html"><small>Next</small>Week 2 · Part B: Learning from data</a>
 </nav>
-<footer>Build a Robot Brain · Week 2 of 12 · Part A</footer>
+<footer>Build a Robot Brain · Week 2 of 16 · Part A</footer>
 </main>
 
 <script>
@@ -390,5 +375,6 @@ nIn.oninput = () => { last = null; draw(); };
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
 draw();
 </script>
+<script src="room.js"></script>
 </body>
 </html>

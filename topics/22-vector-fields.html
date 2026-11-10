@@ -16,7 +16,7 @@
 <p class="meta">Source: Matheorems, “Gradient, Divergence and Curl”, 8 Nov 2026 (X post with an animation) ·
 <a href="https://x.com/matheorems/status/2119505986381901899">X post</a>. The post is a short animation with three worked examples; the robot experiment on this page is ours.</p>
 
-<div class="card note"><strong>For Robo-Helper builders (ages 12+):</strong> Best after Robo-Helper week 4 (A*). The formulas are optional: the pictures, the demo and the robot experiment are the main part. <a href="18-robot-brain/index.html">Back to the course</a>.</div>
+<div class="card note"><strong>For Robo-Helper builders (ages 12+):</strong> Best after Robo-Helper week 5 (A*). The formulas are optional: the pictures, the demo and the robot experiment are the main part. <a href="18-robot-brain/index.html">Back to the course</a>.</div>
 
 <section class="kid" id="start">
 <h2>Start here (no maths needed)</h2>
@@ -80,7 +80,7 @@
 </div>
 <ul>
 <li><strong>Potential-field navigation</strong> (Khatib, 1986): the goal attracts, obstacles repel, the robot follows the combined field. Cheap and reactive, used in arms, drones and game AI. Its known weakness is local minima, which this page shows and fixes.</li>
-<li><strong>Escaping local minima with rotation:</strong> adding a tangential (curl) component around obstacles is a standard fix (often called vortex or circulation fields). Planners like A* (<a href="18-robot-brain/06-pathfinding.html">Robo-Helper week 4</a>) don't have this problem, but need a map and a search first.</li>
+<li><strong>Escaping local minima with rotation:</strong> adding a tangential (curl) component around obstacles is a standard fix (often called vortex or circulation fields). Planners like A* (<a href="18-robot-brain/06-pathfinding.html">Robo-Helper week 5</a>) don't have this problem, but need a map and a search first.</li>
 <li><strong>Gradient descent:</strong> <a href="18-robot-brain/03-learning-from-data.html">week 2</a> fits the braking distance by stepping against the gradient; <a href="21-robot-math.html#momentum">Module 21</a> adds momentum.</li>
 <li><strong>Flow matching and diffusion</strong> (<a href="21-robot-math.html#diffusion">Module 21</a>): π0 and GR00T's action heads learn a <em>velocity field</em> that carries random noise to a smooth arm motion. That's a learned vector field, and divergence appears directly in the maths of how probability flows along it.</li>
 <li><strong>Drones and underwater robots:</strong> wind and water currents are vector fields; divergence and curl describe where air or water piles up and where it spins.</li>
@@ -110,7 +110,7 @@
 <p class="meta">The derivatives are worked out numerically (a tiny step either side), so the check doesn't rely on the formulas it's checking.</p>
 
 <h2 id="robot">6. Steering Robo-Helper with a field</h2>
-<p>A different way to drive than week 4's A*. The robot is a point in a 10 m × 10 m room with the goal at (9, 5). Three fields add up:</p>
+<p>A different way to drive than week 5's A*. The robot is a point in a 10 m × 10 m room with the goal at (9, 5). Three fields add up:</p>
 <ul>
 <li><b>Attract:</b> (−(x − 9), −(y − 5)), the downhill direction of a bowl centred on the goal. Divergence −2, curl 0.</li>
 <li><b>Repel:</b> near each obstacle, a push straight away from it that grows fast as you get close (the classic Khatib formula, active within 2 m of the edge).</li>
@@ -196,7 +196,7 @@
 <li>3Blue1Brown, <a href="https://www.youtube.com/watch?v=rB83DpBJQsE">Divergence and curl: the language of Maxwell's equations, fluid flow, and more</a></li>
 <li>Khan Academy, <a href="https://www.khanacademy.org/math/multivariable-calculus">Multivariable calculus</a> (gradient, divergence, curl units)</li>
 <li>O. Khatib (1986), “Real-Time Obstacle Avoidance for Manipulators and Mobile Robots”, <em>International Journal of Robotics Research</em> 5(1): the original potential-field paper</li>
-<li>Related: <a href="21-robot-math.html">Module 21</a> (A*, Kalman, momentum, diffusion: interactive), <a href="18-robot-brain/06-pathfinding.html">Robo-Helper week 4</a> (A*), <a href="18-robot-brain/03-learning-from-data.html">week 2</a> (gradient descent), <a href="02-tensortonic.html">Module 02</a> (maths drills)</li>
+<li>Related: <a href="21-robot-math.html">Module 21</a> (A*, Kalman, momentum, diffusion: interactive), <a href="18-robot-brain/06-pathfinding.html">Robo-Helper week 5</a> (A*), <a href="18-robot-brain/03-learning-from-data.html">week 2</a> (gradient descent), <a href="02-tensortonic.html">Module 02</a> (maths drills)</li>
 </ul>
 
 <footer>Module 22 · added 2026-11-09 · <a href="../index.html">Back to course index</a></footer>

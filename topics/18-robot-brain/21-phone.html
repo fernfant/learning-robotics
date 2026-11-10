@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 3 · Real phone sensors</title>
+<link rel="stylesheet" href="../../style.css?v=16">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 3</nav>
+
+<div class="eyebrow"><span class="track robo">Robotics</span>Build a Robot Brain · Week 3 of 16</div>
+<h1>Real sensor data from your phone: smoothing, tilt and steps</h1>
+<p class="lede">Your phone has the same sensor that real robots use to feel which way is down. This week you read a real recording from one, and find out how someone was standing, sitting, lying and walking.</p>
+<div class="card note" id="journey"><strong>Week 3 of 16.</strong> So far your robot: ✓ says hello ✓ moves ✓ measures walls ✓ knows its braking distance. <strong>Today</strong> it reads real data from a phone's sensor: which way is down, and how many steps. Next: <a href="04-neuron.html">Week 4 · Part A: The artificial neuron</a>. <a href="index.html#my-robot">Your robot, week by week</a>.</div>
+
+<div class="facts">
+  <div><b>Time</b>2–3 h</div>
+  <div><b>You'll need</b>Week 2 done. A phone is optional (ask an adult before installing an app)</div>
+  <div><b>New words</b>Accelerometer, axis, magnitude, moving average, peak</div>
+  <div><b>Homework file</b><code>lesson21_phone.py</code></div>
+</div>
+
+<section class="kid" id="start">
+<h2>Start here</h2>
+<p class="big">A still phone always feels gravity. The way gravity splits across the phone's sides tells you how it's tilted. The bumps tell you about steps.</p>
+<dl>
+<dt>Accelerometer</dt><dd>A tiny sensor that measures pushes and pulls, including gravity, in m/s². About 50 readings a second.</dd>
+<dt>Axis</dt><dd>One of the phone's three directions: x, y and z. Each reading has one number per axis.</dd>
+<dt>Magnitude</dt><dd>How strong the reading is, whatever direction it points.</dd>
+<dt>Moving average</dt><dd>Smoothing: each new value is the average of the last few.</dd>
+<dt>Peak</dt><dd>A point higher than its neighbours: the top of a bump.</dd>
+</dl>
+</section>
+
+<h2 id="idea">1. The idea</h2>
+<div class="box idea"><span class="tag">💡 The idea: gravity is an arrow the phone can measure</span>
+<p>Hold a glass of water and tilt it. The water stays level, because gravity always pulls straight down. A phone feels that same pull, about 9.8 m/s², even sitting still. It measures it along its own three edges: x, y and z. Stand the phone up and all of it lands on x. Lay it flat and none does. Tip it halfway and it splits.</p>
+<svg class="diagram" viewBox="0 0 520 270" role="img" aria-label="Three phones with a gravity arrow pointing down beside each. Upright: the x part is 9.8 and the y part is 0, tilt 0 degrees. Tipped 45 degrees: x and y parts are both 6.9. On its side: x is 0, y is 9.8, tilt 90 degrees.">
+  <defs>
+    <marker id="aG" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--fg)"/></marker>
+    <marker id="aX" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--idea)"/></marker>
+    <marker id="aY" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--build)"/></marker>
+  </defs>
+  <g font-size="16" text-anchor="middle" style="fill:var(--fg)">
+    <!-- upright -->
+    <line x1="30" y1="70" x2="30" y2="170" stroke-width="3" marker-end="url(#aG)" style="stroke:var(--fg)"/>
+    <text x="30" y="60">gravity</text>
+    <g transform="translate(100 120)">
+      <rect x="-25" y="-50" width="50" height="100" rx="8" fill="none" stroke-width="3" style="stroke:var(--muted)"/>
+      <line x1="0" y1="0" x2="0" y2="-60" stroke-width="4" marker-end="url(#aX)" style="stroke:var(--idea)"/>
+    </g>
+    <text x="100" y="205">upright</text>
+    <text x="100" y="225" style="fill:var(--idea)">x 9.8</text><text x="100" y="243" style="fill:var(--build)">y 0</text>
+    <text x="100" y="263" font-weight="700">tilt 0°</text>
+    <!-- 45 -->
+    <line x1="200" y1="70" x2="200" y2="170" stroke-width="3" marker-end="url(#aG)" style="stroke:var(--fg)"/>
+    <g transform="translate(275 125) rotate(-45)">
+      <rect x="-25" y="-50" width="50" height="100" rx="8" fill="none" stroke-width="3" style="stroke:var(--muted)"/>
+      <line x1="0" y1="0" x2="0" y2="-42" stroke-width="4" marker-end="url(#aX)" style="stroke:var(--idea)"/>
+      <line x1="0" y1="0" x2="42" y2="0" stroke-width="4" marker-end="url(#aY)" style="stroke:var(--build)"/>
+    </g>
+    <text x="275" y="205">tipped halfway</text>
+    <text x="275" y="225" style="fill:var(--idea)">x 6.9</text><text x="275" y="243" style="fill:var(--build)">y 6.9</text>
+    <text x="275" y="263" font-weight="700">tilt 45°</text>
+    <!-- 90 -->
+    <line x1="370" y1="70" x2="370" y2="170" stroke-width="3" marker-end="url(#aG)" style="stroke:var(--fg)"/>
+    <g transform="translate(450 125) rotate(-90)">
+      <rect x="-25" y="-50" width="50" height="100" rx="8" fill="none" stroke-width="3" style="stroke:var(--muted)"/>
+      <line x1="0" y1="0" x2="60" y2="0" stroke-width="4" marker-end="url(#aY)" style="stroke:var(--build)"/>
+    </g>
+    <text x="450" y="205">on its side</text>
+    <text x="450" y="225" style="fill:var(--idea)">x 0</text><text x="450" y="243" style="fill:var(--build)">y 9.8</text>
+    <text x="450" y="263" font-weight="700">tilt 90°</text>
+  </g>
+</svg>
+<p>So the angle between the reading and the x axis is the <strong>tilt</strong>. Our real recording comes from a phone clipped to someone's waist, x pointing up when they stand. Here's what it measured (real output):</p>
+<pre><code>  standing      5- 25 s   gravity 10.12 m/s^2   tilt   9 degrees
+  sitting      28- 44 s   gravity  9.74 m/s^2   tilt  33 degrees
+  laying       73- 91 s   gravity  9.74 m/s^2   tilt  79 degrees</code></pre>
+<p>Standing is nearly upright, sitting leans back, lying is nearly on its side. Notice gravity isn't exactly 9.81: real sensors are a little off, like in week 2.</p>
+</div>
+
+<div class="box idea"><span class="tag">💡 The idea: every step is a bump</span>
+<p>When you walk, your body bounces: up, down, up, down. The phone feels each bounce as a bump in the reading's strength. Count the bumps and you've counted steps. Two tricks make it work: <strong>smooth</strong> the wobbly signal first, and <strong>ignore a second bump</strong> that comes too soon after the last step.</p>
+<svg class="diagram" viewBox="0 0 520 250" role="img" aria-label="Three seconds of real walking data. A thin grey wobbly line is the raw strength; a thick smooth line is the moving average. A dashed line at 10.5 is the threshold. Six green dots mark the counted steps. Four grey rings mark second bumps that came too soon after a step and were ignored.">
+  <line x1="50" y1="200" x2="505" y2="200" stroke-width="1.5" style="stroke:var(--muted)"/>
+  <line x1="50" y1="200" x2="50" y2="25" stroke-width="1.5" style="stroke:var(--muted)"/>
+  <g font-size="12" style="fill:var(--muted)"><text x="44" y="204" text-anchor="end">5</text><text x="44" y="134" text-anchor="end">10</text><text x="44" y="64" text-anchor="end">15</text>
+  <text x="50" y="216" text-anchor="middle">171 s</text><text x="200" y="216" text-anchor="middle">172 s</text><text x="350" y="216" text-anchor="middle">173 s</text><text x="500" y="216" text-anchor="middle">174 s</text></g>
+  <text x="275" y="240" font-size="13" text-anchor="middle" style="fill:var(--fg)">time → (strength of the shake, m/s²)</text>
+  <polyline fill="none" stroke-width="1.2" opacity=".7" style="stroke:var(--muted)" points="50,148 53,134 56,126 59,126 62,133 65,137 68,115 71,89 74,85 77,91 80,95 83,108 86,118 89,116 92,94 95,63 98,44 101,72 104,117 107,146 110,157 113,168 116,169 119,170 122,170 126,172 129,175 132,174 135,165 138,160 141,159 144,149 147,123 150,78 153,49 156,65 159,80 162,59 165,47 168,83 171,162 174,184 177,136 180,110 183,97 186,125 189,143 192,156 195,168 198,171 201,163 204,139 207,132 210,136 213,153 216,153 219,145 222,131 225,117 228,111 231,107 234,99 237,96 240,97 243,98 246,111 249,122 252,111 255,69 258,33 261,36 264,90 267,137 270,137 273,172 277,168 280,168 283,173 286,173 289,171 292,172 295,178 298,168 301,156 304,145 307,133 310,124 313,95 316,63 319,67 322,73 325,60 328,34 331,130 334,166 337,173 340,126 343,108 346,120 349,126 352,134 355,158 358,179 361,181 364,152 367,124 370,124 373,150 376,155 379,145 382,145 385,117 388,116 391,116 394,119 397,110 400,88 403,77 406,85 409,117 412,122 415,103 418,89 421,55 424,49 428,67 431,117 434,130 437,160 440,167 443,178 446,181 449,178 452,177 455,184 458,179 461,155 464,146 467,136 470,110 473,74 476,53 479,66 482,66 485,64 488,46 491,118 494,171 497,157 500,137"/>
+  <polyline fill="none" stroke-width="3.5" stroke-linejoin="round" style="stroke:var(--idea)" points="50,144 53,142 56,139 59,137 62,133 65,131 68,127 71,120 74,112 77,103 80,95 83,94 86,99 89,106 92,106 95,100 98,87 101,78 104,78 107,88 110,107 113,132 116,151 119,162 122,167 126,170 129,171 132,172 135,171 138,169 141,166 144,161 147,151 150,134 153,112 156,93 159,79 162,66 165,60 168,67 171,86 174,107 177,122 180,135 183,138 186,130 189,122 192,126 195,138 198,153 201,160 204,159 207,155 210,148 213,145 216,143 219,144 222,144 225,140 228,131 231,122 234,113 237,106 240,102 243,99 246,100 249,105 252,108 255,102 258,89 261,74 264,68 267,73 270,87 273,115 277,141 280,157 283,164 286,171 289,171 292,172 295,174 298,173 301,169 304,164 307,156 310,145 313,131 316,112 319,97 322,84 325,72 328,59 331,73 334,93 337,113 340,126 343,141 346,139 349,131 352,123 355,129 358,144 361,156 364,161 367,159 370,152 373,146 376,141 379,139 382,143 385,142 388,135 391,128 394,123 397,116 400,110 403,102 406,96 409,95 412,98 415,101 418,103 421,97 424,83 428,72 431,75 434,83 437,105 440,128 443,150 446,163 449,173 452,176 455,180 458,180 461,175 464,168 467,160 470,145 473,124 476,104 479,88 482,74 485,65 488,59 491,72 494,93 497,111 500,126"/>
+  <line x1="50" y1="123" x2="505" y2="123" stroke-width="2" stroke-dasharray="6 4" style="stroke:var(--build)"/>
+  <text x="505" y="118" font-size="12" text-anchor="end" font-weight="700" style="fill:var(--build)">threshold 10.5</text>
+  <g style="fill:var(--ok)"><circle cx="83" cy="94" r="6"/><circle cx="165" cy="60" r="6"/><circle cx="243" cy="99" r="6"/><circle cx="328" cy="59" r="6"/><circle cx="409" cy="95" r="6"/><circle cx="488" cy="59" r="6"/></g>
+  <g fill="none" stroke-width="2.5" style="stroke:var(--muted)"><circle cx="101" cy="78" r="7"/><circle cx="189" cy="122" r="7"/><circle cx="264" cy="68" r="7"/><circle cx="428" cy="72" r="7"/></g>
+  <text x="60" y="22" font-size="13" font-weight="700" style="fill:var(--ok)">● counted step (6 in 3 s)</text>
+  <text x="260" y="22" font-size="13" font-weight="700" style="fill:var(--muted)">○ too soon after a step: ignored</text>
+</svg>
+<p>Real data from 171–174 s of the recording. Grey: the raw strength, wobbly. Purple: smoothed over 5 readings. Each step makes two bumps, 6–8 readings apart, so the counter ignores any bump less than 15 readings after the last step it counted.</p>
+</div>
+
+<h2 id="play">2. Play</h2>
+<div class="box play"><span class="tag">🎮 Play: tilt the phone</span>
+<p>Drag the slider to tip the phone. Watch gravity move from x to y. The buttons load the <em>real</em> average readings from the recording.</p>
+<div class="card demo">
+<svg id="tiltSvg" class="diagram" viewBox="0 0 300 260" role="img" aria-label="A phone you can tilt with the slider, with its x and y parts of gravity drawn as arrows">
+  <defs>
+    <marker id="dG" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--fg)"/></marker>
+    <marker id="dX" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--idea)"/></marker>
+    <marker id="dY" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--build)"/></marker>
+  </defs>
+  <line x1="30" y1="60" x2="30" y2="190" stroke-width="3" marker-end="url(#dG)" style="stroke:var(--fg)"/>
+  <text x="30" y="50" font-size="13" text-anchor="middle" style="fill:var(--fg)">gravity</text>
+  <g id="phone" transform="rotate(0 160 130)">
+    <rect x="125" y="60" width="70" height="140" rx="12" stroke-width="3" style="fill:var(--card);stroke:var(--muted)"/>
+    <line id="ax" x1="160" y1="130" x2="160" y2="50" stroke-width="5" marker-end="url(#dX)" style="stroke:var(--idea)"/>
+    <line id="ay" x1="160" y1="130" x2="160" y2="130" stroke-width="5" marker-end="url(#dY)" style="stroke:var(--build)"/>
+    <text x="160" y="190" font-size="12" text-anchor="middle" style="fill:var(--muted)">phone</text>
+  </g>
+</svg>
+<label for="ang">Tip the phone: <span id="angV" class="num"></span></label>
+<input id="ang" type="range" min="-180" max="180" step="1" value="0">
+<p><button data-p="standing">Real: standing</button> <button data-p="sitting">Real: sitting</button> <button data-p="laying">Real: lying</button></p>
+<div class="stats">
+  <div class="stat"><div class="k">x</div><div class="v" id="xV">–</div></div>
+  <div class="stat"><div class="k">y</div><div class="v" id="yV">–</div></div>
+  <div class="stat"><div class="k">z</div><div class="v" id="zV">–</div></div>
+  <div class="stat"><div class="k">magnitude</div><div class="v" id="mV">–</div></div>
+  <div class="stat"><div class="k">tilt</div><div class="v" id="tV">–</div></div>
+</div>
+<p class="meta" id="src">–</p>
+</div>
+<p>Try 90°, then −90°: the tilt is the same. Tilt only says how far x is from straight up, not which way it leaned. What happens at 180°?</p>
+</div>
+
+<h2 id="homework">3. Build</h2>
+<div class="box build"><span class="tag">🛠 Build</span>
+<p>Open <code>homework/lesson21_phone.py</code>. The real recording is already in <code>homework/data/phone_acc.csv</code>. Run <code>python3 check.py 21</code> from <code>project</code> after each step. The one-line tests run from <code>homework</code>.</p>
+<ol class="steps">
+<li><strong><code>read_phone_csv(path)</code></strong> reads the file and returns four lists: <code>(times, xs, ys, zs)</code>. The first line is a header (words, not numbers), so skip it, and skip empty lines. The file starts like this:
+<pre><code>"Time (s)","Acceleration x (m/s^2)","Acceleration y (m/s^2)","Acceleration z (m/s^2)"
+0.00,9.0030,-1.1032,4.9987
+0.02,8.9349,-0.9126,5.2711</code></pre>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p><code>Path</code> is already imported. <code>lines = Path(path).read_text().splitlines()</code> gives a list of lines, and <code>lines[1:]</code> skips the header.</p></details>
+<details><summary>Hint 2</summary><p><code>line.split(",")</code> gives strings. Keep the first four with <code>[:4]</code> (phyphox files can have a fifth column) and turn each into a <code>float</code>.</p></details>
+<details><summary>Hint 3: fill in the blanks</summary><pre><code>times, xs, ys, zs = [], [], [], []
+lines = Path(path).read_text().splitlines()
+for line in lines[____:]:
+    if not line.strip():
+        continue
+    t, x, y, z = (float(v) for v in line.split(",")[:4])
+    times.append(t)
+    xs.append(x)
+    ys.append(____)
+    zs.append(z)
+return times, xs, ys, zs</code></pre></details>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>python3 -c "from lesson21_phone import *; t, xs, ys, zs = read_phone_csv(DATA / 'phone_acc.csv'); print(len(t), t[-1], xs[0], ys[0], zs[0])"</code></pre>
+<pre><code>11800 235.98 9.003 -1.1032 4.9987</code></pre>
+<p>11,800 readings over 236 seconds: 50 a second. And <code>python3 check.py 21</code>:</p>
+<pre><code>  ✓ read_phone_csv
+  … magnitude: not written yet (Lesson 21: write this function)
+  ...
+  1/6 passed</code></pre>
+<p><strong>If you see</strong> <code>crashed with ValueError: could not convert string to float: '"Time (s)"'</code>, you didn't skip the header. If it says <code>''</code> at the end, you didn't skip empty lines.</p>
+</div></li>
+
+<li><strong><code>magnitude(x, y, z)</code></strong> is the strength of the reading: the square root of <code>x*x + y*y + z*z</code>. By hand: <code>magnitude(3, 4, 12)</code> = √(9 + 16 + 144) = √169 = <code>13</code>.
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p><code>math</code> is already imported. <code>math.sqrt(169)</code> is <code>13.0</code>.</p></details>
+<details><summary>Hint 2: fill in the blank</summary><pre><code>return math.sqrt(x * x + y * y + ____)</code></pre></details>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>python3 -c "from lesson21_phone import *; print(magnitude(3, 4, 12)); print(magnitude(9.0030, -1.1032, 4.9987))"</code></pre>
+<pre><code>13.0
+10.356546766659243</code></pre>
+<p>The first real reading is about 10.4: gravity plus a little movement. <code>check.py 21</code> now says <code>2/6 passed</code>.</p>
+<p><strong>If you see</strong> <code>✗ magnitude: magnitude(3, 4, 12) should be 13</code>, you forgot the square root (you got 169).</p>
+</div></li>
+
+<li><strong><code>moving_average(values, n)</code></strong> smooths: each output is the average of the last <code>n</code> values, or fewer at the very start. <code>moving_average([2, 4, 6, 8], 2)</code> → <code>[2.0, 3.0, 5.0, 7.0]</code>: the first has only itself, then (2+4)/2, (4+6)/2, (6+8)/2.
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>For position <code>i</code>, the window is <code>values[max(0, i - n + 1):i + 1]</code>. <code>max(0, …)</code> stops it going below the start.</p></details>
+<details><summary>Hint 2: fill in the blank</summary><pre><code>out = []
+for i in range(len(values)):
+    window = values[max(0, i - n + 1):i + 1]
+    out.append(sum(window) / len(____))
+return out</code></pre></details>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>python3 -c "from lesson21_phone import *; print(moving_average([2, 4, 6, 8], 2)); print(moving_average([1, 9, 1, 9, 1, 9], 3))"</code></pre>
+<pre><code>[2.0, 3.0, 5.0, 7.0]
+[1.0, 5.0, 3.6666666666666665, 6.333333333333333, 3.6666666666666665, 6.333333333333333]</code></pre>
+<p>A signal jumping 1, 9, 1, 9 now only wobbles between 3.7 and 6.3. <code>check.py 21</code>: <code>3/6 passed</code>.</p>
+<p><strong>If you see</strong> <code>✗ moving_average: moving_average([2, 4, 6, 8], 2) -&gt; [2.0, 3.0, 5.0, 7.0]</code>, you divided by <code>n</code> instead of <code>len(window)</code>. At the start the window is shorter.</p>
+</div></li>
+
+<li><strong><code>tilt_degrees(x, y, z)</code></strong> is the angle between the reading and the x axis: <code>acos(x / magnitude)</code>, in degrees. 0 = x straight up, 90 = x flat.
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p><code>math.acos</code> answers in radians. <code>math.degrees</code> turns radians into degrees.</p></details>
+<details><summary>Hint 2</summary><p>Rounding can make <code>x / magnitude</code> a hair above 1 (like 1.0000000000000002), and <code>acos</code> then crashes with <code>math domain error</code>. Squeeze it: <code>max(-1.0, min(1.0, ratio))</code>.</p></details>
+<details><summary>Hint 3: fill in the blank</summary><pre><code>ratio = max(-1.0, min(1.0, x / magnitude(x, y, z)))
+return math.degrees(math.____(ratio))</code></pre></details>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>python3 -c "from lesson21_phone import *; print(tilt_degrees(9.8, 0, 0), tilt_degrees(0, 9.8, 0), tilt_degrees(5, 5, 0))"</code></pre>
+<pre><code>0.0 90.0 45.00000000000001</code></pre>
+<p>Upright, flat, halfway: the three phones from the picture. (The tiny 0.00000000000001 is normal computer rounding.) <code>check.py 21</code>: <code>4/6 passed</code>.</p>
+<p><strong>If you see</strong> <code>✗ tilt_degrees: x flat -&gt; 90 degrees</code>, you forgot <code>math.degrees</code> (you got 1.57 radians).</p>
+</div></li>
+
+<li><strong><code>count_steps(values, threshold, min_gap)</code></strong> counts peaks. A sample counts as a step if it is:
+<ul><li>above <code>threshold</code>,</li><li>bigger than the sample before it,</li><li>at least as big as the sample after it,</li><li>at least <code>min_gap</code> samples after the last step counted.</li></ul>
+The first and last samples never count: they don't have two neighbours.
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>Loop <code>for i in range(1, len(values) - 1):</code>. Keep two things: <code>steps</code> (the count) and <code>last</code> (where the last step was). Start <code>last = -min_gap</code> so the first peak is allowed.</p></details>
+<details><summary>Hint 2: fill in the blanks</summary><pre><code>steps, last = 0, -min_gap
+for i in range(1, len(values) - 1):
+    v = values[i]
+    if v &gt; threshold and v &gt; values[i - 1] and v &gt;= values[____] and i - last &gt;= ____:
+        steps += 1
+        last = i
+return steps</code></pre></details>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>python3 -c "from lesson21_phone import *; print(count_steps([0, 5, 0, 5, 0, 5, 0], 3, 1), count_steps([0, 5, 0, 5, 0, 5, 0], 3, 3))"</code></pre>
+<pre><code>3 2</code></pre>
+<p>With <code>min_gap</code> 3, the middle peak is only 2 samples after the first, so it's skipped. Now run the whole lesson on the real data: <code>python3 lesson21_phone.py</code>. Real output:</p>
+<pre><code>11800 readings over 236 s (50 a second)
+
+Still postures: which way is down?
+  standing      5- 25 s   gravity 10.12 m/s^2   tilt   9 degrees
+  sitting      28- 44 s   gravity  9.74 m/s^2   tilt  33 degrees
+  standing     47- 68 s   gravity 10.19 m/s^2   tilt  14 degrees
+  laying       73- 91 s   gravity  9.74 m/s^2   tilt  79 degrees
+  sitting      95-113 s   gravity  9.97 m/s^2   tilt  20 degrees
+  laying      117-136 s   gravity  8.64 m/s^2   tilt  93 degrees
+
+Walking: counting steps (strength of the shake, smoothed over 5 readings)
+    150-162 s: 21 steps in 11.7 s = 1.80 steps a second
+    167-185 s: 32 steps in 17.9 s = 1.79 steps a second
+    193-211 s: 34 steps in 18.2 s = 1.87 steps a second
+    215-234 s: 35 steps in 19.3 s = 1.81 steps a second
+
+Noise while standing still: raw readings vary by 0.20 m/s^2, smoothed by 0.08
+
+Your own recording: put it in data/ and run describe(DATA / 'your_file.csv')
+  236 s of data: average tilt 13 degrees, 197 steps (0.83 a second).</code></pre>
+<p>About 1.8 steps a second in all four walks: a normal walking pace. Smoothing cut the standing-still wobble from 0.20 to 0.08. Then <code>python3 check.py 21</code>:</p>
+<pre><code>Lesson 21: lesson21_phone.py
+  ✓ read_phone_csv
+  ✓ magnitude
+  ✓ moving_average
+  ✓ tilt_degrees
+  ✓ count_steps
+  ✓ real data: walking
+  6/6 passed  🎉 lesson complete!</code></pre>
+<p><strong>If you see</strong> <code>✗ count_steps: min_gap 3: peaks 2 samples apart are too close -&gt; 2 steps</code>, you forgot the <code>i - last &gt;= min_gap</code> test, or forgot to set <code>last = i</code>.</p>
+</div></li>
+</ol>
+</div>
+
+<h2 id="add-to-robot">4. Add it to your robot</h2>
+<div class="box bot"><span class="tag">🤖 Add it to your robot: the <code>phone</code> command</span>
+<p>Fill in <code>phone(self, path)</code> in <code>my_robot.py</code>. It reads a recording with your four functions and returns one sentence:</p>
+<pre><code>times, xs, ys, zs = read_phone_csv(path)
+tilt  = tilt_degrees(average x, average y, average z)
+mags  = moving_average([magnitude(x, y, z) for each reading], 5)
+steps = count_steps(mags, 10.5, 15)
+return f"{seconds:.0f} s of real data: tilted {tilt:.0f} degrees on average, {steps} steps."</code></pre>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>First line of the gap:</p><pre><code>from lesson21_phone import read_phone_csv, magnitude, moving_average, tilt_degrees, count_steps</code></pre></details>
+<details><summary>Hint 2</summary><p>The average of a list is <code>sum(xs) / len(xs)</code>. The length of the recording is <code>times[-1] - times[0]</code>.</p></details>
+<details><summary>Hint 3: fill in the blanks</summary><pre><code>times, xs, ys, zs = read_phone_csv(path)
+n = len(times)
+tilt = tilt_degrees(sum(xs) / n, sum(ys) / n, sum(____) / n)
+mags = moving_average([magnitude(x, y, z) for x, y, z in zip(xs, ys, zs)], 5)
+steps = count_steps(____, 10.5, 15)
+return f"{times[-1] - times[0]:.0f} s of real data: tilted {tilt:.0f} degrees on average, {steps} steps."</code></pre></details>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p><code>python3 check.py robot</code> from <code>project</code>. Real output:</p>
+<pre><code>Your robot: my_robot.py
+  ✓ week 1: arrows
+  ✓ week 2: look
+  ✓ week 2 part B: look's safe speed
+  ✓ week 3: real phone data
+  … week 4: stops for the cat: not written yet (fill in should_stop_for() first)
+  ...
+  4/21 passed</code></pre>
+<p>Then <code>cd homework</code>, <code>python3 my_robot.py</code>, and type <code>phone</code>. It redraws the room, then says:</p>
+<pre><code>Zippy&gt; phone
+  236 s of real data: tilted 13 degrees on average, 197 steps.</code></pre>
+<p>To use your own recording: <code>phone data/my_walk.csv</code>.</p>
+<p><strong>If you see</strong> <code>✗ week 3: real phone data: 'phone' should describe the shipped recording (236 s); got '236 s of data: …'</code>, your sentence is slightly different. Copy the f-string exactly, including "real data". If the robot says <code>I can't do that yet: week 3</code>, you didn't delete the <code>raise NotImplementedError</code> line.</p>
+</div>
+</div>
+
+<h2 id="challenge">5. Real-world challenge: record yourself</h2>
+<div class="box play"><span class="tag">🌍 Record with phyphox</span>
+<p><strong>phyphox</strong> is a free app (iPhone and Android) that records your phone's sensors and saves the numbers. <strong>Ask an adult before you install it.</strong></p>
+<ol class="steps">
+<li>Open phyphox and choose <b>Acceleration with g</b>. (Not the one "without g": we want gravity.)</li>
+<li>Turn the phone on its side and hold it against your tummy, screen facing out. Press ▶ and check the x graph: standing still, x should be about <b>+9.8</b>. If y is about 9.8 instead, turn the phone onto its side. If x is about −9.8, turn it the other way up.</li>
+<li>Press ▶ to start fresh. Stand still for 10 s, sit for 10 s, lie down for 10 s, then stand up and walk for 20 s, keeping the phone in place. Press ⏸.</li>
+<li>Tap the <b>⋮</b> menu, <b>Export Data</b>, and choose <b>CSV (Comma, decimal point)</b>. Send it to your computer (email it to yourself, or ask an adult). If it comes as a <code>.zip</code>, open it.</li>
+<li>Rename the acceleration file <code>my_walk.csv</code> and put it in <code>homework/data/</code>.</li>
+<li>Run <code>phone data/my_walk.csv</code> in your robot, or from <code>homework</code>:
+<pre><code>python3 -c "from lesson21_phone import *; print(describe(DATA / 'my_walk.csv'))"</code></pre></li>
+<li>While you're there, record <b>Gyroscope</b> the same way and save it as <code>my_gyro.csv</code>. You'll use it in <a href="22-fusion.html">week 6</a>.</li>
+</ol>
+<p>Count your real steps while walking, then compare. If it finds far too few or too many, try a different threshold with <code>count_steps</code> directly: phones and pockets differ.</p>
+</div>
+<div class="card note"><strong>On your own, no phone:</strong> use the shipped recording. Run <code>read_labels()</code> to see what happened when. Work out the tilt for the two "standing" parts (9° and 14°) and the two "sitting" parts (33° and 20°). Why might the same posture give different tilts? Write down two reasons, then check them in "Want to know more?".</div>
+
+<h2 id="check">Check yourself</h2>
+<details><summary>A phone lies still on a table. Why doesn't it read 0?</summary><p>Gravity. A still phone always feels about 9.8 m/s². Only a phone in free fall (dropped) reads close to 0.</p></details>
+<details><summary>Predict: <code>tilt_degrees(0, 0, 9.81)</code>?</summary><p><strong>90.</strong> All of gravity is on z, none on x, so x is flat.</p></details>
+<details><summary>Predict: <code>moving_average([0, 0, 9], 3)</code>?</summary><p><strong>[0.0, 0.0, 3.0].</strong> The last value averages 0, 0 and 9.</p></details>
+<details><summary>Why do we need <code>min_gap</code>?</summary><p>Each step makes two bumps a few readings apart (look at the chart). Without <code>min_gap</code>, many steps would be counted twice.</p></details>
+<details><summary>The walks give 1.8 steps a second. Why does <code>describe</code> say 0.83?</summary><p>It divides by the whole 236 s, including all the standing, sitting and lying. Only about 67 s of it is walking.</p></details>
+
+<h2 id="deeper">Want to know more?</h2>
+<details><summary>Why the same posture gives different tilts</summary><p>The phone shifts on the belt, and people sit back or lean forward by different amounts. In the second lying part the tilt is 93°, just past flat. Real data is messy. That's why robots smooth, average and check, as you did in week 2.</p></details>
+<details><summary>Why gravity reads 8.64 to 10.19, not 9.81</summary><p>Cheap sensors have small errors in each axis, and the person was not perfectly still. A robot fixes this by <em>calibrating</em>: measuring when it knows the true answer, and correcting.</p></details>
+<details><summary>Which way did it lean?</summary><p>Tilt only says how far x is from up, which is why 90° and −90° look the same in the demo. The direction of the lean comes from comparing y and z, with <code>math.atan2(y, z)</code>.</p></details>
+<details><summary>Where the data comes from</summary><p>Experiment 1, user 1 of the UCI "Smartphone-Based Recognition of Human Activities and Postural Transitions" dataset by Reyes-Ortiz, Anguita, Oneto and Parra, under CC BY 4.0 (<a href="https://archive.ics.uci.edu/dataset/341">archive.ics.uci.edu/dataset/341</a>). We trimmed it to the first 11,800 readings, converted g to m/s², and added the activity labels. It uses the same CSV layout as phyphox.</p></details>
+<details><summary>What real robots do with this</summary><p>Every drone, self-balancing scooter and walking robot has an accelerometer, used exactly like this to find "down". Its weakness is that any shake looks like a tilt. In <a href="22-fusion.html">week 6</a> you add a second sensor, the gyroscope, and blend the two.</p></details>
+
+<nav class="pager">
+  <a href="03-learning-from-data.html"><small>Previous</small>Week 2 · Part B: Learning from data</a>
+  <a class="next" href="04-neuron.html"><small>Next</small>Week 4 · Part A: The artificial neuron</a>
+</nav>
+<footer>Build a Robot Brain · Week 3 of 16</footer>
+</main>
+
+<script>
+// Same maths as lesson21_phone.py
+const G = 9.81;
+function magnitude(x, y, z) { return Math.sqrt(x * x + y * y + z * z); }
+function tiltDegrees(x, y, z) { return Math.acos(Math.max(-1, Math.min(1, x / magnitude(x, y, z)))) * 180 / Math.PI; }
+// Real average readings from data/phone_acc.csv (lesson21_phone.py, first part of each posture)
+const REAL = { standing: [10.01, -1.28, 0.82], sitting: [8.18, 3.27, 4.15], laying: [1.85, 7.72, 5.64] };
+const NAMES = { standing: "standing, 5–25 s", sitting: "sitting, 28–44 s", laying: "lying, 73–91 s" };
+const $ = id => document.getElementById(id);
+
+function show(x, y, z, angle, note) {
+  $("phone").setAttribute("transform", `rotate(${-angle} 160 130)`);
+  $("ax").setAttribute("y2", 130 - x / G * 70);
+  $("ay").setAttribute("x2", 160 + y / G * 70);
+  $("xV").textContent = x.toFixed(2);
+  $("yV").textContent = y.toFixed(2);
+  $("zV").textContent = z.toFixed(2);
+  $("mV").textContent = magnitude(x, y, z).toFixed(2);
+  $("tV").textContent = tiltDegrees(x, y, z).toFixed(0) + "°";
+  $("angV").textContent = angle + "°";
+  $("src").textContent = note;
+}
+function fromSlider() {
+  const a = +$("ang").value, r = a * Math.PI / 180;
+  show(G * Math.cos(r), G * Math.sin(r), 0, a, "Perfect sensor, tipped in the flat of the screen, so z stays 0.");
+}
+$("ang").oninput = fromSlider;
+document.querySelectorAll("button[data-p]").forEach(b => b.onclick = () => {
+  const [x, y, z] = REAL[b.dataset.p], t = Math.round(tiltDegrees(x, y, z)) * (y < 0 ? -1 : 1);
+  $("ang").value = t;
+  show(x, y, z, t, `Real average reading while ${NAMES[b.dataset.p]}. The drawing shows the tilt; the real phone also leaned in z.`);
+});
+fromSlider();
+</script>
+</body>
+</html>

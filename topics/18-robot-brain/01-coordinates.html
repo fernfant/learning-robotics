@@ -3,125 +3,109 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Week 1 Part B · Coordinates and moving</title>
-<link rel="stylesheet" href="../../style.css">
+<title>Week 1 Part B · Coordinates and moving on a grid</title>
+<link rel="stylesheet" href="../../style.css?v=16">
 </head>
 <body>
 <main>
 <nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 1 · Part B</nav>
 
-<div class="eyebrow"><span class="track robo">Robotics</span>Build a Robot Brain · Week 1 of 12 · Part B</div>
+<div class="eyebrow"><span class="track robo">Robotics</span>Build a Robot Brain · Week 1 of 16 · Part B</div>
 <h1>Where am I? Coordinates and moving on a grid</h1>
-<p class="lede">Before a robot can go anywhere, it needs a way to say where it is. Two numbers do the job. Moving becomes adding, walls become a check, and "how far?" becomes a tiny formula.</p>
-<div class="card note" id="journey"><strong>Week 1 of 12 · Part B.</strong> So far your robot: ✓ says hello. <strong>Today</strong> it learns to move around the room. Next: <a href="02-sensors.html">Week 2 · Part A: Noisy senses</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>EEEE</code>. The <code>c</code> at (4, 1) is a cat, and your robot can't sense it yet: <a href="#cat">see why</a>.</div>
+<p class="lede">Two numbers say where the robot is. Moving becomes adding, and walls become a check.</p>
+<div class="card note" id="journey"><strong>Week 1 of 16 · Part B.</strong> So far your robot: ✓ says hello. <strong>Today</strong> it learns to move around the room. Next: <a href="02-sensors.html">Week 2 · Part A: Noisy senses</a>. <a href="index.html#my-robot">Your robot, week by week</a>.</div>
 
 <div class="facts">
   <div><b>Time</b>2–3 h</div>
   <div><b>You'll need</b>Part A done, squared paper, a pencil</div>
-  <div><b>New words</b>Coordinates, tuple, dictionary, path, Manhattan distance</div>
-  <div><b>Project piece</b>The robot can move</div>
+  <div><b>New words</b>Coordinates, tuple, dictionary, Manhattan distance</div>
   <div><b>Homework file</b><code>lesson01_moving.py</code></div>
 </div>
 
 <section class="kid" id="start">
 <h2>Start here</h2>
-<p class="big">Give every square a pair of numbers (x, y), and moving one step is just adding a small change to them.</p>
-<h3>The problem</h3>
-<p>You tell Robo-Helper: "the red block is near the top, a bit to the right of you." The robot has no idea what that means. "Near" how near? "Top" of what? It needs an exact address for every square, and exact rules for what "go east" does to that address. It also needs to not drive through walls.</p>
-<h3>The idea in one picture</h3>
-<p>Think of a game of Battleships, or seats in a cinema: "row F, seat 12". One number says how far across, one says which row. Once every square has an address, "move one seat right" just means "seat number + 1". The robot's room works the same way.</p>
-<h3>Words to know</h3>
+<p class="big">Give every square a pair of numbers (x, y). Then moving one step is just adding a small change to them.</p>
 <dl>
-<dt>Coordinates</dt><dd>A pair of numbers (x, y) that gives the address of a square. x = across, y = down.</dd>
-<dt>Tuple</dt><dd>Python's way of keeping a few values together, like <code>(2, 3)</code>. You can't change it, only make a new one.</dd>
-<dt>Dictionary</dt><dd>A lookup table. <code>DIRECTIONS["E"]</code> looks up "E" and gives back <code>(1, 0)</code>.</dd>
-<dt>Path</dt><dd>The list of every square the robot stood on, in order.</dd>
-<dt>Manhattan distance</dt><dd>How many steps apart two squares are if you can only move along the grid, never diagonally.</dd>
+<dt>Coordinates</dt><dd>A pair of numbers (x, y): how far across, how far down.</dd>
+<dt>Tuple</dt><dd>Python's way to keep values together: <code>(2, 3)</code>.</dd>
+<dt>Dictionary</dt><dd>A lookup table. <code>DIRECTIONS["E"]</code> gives <code>(1, 0)</code>.</dd>
 </dl>
 </section>
-<p class="deeper"><strong>Going deeper:</strong> everything below is the full lesson. Keep squared paper next to you: you'll draw on it.</p>
 
-<h2 id="problem">1. The problem</h2>
-<p>Here is the room again. The robot <code>R</code> is in the top-left area, the red block <code>r</code> is right next to it, and the bin <code>B</code> is bottom right.</p>
-<pre><code>##########
-#Rr......#
-#..##....#
-#..#..b..#
-#....##..#
-#g.......#
-#.#....B.#
-##########</code></pre>
-<p>To drive to the bin, the robot needs answers to four questions:</p>
-<ol>
-<li>Where am I, exactly?</li>
-<li>If I take one step east, where will I be?</li>
-<li>Is that square a wall? If so, don't go.</li>
-<li>How far am I from the thing I want?</li>
-</ol>
-<p>Each question becomes one function in today's homework.</p>
+<h2 id="idea">1. The idea</h2>
+<div class="box idea"><span class="tag">💡 The idea: every square has an address</span>
+<p>Think of a cinema ticket: "row F, seat 12". One number says how far across, one says which row. The robot's room works the same. <strong>x counts across from the left. y counts down from the top.</strong> Both start at 0.</p>
+<svg class="diagram" viewBox="0 0 440 300" role="img" aria-label="A grid. x grows to the right along the top, y grows downwards along the left. The square at x 3, y 2 is highlighted: go across 3, then down 2.">
+  <defs><marker id="ah1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--fg)"/></marker>
+  <marker id="ah1b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--build)"/></marker></defs>
+  <g style="fill:var(--floor);stroke:var(--line)" stroke-width="2">
+    <rect x="70" y="70" width="60" height="60"/><rect x="130" y="70" width="60" height="60"/><rect x="190" y="70" width="60" height="60"/><rect x="250" y="70" width="60" height="60"/><rect x="310" y="70" width="60" height="60"/>
+    <rect x="70" y="130" width="60" height="60"/><rect x="130" y="130" width="60" height="60"/><rect x="190" y="130" width="60" height="60"/><rect x="250" y="130" width="60" height="60"/><rect x="310" y="130" width="60" height="60"/>
+    <rect x="70" y="190" width="60" height="60"/><rect x="130" y="190" width="60" height="60"/><rect x="190" y="190" width="60" height="60"/><rect x="310" y="190" width="60" height="60"/>
+  </g>
+  <rect x="250" y="190" width="60" height="60" style="fill:var(--idea-soft);stroke:var(--idea)" stroke-width="3"/>
+  <text x="280" y="226" font-size="15" text-anchor="middle" font-weight="700" style="fill:var(--idea)">(3, 2)</text>
+  <line x1="70" y1="40" x2="400" y2="40" stroke-width="2.5" style="stroke:var(--fg)" marker-end="url(#ah1)"/>
+  <text x="404" y="32" font-size="15" text-anchor="end" font-weight="700" style="fill:var(--fg)">x grows →</text>
+  <line x1="40" y1="70" x2="40" y2="262" stroke-width="2.5" style="stroke:var(--fg)" marker-end="url(#ah1)"/>
+  <text x="8" y="288" font-size="15" font-weight="700" style="fill:var(--fg)">y grows ↓</text>
+  <g font-size="14" text-anchor="middle" style="fill:var(--muted)">
+    <text x="100" y="62">0</text><text x="160" y="62">1</text><text x="220" y="62">2</text><text x="280" y="62">3</text><text x="340" y="62">4</text>
+    <text x="58" y="105">0</text><text x="58" y="165">1</text><text x="58" y="225">2</text>
+  </g>
+  <path d="M100,100 L268,100" fill="none" stroke-width="3" stroke-dasharray="6 4" style="stroke:var(--build)" marker-end="url(#ah1b)"/>
+  <path d="M280,104 L280,200" fill="none" stroke-width="3" stroke-dasharray="6 4" style="stroke:var(--build)" marker-end="url(#ah1b)"/>
+  <text x="185" y="92" font-size="13" text-anchor="middle" style="fill:var(--build)">across 3</text>
+  <text x="290" y="160" font-size="13" style="fill:var(--build)">down 2</text>
+</svg>
+<p><strong>Yes, y goes down.</strong> In maths class y goes up. On screens, rows are counted from the top. Mixing this up is the most common bug this week.</p>
+</div>
 
-<h2 id="principles">2. First principles</h2>
-<h3>Step 1: give every square an address</h3>
-<p>Number the columns from the left, starting at 0. That's <strong>x</strong>. Number the rows from the top, starting at 0. That's <strong>y</strong>. Now every square has an address (x, y):</p>
-<pre><code>      x: 0 1 2 3 4 5 6 7 8 9
-  y = 0  # # # # # # # # # #
-  y = 1  # R r . . . . . . #
-  y = 2  # . . # # . . . . #
-  y = 3  # . . # . . b . . #
-  y = 4  # . . . . # # . . #
-  y = 5  # g . . . . . . . #
-  y = 6  # . # . . . . B . #
-  y = 7  # # # # # # # # # #</code></pre>
-<p>Read it like this: go across x, then down y. The robot is at (1, 1). The red block is at (2, 1). The bin is at (7, 6).</p>
-<p><strong>Wait, y goes down?</strong> In maths class y usually goes <em>up</em>. On screens and in text files, rows are counted from the top, so y grows <em>downwards</em>. It's just a choice, but you must stick to it. Getting it backwards is the most common bug in this lesson.</p>
-<details><summary>Predict first: what are the coordinates of the blue block <code>b</code>? And what's at (5, 4)?</summary>
-<p>The blue block is in column 6, row 3, so <strong>(6, 3)</strong>. At (5, 4), go across 5 and down 4: it's a <strong>wall</strong> <code>#</code>, part of the little wall in the middle.</p>
-</details>
+<div class="box idea"><span class="tag">💡 The idea: a direction is a small change</span>
+<p>"Go east" means x goes up by 1, y stays the same: the change <code>(+1, 0)</code>. North is <code>(0, −1)</code>, because up the screen makes y <em>smaller</em>. So <strong>moving is adding</strong>: from (2, 3), east gives (2 + 1, 3 + 0) = (3, 3).</p>
+<svg class="diagram" viewBox="0 0 360 260" role="img" aria-label="The robot in the middle at (2, 3). Arrows: north to (2, 2), change 0, minus 1. East to (3, 3), change plus 1, 0. South to (2, 4), change 0, plus 1. West to (1, 3), change minus 1, 0.">
+  <defs><marker id="ah2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--build)"/></marker></defs>
+  <g style="fill:var(--floor);stroke:var(--line)" stroke-width="2">
+    <rect x="150" y="20" width="60" height="60" rx="6"/><rect x="90" y="100" width="60" height="60" rx="6"/><rect x="210" y="100" width="60" height="60" rx="6"/><rect x="150" y="180" width="60" height="60" rx="6"/>
+  </g>
+  <rect x="150" y="100" width="60" height="60" rx="6" style="fill:var(--bot-soft);stroke:var(--bot)" stroke-width="2"/>
+  <text x="180" y="142" font-size="30" text-anchor="middle">🤖</text>
+  <g font-size="12" text-anchor="middle" style="fill:var(--muted)"><text x="180" y="55">(2, 2)</text><text x="120" y="135">(1, 3)</text><text x="240" y="135">(3, 3)</text><text x="180" y="215">(2, 4)</text></g>
+  <g stroke-width="3" style="stroke:var(--build)" marker-end="url(#ah2)"><line x1="180" y1="104" x2="180" y2="80"/><line x1="206" y1="130" x2="230" y2="130"/><line x1="180" y1="156" x2="180" y2="180"/><line x1="154" y1="130" x2="130" y2="130"/></g>
+  <g font-size="14" font-weight="700" style="fill:var(--build)">
+    <text x="218" y="40">N (0, −1)</text><text x="276" y="126">E</text><text x="276" y="144">(+1, 0)</text><text x="218" y="222">S (0, +1)</text><text x="84" y="126" text-anchor="end">W</text><text x="84" y="144" text-anchor="end">(−1, 0)</text>
+  </g>
+</svg>
+<p>Then one extra rule: <em>work out the new square, then check it.</em> If it's a wall, stay put.</p>
+</div>
 
-<h3>Step 2: a direction is a small change</h3>
-<p>What does "go east" do to the address? East means one column to the right: x goes up by 1, y stays the same. So "east" is the change <code>(+1, 0)</code>. Do the same for all four:</p>
-<table>
-<tr><th>Direction</th><th>Change (dx, dy)</th><th>Why</th></tr>
-<tr><td>N (north, up)</td><td>(0, −1)</td><td>up a row, and y grows downwards, so y gets smaller</td></tr>
-<tr><td>S (south, down)</td><td>(0, +1)</td><td>down a row</td></tr>
-<tr><td>E (east, right)</td><td>(+1, 0)</td><td>one column right</td></tr>
-<tr><td>W (west, left)</td><td>(−1, 0)</td><td>one column left</td></tr>
-</table>
-<p>The homework file already has this table, as a Python <em>dictionary</em> called <code>DIRECTIONS</code>. ("dx" just means "change in x".)</p>
-<p>Now <strong>moving is adding</strong>. New x = old x + dx. New y = old y + dy. By hand:</p>
-<pre><code>start (2, 3), go E:  change (1, 0)   →  (2 + 1, 3 + 0) = (3, 3)
-start (2, 3), go N:  change (0, -1)  →  (2 + 0, 3 - 1) = (2, 2)
-start (2, 3), go W:  change (-1, 0)  →  (2 - 1, 3 + 0) = (1, 3)</code></pre>
-<p>Why is this better than writing four separate <code>if</code> statements? Because it's one rule for every direction. Later you could add diagonals, like <code>"NE": (1, -1)</code>, without changing the moving code at all.</p>
+<div class="box idea"><span class="tag">💡 The idea: how far is it, on a grid?</span>
+<p>A taxi in Manhattan can't drive through buildings. It goes along the streets. So the distance is the steps across plus the steps down: <code>|x1 − x2| + |y1 − y2|</code>. The bars mean "drop the minus sign", Python's <code>abs()</code>.</p>
+<svg class="diagram" viewBox="0 0 400 230" role="img" aria-label="From (5, 3) to (2, 1): 3 steps across plus 2 steps up makes 5. Any staircase route between them is also 5.">
+  <g style="fill:var(--floor);stroke:var(--line)" stroke-width="1.5">
+    <rect x="40" y="30" width="300" height="180"/>
+  </g>
+  <g style="stroke:var(--line)" stroke-width="1.5">
+    <line x1="100" y1="30" x2="100" y2="210"/><line x1="160" y1="30" x2="160" y2="210"/><line x1="220" y1="30" x2="220" y2="210"/><line x1="280" y1="30" x2="280" y2="210"/>
+    <line x1="40" y1="90" x2="340" y2="90"/><line x1="40" y1="150" x2="340" y2="150"/>
+  </g>
+  <rect x="49" y="39" width="42" height="42" rx="4" fill="#e5484d"/>
+  <text x="250" y="190" font-size="30" text-anchor="middle">🤖</text>
+  <polyline points="250,180 250,120 70,120 70,82" fill="none" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--path)"/>
+  <line x1="250" y1="180" x2="70" y2="62" stroke-width="2" stroke-dasharray="5 5" style="stroke:var(--muted)"/>
+  <text x="160" y="140" font-size="14" text-anchor="middle" font-weight="700" style="fill:var(--build)">3 across</text>
+  <text x="262" y="156" font-size="14" font-weight="700" style="fill:var(--build)">2 up</text>
+  <text x="200" y="226" font-size="15" text-anchor="middle" font-weight="700" style="fill:var(--ok)">3 + 2 = 5 steps (no flying diagonally)</text>
+  <text x="106" y="66" font-size="13" style="fill:var(--muted)">(2, 1)</text>
+  <text x="284" y="200" font-size="13" style="fill:var(--muted)">(5, 3)</text>
+</svg>
+<p>It ignores walls, so the real route can be the same or longer, never shorter. In <a href="06-pathfinding.html">week 5</a> that's exactly what makes A* search work.</p>
+</div>
 
-<h3>Step 3: don't drive into walls</h3>
-<p>The adding rule doesn't know about walls. From (1, 1), going N gives (1, 0), which is a <code>#</code>. A real robot would crash. So we add one rule: <em>work out the new square, then check it. If it's free, go there. If not, stay put.</em></p>
-<p>You don't need to write the check yourself. <code>world.py</code> gives you <code>is_free(room, pos)</code>, which returns <code>True</code> for floor and <code>False</code> for walls or anywhere outside the room.</p>
-
-<h3>Step 4: follow a list of commands, and remember the path</h3>
-<p>A command string like <code>"EES"</code> means: east, east, south. Do them one at a time, and after each one, write down where you are. Start (1, 1):</p>
-<pre><code>start            (1, 1)
-E  → (2, 1) free  (2, 1)
-E  → (3, 1) free  (3, 1)
-S  → (3, 2) WALL  (3, 1)   stays put
-path = [(1, 1), (2, 1), (3, 1), (3, 1)]</code></pre>
-<p>Notice the path has 4 entries for 3 commands: the start plus one per command. And a bump into a wall still counts as an entry. The robot spent that turn standing still.</p>
-<details><summary>Predict first: the robot starts at (1, 1) and runs <code>"EEEESSS"</code>. Where does it end up? Trace it on paper, then open.</summary>
-<p>E four times: (2, 1), (3, 1), (4, 1), (5, 1). S: (5, 2) free. S: (5, 3) free. S: (5, 4) is a wall, so it stays at <strong>(5, 3)</strong>. That's exactly what the homework program prints at the end.</p>
-</details>
-
-<h3>Step 5: how far away is something?</h3>
-<p>The robot is at (5, 3). The red block is at (2, 1). How far is that? You can't fly diagonally, you walk along the grid. So count the steps across and the steps down separately:</p>
-<pre><code>across: from x = 5 to x = 2  →  5 - 2 = 3 steps
-down:   from y = 3 to y = 1  →  3 - 1 = 2 steps
-total:  3 + 2 = 5</code></pre>
-<p>This is called the <strong>Manhattan distance</strong>, after the city where the streets form a grid and taxis can't cut through buildings. In general: <code>|x1 − x2| + |y1 − y2|</code>. The bars <code>| |</code> mean "absolute value": drop the minus sign. Why? Because if you subtract the other way round, 2 − 5 = −3, and a distance can't be negative. Python's <code>abs(-3)</code> gives <code>3</code>.</p>
-<p>One important thing: Manhattan distance <em>ignores walls</em>. It's the shortest possible distance in a perfect world. The real route can only be the same or longer. In <a href="06-pathfinding.html">week 4</a> that "never too big" property is exactly what makes A* search work.</p>
-
-<h2 id="play">3. Play with it</h2>
+<h2 id="play">2. Play</h2>
+<div class="box play"><span class="tag">🎮 Play</span>
+<p>The real room, with the same rules as your Python. Click a square next to the robot, use the buttons, or type commands and press <b>Run</b>. A bump into a wall leaves the robot where it is.</p>
 <div class="card demo">
-<h3>Interactive: drive the robot</h3>
-<p class="legend">The real room from <code>world.py</code>, with the same moving rules as your Python. Click a square next to the robot, use the buttons, or type a command string and press <b>Run</b>. Bumps into walls leave the robot where it is.</p>
 <canvas id="grid" width="700" height="400" style="height:auto" aria-label="The robot's room as a grid you can click to move the robot"></canvas>
 <p><button id="bN">N</button> <button id="bS">S</button> <button id="bE">E</button> <button id="bW">W</button> <button id="bReset">Back to start</button></p>
 <label for="cmds">Commands:</label> <input id="cmds" type="text" value="EEEESSS" size="16" spellcheck="false"> <button id="bRun">Run from start</button>
@@ -133,51 +117,68 @@ total:  3 + 2 = 5</code></pre>
 </div>
 <p class="legend" id="lastmove"></p>
 </div>
-<p>Try: drive to the bin at (7, 6) in as few moves as you can. Manhattan says at least 11. Can you do it in 11? Then type <code>NNNWWW</code> and count the bumps.</p>
+<p>Run <code>EEEESSS</code> and predict where it ends before you press. Then reach the bin at (7, 6). Manhattan says at least 11 moves. Can you do 11?</p>
+</div>
 
-<h2 id="homework">4. Homework</h2>
-<p>Open <code>homework/lesson01_moving.py</code>. It imports the room from <code>world.py</code> and already has the <code>DIRECTIONS</code> dictionary. Write the four functions in order. Each one uses the one before.</p>
-
-<h3>Function 1: <code>move(pos, direction)</code></h3>
-<p><strong>What it does:</strong> returns the new (x, y) after one step. Pure maths, no wall check.</p>
-<p><strong>Example:</strong> <code>move((2, 3), "E")</code> → <code>(3, 3)</code>, and <code>move((2, 3), "N")</code> → <code>(2, 2)</code>.</p>
-<details><summary>Hint 1</summary><p>Look up the change for this direction in <code>DIRECTIONS</code>, then add it to the position.</p></details>
-<details><summary>Hint 2</summary><p><code>dx, dy = DIRECTIONS[direction]</code> unpacks the tuple into two variables in one go. The position's parts are <code>pos[0]</code> (x) and <code>pos[1]</code> (y).</p></details>
-<details><summary>Hint 3</summary><p>Return a new tuple: <code>(</code> x plus dx <code>,</code> y plus dy <code>)</code>. Don't forget the brackets: you're returning one tuple, not two numbers.</p></details>
-
-<h3>Function 2: <code>safe_move(room, pos, direction)</code></h3>
-<p><strong>What it does:</strong> like <code>move</code>, but if the new square isn't free, return the old position.</p>
-<p><strong>Example:</strong> <code>safe_move(ROOM, (1, 1), "N")</code> → <code>(1, 1)</code> (wall above). <code>safe_move(ROOM, (1, 1), "E")</code> → <code>(2, 1)</code>.</p>
-<details><summary>Hint 1</summary><p>Don't redo the maths. Call your own <code>move</code> first.</p></details>
-<details><summary>Hint 2</summary><p>Then ask <code>is_free(room, new_pos)</code>. It's already imported at the top of the file.</p></details>
-<details><summary>Hint 3</summary><pre><code>new_pos = (the result of move)
-if the new square is free: return new_pos
-otherwise: return pos</code></pre></details>
-
-<h3>Function 3: <code>follow(room, start, commands)</code></h3>
-<p><strong>What it does:</strong> runs every letter of the command string through <code>safe_move</code>, and returns the list of all positions, including the start.</p>
-<p><strong>Example:</strong> <code>follow(ROOM, (1, 1), "EE")</code> → <code>[(1, 1), (2, 1), (3, 1)]</code>. An empty string gives <code>[(1, 1)]</code>.</p>
-<details><summary>Hint 1</summary><p>A <code>for</code> loop over a string gives you one letter at a time: <code>for c in "EES":</code> runs with <code>c = "E"</code>, then <code>"E"</code>, then <code>"S"</code>.</p></details>
-<details><summary>Hint 2</summary><p>Keep two things: the list so far (it starts with the start in it) and the current position. Each loop, update the position, then add it to the list with <code>.append</code>.</p></details>
-<details><summary>Hint 3</summary><pre><code>path = a list containing just start
+<h2 id="homework">3. Build</h2>
+<div class="box build"><span class="tag">🛠 Build</span>
+<p>Open <code>homework/lesson01_moving.py</code>. The <code>DIRECTIONS</code> dictionary and <code>is_free(room, pos)</code> are already there. Write the four functions in order: each uses the one before. Run <code>python3 check.py 1</code> from <code>project</code> after each one.</p>
+<ol class="steps">
+<li><strong><code>move(pos, direction)</code></strong> returns the new (x, y) after one step. Just adding, no wall check. <code>move((2, 3), "E")</code> → <code>(3, 3)</code>; <code>move((2, 3), "N")</code> → <code>(2, 2)</code>.
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p><code>dx, dy = DIRECTIONS[direction]</code> gets the change. <code>pos[0]</code> is x, <code>pos[1]</code> is y.</p></details>
+<details><summary>Hint 2: fill in the blanks</summary><pre><code>dx, dy = DIRECTIONS[direction]
+return (pos[0] + ____, pos[1] + ____)</code></pre></details>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>Lesson 1: lesson01_moving.py
+  ✓ move
+  … safe_move: not written yet (Lesson 1: write this function)
+  … follow: not written yet (Lesson 1: write this function)
+  … manhattan: not written yet (Lesson 1: write this function)
+  1/4 passed</code></pre>
+<p><strong>If you see</strong> <code>✗ move: move((2, 3), "N") should be (2, 2): remember y grows DOWN</code>, check the N and S rows of the picture above.</p>
+</div></li>
+<li><strong><code>safe_move(room, pos, direction)</code></strong> is <code>move</code>, but if the new square isn't free, it returns the old position. <code>safe_move(ROOM, (1, 1), "N")</code> → <code>(1, 1)</code> (a wall above).
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>Call your own <code>move</code> first. Then ask <code>is_free(room, new_pos)</code>.</p></details>
+<details><summary>Hint 2: fill in the blanks</summary><pre><code>new_pos = move(pos, direction)
+if is_free(room, ____):
+    return new_pos
+return ____</code></pre></details>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>  ✓ move
+  ✓ safe_move
+  … follow: not written yet (Lesson 1: write this function)
+  … manhattan: not written yet (Lesson 1: write this function)
+  2/4 passed</code></pre>
+</div></li>
+<li><strong><code>follow(room, start, commands)</code></strong> runs every letter through <code>safe_move</code> and returns every position, <em>including the start</em>. <code>follow(ROOM, (1, 1), "EE")</code> → <code>[(1, 1), (2, 1), (3, 1)]</code>. A bump still adds an entry: the robot spent that turn standing still.
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p><code>for c in "EES":</code> gives you one letter at a time. Add to a list with <code>.append</code>.</p></details>
+<details><summary>Hint 2: fill in the blanks</summary><pre><code>path = [start]
 pos = start
-for each letter in commands:
-    pos = safe_move(room, pos, letter)
-    append pos to path
+for c in commands:
+    pos = safe_move(room, pos, ____)
+    path.append(____)
 return path</code></pre></details>
-
-<h3>Function 4: <code>manhattan(a, b)</code></h3>
-<p><strong>What it does:</strong> the grid distance <code>|x1 − x2| + |y1 − y2|</code>.</p>
-<p><strong>Example:</strong> <code>manhattan((1, 1), (4, 5))</code> → 3 + 4 = <code>7</code>, and the other way round, <code>manhattan((4, 5), (1, 1))</code>, is also <code>7</code>.</p>
-<details><summary>Hint 1</summary><p>Work out the difference in x and the difference in y separately, then add them.</p></details>
-<details><summary>Hint 2</summary><p>Each difference could come out negative. Python's <code>abs()</code> removes the minus sign.</p></details>
-<details><summary>Hint 3</summary><p>One line: <code>return abs(</code>difference of the x parts<code>) + abs(</code>difference of the y parts<code>)</code>. Use <code>a[0]</code>, <code>b[0]</code>, <code>a[1]</code>, <code>b[1]</code>.</p></details>
-
-<h3>Run it and see</h3>
-<pre><code>cd homework
-python3 lesson01_moving.py          # Windows: py lesson01_moving.py
-cd ..</code></pre>
-<p>The program follows <code>"EEEESSS"</code> from the start and draws the path with <code>*</code>. Real output:</p>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>  ✓ move
+  ✓ safe_move
+  ✓ follow
+  … manhattan: not written yet (Lesson 1: write this function)
+  3/4 passed</code></pre>
+<p><strong>If you see</strong> <code>✗ follow: follow(ROOM, (1, 1), "EE") should list 3 positions</code>, you forgot to put the start in the list.</p>
+</div></li>
+<li><strong><code>manhattan(a, b)</code></strong> returns <code>|x1 − x2| + |y1 − y2|</code>. <code>manhattan((1, 1), (4, 5))</code> → <code>7</code>, and the other way round is also <code>7</code>.
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>Python's <code>abs(-3)</code> is <code>3</code>.</p></details>
+<details><summary>Hint 2: fill in the blanks</summary><pre><code>return abs(a[0] - ____) + abs(____ - b[1])</code></pre></details>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p>Run the lesson file: <code>cd homework</code>, then <code>python3 lesson01_moving.py</code>. It follows <code>EEEESSS</code> and marks the path with <code>*</code>. Real output:</p>
 <pre><code>##########
 #*r***...#
 #..##*...#
@@ -187,51 +188,43 @@ cd ..</code></pre>
 #.#....B.#
 ##########
 Ended at (5, 3) | distance to red block: 5</code></pre>
-<p>The red block's <code>r</code> covers the <code>*</code> at (2, 1): the robot rolled past it, since blocks aren't walls.</p>
-
-<h3>Check it</h3>
-<pre><code>python3 check.py 1                 # Windows: py check.py 1</code></pre>
-<p>All done looks like this (real output):</p>
+<div class="room" data-robot="5,3" data-path="1,1 2,1 3,1 4,1 5,1 5,2 5,3" data-mark="5,4" data-blocks="red:2,1 blue:6,3 green:1,5" data-label="The same thing as a picture: the third S hits the wall (red ring), so it stays at (5, 3)."></div>
+<p>Then <code>python3 check.py 1</code> from <code>project</code>:</p>
 <pre><code>Lesson 1: lesson01_moving.py
   ✓ move
   ✓ safe_move
   ✓ follow
   ✓ manhattan
   4/4 passed  🎉 lesson complete!</code></pre>
-<p>A ✗ comes with a hint. If you swap N and S, you'll see:</p>
-<pre><code>  ✗ move: move((2, 3), "N") should be (2, 2): remember y grows DOWN</code></pre>
-<p>And if you forget the start in <code>follow</code>:</p>
-<pre><code>  ✗ follow: follow(ROOM, (1, 1), "EE") should list 3 positions</code></pre>
-<p>Notice how one bug can cause several ✗: a wrong <code>move</code> also breaks <code>safe_move</code> and <code>follow</code>, because they use it. Always fix the first ✗ first.</p>
+<p><strong>If several ✗ appear at once</strong>, fix the first one: a wrong <code>move</code> breaks everything that uses it.</p>
+</div></li>
+</ol>
+</div>
 
-<h3>Stretch</h3>
-<p>Write <code>commands_to(start, goal)</code> that returns a command string that walks straight to the goal, ignoring walls: first all the E or W steps, then all the N or S steps. Check that <code>len(commands_to(a, b)) == manhattan(a, b)</code> for a few pairs. Then run it through <code>follow</code> from (1, 1) to the bin at (7, 6) and count how many bumps it gets. (Not checked by <code>check.py</code>.)</p>
-
-<h2 id="add-to-robot">Add it to your robot</h2>
-<p>Fill in <code>arrows(self, text)</code> in <code>my_robot.py</code>. It moves the robot one square for each letter, so <code>EESN</code> means east, east, south, north. You need both of your functions, and they do different jobs: <code>safe_move</code> tells you whether there's a wall (it leaves the robot where it is if there is), and <code>move</code> tells you which square you'd step to. Hand that square to <code>self.step()</code> (provided), which moves the robot and draws it. (New to <code>self</code>? Read <a href="00-setup.html#robot-file">How your robot file works</a> first.)</p>
-<div class="card note" id="cat"><strong>The cat.</strong> When you run <code>my_robot.py</code>, the room shows a <code>c</code> at (4, 1). That's a cat. It is drawn for you, but it's NOT on the robot's map: the robot only finds out by sensing it. Real robots meet surprises like this too. In week 1 your robot can't sense anything yet, so <code>EEEE</code> walks right into it and says: <em>BUMP! I walked into the cat. (It's not on my map, so I can't sense it yet: add week 3.)</em> In week 3 you fix that.</div>
-<div class="card note"><strong>New Python this time: <code>return</code> inside a loop.</strong> A <code>return</code> stops the whole method straight away, even in the middle of a <code>for</code> loop. The loop never finishes.
-<pre><code>for d in "EEN":
-    if d == "N": return "Found N!"   # stops here; nothing after this runs</code></pre></div>
-<details><summary>Hint 1</summary><p>Start with this import, inside the method:</p><pre><code>from lesson01_moving import move, safe_move</code></pre><p>Then loop over the letters: <code>for d in text:</code>. (The robot already turns lowercase into capitals before calling <code>arrows</code>, so <code>eess</code> works too.)</p></details>
+<h2 id="add-to-robot">4. Add it to your robot</h2>
+<div class="box bot"><span class="tag">🤖 Add it to your robot</span>
+<p>Fill in <code>arrows(self, text)</code> in <code>my_robot.py</code>: one square per letter, so <code>EESN</code> is east, east, south, north. Use <code>safe_move</code> to spot a wall, and <code>move</code> to get the next square. Hand that square to <code>self.step()</code> (provided), which moves and draws the robot. New to <code>self</code>? Read <a href="00-setup.html#robot-file">how your robot file works</a>.</p>
+<p><strong>New Python:</strong> a <code>return</code> inside a loop stops the whole method straight away.</p>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>Put this import inside the method, then loop: <code>for d in text:</code></p><pre><code>from lesson01_moving import move, safe_move</code></pre></details>
 <details><summary>Hint 2</summary><p>If <code>safe_move(ROOM, self.pos, d) == self.pos</code>, the next square is a wall: return <code>f"Bonk! A wall. I'm at {self.pos}."</code></p></details>
-<details><summary>Hint 3</summary><p>Fill in the blanks:</p><pre><code>for d in text:
+<details><summary>Hint 3: fill in the blanks</summary><pre><code>for d in text:
     if safe_move(ROOM, self.pos, d) == self.pos:
         return f"Bonk! A wall. I'm at {self.pos}."
     result = self.step(____)
     if result != "moved":
         return self.step_message(result, ____)
-return f"I'm at {____}."</code></pre><p>Stuck for real? The worked version is in <code>solutions/my_robot.py</code>.</p></details>
-<p>Check it: <code>python3 check.py robot</code> (from <code>project</code>). Your new check is <em>"week 1: arrows"</em>. It also tries lowercase <code>sss</code>. Real output (the other 14 checks stay yellow until their week):</p>
+return f"I'm at {____}."</code></pre><p>The worked version is in <code>solutions/my_robot.py</code>.</p></details>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p>From <code>project</code>: <code>python3 check.py robot</code>. Real output:</p>
 <pre><code>Your robot: my_robot.py
   ✓ week 1: arrows
   … week 2: look: not written yet (fill in look() first)
   ...
-  1/15 passed</code></pre>
-<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output (it also draws the room after each command; we've left that out):</p>
-<pre><code>Hello, I am Zippy!
-...
-Zippy&gt; N
+  1/21 passed</code></pre>
+<p>Then talk to it: <code>cd homework</code>, <code>python3 my_robot.py</code>. Real replies (it draws the room after each one):</p>
+<pre><code>Zippy&gt; N
   Bonk! A wall. I'm at (1, 1).
 
 Zippy&gt; sss
@@ -240,60 +233,51 @@ Zippy&gt; sss
 Zippy&gt; reset
 
 Zippy&gt; EEEE
-  BUMP! I walked into the cat. (It's not on my map, so I can't sense it yet: add week 3.)</code></pre>
-<p>Your robot walks straight into the cat. It can't sense it yet: that's week 3.</p>
+  BUMP! I walked into the cat. (It's not on my map, so I can't sense it yet: add week 4.)</code></pre>
+<div class="room" id="cat" data-robot="3,1" data-path="1,1 2,1 3,1" data-cat="4,1" data-mark="4,1" data-blocks="red:2,1 blue:6,3 green:1,5" data-label="EEEE: BUMP! The cat isn't on the robot's map. In week 4 it learns to sense it and stop."></div>
+<p><strong>If you see</strong> <code>I can't do that yet: week 1</code>, the <code>raise NotImplementedError</code> line is still there, or you didn't save.</p>
+</div>
+</div>
 
 <h2 id="challenge">5. Real-world challenge: map your room</h2>
-<ol>
-<li><strong>Pick a room</strong> at home, like your bedroom or the kitchen. Choose a step size: floor tiles if you have them, or one foot-length (heel to toe), or one big step.</li>
-<li><strong>Draw it on squared paper</strong>, one paper square per step. Mark walls and furniture you can't walk through with <code>#</code>. Put (0, 0) in the top-left corner of your drawing, x to the right, y downwards, exactly like the robot's room.</li>
-<li><strong>Label three things</strong> with their coordinates, for example the door, the bed, a lamp.</li>
-<li><strong>Write a command string</strong> (only N, S, E, W) to get from the door to one of the things. Write down the Manhattan distance too.</li>
-<li><strong>Be the robot.</strong> Stand at the door, then follow your string one step per letter without looking where you're going: only at the paper. Or have a friend follow it. If a step would hit furniture, stay put (and count a bump).</li>
-<li><strong>Record:</strong> where you meant to end up, where you actually ended up, number of bumps, number of commands, and the Manhattan distance.</li>
+<ol class="steps">
+<li>Draw a room at home on squared paper, one square per step. Walls and furniture are <code>#</code>. Put (0, 0) top left, x right, y down.</li>
+<li>Label three things with their coordinates: the door, the bed, a lamp.</li>
+<li>Write a command string (N, S, E, W) from the door to one of them, and its Manhattan distance.</li>
+<li>Be the robot: follow the string one step per letter, looking only at the paper. Furniture in the way? Stay put and count a bump.</li>
 </ol>
-<div class="card note"><strong>On your own:</strong> this one works alone. Do steps 1–4, then be the robot yourself: follow your own string one step per letter, looking only at the paper.</div>
-<p><strong>What it teaches:</strong> you'll find that the map and the real room don't quite agree (your steps aren't all the same size, the bed sticks out further than you drew). That gap between the map and reality is a real robotics problem: robots also drift, and that's why week 2 adds sensors. You'll also see that your number of commands is never smaller than the Manhattan distance, and is bigger whenever furniture is in the way.</p>
+<div class="card note"><strong>On your own:</strong> this one works alone. Record where you meant to end, where you ended, and the bumps.</div>
+<p>Your map and the real room won't quite agree: your steps aren't all the same size. Robots drift too. That's why week 2 adds sensors.</p>
 
-<h2 id="project">6. Your Robo-Helper so far</h2>
-<pre><code>Week 1A  ✓ the robot greets you and counts steps to a wall
-Week 1B  ✓ move, safe_move, follow, manhattan: the robot can move around the room</code></pre>
-<p>These four functions are the robot's legs, and later lessons import them directly:</p>
+<h2 id="check">Check yourself</h2>
+<details><summary>What change does "S" mean, and why +1?</summary><p><code>(0, 1)</code>. Down the screen makes y bigger.</p></details>
+<details><summary>Predict: <code>follow(ROOM, (1, 1), "NW")</code>?</summary><p><code>[(1, 1), (1, 1), (1, 1)]</code>. Both moves hit walls, but each turn still adds an entry.</p></details>
+<details><summary>Manhattan distance from (1, 1) to the bin at (7, 6)? Can the real route be shorter?</summary><p>6 + 5 = <strong>11</strong>. Never shorter: walls can only add steps. (In week 5 you'll find the real shortest route is exactly 11.)</p></details>
+<details><summary>Why should <code>safe_move</code> call <code>move</code> instead of doing its own maths?</summary><p>The maths lives in one place. Fix <code>move</code> and everything that uses it is fixed too.</p></details>
+
+<h2 id="deeper">Want to know more?</h2>
+<details><summary>Common mistakes</summary>
 <ul>
-<li><a href="02-sensors.html">Week 2</a>: <code>distance_to_wall</code> calls your <code>move</code> to look further and further ahead.</li>
-<li><a href="06-pathfinding.html">Week 4</a>: <code>astar_path</code> uses <code>move</code> to find neighbours and <code>manhattan</code> as its guess of the distance left.</li>
-<li>Week 12's boss gap uses your <code>manhattan</code> to find the block closest to the bin.</li>
-<li><a href="07-trial-and-error.html">The bonus trial-and-error lesson</a>: the Q-learning robot practises in a maze using your <code>safe_move</code>, bumps and all.</li>
-</ul>
-
-<h2 id="mistakes">7. Common mistakes</h2>
+<li><strong>y the wrong way.</strong> North is y − 1.</li>
+<li><strong>Reading the grid as <code>ROOM[x][y]</code>.</strong> It's <code>ROOM[y][x]</code>: row first. <code>is_free</code> handles this, so use it.</li>
+<li><strong>Forgetting <code>abs()</code>.</strong> <code>manhattan((4, 5), (1, 1))</code> gives −7. The checker says <code>use abs()</code>.</li>
+<li><strong>Returning a list.</strong> <code>[3, 3] == (3, 3)</code> is <code>False</code>. Use round brackets.</li>
+</ul></details>
+<details><summary>Stretch: commands_to</summary><p>Write <code>commands_to(start, goal)</code>: all the E or W steps, then all the N or S steps, ignoring walls. Check <code>len(commands_to(a, b)) == manhattan(a, b)</code>. Then run it through <code>follow</code> from (1, 1) to the bin and count the bumps.</p></details>
+<details><summary>Where these functions come back</summary>
 <ul>
-<li><strong>y going the wrong way.</strong> North is y − 1, because y grows downwards. The checker says <code>move((2, 3), "N") should be (2, 2): remember y grows DOWN</code>.</li>
-<li><strong>Mixing up x and y when reading the grid.</strong> <code>ROOM[y][x]</code>: the row (y) comes first, then the column (x). <code>is_free</code> already handles this for you, so use it.</li>
-<li><strong>Forgetting the start in the path.</strong> The path for <code>"EE"</code> has 3 positions, not 2.</li>
-<li><strong>Forgetting <code>abs()</code>.</strong> Then <code>manhattan((4, 5), (1, 1))</code> gives −7, and the checker says <code>distance shouldn't depend on order: use abs()</code>.</li>
-<li><strong>Returning two numbers instead of a tuple.</strong> <code>return x, y</code> actually does make a tuple in Python, but <code>return [x, y]</code> makes a list, and <code>[3, 3] == (3, 3)</code> is <code>False</code>. Use round brackets.</li>
-</ul>
-
-<h2 id="check">8. Check yourself</h2>
-<details><summary>What change (dx, dy) does "S" mean, and why is it +1 not −1?</summary><p><code>(0, 1)</code>. South is down the screen, and y counts rows from the top, so going down makes y bigger.</p></details>
-<details><summary>Predict: what does <code>follow(ROOM, (2, 1), "SS")</code> return? Use the grid in section 2.</summary><p><code>[(2, 1), (2, 2), (2, 3)]</code>. Both squares below (2, 1) are floor, so there are no bumps.</p></details>
-<details><summary>Predict: what does <code>follow(ROOM, (1, 1), "NW")</code> return?</summary><p><code>[(1, 1), (1, 1), (1, 1)]</code>. Both moves hit walls, so the robot stays put twice, but each turn still adds an entry to the path.</p></details>
-<details><summary>What is the Manhattan distance from the robot's start (1, 1) to the bin (7, 6)? Can the real route ever be shorter?</summary><p>6 + 5 = <strong>11</strong>. No: Manhattan distance ignores walls, so it's the best case. Walls can only make the real route the same or longer. (In week 4 you'll find the real shortest route is exactly 11.)</p></details>
-<details><summary>Why is it useful that <code>safe_move</code> calls <code>move</code> instead of doing its own maths?</summary><p>The maths lives in one place. If you change or fix <code>move</code> (or add diagonal directions), <code>safe_move</code> and <code>follow</code> get the fix for free.</p></details>
-
-<h2 id="deeper">9. Go deeper (optional)</h2>
-<ul>
-<li><a href="../02-tensortonic.html#transforms">Homogeneous transforms</a>: how real robot arms keep track of coordinates in 3D, when every joint has its own (x, y, z).</li>
-<li><a href="../03-shared-autonomy.html">Human–AI help levels</a>: a robot moving towards goals on a 2D plane, with a human steering.</li>
-<li><a href="../17-free-ai-curriculum.html#robotics">Free robotics courses</a>: look for "mobile robots" and "kinematics".</li>
-</ul>
+<li><a href="02-sensors.html">Week 2</a>: <code>distance_to_wall</code> calls your <code>move</code> to look further ahead.</li>
+<li><a href="06-pathfinding.html">Week 5</a>: A* uses <code>move</code> for neighbours and <code>manhattan</code> as its guess.</li>
+<li>Week 16's boss uses <code>manhattan</code> to find the block closest to the bin.</li>
+<li><a href="07-trial-and-error.html">The bonus lesson</a>: a robot learns a maze with your <code>safe_move</code>.</li>
+<li><a href="../02-tensortonic.html#transforms">Homogeneous transforms</a>: coordinates in 3D for robot arms.</li>
+</ul></details>
 
 <nav class="pager">
   <a href="00-setup.html"><small>Previous</small>Week 1 · Part A: Setup and your first program</a>
   <a class="next" href="02-sensors.html"><small>Next</small>Week 2 · Part A: Noisy senses</a>
 </nav>
-<footer>Build a Robot Brain · Week 1 of 12 · Part B</footer>
+<footer>Build a Robot Brain · Week 1 of 16 · Part B</footer>
 </main>
 
 <script>
@@ -393,5 +377,6 @@ document.getElementById('bRun').onclick = runCmds;
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
 reset();
 </script>
+<script src="room.js"></script>
 </body>
 </html>

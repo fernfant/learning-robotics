@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 6 · Sensor fusion</title>
+<link rel="stylesheet" href="../../style.css?v=16">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 6 of 16</nav>
+
+<div class="eyebrow"><span class="track robo">Robotics</span>Build a Robot Brain · Week 6 of 16</div>
+<h1>Two sensors, one steady angle: sensor fusion</h1>
+<p class="lede">One sensor drifts. The other shakes. Together, on real phone data, they make one good angle.</p>
+<div class="card note" id="journey"><strong>Week 6 of 16.</strong> So far your robot: ✓ moves ✓ senses walls ✓ reads real phone data ✓ stops for the cat ✓ is tested safe ✓ plans routes. <strong>Today</strong> it learns to mix two imperfect sensors into one steady angle. Next: <a href="08-words-as-numbers.html">Week 7 · Part A: Words as numbers</a>. <a href="index.html#my-robot">Your robot, week by week</a>.</div>
+
+<section class="kid" id="start">
+<h2>Start here</h2>
+<p class="big">Walk across a room with your eyes shut, counting steps: smooth, but you slowly go off course. Peek every few seconds: you see where you really are, but a glance while walking is shaky. Do both and you walk straight. That is sensor fusion.</p>
+<dl>
+<dt>Gyroscope</dt><dd>Measures how fast the phone turns, in degrees per second.</dd>
+<dt>Accelerometer</dt><dd>Feels gravity, so it knows which way is down. Shakes when you move.</dd>
+<dt>Drift</dt><dd>A tiny error that adds up over time.</dd>
+<dt>Complementary filter</dt><dd>Trust the gyro from moment to moment, and the accelerometer over the long run.</dd>
+</dl>
+</section>
+
+<h2 id="idea">1. The idea</h2>
+<div class="box idea"><span class="tag">💡 The gyro adds up, and drifts</span>
+<p>The gyroscope says "turning 2 degrees a second". To get the angle, add up the turning: <code>angle = angle + rate × 0.02</code>, 50 times a second. It's smooth, even while you move. But this phone's gyro reads <strong>−0.155 degrees a second</strong> when it is perfectly still. That tiny error gets added in every time:</p>
+<svg class="diagram" viewBox="0 0 520 230" role="img" aria-label="Real data while standing still for 20 seconds: the accelerometer angle stays near minus 7 degrees, the added-up gyro slides to minus 10."><line x1="46" y1="196" x2="370" y2="196" style="stroke:var(--line)"/><text x="40" y="200.0" text-anchor="end" font-size="11" style="fill:var(--muted)">-11°</text><line x1="46" x2="370" y1="196.0" y2="196.0" style="stroke:var(--line)" stroke-width=".5"/><text x="40" y="169.7" text-anchor="end" font-size="11" style="fill:var(--muted)">-10°</text><line x1="46" x2="370" y1="165.7" y2="165.7" style="stroke:var(--line)" stroke-width=".5"/><text x="40" y="139.3" text-anchor="end" font-size="11" style="fill:var(--muted)">-9°</text><line x1="46" x2="370" y1="135.3" y2="135.3" style="stroke:var(--line)" stroke-width=".5"/><text x="40" y="109.0" text-anchor="end" font-size="11" style="fill:var(--muted)">-8°</text><line x1="46" x2="370" y1="105.0" y2="105.0" style="stroke:var(--line)" stroke-width=".5"/><text x="40" y="78.7" text-anchor="end" font-size="11" style="fill:var(--muted)">-7°</text><line x1="46" x2="370" y1="74.7" y2="74.7" style="stroke:var(--line)" stroke-width=".5"/><text x="40" y="48.3" text-anchor="end" font-size="11" style="fill:var(--muted)">-6°</text><line x1="46" x2="370" y1="44.3" y2="44.3" style="stroke:var(--line)" stroke-width=".5"/><text x="40" y="18.0" text-anchor="end" font-size="11" style="fill:var(--muted)">-5°</text><line x1="46" x2="370" y1="14.0" y2="14.0" style="stroke:var(--line)" stroke-width=".5"/><text x="46.0" y="212" text-anchor="middle" font-size="11" style="fill:var(--muted)">0 s</text><text x="128.7" y="212" text-anchor="middle" font-size="11" style="fill:var(--muted)">5 s</text><text x="211.3" y="212" text-anchor="middle" font-size="11" style="fill:var(--muted)">10 s</text><text x="294.0" y="212" text-anchor="middle" font-size="11" style="fill:var(--muted)">15 s</text><text x="376.6" y="212" text-anchor="middle" font-size="11" style="fill:var(--muted)">20 s</text><polyline points="46.0,74.1 47.3,79.3 48.6,78.8 50.0,67.4 51.3,67.1 52.6,74.1 53.9,75.2 55.3,67.9 56.6,76.7 57.9,60.1 59.2,63.2 60.5,74.4 61.9,67.1 63.2,80.8 64.5,80.8 65.8,71.1 67.2,78.2 68.5,71.8 69.8,67.7 71.1,79.0 72.4,67.7 73.8,76.7 75.1,78.8 76.4,69.7 77.7,77.9 79.1,67.9 80.4,81.4 81.7,86.0 83.0,77.0 84.4,65.0 85.7,79.0 87.0,70.0 88.3,62.7 89.6,67.7 91.0,84.6 92.3,63.2 93.6,55.7 94.9,76.4 96.3,67.7 97.6,62.7 98.9,60.6 100.2,78.5 101.5,48.7 102.9,64.8 104.2,52.8 105.5,60.4 106.8,69.2 108.2,77.0 109.5,90.7 110.8,67.1 112.1,79.9 113.4,63.5 114.8,74.4 116.1,83.4 117.4,83.4 118.7,85.4 120.1,83.1 121.4,67.4 122.7,89.3 124.0,86.3 125.3,78.8 126.7,90.4 128.0,87.8 129.3,78.5 130.6,76.1 132.0,76.7 133.3,89.5 134.6,83.1 135.9,90.7 137.2,85.7 138.6,100.6 139.9,102.0 141.2,86.0 142.5,83.1 143.9,95.0 145.2,81.1 146.5,79.6 147.8,78.5 149.2,76.1 150.5,94.1 151.8,79.9 153.1,81.1 154.4,83.7 155.8,90.7 157.1,77.9 158.4,75.2 159.7,87.8 161.1,85.4 162.4,73.8 163.7,83.1 165.0,79.9 166.3,102.3 167.7,70.9 169.0,66.6 170.3,75.6 171.6,69.7 173.0,61.6 174.3,78.5 175.6,78.5 176.9,78.8 178.2,70.0 179.6,72.3 180.9,79.0 182.2,88.4 183.5,82.8 184.9,67.1 186.2,51.0 187.5,76.1 188.8,73.8 190.1,73.8 191.5,74.7 192.8,66.8 194.1,61.6 195.4,75.2 196.8,80.8 198.1,66.8 199.4,88.4 200.7,74.4 202.0,80.5 203.4,78.5 204.7,80.8 206.0,77.9 207.3,84.6 208.7,84.3 210.0,100.0 211.3,94.4 212.6,85.4 214.0,105.3 215.3,107.3 216.6,92.7 217.9,95.3 219.2,99.7 220.6,94.7 221.9,100.0 223.2,107.0 224.5,107.3 225.9,110.6 227.2,95.3 228.5,104.6 229.8,88.4 231.1,104.6 232.5,91.0 233.8,93.6 235.1,93.0 236.4,96.0 237.8,88.4 239.1,94.7 240.4,85.4 241.7,99.4 243.0,94.7 244.4,90.7 245.7,94.7 247.0,81.4 248.3,115.6 249.7,95.0 251.0,95.7 252.3,119.5 253.6,83.7 254.9,95.3 256.3,93.8 257.6,116.9 258.9,120.3 260.2,68.6 261.6,94.3 262.9,92.4 264.2,70.9 265.5,54.9 266.8,81.1 268.2,78.2 269.5,93.2 270.8,76.7 272.1,74.7 273.5,93.5 274.8,60.4 276.1,78.5 277.4,79.0 278.8,80.8 280.1,98.1 281.4,80.8 282.7,88.7 284.0,88.1 285.4,88.4 286.7,81.4 288.0,89.5 289.3,74.4 290.7,94.7 292.0,93.0 293.3,90.7 294.6,81.1 295.9,78.5 297.3,88.4 298.6,80.2 299.9,83.4 301.2,90.4 302.6,78.5 303.9,84.8 305.2,99.4 306.5,94.4 307.8,85.4 309.2,97.3 310.5,97.0 311.8,94.7 313.1,94.7 314.5,95.3 315.8,90.4 317.1,95.7 318.4,102.0 319.7,91.0 321.1,94.7 322.4,101.7 323.7,92.1 325.0,95.3 326.4,96.7 327.7,83.4 329.0,102.3 330.3,99.7 331.6,81.4 333.0,82.8 334.3,93.0 335.6,90.7 336.9,91.0 338.3,94.7 339.6,90.1 340.9,85.4 342.2,78.5 343.6,92.7 344.9,85.7 346.2,94.1 347.5,96.0 348.8,78.8 350.2,84.5 351.5,90.7 352.8,93.0 354.1,83.1 355.5,83.7 356.8,92.4 358.1,84.3 359.4,95.3 360.7,94.7 362.1,84.0 363.4,90.1 364.7,90.7 366.0,91.8 367.4,93.8 368.7,94.7" fill="none" style="stroke:var(--play)" stroke-width="1.5" opacity=".8"/><polyline points="46.0,74.2 47.3,73.7 48.6,74.3 50.0,74.8 51.3,74.9 52.6,74.3 53.9,74.5 55.3,74.4 56.6,75.2 57.9,75.9 59.2,75.9 60.5,76.3 61.9,77.9 63.2,79.2 64.5,78.9 65.8,78.8 67.2,79.7 68.5,79.9 69.8,80.6 71.1,81.8 72.4,83.2 73.8,84.0 75.1,84.6 76.4,85.4 77.7,85.7 79.1,85.8 80.4,85.8 81.7,85.9 83.0,86.4 84.4,86.1 85.7,85.6 87.0,85.3 88.3,85.1 89.6,85.0 91.0,84.6 92.3,84.5 93.6,85.6 94.9,85.3 96.3,83.9 97.6,83.9 98.9,85.2 100.2,85.8 101.5,85.1 102.9,86.4 104.2,88.1 105.5,91.3 106.8,94.1 108.2,95.4 109.5,95.0 110.8,96.5 112.1,100.1 113.4,102.2 114.8,104.1 116.1,105.5 117.4,105.3 118.7,105.0 120.1,104.8 121.4,104.5 122.7,105.0 124.0,107.0 125.3,108.3 126.7,108.3 128.0,108.8 129.3,108.8 130.6,109.6 132.0,110.0 133.3,110.5 134.6,110.8 135.9,110.8 137.2,111.7 138.6,112.7 139.9,112.6 141.2,112.1 142.5,111.4 143.9,112.0 145.2,112.6 146.5,112.9 147.8,112.6 149.2,111.5 150.5,110.9 151.8,109.0 153.1,107.0 154.4,106.4 155.8,107.9 157.1,108.1 158.4,106.9 159.7,106.8 161.1,106.8 162.4,105.5 163.7,104.5 165.0,103.6 166.3,106.2 167.7,108.4 169.0,110.3 170.3,111.9 171.6,111.9 173.0,110.5 174.3,109.3 175.6,107.5 176.9,104.8 178.2,103.1 179.6,103.2 180.9,102.5 182.2,102.1 183.5,103.1 184.9,103.9 186.2,104.4 187.5,105.5 188.8,105.6 190.1,106.2 191.5,106.7 192.8,108.2 194.1,110.3 195.4,111.6 196.8,114.5 198.1,115.9 199.4,115.5 200.7,116.2 202.0,119.1 203.4,120.3 204.7,120.1 206.0,121.8 207.3,124.2 208.7,128.3 210.0,131.1 211.3,130.7 212.6,132.2 214.0,135.8 215.3,138.7 216.6,141.5 217.9,143.7 219.2,144.2 220.6,143.4 221.9,143.2 223.2,142.2 224.5,141.4 225.9,140.6 227.2,139.6 228.5,139.0 229.8,138.6 231.1,138.0 232.5,138.2 233.8,138.3 235.1,137.2 236.4,137.1 237.8,138.3 239.1,139.3 240.4,139.6 241.7,140.5 243.0,140.1 244.4,139.4 245.7,138.4 247.0,138.3 248.3,140.1 249.7,140.0 251.0,140.7 252.3,141.9 253.6,141.5 254.9,141.2 256.3,140.1 257.6,138.2 258.9,135.8 260.2,132.4 261.6,134.5 262.9,137.1 264.2,138.2 265.5,137.5 266.8,135.4 268.2,135.7 269.5,135.9 270.8,134.2 272.1,136.2 273.5,138.1 274.8,137.7 276.1,138.0 277.4,138.9 278.8,140.5 280.1,141.1 281.4,140.2 282.7,140.6 284.0,141.9 285.4,143.0 286.7,144.3 288.0,144.6 289.3,144.9 290.7,145.0 292.0,145.6 293.3,146.4 294.6,146.1 295.9,145.9 297.3,146.9 298.6,147.9 299.9,148.4 301.2,149.0 302.6,149.8 303.9,150.6 305.2,151.9 306.5,152.8 307.8,153.4 309.2,154.4 310.5,155.1 311.8,155.7 313.1,156.1 314.5,156.1 315.8,156.7 317.1,156.8 318.4,157.2 319.7,157.2 321.1,157.2 322.4,157.9 323.7,158.0 325.0,158.2 326.4,158.1 327.7,158.1 329.0,158.7 330.3,159.6 331.6,159.8 333.0,159.4 334.3,159.1 335.6,158.5 336.9,157.8 338.3,157.7 339.6,157.2 340.9,157.6 342.2,158.0 343.6,158.1 344.9,158.4 346.2,158.2 347.5,158.2 348.8,158.3 350.2,158.9 351.5,158.5 352.8,158.7 354.1,159.7 355.5,160.6 356.8,161.0 358.1,161.1 359.4,161.2 360.7,161.7 362.1,162.7 363.4,163.2 364.7,163.1 366.0,164.0 367.4,164.3 368.7,165.1" fill="none" style="stroke:var(--build)" stroke-width="3"/><text x="378" y="98.1" font-size="12" style="fill:var(--play)">accelerometer</text><text x="378" y="112.1" font-size="12" style="fill:var(--play)">about -7.5° (steady)</text><text x="378" y="170.5" font-size="12" font-weight="700" style="fill:var(--build)">gyro, added up</text><text x="378" y="184.5" font-size="12" style="fill:var(--build)">-10.0°: drifted 2.5°</text><text x="208.0" y="228" text-anchor="middle" font-size="11" style="fill:var(--muted)">standing still (real recording, 5–25 s)</text></svg>
+<p>2.5° off after 20 s. At that rate, about <strong>93° off after 10 minutes</strong>: the robot would think it was lying on its side.</p>
+</div>
+
+<div class="box idea"><span class="tag">💡 The accelerometer never drifts, but it shakes</span>
+<p>Gravity always pulls down, so the accelerometer's reading tells you the angle straight away: <code>angle = atan2(y, x)</code>. No adding up, so no drift. But every step you take is a push the accelerometer can't tell apart from gravity:</p>
+<svg class="diagram" viewBox="0 0 520 200" role="img" aria-label="Real accelerometer angle while walking: it jumps up and down around minus 13 degrees with every step."><line x1="46" y1="166" x2="504" y2="166" style="stroke:var(--line)"/><text x="40" y="170.0" text-anchor="end" font-size="11" style="fill:var(--muted)">-40°</text><line x1="46" x2="504" y1="166.0" y2="166.0" style="stroke:var(--line)" stroke-width=".5"/><text x="40" y="139.6" text-anchor="end" font-size="11" style="fill:var(--muted)">-30°</text><line x1="46" x2="504" y1="135.6" y2="135.6" style="stroke:var(--line)" stroke-width=".5"/><text x="40" y="109.2" text-anchor="end" font-size="11" style="fill:var(--muted)">-20°</text><line x1="46" x2="504" y1="105.2" y2="105.2" style="stroke:var(--line)" stroke-width=".5"/><text x="40" y="78.8" text-anchor="end" font-size="11" style="fill:var(--muted)">-10°</text><line x1="46" x2="504" y1="74.8" y2="74.8" style="stroke:var(--line)" stroke-width=".5"/><text x="40" y="48.4" text-anchor="end" font-size="11" style="fill:var(--muted)">0°</text><line x1="46" x2="504" y1="44.4" y2="44.4" style="stroke:var(--line)" stroke-width=".5"/><text x="40" y="18.0" text-anchor="end" font-size="11" style="fill:var(--muted)">10°</text><line x1="46" x2="504" y1="14.0" y2="14.0" style="stroke:var(--line)" stroke-width=".5"/><text x="46.0" y="182" text-anchor="middle" font-size="11" style="fill:var(--muted)">0 s</text><text x="160.5" y="182" text-anchor="middle" font-size="11" style="fill:var(--muted)">1 s</text><text x="275.0" y="182" text-anchor="middle" font-size="11" style="fill:var(--muted)">2 s</text><text x="389.5" y="182" text-anchor="middle" font-size="11" style="fill:var(--muted)">3 s</text><text x="504.0" y="182" text-anchor="middle" font-size="11" style="fill:var(--muted)">4 s</text><line x1="46" x2="504" y1="84.6" y2="84.6" style="stroke:var(--fg)" stroke-width="1.5" stroke-dasharray="6 4"/><polyline points="46.0,85.3 48.3,79.4 50.6,59.9 52.9,64.1 55.2,91.3 57.4,108.2 59.7,112.1 62.0,112.7 64.3,107.4 66.6,100.1 68.9,84.4 71.2,68.1 73.5,64.7 75.8,67.7 78.1,72.9 80.3,78.0 82.6,78.0 84.9,77.8 87.2,74.3 89.5,72.4 91.8,74.2 94.1,79.0 96.4,83.4 98.7,87.1 101.0,85.7 103.2,76.5 105.5,63.3 107.8,51.0 110.1,50.0 112.4,61.8 114.7,69.6 117.0,70.2 119.3,76.4 121.6,97.3 123.9,127.3 126.1,127.3 128.4,137.7 130.7,126.4 133.0,126.4 135.3,79.8 137.6,74.9 139.9,74.9 142.2,71.6 144.5,66.3 146.8,66.3 149.1,75.3 151.3,75.3 153.6,86.5 155.9,93.5 158.2,91.6 160.5,93.0 162.8,91.7 165.1,83.7 167.4,76.7 169.7,76.9 171.9,75.7 174.2,73.7 176.5,71.0 178.8,62.4 181.1,51.2 183.4,42.6 185.7,41.9 188.0,61.9 190.3,90.5 192.6,107.8 194.8,132.4 197.1,139.7 199.4,140.2 201.7,108.8 204.0,90.1 206.3,91.4 208.6,93.0 210.9,103.8 213.2,107.9 215.5,114.9 217.8,108.4 220.0,101.9 222.3,84.8 224.6,77.0 226.9,69.9 229.2,67.5 231.5,62.4 233.8,55.1 236.1,45.2 238.4,45.4 240.6,64.6 242.9,85.9 245.2,90.5 247.5,86.2 249.8,71.1 252.1,47.7 254.4,34.2 256.7,48.8 259.0,81.8 261.3,130.8 263.6,141.5 265.8,130.8 268.1,119.8 270.4,106.9 272.7,91.8 275.0,70.3 277.3,52.4 279.6,54.1 281.9,61.6 284.2,89.8 286.4,109.8 288.7,109.8 291.0,128.9 293.3,133.6 295.6,119.3 297.9,91.0 300.2,78.6 302.5,86.0 304.8,90.5 307.1,79.3 309.3,66.3 311.6,49.2 313.9,39.3 316.2,58.4 318.5,97.1 320.8,121.9 323.1,123.2 325.4,129.2 327.7,112.7 330.0,96.6 332.2,94.4 334.5,102.9 336.8,126.3 339.1,142.8 341.4,138.7 343.7,119.1 346.0,91.5 348.3,73.6 350.6,63.1 352.9,61.8 355.1,65.9 357.4,73.3 359.7,76.0 362.0,75.8 364.3,84.2 366.6,84.5 368.9,75.0 371.2,65.9 373.5,55.2 375.8,40.8 378.1,44.8 380.3,56.4 382.6,56.4 384.9,119.7 387.2,147.8 389.5,147.8 391.8,121.7 394.1,105.0 396.4,105.0 398.7,85.0 400.9,60.6 403.2,60.6 405.5,55.3 407.8,83.1 410.1,83.1 412.4,103.5 414.7,114.6 417.0,118.3 419.3,99.7 421.6,75.6 423.8,61.8 426.1,62.6 428.4,67.9 430.7,75.6 433.0,80.0 435.3,77.3 437.6,65.8 439.9,53.3 442.2,62.5 444.5,88.4 446.8,113.7 449.0,124.6 451.3,114.5 453.6,91.9 455.9,78.0 458.2,78.8 460.5,87.5 462.8,87.5 465.1,132.1 467.4,130.3 469.6,130.3 471.9,97.1 474.2,76.9 476.5,76.9 478.8,60.1 481.1,57.9 483.4,53.3 485.7,50.5 488.0,46.3 490.3,46.1 492.6,50.2 494.8,65.2 497.1,81.2 499.4,83.9 501.7,67.9" fill="none" style="stroke:var(--play)" stroke-width="2"/><text x="500" y="78.6" text-anchor="end" font-size="12" style="fill:var(--fg)">true angle -13.2° (average)</text><text x="275.0" y="198" text-anchor="middle" font-size="11" style="fill:var(--muted)">walking (real recording, first 4 s of 150–162 s): accelerometer angle</text></svg>
+<p>While walking, it wobbles <strong>9.5°</strong> on average around the true angle.</p>
+</div>
+
+<div class="box idea"><span class="tag">💡 Trust the gyro now, the accelerometer over time</span>
+<p>Every reading: let the gyro predict the new angle, then nudge a little way toward the accelerometer.</p>
+<pre><code>predicted = angle + rate × dt
+angle     = predicted + (1 − alpha) × (accelerometer − predicted)</code></pre>
+<p>One nudge is tiny, so one shaky step barely matters. But 50 nudges a second add up, so the accelerometer slowly pulls back any drift.</p>
+<svg class="diagram" id="seesaw" viewBox="0 0 460 190" role="img" aria-label="A seesaw: the gyro on one end, the accelerometer on the other. It tilts toward the sensor trusted more in each reading.">
+  <polygon points="230,120 210,170 250,170" style="fill:var(--muted)"/>
+  <g id="ssBeam">
+    <rect x="60" y="112" width="340" height="8" rx="4" style="fill:var(--fg)"/>
+    <rect x="62" y="70" width="110" height="40" rx="10" style="fill:var(--build-soft);stroke:var(--build)" stroke-width="2"/>
+    <text x="117" y="88" text-anchor="middle" font-size="13" font-weight="700" style="fill:var(--build)">gyro</text>
+    <text id="ssG" x="117" y="104" text-anchor="middle" font-size="12" style="fill:var(--fg)"></text>
+    <rect x="288" y="70" width="110" height="40" rx="10" style="fill:var(--play-soft);stroke:var(--play)" stroke-width="2"/>
+    <text x="343" y="88" text-anchor="middle" font-size="13" font-weight="700" style="fill:var(--play)">accelerometer</text>
+    <text id="ssA" x="343" y="104" text-anchor="middle" font-size="12" style="fill:var(--fg)"></text>
+  </g>
+  <text id="ssT" x="230" y="188" text-anchor="middle" font-size="12" style="fill:var(--fg)"></text>
+</svg>
+<label for="ssa">alpha: <span id="ssav" class="num"></span></label>
+<input id="ssa" type="range" min="0" max="1" step="0.01" value="0.98">
+<p class="legend">alpha 1 = gyro only (drifts). alpha 0 = accelerometer only (shakes). The answer is in between.</p>
+</div>
+
+<div class="box idea"><span class="tag">💡 The wrap-around trap</span>
+<p>Angles go round a dial: past 179° comes −180°, not 181°. In this recording, while lying down, the accelerometer read <strong>177.8°</strong> and, 0.02 s later, <strong>−179.6°</strong>. They're only <strong>2.7° apart</strong>. But subtract the numbers and you get 357°. Average them and you get <strong>−0.9°</strong>: pointing the opposite way!</p>
+<svg class="diagram" viewBox="0 0 470 270" role="img" aria-label="An angle dial. 177.8 and minus 179.6 degrees sit next to each other on the left. Their true halfway is 179.1 degrees, also on the left. The naive average, minus 0.9 degrees, is on the right, the opposite side.">
+  <circle cx="210" cy="135" r="95" fill="none" style="stroke:var(--line)" stroke-width="10"/>
+  <path d="M115.1,131.3 A95,95 0 1 1 115.0,135.7" fill="none" style="stroke:var(--fail)" stroke-width="2" stroke-dasharray="5 4"/>
+  <text x="210" y="30" text-anchor="middle" font-size="12" style="fill:var(--muted)">90°</text>
+  <text x="210" y="250" text-anchor="middle" font-size="12" style="fill:var(--muted)">−90°</text>
+  <text x="312" y="122" font-size="12" style="fill:var(--muted)">0°</text>
+  <text x="126" y="172" font-size="11" style="fill:var(--muted)">±180°</text>
+  <circle cx="115.1" cy="129.5" r="6" style="fill:var(--play)"/>
+  <circle cx="115.0" cy="137.5" r="6" style="fill:var(--play)"/>
+  <text x="104" y="118" text-anchor="end" font-size="13" style="fill:var(--play)">177.8°</text>
+  <text x="104" y="156" text-anchor="end" font-size="13" style="fill:var(--play)">−179.6°</text>
+  <text x="104" y="137" text-anchor="end" font-size="12" font-weight="700" style="fill:var(--ok)">✓ halfway 179.1°</text>
+  <line x1="298" y1="128" x2="312" y2="144" style="stroke:var(--fail)" stroke-width="3"/><line x1="312" y1="128" x2="298" y2="144" style="stroke:var(--fail)" stroke-width="3"/>
+  <text x="318" y="160" font-size="12" font-weight="700" style="fill:var(--fail)">✗ naive average −0.9°</text>
+  <text x="318" y="176" font-size="11" style="fill:var(--fail)">(the long way round: 357°)</text>
+</svg>
+<p>The fix: <code>wrap()</code> every difference into −180…180. Then the gap between 177.8° and −179.6° comes out as 2.7°, the short way. Your <code>complementary</code> uses it.</p>
+</div>
+
+<h2 id="play">2. Play</h2>
+<div class="box play"><span class="tag">🎮 Play</span>
+<p>The <strong>real</strong> 11.7 seconds of walking from the recording (585 readings), computed exactly like <code>lesson22_fusion.py</code>. Blue: accelerometer alone. Orange: gyro alone, added up. Green: fused. Dashed: the true angle (the walk's average).</p>
+<div class="card demo">
+<canvas id="fcv" width="700" height="300" aria-label="Real walking data: accelerometer angle, gyro-only angle and fused angle over 11.7 seconds"></canvas>
+<label for="fa">alpha: <span id="fav" class="num"></span></label>
+<input id="fa" type="range" min="0" max="1" step="0.01" value="0.98">
+<p>
+<button data-a="0">0 (accelerometer only)</button>
+<button data-a="0.9">0.9</button>
+<button data-a="0.98">0.98</button>
+<button data-a="1">1 (gyro only)</button>
+</p>
+<div class="stats">
+  <div class="stat"><div class="k">Accelerometer wobble</div><div class="v" id="wA">–</div></div>
+  <div class="stat"><div class="k">Gyro-only wobble</div><div class="v" id="wG">–</div></div>
+  <div class="stat"><div class="k">Fused wobble</div><div class="v" id="wF">–</div></div>
+</div>
+</div>
+<p><strong>Try:</strong> slide alpha from 0 to 1. Where is the green line steadiest? Watch the orange line slide away from the dashed one: that's drift.</p>
+</div>
+
+<h2 id="build">3. Build</h2>
+<div class="box build"><span class="tag">🛠 Build</span>
+<p>Open <code>lesson22_fusion.py</code> in <code>project/homework</code>. It reads the same recording as week 3 (<code>data/phone_acc.csv</code> and <code>data/phone_gyro.csv</code>) with your <code>read_phone_csv</code>. <code>load</code>, <code>still_angle</code> and <code>wobble</code> are written for you. Fill in four functions. Check each with <code>python3 check.py 22</code> from <code>project</code>.</p>
+<ol class="steps">
+<li><strong><code>wrap(angle)</code></strong>: bring any angle into −180 (included) to 180 (not included). <code>wrap(190)</code> → −170, <code>wrap(-190)</code> → 170, <code>wrap(360)</code> → 0.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>Lesson 22: lesson22_fusion.py
+  ✓ wrap
+  … accel_angle: not written yet (Lesson 22: write this function)
+  … integrate_gyro: not written yet (Lesson 22: write this function)
+  … complementary: not written yet (Lesson 22: write this function)
+  … real data: fusion beats both: not written yet (Lesson 22: write this function)
+  1/5 passed</code></pre>
+<p>If you see <code>✗ wrap: wrap(190) -&gt; -170, wrap(-190) -&gt; 170, wrap(360) -&gt; 0</code>, you probably wrote <code>angle % 360</code>, which gives 0 to 360. Shift by 180 first.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>The signature is <code>def wrap(angle):</code>. In Python, <code>%</code> always gives a result from 0 up to the number: <code>-10 % 360</code> is 350.</p></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code>return (angle + ____) % 360 - ____</code></pre></details>
+</div>
+
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" style="counter-reset: step 1">
+<li><strong><code>accel_angle(x, y)</code></strong>: the angle from the accelerometer, <code>atan2(y, x)</code>, in degrees.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>  ✓ wrap
+  ✓ accel_angle
+  … integrate_gyro: not written yet (Lesson 22: write this function)
+  … complementary: not written yet (Lesson 22: write this function)
+  … real data: fusion beats both: not written yet (Lesson 22: write this function)
+  2/5 passed</code></pre>
+<p>If you see <code>✗ accel_angle: accel_angle(-1, 0) -&gt; 180</code>, you swapped the order. It's <code>atan2(y, x)</code>: y first.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p><code>math.atan2(y, x)</code> gives radians. <code>math.degrees(r)</code> turns radians into degrees. <code>math</code> is already imported.</p></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code>return math.degrees(math.atan2(____, ____))</code></pre></details>
+</div>
+
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" style="counter-reset: step 2">
+<li><strong><code>integrate_gyro(start_angle, rates, dt)</code></strong>: start at <code>start_angle</code>. For each rate, add <code>rate × dt</code> and wrap. Return the list of angles, one per rate. <code>integrate_gyro(0, [10, 10, -5], 0.5)</code> → <code>[5.0, 10.0, 7.5]</code>.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>  ✓ wrap
+  ✓ accel_angle
+  ✓ integrate_gyro
+  … complementary: not written yet (Lesson 22: write this function)
+  … real data: fusion beats both: not written yet (Lesson 22: write this function)
+  3/5 passed</code></pre>
+<p>If you see <code>✗ integrate_gyro: 175 + 10 = 185 wraps to -175</code>, you forgot to <code>wrap</code> after adding.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p>Keep a running <code>angle</code> and an <code>out</code> list. Append <em>after</em> adding, so the first item already includes <code>rates[0] * dt</code>.</p></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code>out, angle = [], start_angle
+for r in rates:
+    angle = wrap(angle + ____ * dt)
+    out.append(____)
+return out</code></pre></details>
+</div>
+
+<div class="box build"><span class="tag">🛠 Build</span>
+<ol class="steps" style="counter-reset: step 3">
+<li><strong><code>complementary(start_angle, rates, accel_angles, dt, alpha)</code></strong>: for each <code>(rate, accel_angle)</code> pair:
+<pre><code>predicted = angle + rate * dt
+angle = wrap(predicted + (1 - alpha) * wrap(accel_angle - predicted))</code></pre>
+Return the list of angles. Note the <em>inner</em> <code>wrap</code>: that's the trap from the dial.</li>
+</ol>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>  ✓ wrap
+  ✓ accel_angle
+  ✓ integrate_gyro
+  ✓ complementary
+  ✓ real data: fusion beats both
+  5/5 passed  🎉 lesson complete!</code></pre>
+<p>If you see <code>✗ complementary: 170 and -170 are 20 apart, not 340: halfway is 180 (= -180)</code>, add the inner <code>wrap</code> around <code>accel_angle - predicted</code>.</p>
+<p>Now <code>cd homework</code> and <code>python3 lesson22_fusion.py</code>. You should see:</p>
+<pre><code>1) DRIFT. Standing still for 20 s (5-25 s): the accelerometer's angle barely moves (it's the truth here).
+   accelerometer: -7.0 degrees at the start, -7.5 at the end
+   gyroscope alone: -10.0 at the end, so -2.5 degrees off after 20 s (it reads -0.155 degrees a second while still: that's its bias)
+   at that rate, after 10 minutes it would be -93 degrees off
+
+2) SHAKE. Standing, sitting, standing, then lying down (0-91 s). Still stretches checked against the truth:
+   accelerometer alone        typical error while still:  2.95 degrees
+   gyroscope alone            typical error while still:  5.34 degrees
+   complementary alpha 0.9    typical error while still:  2.78 degrees
+   complementary alpha 0.98   typical error while still:  2.70 degrees
+
+3) WALKING (150-162 s): the accelerometer shakes with every step.
+   accelerometer alone        wobbles  9.55 degrees around its average
+   gyroscope alone            wobbles  5.94 degrees around its average
+   complementary alpha 0.98   wobbles  2.14 degrees around its average</code></pre>
+<p>Fused beats both sensors, every time.</p>
+</div>
+<div class="box stuck"><span class="tag">🆘 Stuck?</span>
+<details><summary>Hint 1</summary><p><code>zip(rates, accel_angles)</code> walks both lists together. It's <code>integrate_gyro</code> plus one nudge.</p></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code>out, angle = [], start_angle
+for r, a in zip(rates, accel_angles):
+    predicted = angle + r * dt
+    angle = wrap(predicted + (1 - alpha) * wrap(____ - predicted))
+    out.append(angle)
+return out</code></pre></details>
+</div>
+
+<h2 id="add-to-robot">4. Add it to your robot</h2>
+<div class="box bot"><span class="tag">🤖 Add it to your robot</span>
+<p>Fill in <code>steady(self)</code> in <code>my_robot.py</code>. It measures the wobble while walking (150–162 s of the recording), for the accelerometer alone and for your fused angle with alpha 0.98, and returns one sentence. Then the robot answers the new command <code>steady</code>.</p>
+<details><summary>Hint 1: the import</summary><pre><code>from lesson22_fusion import load, still_angle, complementary, wobble, DT</code></pre></details>
+<details><summary>Hint 2 (fill in the blanks)</summary><pre><code>t, acc, rate = load(149.9, 161.6)
+truth = still_angle(t, acc, 149.9, 161.6)
+fused = complementary(acc[0], rate, acc, DT, ____)
+return (f"Accelerometer alone wobbles {wobble(t, acc, 149.9, 161.6, truth):.1f} degrees; "
+        f"fused, {wobble(t, ____, 149.9, 161.6, truth):.1f}.")</code></pre></details>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p>From <code>project</code>, run <code>python3 check.py robot</code>:</p>
+<pre><code>Your robot: my_robot.py
+  ✓ week 1: arrows
+  ✓ week 2: look
+  ✓ week 2 part B: look's safe speed
+  ✓ week 3: real phone data
+  ✓ week 4: stops for the cat
+  ✓ week 4 part B: the safest threshold
+  ✓ week 5: goto
+  ✓ week 6: steady
+  … week 7: fixes typos: not written yet (fill in clean() first)
+  ...
+  8/21 passed</code></pre>
+<p>Then <code>cd homework</code>, <code>python3 my_robot.py</code>:</p>
+<pre><code>Zippy&gt; steady
+  Accelerometer alone wobbles 9.5 degrees; fused, 2.1.</code></pre>
+<p>If you see <code>✗ week 6: steady: fused should wobble less than half the accelerometer; got 'Accelerometer alone wobbles 9.5 degrees; fused, 7.7.'</code>, you used alpha 0.5. Use 0.98.</p>
+</div>
+
+<h2 id="challenge">5. Real-world challenge: find your phone's drift</h2>
+<div class="card">
+<p>Ask an adult before installing apps. <strong>phyphox</strong> is free (iOS and Android).</p>
+<ol>
+<li>Lay the phone flat on a table. In phyphox, open <strong>Gyroscope</strong> and record 20 seconds without touching it.</li>
+<li>Export the CSV ("comma, decimal point"). Save the gyroscope file as <code>homework/data/my_gyro.csv</code>.</li>
+<li>From <code>homework</code>, average the z column (radians a second) and turn it into degrees:
+<pre><code>python3 -c "import math; from lesson21_phone import read_phone_csv; t, x, y, z = read_phone_csv('data/my_gyro.csv'); b = math.degrees(sum(z) / len(z)); print(b, 'degrees a second;', b * 600, 'after 10 minutes')"</code></pre></li>
+<li>Is your phone's bias bigger or smaller than −0.155 degrees a second?</li>
+</ol>
+<p><strong>On your own, no phone:</strong> in a clear, safe space, walk 10 steps toward a spot on the wall with your eyes shut (the gyro). How far off are you? Now repeat, peeking for a moment every 3 steps (the accelerometer). Which got you closer?</p>
+</div>
+
+<details id="check"><summary><strong>Check yourself</strong></summary>
+<p><strong>With alpha 1, what is the fused line?</strong> The gyro alone: <code>(1 − 1) = 0</code>, so the accelerometer is never used.</p>
+<p><strong>Why not just use the accelerometer and average out the shake?</strong> Averaging makes it slow: when the robot really turns, the average lags behind. The gyro sees turns instantly.</p>
+<p><strong>What is <code>wrap(−179.6 − 177.8)</code>?</strong> 2.6 (2.7 with the unrounded readings): the short way round. Without wrap it's −357.4.</p>
+<p><strong>The gyro drifts 2.5° in 20 s. Why doesn't the fused angle?</strong> Every reading, 2% of the gap to the accelerometer is closed. Over one second (50 readings) that pulls back about 64% of any drift.</p>
+</details>
+
+<details id="more"><summary><strong>Want to know more?</strong></summary>
+<p><strong>The best alpha, on this walk:</strong> 0 → 9.5°, 0.5 → 7.7°, 0.9 → 3.0°, 0.95 → 2.2°, 0.98 → 2.1°, 0.99 → 2.5°, 1 → 5.9°. Too low and you get the shake. Too high and you get the drift.</p>
+<p><strong>A real limit.</strong> <code>load</code> stops at 91 s. After that, the phone lies so flat that one angle stops making sense: a 3D object needs three angles. Real phones and drones use quaternions to avoid this, and a <strong>Kalman filter</strong>, a cleverer mix that works out how much to trust each sensor as it goes.</p>
+<p><strong>Where you meet this:</strong> self-balancing scooters, drones, and your phone's screen rotation all fuse a gyro with an accelerometer.</p>
+<p><strong>The data.</strong> Experiment 1, user 1 of the UCI "Smartphone-Based Recognition of Human Activities and Postural Transitions" dataset by J.-L. Reyes-Ortiz, D. Anguita, L. Oneto and X. Parra, <a href="https://archive.ics.uci.edu/dataset/341">archive.ics.uci.edu/dataset/341</a>, licensed CC BY 4.0. Trimmed to the first 11,800 readings, acceleration converted from g to m/s², and activity labels added. Paper: Reyes-Ortiz, Oneto, Samà, Parra, Anguita, "Transition-Aware Human Activity Recognition Using Smartphones", Neurocomputing, 2015.</p>
+<ul>
+<li><a href="21-phone.html">Week 3 · Real phone sensors</a>: the same recording, used for tilt and steps.</li>
+<li><a href="../17-free-ai-curriculum.html#robotics">Free robotics courses</a>: state estimation and Kalman filters.</li>
+</ul>
+</details>
+
+<nav class="pager">
+  <a href="06-pathfinding.html"><small>Previous</small>Week 5 · Finding the way</a>
+  <a class="next" href="08-words-as-numbers.html"><small>Next</small>Week 7 · Part A: Words as numbers</a>
+</nav>
+<footer>Build a Robot Brain · Week 6 of 16 (homework file: lesson22_fusion.py). Data: UCI HAPT, CC BY 4.0.</footer>
+</main>
+
+<script>
+(() => {
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  // Real walking data, 149.90-161.58 s: phone_acc.csv x, y (m/s^2) and phone_gyro.csv z (rad/s), 50 a second
+  const WALK = {"t0":"149.90","ax":[13.9336,9.8339,6.7012,7.1915,9.3844,10.297,9.9429,9.3163,9.3163,9.3436,8.9622,8.9486,9.3163,9.507,9.6568,9.4934,9.1393,9.1801,10.1335,10.5149,10.3106,10.1608,10.1199,10.0246,10.1472,10.2153,10.1472,10.0927,10.5149,11.4002,11.9587,11.6999,10.7056,9.4798,8.4038,8.4038,8.0769,8.4855,8.4855,10.7056,11.2368,11.2368,12.2856,11.4139,11.4139,8.9758,8.9758,8.5127,8.5672,8.5263,7.7908,6.9464,7.4231,8.8532,9.5206,9.5342,9.0575,9.1937,10.2697,11.5364,12.0676,12.1494,12.7078,14.4784,15.6225,12.6397,9.0984,6.3743,6.6467,8.1586,9.6023,10.0791,10.6239,10.2834,7.6002,6.0883,5.8023,7.6683,8.6217,9.6023,9.6023,9.3163,9.3027,9.398,9.6704,10.1744,10.4332,10.8963,12.0268,13.1164,13.7429,13.416,11.3185,8.9894,7.246,8.0224,11.2232,14.2605,15.2139,13.1845,10.7192,8.8805,8.0496,7.8589,7.4095,6.7693,6.7693,5.7069,5.0668,4.9033,5.6661,7.3277,9.1256,10.8146,12.34,13.239,13.3479,12.9257,13.1573,13.92,15.1322,12.6124,7.0281,5.598,6.7421,10.4196,10.6511,9.7522,8.1858,7.6546,6.674,6.8783,7.9543,9.8748,9.6704,8.8805,8.6353,8.9077,9.1256,9.3027,9.6568,10.6511,11.5228,11.6318,11.9314,12.9257,13.0619,13.0619,9.1529,9.221,9.221,12.9802,14.4239,14.4239,12.4626,9.9565,9.9565,8.717,6.8102,6.8102,6.6331,6.9328,7.0553,6.6331,6.9872,7.6274,8.322,9.0303,9.9292,11.373,13.0211,13.1164,11.9314,11.7544,13.7293,15.1594,12.7759,8.4174,6.5241,8.5808,10.4196,10.2016,10.2016,8.6489,8.4446,8.4446,6.3743,6.565,6.565,8.8941,9.4389,9.6023,8.8941,8.9622,9.507,9.7658,10.2016,10.2153,10.3242,12.5443,13.416,13.8247,12.7078,11.0733,9.6841,8.717,10.1199,12.4762,13.8791,13.9336,12.3673,10.474,8.6353,7.8045,7.3277,7.069,6.5105,6.0611,5.7478,5.8023,6.8919,8.1858,9.3572,9.7113,10.3515,12.7078,14.5874,14.3286,14.71,15.1594,14.9007,9.112,4.4675,7.0553,10.3515,10.692,9.5751,9.1393,9.1393,6.7012,6.3335,6.3335,7.7227,10.1744,10.1744,9.6704,8.4991,8.4991,8.9349,9.6977,9.6977,9.8475,10.3106,10.3106,11.2232,11.9042,12.5988,12.5307,10.8146,9.5615,10.4059,12.8304,14.3967,13.5931,11.373,9.6704,9.0167,8.8668,8.5127,7.7772,6.674,5.9112,5.7614,6.17,6.7966,7.3005,7.4776,8.1177,9.6704,12.0268,14.4512,15.0777,13.8791,13.7702,15.0505,14.1924,9.5751,5.1894,6.17,9.8339,11.1823,10.5421,8.6898,8.1041,8.1041,6.9328,6.9872,8.3084,9.398,9.7522,9.7522,8.7306,8.4174,8.4174,8.2403,9.0712,10.6511,11.9859,11.9995,11.6999,11.8497,12.6533,12.4762,10.6647,8.54,8.8668,11.6454,14.4921,15.1867,14.1515,9.7658,8.5127,7.7636,7.3822,6.8102,6.3879,6.2517,5.9385,6.0066,6.4424,7.355,8.1177,8.8805,10.583,13.0892,15.4455,14.8189,12.5307,12.6261,12.3128,12.6261,9.3708,7.9679,9.3436,10.011,9.3572,8.6353,8.9213,8.6625,8.1586,6.4833,6.674,7.9951,9.5479,9.3844,8.6762,8.145,8.3765,9.5206,10.6239,11.4275,11.8361,12.1494,12.0949,12.0949,12.3809,11.6726,11.6726,10.0382,11.0733,11.0733,14.5738,12.8167,12.8167,9.3844,8.1858,8.1858,7.355,6.7557,6.3607,6.3471,6.4152,6.6331,7.0417,7.464,7.8998,8.4038,9.4253,12.1221,15.1186,15.105,13.5114,13.4841,13.8383,12.5852,8.7034,6.9736,8.9486,10.9916,10.4196,8.5808,7.6002,7.4776,7.4095,7.1643,7.4231,9.1393,9.5615,9.5342,9.003,8.8668,9.2891,9.8611,9.9156,9.8203,10.3106,11.1414,11.482,11.8361,12.5171,12.4899,10.6511,8.54,9.1529,11.8497,14.8053,15.5272,13.0619,10.5558,9.0167,8.5127,7.4231,6.96,6.279,6.279,6.4016,6.4016,6.3198,7.5457,7.8998,8.5808,9.8611,11.9587,13.9881,13.9609,13.9609,12.6397,14.2196,14.2196,11.0597,6.7285,6.7285,7.0553,10.7601,10.7601,9.9156,8.322,8.322,7.927,7.3958,7.4503,8.5808,9.5342,9.7385,8.9077,8.6762,9.5342,10.0246,10.3923,9.8339,9.5479,10.0518,10.869,11.2776,11.4683,12.054,12.1221,11.6045,9.9565,8.4174,9.3299,12.163,14.3422,14.3422,12.2175,10.1335,8.7715,8.3629,8.2131,7.4503,7.2052,7.0281,6.5786,6.5378,6.9872,8.1313,8.6898,8.9213,9.4253,11.4139,13.7021,13.239,12.4218,14.315,16.1674,13.9472,8.4855,5.0259,5.6116,9.793,11.0461,10.869,8.6898,8.0632,7.1234,7.1234,7.5729,9.0575,9.0575,9.9429,9.3027,9.3027,8.826,9.0303,9.5615,9.6977,9.7385,10.1335,10.6103,10.6103,10.3651,11.5909,13.3616,13.3071,10.7601,8.1858,8.1177,10.8009,14.029,14.9551,13.3752,10.9916,9.507,8.6081,8.145,7.3277,6.674,6.4833,6.3198,6.3471,6.9736,7.3141,7.9815,7.9815,8.9077,9.6841,12.0268,14.3014,14.1652,13.7838,15.0369,14.315,13.7974,6.565,4.9442,5.9657,10.9916,11.9587,11.7952,9.6977,7.641,6.565,6.5514,7.9951,9.7113,10.2153,9.6568,8.8668,8.7987,9.3299,9.8067,9.8339,9.8203,10.0791,10.1335],"ay":[-3.337,-2.0022,-0.5993,-0.8172,-2.5879,-3.9499,-4.0725,-3.8546,-3.5277,-3.0918,-2.0975,-1.2258,-1.0896,-1.2803,-1.5936,-1.8524,-1.7843,-1.7843,-1.757,-1.7025,-1.7843,-2.0431,-2.3018,-2.5061,-2.4517,-1.9068,-1.1032,-0.3814,-0.3405,-1.1441,-1.7434,-1.7434,-1.9886,-2.9692,-4.3313,-4.3313,-4.7944,-4.3177,-4.3177,-2.2065,-1.9886,-1.9886,-1.9341,-1.4438,-1.4438,-1.6072,-1.6072,-2.0975,-2.4789,-2.3699,-2.2337,-1.9341,-1.7025,-1.6617,-1.7979,-1.7298,-1.5391,-1.4165,-1.0624,-0.4495,0.1226,0.1771,-1.2803,-3.9227,-5.9521,-6.9872,-5.5435,-3.909,-2.5742,-2.1929,-2.656,-2.8875,-3.7728,-3.9227,-3.2553,-2.3427,-1.9886,-1.8115,-1.6344,-1.4165,-1.2803,-0.967,-0.5721,-0.0409,-0.0545,-1.185,-2.5334,-2.9556,-2.942,-2.0294,-0.2588,0.79,-0.286,-1.9613,-3.9227,-4.9987,-6.0747,-6.5922,-5.7069,-3.6775,-1.6072,-0.4086,-0.4495,-0.7764,-1.975,-2.6696,-2.6696,-3.0101,-2.8467,-2.2474,-1.5527,-1.4574,-2.2201,-2.9284,-2.5061,-1.6753,-0.3677,0.3814,-1.0624,-4.3449,-7.2188,-6.1292,-3.7184,-2.3155,-2.0839,-3.0782,-3.7184,-4.9578,-5.1894,-4.6037,-3.051,-1.9068,-1.3484,-1.0624,-0.967,-1.1032,-1.4438,-1.6344,-1.6617,-2.1656,-2.261,-1.8932,-1.4301,-0.7219,0.2452,-0.0272,-0.8989,-0.8989,-4.2223,-6.2245,-6.2245,-6.17,-5.2302,-5.2302,-2.9556,-0.9262,-0.9262,-0.5448,-1.5391,-1.5391,-2.3427,-2.9556,-3.1872,-2.1793,-1.2667,-0.7627,-0.8717,-1.2258,-1.7979,-2.3563,-2.4925,-1.6208,-0.6129,-1.2258,-3.5413,-6.3743,-6.3335,-3.5822,-1.8251,-1.6753,-2.0839,-2.5742,-2.5742,-4.7671,-4.5356,-4.5356,-1.9886,-1.2395,-1.2395,-0.8036,-0.7355,-0.4903,-0.3133,-0.0953,-0.0953,-0.3269,-1.2258,-2.1929,-2.3836,-1.7025,-1.2122,-0.2452,-0.0953,-1.1441,-3.0646,-5.5435,-6.2245,-6.4424,-6.0202,-4.3721,-1.7706,0.0272,0.1498,-0.8308,-2.0839,-2.5061,-3.0646,-3.0782,-2.5061,-1.1441,-0.6538,-0.681,-1.471,-2.2882,-2.1248,-2.0294,-1.4574,-0.6265,-2.5879,-5.884,-7.1643,-4.1133,-1.8387,-1.185,-1.6344,-2.9148,-4.5492,-5.2575,-5.2575,-3.0918,-2.547,-2.547,-1.7298,-1.3076,-1.3076,-0.681,-0.8853,-0.8853,-1.2258,-1.7979,-1.7979,-2.3291,-1.1986,-1.1986,-0.4359,0.0545,-1.185,-1.7434,-2.7241,-6.0202,-6.5922,-7.2052,-6.9328,-6.1019,-3.3097,-0.8989,0.1498,0.109,-0.504,-1.4165,-2.1793,-2.6287,-2.833,-2.6423,-2.0294,-1.3757,-0.9807,-1.1986,-1.6753,-1.3348,-0.504,0.3541,0.3541,-2.3155,-5.0531,-7.4912,-6.2109,-3.7728,-2.2474,-2.0703,-2.3563,-3.0918,-3.7728,-4.0316,-4.0316,-3.1599,-2.0022,-1.5391,-1.3212,-1.2122,-1.2122,-0.5857,-0.4495,-0.4495,-0.3133,-0.6538,-1.5391,-2.3699,-2.3836,-1.5527,0.5584,1.2531,-0.7083,-2.9284,-5.598,-6.6059,-6.7148,-6.8647,-6.2381,-5.3392,-1.3212,-0.0136,0.0272,-0.5721,-1.3212,-2.1929,-2.5061,-2.5742,-2.152,-1.5255,-1.0896,-0.7764,-1.185,-1.5255,-1.1032,-0.4903,0.2179,0.0136,-2.9284,-6.7966,-6.7829,-4.699,-3.2961,-2.4789,-2.438,-2.942,-4.018,-4.7126,-4.0997,-3.514,-1.8251,-1.5527,-1.3212,-0.9126,-0.5312,-0.504,-0.5312,-0.7355,-1.2803,-2.0158,-2.3291,-2.0567,-1.3212,-0.4359,-0.4359,-2.5334,-3.3778,-3.3778,-5.9249,-5.6388,-5.6388,-5.5435,-3.3506,-3.3506,-1.1305,-1.3212,-1.3212,-1.4574,-1.5119,-1.7025,-2.1384,-2.152,-2.0431,-1.4165,-0.8036,-0.7491,-1.5936,-1.9886,-1.4574,-0.8989,0.1226,0.4631,-1.866,-5.3256,-7.2733,-5.5435,-3.1872,-1.8796,-1.2667,-1.6617,-2.7649,-4.127,-4.5628,-3.909,-2.833,-2.2201,-1.1577,-0.8308,0.0681,0.286,0.3133,0.1226,-0.4903,-1.4029,-2.1929,-2.438,-1.9341,-1.3076,-0.5993,-0.2179,-1.2803,-3.0237,-5.3664,-6.2245,-6.6059,-6.5105,-5.1621,-2.7104,-0.967,-0.3133,-0.3133,-0.504,-0.7219,-1.1577,-2.1929,-2.4517,-2.4517,-2.1929,-0.9943,-0.8989,-1.0624,-1.5391,-1.4982,-1.5119,-0.5448,-0.5448,-0.7083,-3.4868,-3.4868,-6.6195,-4.3449,-4.3449,-2.4517,-1.5391,-1.5391,-2.3291,-4.4811,-4.4811,-4.3449,-3.6366,-2.6015,-1.757,-0.8581,-0.4086,0.2452,0.2724,0.0272,-0.1226,-0.6946,-1.3484,-1.9613,-2.4517,-2.6015,-1.9886,-1.0215,-0.1226,-0.0545,-1.3076,-3.3642,-5.2302,-5.7205,-6.0202,-5.8431,-4.1814,-2.0839,-0.5721,-0.1771,-0.5584,-0.8308,-1.4165,-1.9341,-2.2201,-2.3563,-2.0431,-1.4574,-1.3757,-1.362,-1.9886,-2.5061,-2.1384,-1.1169,0.681,1.3212,-1.471,-4.6309,-7.5321,-5.4754,-3.3234,-2.5061,-1.2531,-2.0567,-2.6696,-3.9771,-4.2223,-4.2087,-4.2087,-3.051,-2.2474,-2.2474,-0.2452,0.1226,0.1226,-0.0953,-0.4086,-0.7083,-1.3757,-1.6344,-2.3155,-2.8603,-2.3427,-1.2395,-0.3541,0.0136,-0.7764,-1.5119,-3.5685,-5.2711,-6.0611,-6.9872,-6.7012,-4.4539,-1.6753,-0.0953,0.0681,-0.3541,-1.1577,-1.866,-2.5742,-2.6832,-2.4108,-1.3212,-1.0896,-1.0215,-1.0215,-1.9205,-1.975,-1.6208,-1.1441,0.1634,0.5993,-2.5879,-6.1836,-7.2188,-4.4811,-3.2416,-1.2258,-0.8308,-1.7162,-3.7047,-5.0259,-5.1894,-4.3177,-3.1463,-2.3155,-1.6617,-0.9262,-0.3814,-0.109,-0.2588,-0.4495,-0.8445,-1.2803,-1.7025,-2.261,-1.9613],"gz":[-0.08216,-0.08338,0.11881,0.10568,0.03451,-0.08705,-0.1182,-0.09194,0.06628,0.16982,0.31429,0.44563,0.45754,0.42516,0.36866,0.28955,0.27855,0.26298,0.26481,0.36102,0.39401,0.33995,0.25015,0.18692,0.17318,0.10812,0.01619,-0.01527,0.01161,0.00153,-0.12889,-0.13683,-0.05437,0.03299,0.03024,-0.07147,-0.21136,-0.36652,-0.38057,-0.26664,0.12492,0.37232,0.38515,0.27428,0.2138,0.33078,0.51252,0.52015,0.2587,0.02046,-0.08216,0.03818,0.04643,-0.04581,-0.20647,-0.30971,-0.30513,-0.26298,-0.17868,-0.08827,-0.04429,0.00855,0.1741,0.48075,0.45998,0.07086,-0.03024,-0.00458,0.23488,0.25901,0.14936,0.12859,0.0504,-0.23579,-0.40989,-0.29993,-0.01558,0.14936,0.16127,0.197,0.17898,0.14019,0.08766,0.06445,0.12645,0.1408,0.05589,-0.10568,-0.2813,-0.36927,-0.23976,-0.14111,-0.15974,-0.24801,-0.4047,-0.54367,-0.60476,-0.67317,-0.44471,-0.22633,-0.02535,0.13836,0.26786,0.42028,0.4722,0.35216,0.19395,-0.14355,-0.17135,-0.1066,-0.01222,0.0452,-0.07514,-0.27092,-0.28008,-0.14752,-0.02779,0.07269,0.25259,0.92149,0.76877,-0.21197,-0.22938,0.20159,0.50457,0.29505,0.16005,-0.05162,-0.36041,-0.45112,-0.3543,0.02932,0.14936,0.22022,0.20831,0.2813,0.32223,0.28436,0.22633,0.23824,0.33872,0.25748,-0.1689,-0.47953,-0.55619,-0.37263,-0.3653,-0.55925,-0.53329,-0.65149,-0.62553,-0.56749,-0.47403,-0.26512,-0.13531,-0.01924,0.1405,0.25595,0.39034,0.42699,0.24526,-0.00489,-0.14294,-0.06781,0.06811,0.11087,-0.01436,-0.16646,-0.20311,-0.11393,-0.00977,-0.06994,-0.11851,-0.07178,0.23488,0.78954,0.55619,0.11301,0.09346,0.22022,0.22602,0.0672,0.05528,-0.01527,-0.24068,-0.30513,-0.14386,0.26053,0.30085,0.27367,0.26848,0.30818,0.38423,0.41142,0.4102,0.33964,0.1741,0.01802,-0.21472,-0.39828,-0.34514,-0.0898,-0.03971,-0.22816,-0.45815,-0.76022,-0.76541,-0.76755,-0.64324,-0.31124,-0.07269,0.10812,0.2642,0.36774,0.40928,0.33537,0.2193,0.00275,-0.0562,0.03757,0.23824,0.1799,-0.03115,-0.24984,-0.29138,-0.10751,-0.03543,-0.08583,0.12248,0.832,0.78282,-0.20525,-0.37538,0.00428,0.31765,0.2025,0.23702,0.07972,-0.26206,-0.4441,-0.30146,0.00794,0.11942,0.1576,0.24893,0.33139,0.39706,0.40714,0.3766,0.35858,0.42852,0.38454,0.20189,-0.15577,-0.40806,-0.39248,-0.31124,-0.53726,-0.5568,-0.60964,-0.58368,-0.48472,-0.58887,-0.53817,-0.32865,-0.06414,0.11698,0.21319,0.33384,0.34972,0.24679,0.05223,-0.04643,-0.04093,0.00977,0.08155,0.03512,-0.07086,-0.2364,-0.27275,-0.16005,-0.02993,0.08491,0.23732,0.64752,0.60842,-0.14936,-0.21014,0.12126,0.5681,0.47586,0.23702,0.11179,-0.09438,-0.29902,-0.32712,-0.0223,0.16341,0.18082,0.135,0.15455,0.22052,0.28711,0.41142,0.48686,0.46304,0.25534,-0.09499,-0.37996,-0.48564,-0.37629,-0.22999,-0.31062,-0.45082,-0.66584,-0.77213,-0.72449,-0.61789,-0.46487,-0.25259,-0.10049,0.08583,0.28894,0.46059,0.56077,0.38087,0.01588,-0.20067,-0.12859,-0.03207,0.04032,-0.00855,-0.11301,-0.13531,-0.08613,-0.03482,-0.04673,0.08247,0.61056,0.91966,0.2926,-0.08033,0.01558,0.14936,0.01985,-0.02688,0.05498,0.02016,-0.08858,-0.09316,0.10232,0.28711,0.26817,0.19639,0.24007,0.31337,0.41447,0.44624,0.45387,0.40348,0.25259,-0.07636,-0.35949,-0.36438,-0.19884,-0.28283,-0.5736,-0.72265,-0.81948,-0.63286,-0.55161,-0.47006,-0.31857,-0.1967,-0.07391,0.09377,0.26389,0.35461,0.2978,0.09621,-0.07086,-0.05131,0.03238,0.09988,0.05315,-0.08491,-0.28466,-0.34422,-0.18723,-0.04856,-0.07239,0.10018,0.53573,0.98319,0.46029,0.11973,0.23213,0.34208,0.10568,-0.05498,-0.05773,-0.06048,-0.14111,-0.14325,-0.03512,0.16646,0.11301,0.06109,0.17379,0.27886,0.36927,0.43677,0.42608,0.3204,0.18967,0.13836,-0.10782,-0.42272,-0.51526,-0.36194,-0.32834,-0.42211,-0.54,-0.73762,-0.74464,-0.71166,-0.53848,-0.30635,-0.135,0.0058,0.21289,0.42089,0.53054,0.42272,0.18082,-0.02749,-0.07269,-0.07025,0.00275,-0.04154,-0.12553,-0.21441,-0.20861,-0.05315,-0.06353,-0.0675,0.09652,0.71868,0.93157,0.27122,-0.10507,0.07758,0.26206,0.16035,0.04307,0.07055,0.05681,-0.09499,-0.20464,-0.14355,0.01222,-0.01222,0.05345,0.19334,0.30024,0.37538,0.39828,0.39706,0.3708,0.32651,0.2926,0.08919,-0.31796,-0.56902,-0.43646,-0.19487,-0.21044,-0.40806,-0.61117,-0.75106,-0.77244,-0.82528,-0.62858,-0.2587,0.01161,0.17959,0.23763,0.2865,0.40348,0.4383,0.3372,0.14172,0.05437,0.13134,0.18326,0.16829,-0.07178,-0.20647,-0.27061,-0.1909,-0.14875,-0.19395,-0.11606,0.32193,0.98013,0.77274,0.07819,-0.05742,0.24771,0.45754,0.30085,0.18418,0.09865,0.04246,-0.07147,-0.13134,-0.0562,-0.07239,-0.07697,0.05712,0.27061,0.36652,0.43707,0.4893,0.46212,0.40287,0.35186,0.24496,0.0226,-0.34392,-0.54459,-0.48655,-0.30543,-0.40378,-0.51282,-0.53267,-0.57574,-0.52198,-0.7028,-0.54978,-0.32926,-0.21044,0.03757,0.22846,0.45815,0.48197,0.36377,0.14966,0.00244,0.07391,0.14172,0.16952,-0.0898,-0.17562,-0.34575,-0.29199,-0.12156,-0.06017,-0.11118,0.18265,0.83017,0.97769,0.0846,-0.27794,-0.10568,0.29993,0.3708,0.2303,0.12187,-0.13225,-0.2978,-0.31246,-0.18967,0.03024,0.0394,0.08735,0.15149,0.24862,0.34086,0.43982,0.47525,0.45571,0.49633,0.37599,0.12401]};
+  const DT = 0.02, T0 = 149.9;
+  const deg = r => r * 180 / Math.PI;
+  const wrap = a => (((a + 180) % 360) + 360) % 360 - 180;   // Python's (a + 180) % 360 - 180
+  const acc = WALK.ax.map((x, i) => deg(Math.atan2(WALK.ay[i], x)));
+  const rate = WALK.gz.map(g => -deg(g));
+  function integrate(start, rates) { const out = []; let a = start; for (const r of rates) { a = wrap(a + r * DT); out.push(a); } return out; }
+  function complementary(start, rates, accs, alpha) {
+    const out = []; let a = start;
+    for (let i = 0; i < rates.length; i++) { const p = a + rates[i] * DT; a = wrap(p + (1 - alpha) * wrap(accs[i] - p)); out.push(a); }
+    return out;
+  }
+  let s = 0, c = 0;
+  for (const a of acc) { s += Math.sin(a * Math.PI / 180); c += Math.cos(a * Math.PI / 180); }
+  const truth = deg(Math.atan2(s, c));
+  const wobble = est => Math.sqrt(est.reduce((t, e) => t + wrap(e - truth) ** 2, 0) / est.length);
+  const gyro = integrate(acc[0], rate);
+  const calc = alpha => { const fused = complementary(acc[0], rate, acc, alpha); return { truth, acc: wobble(acc), gyro: wobble(gyro), fused: wobble(fused), fusedSeries: fused }; };
+  window.fusionCalc = calc;
+
+  const cv = $('fcv');
+  if (!cv || !cv.getContext) return;
+  const ctx = cv.getContext('2d'), pad = { l: 44, r: 12, t: 12, b: 30 }, Y0 = -45, Y1 = 15;
+  const px = i => pad.l + i / (acc.length - 1) * (cv.width - pad.l - pad.r);
+  const py = a => pad.t + (Y1 - a) / (Y1 - Y0) * (cv.height - pad.t - pad.b);
+  function line(series, col, w, alpha) {
+    ctx.strokeStyle = col; ctx.lineWidth = w; ctx.globalAlpha = alpha; ctx.beginPath();
+    series.forEach((a, i) => i ? ctx.lineTo(px(i), py(a)) : ctx.moveTo(px(i), py(a))); ctx.stroke(); ctx.globalAlpha = 1;
+  }
+  function draw() {
+    const alpha = +$('fa').value, r = calc(alpha);
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.font = '12px sans-serif'; ctx.fillStyle = css('--muted'); ctx.strokeStyle = css('--line'); ctx.lineWidth = 1;
+    ctx.textAlign = 'right';
+    for (let a = Y0; a <= Y1; a += 15) { ctx.beginPath(); ctx.moveTo(pad.l, py(a)); ctx.lineTo(cv.width - pad.r, py(a)); ctx.stroke(); ctx.fillText(a + '°', pad.l - 6, py(a) + 4); }
+    ctx.textAlign = 'center';
+    for (let sec = 0; sec <= 11; sec++) ctx.fillText(sec + ' s', px(sec / DT), cv.height - 10);
+    ctx.setLineDash([6, 4]); line(acc.map(() => truth), css('--fg'), 1.5, 1); ctx.setLineDash([]);
+    line(acc, css('--play'), 1.2, 0.7);
+    line(gyro, css('--build'), 2, 1);
+    line(r.fusedSeries, css('--ok'), 3, 1);
+    $('fav').textContent = alpha.toFixed(2);
+    $('wA').textContent = r.acc.toFixed(1) + '°';
+    $('wG').textContent = r.gyro.toFixed(1) + '°';
+    $('wF').textContent = r.fused.toFixed(1) + '°';
+  }
+  $('fa').oninput = draw;
+  document.querySelectorAll('button[data-a]').forEach(b => b.onclick = () => { $('fa').value = b.dataset.a; draw(); });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+  draw();
+
+  function seesaw() {
+    const a = +$('ssa').value, back = 1 - Math.pow(a, 50);
+    $('ssBeam').setAttribute('transform', `rotate(${(0.5 - a) * 24} 230 116)`);
+    $('ssG').textContent = Math.round(a * 100) + '% each reading';
+    $('ssA').textContent = Math.round((1 - a) * 100) + '% each reading';
+    $('ssT').textContent = `In one second (50 readings) the accelerometer pulls back ${Math.round(back * 100)}% of any drift.`;
+    $('ssav').textContent = a.toFixed(2);
+  }
+  $('ssa').oninput = seesaw;
+  seesaw();
+})();
+</script>
+</body>
+</html>

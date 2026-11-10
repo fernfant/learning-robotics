@@ -3,175 +3,103 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Week 5 · Next-word model</title>
-<link rel="stylesheet" href="../../style.css">
+<title>Week 7 · Next-word model</title>
+<link rel="stylesheet" href="../../style.css?v=16">
+<style>main p code, main li code, main dd code { overflow-wrap: anywhere; }</style>
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 5 of 12 · Part A</nav>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › Week 7 of 16 · Part A</nav>
 
-<div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 5 of 12 · Part A</div>
+<div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 7 of 16 · Part A</div>
 <h1>Words as numbers: a tiny next-word model</h1>
-<p class="lede">Count which word follows which, turn the counts into chances, and roll a die. That's a language model. It's tiny and a bit silly, and it's the great-great-grandparent of ChatGPT. Then you'll give it a real job on the robot: fixing typos in your commands, the way your phone keyboard does.</p>
-<div class="card note" id="journey"><strong>Week 5 of 12 · Part A.</strong> So far your robot: ✓ says hello ✓ moves ✓ senses ✓ knows its braking distance ✓ decides to stop ✓ is tested safe ✓ plans routes. <strong>Today</strong> it learns to turn words into numbers, and fix typos in what you type. Next: <a href="09-understanding-commands.html">Week 5 · Part B: Understanding commands</a>. <a href="index.html#my-robot">Your robot, week by week</a>.<br><strong>Your robot:</strong> after the homework, <a href="#add-to-robot">add it to your robot</a> (a small gap in <code>my_robot.py</code>). Then run <code>python3 my_robot.py</code> and try <code>put teh red blok in the bin</code>: it fixes the typos straight away. After Part B of this week it also bins the block.</div>
+<p class="lede">Count which word follows which, turn the counts into chances, and roll a die. That's a language model, the great-great-grandparent of ChatGPT. Then your robot uses it to fix typos.</p>
+<div class="card note" id="journey"><strong>Week 7 of 16 · Part A.</strong> So far your robot: ✓ moves ✓ looks around ✓ reads real phone data ✓ stops for the cat ✓ plans routes ✓ fuses two sensors. <strong>Today</strong> it learns to turn words into numbers and fix typos in what you type. Next: <a href="09-understanding-commands.html">Week 7 · Part B: Understanding commands</a>. <a href="index.html#my-robot">Your robot, week by week</a>.</div>
 
 <div class="facts">
   <div><b>Time</b>3–4 hours</div>
-  <div><b>You'll need</b>Python 3, paper, a pencil, a cup and some scraps of paper</div>
-  <div><b>New words</b>token, tokenize, bigram, probability, sampling, language model, edit (typo)</div>
-  <div><b>Project piece</b>A text generator (a baby LLM) and a typo fixer for the robot's commands</div>
+  <div><b>You'll need</b>Python 3, paper, a cup and some scraps of paper</div>
+  <div><b>New words</b>token, bigram, probability, sampling, edit (typo)</div>
+  <div><b>Homework file</b><code>lesson08_words.py</code></div>
 </div>
 
 <section class="kid" id="start">
 <h2>Start here</h2>
 <p class="big">A computer can "write" by doing one thing over and over: look at the last word, guess what usually comes next, pick one, repeat.</p>
-
-<h3>The problem</h3>
-<p>So far Robo-Helper only understands numbers: coordinates, distances, speeds. But you want to <em>talk</em> to it. "Put the red block in the bin." To a computer that sentence is just a row of letters. Before a robot can understand language, it needs a way to turn words into something it can count and calculate with.</p>
-
-<h3>The idea in one picture</h3>
-<p>Think about your phone keyboard. You type "see you" and it suggests "tomorrow", "soon", "later". How does it know? It has noticed which words <em>you</em> usually type after "you". It's not thinking. It's counting. Keep tapping the middle suggestion and your phone writes a whole (weird) sentence. In this lesson you'll build exactly that.</p>
-<p>The same counting fixes typos. Type "teh" and your phone changes it to "the". It tries every real word that is one slip of a finger away, and keeps the one that usually comes after the word before. Robo-Helper will do the same with "put teh red blok in the bin".</p>
-
-<h3>Words to know</h3>
+<p>Your phone keyboard does this. Type "see you" and it offers "tomorrow", "soon", "later". It isn't thinking. It has <em>counted</em> which words you usually type after "you". The same counting fixes typos: "teh" becomes "the" because "the" is a real word one slip away, and it fits after the word before.</p>
 <dl>
-<dt>Token</dt><dd>One piece of text the model works with. For us, a word, or a full stop.</dd>
-<dt>Tokenize</dt><dd>Chop text into tokens: <code>"The cat. Sat"</code> → <code>["the", "cat", ".", "sat"]</code>.</dd>
-<dt>Bigram</dt><dd>A pair of tokens side by side, like <code>("the", "robot")</code>. "Bi" means two.</dd>
-<dt>Probability</dt><dd>A chance written as a number from 0 (never) to 1 (always). 0.25 means 1 time in 4.</dd>
-<dt>Sampling</dt><dd>Picking one option at random, where likelier options get picked more often.</dd>
-<dt>Language model</dt><dd>A program that gives the probability of each possible next token. ChatGPT and Claude are huge language models.</dd>
-<dt>Edit</dt><dd>One typo: a letter deleted, two letters swapped, one letter replaced, or one letter added. "blok" is one edit away from "block".</dd>
+<dt>Token</dt><dd>One piece of text: for us, a word or a full stop.</dd>
+<dt>Bigram</dt><dd>Two tokens side by side, like <code>("the", "robot")</code>.</dd>
+<dt>Probability</dt><dd>A chance from 0 (never) to 1 (always). 0.25 means 1 time in 4.</dd>
+<dt>Sampling</dt><dd>Picking at random, where likelier options come up more often.</dd>
+<dt>Edit</dt><dd>One typo: a letter deleted, two swapped, one replaced or one added.</dd>
 </dl>
 </section>
-<p class="deeper"><strong>Going deeper:</strong> everything below is the full lesson: the idea built from nothing, two demos, your homework, and a challenge away from the screen.</p>
 
-<div class="card note"><strong>What this adds to your robot:</strong> a typo fixer. <strong>Before:</strong> <code>go to the bleu block</code> → your robot can't find a block called "bleu" and gives up. <strong>After:</strong> it says <code>(I think you meant: 'go to the blue block')</code> and drives there.</div>
+<h2 id="idea">1. The idea</h2>
+<div class="box idea"><span class="tag">💡 The idea</span>
+<p>Our model reads one short story, the <code>STORY</code> in your homework file ("the robot picks up the red block . the robot puts the red block in the bin . …", 66 tokens). Then it keeps a tally: <strong>after this word, which word came next?</strong> Here's every word that ever came after "robot":</p>
+<svg class="diagram" viewBox="0 0 520 250" role="img" aria-label="Arrows from the word robot to the six words that followed it, thicker for more often">
+  <rect x="14" y="103" width="108" height="44" rx="10" style="fill:var(--idea-soft);stroke:var(--idea);stroke-width:2"/>
+  <text x="68" y="131" text-anchor="middle" style="fill:var(--fg);font:700 20px sans-serif">robot</text>
+  <g style="stroke:var(--idea);fill:none" stroke-linecap="round">
+    <path d="M122 125 C 200 125, 220 26, 300 26" stroke-width="8"/>
+    <path d="M122 125 C 200 125, 220 66, 300 66" stroke-width="8"/>
+    <path d="M122 125 C 200 125, 220 106, 300 106" stroke-width="4"/>
+    <path d="M122 125 C 200 125, 220 146, 300 146" stroke-width="4"/>
+    <path d="M122 125 C 200 125, 220 186, 300 186" stroke-width="4"/>
+    <path d="M122 125 C 200 125, 220 226, 300 226" stroke-width="4"/>
+  </g>
+  <g style="fill:var(--fg);font:18px sans-serif">
+    <text x="310" y="31">picks <tspan style="fill:var(--muted)">2 of 8 = 0.25</tspan></text>
+    <text x="310" y="71">puts <tspan style="fill:var(--muted)">2 of 8 = 0.25</tspan></text>
+    <text x="310" y="111">sees <tspan style="fill:var(--muted)">1 of 8 = 0.125</tspan></text>
+    <text x="310" y="151">stops <tspan style="fill:var(--muted)">1 of 8 = 0.125</tspan></text>
+    <text x="310" y="191">moves <tspan style="fill:var(--muted)">1 of 8 = 0.125</tspan></text>
+    <text x="310" y="231">is <tspan style="fill:var(--muted)">1 of 8 = 0.125</tspan></text>
+  </g>
+</svg>
+<p>Thicker arrow = seen more often. Divide each count by the total (8) and you get <strong>probabilities</strong> that add up to 1. To write, roll a weighted die: "picks" comes up 1 time in 4. Add the word, then look at <em>its</em> arrows, and repeat. That's the whole model.</p>
+</div>
 
-<h2 id="problem">1. The problem</h2>
-<p>Here's the only text our model will ever read. It's the <code>STORY</code> in <code>lesson08_words.py</code>:</p>
-<pre><code>the robot picks up the red block . the robot puts the red block in the bin .
-the robot sees a cat . the robot stops . the cat walks away . the robot moves on .
-the robot picks up the blue block . the robot puts the blue block in the bin .
-the robot is happy . the room is tidy .</code></pre>
-<p>We want a program that can write <em>new</em> sentences in the same style. How?</p>
-<p><strong>Obvious idea 1: pick random words from the story.</strong> You get "block happy the in sees away". Every word is real, but the order is nonsense. Word order is the whole point of language.</p>
-<p><strong>Obvious idea 2: write grammar rules by hand.</strong> "A sentence is <em>the</em> + a noun + a verb…" That works for 5 sentences, then you need thousands of rules, and English breaks them all the time. People tried this for decades. It never scaled.</p>
-<p><strong>The idea that does work:</strong> don't write rules. Let the text itself tell you what tends to come next.</p>
-
-<h2 id="principles">2. First principles</h2>
-
-<h3>Step 1: chop text into tokens</h3>
-<p>Computers can't count "words" until we decide what a word is. Our rule: lowercase everything, keep runs of letters (and apostrophes) as words, and keep the full stop as its own token, because "end of sentence" is useful to know. Everything else (commas, question marks, numbers) is thrown away.</p>
-<pre><code>"The cat. Sat"                      → ["the", "cat", ".", "sat"]
-"Where's the cat? It's 5 o'clock!"  → ["where's", "the", "cat", "it's", "o'clock"]</code></pre>
-<p>Notice <code>"where's"</code> stays as one token. Remember that. It causes a real bug in <a href="09-understanding-commands.html">Part B</a>.</p>
-<p>The whole story becomes 66 tokens, using 23 different ones.</p>
-
-<h3>Step 2: count what follows what</h3>
-<p>Slide along the tokens, two at a time, and keep a tally: "after this word, which word came next?"</p>
-<pre><code>the robot picks up the red block .
-─────────
-    ──────────
-          ────────
-             ────── ...
-pairs: (the, robot) (robot, picks) (picks, up) (up, the) (the, red) ...</code></pre>
-<p>Do this for the whole story and here's what follows <code>"robot"</code>:</p>
-<pre><code>after "robot":   picks 2   puts 2   sees 1   stops 1   moves 1   is 1     (8 in total)</code></pre>
-<p>In Python we store this as a dictionary of dictionaries: <code>counts["robot"]["picks"] == 2</code>. That's the whole "brain" of our model. Just counts.</p>
-
-<h3>Step 3: turn counts into probabilities</h3>
-<p>Counts depend on how long the text is. We want chances. Divide each count by the total:</p>
-<pre><code>picks  2 / 8 = 0.25
-puts   2 / 8 = 0.25
-sees   1 / 8 = 0.125
-stops  1 / 8 = 0.125
-moves  1 / 8 = 0.125
-is     1 / 8 = 0.125
-              ─────
-total         1.0    ← probabilities always add up to 1</code></pre>
-<p>So after "robot", there's a 1-in-4 chance of "picks". That's what <code>next_word_probs</code> returns. For "the", it's <code>robot 0.5, red 0.125, bin 0.125, blue 0.125, cat 0.0625, room 0.0625</code>.</p>
-
-<details><summary>Predict first: starting from "the", what's the chance the model writes exactly "the robot picks up"?</summary>
-<p>Multiply the chance of each step: P(robot after the) × P(picks after robot) × P(up after picks) = 0.5 × 0.25 × 1.0 = <strong>0.125</strong>, or 1 time in 8. "picks" is <em>always</em> followed by "up" in our story, so that step is certain.</p>
-</details>
-
-<h3>Step 4: sampling, or how to roll a weighted die</h3>
-<p>Now we write. We could always pick the most likely word, but then "the" is always followed by "robot", and "robot" always by "picks"… the model would repeat the same sentence forever. Instead we pick <em>randomly, but fairly</em>: likely words come up more often.</p>
-<p>Picture a ruler from 0 to 1, cut into pieces as long as each probability:</p>
-<pre><code>after "the":
-0             0.5    0.625  0.75  0.8125 0.9375  1
-|    robot     | red  | bin  | cat |  blue | room |</code></pre>
-<p>(The pieces go in the order the words were first seen after "the": robot, red, bin, cat, blue, room.)</p>
-<p>Pick a random number between 0 and 1 and see which piece it lands in. Python's <code>random.Random(4)</code> gives 0.236 first. That lands in "robot", so the next word is "robot". Python does this for you with <code>rng.choices(words, weights=probs)</code>.</p>
-
-<h3>Step 5: repeat, and you've built a language model</h3>
-<pre><code>start with ["the"]
-look at the LAST word → get its next-word probabilities → sample one → add it
-look at the LAST word → ...
-stop after n new words, or if the last word never had anything after it</code></pre>
-<p>Here's real output from the solution (seed 4, 12 new words each):</p>
+<p>Real output from the solution (seed 4, 12 new words each):</p>
 <pre><code>-> the robot picks up the robot puts the cat walks away . the
 -> the robot picks up the blue block in the robot stops . the
 -> the blue block in the red block . the blue block in the</code></pre>
-<p>Every <em>pair</em> of neighbouring words appeared in the story. But the sentences wander: "picks up the robot puts the cat". Why? Our model only remembers <strong>one</strong> word. After "the" it has no idea it was in the middle of "picks up the …".</p>
+<p>Every <em>pair</em> of neighbours was in the story, but the sentences wander. Our model remembers only <strong>one</strong> word. After "the" it has no idea it was in the middle of "picks up the …". ChatGPT runs the same loop (pick the next token, add it, repeat), but it looks back over thousands of tokens.</p>
 
-<details><summary>Predict first: can this model ever write "the robot sees a block"?</summary>
-<p>No. "a" is only ever followed by "cat" in the story, so P(block after a) = 0. A bigram model can only use pairs it has seen. It can make new <em>sentences</em>, but never a new <em>pair</em>.</p>
-</details>
+<div class="box idea" id="typos"><span class="tag">💡 The idea: fixing typos</span>
+<p>Step 1: list every string <strong>one typo</strong> away and keep only real words the model knows. Step 2: let <strong>the word before</strong> choose. The known words come from the robot's 34 example commands (from Part B). The same typo, "te", gets two different fixes:</p>
+<svg class="diagram" viewBox="0 0 520 170" role="img" aria-label="te after go becomes to; te after put becomes the">
+  <g style="font:18px sans-serif">
+    <text x="10" y="22" style="fill:var(--muted)">one typo from "te":  me · the · to</text>
+    <rect x="10" y="44" width="150" height="40" rx="8" style="fill:var(--card);stroke:var(--line)"/>
+    <text x="85" y="70" text-anchor="middle" style="fill:var(--fg)">go <tspan style="fill:var(--fail);font-weight:700">te</tspan> …</text>
+    <path d="M165 64 H 245" style="stroke:var(--idea);stroke-width:3"/><path d="M245 58 L257 64 L245 70 Z" style="fill:var(--idea)"/>
+    <text x="268" y="60" style="fill:var(--muted)">after "go": to 0.25</text>
+    <text x="268" y="80" style="fill:var(--muted)">(me, the: never)</text>
+    <text x="440" y="70" style="fill:var(--ok);font-weight:700">→ to</text>
+    <rect x="10" y="110" width="150" height="40" rx="8" style="fill:var(--card);stroke:var(--line)"/>
+    <text x="85" y="136" text-anchor="middle" style="fill:var(--fg)">put <tspan style="fill:var(--fail);font-weight:700">te</tspan> …</text>
+    <path d="M165 130 H 245" style="stroke:var(--idea);stroke-width:3"/><path d="M245 124 L257 130 L245 136 Z" style="fill:var(--idea)"/>
+    <text x="268" y="126" style="fill:var(--muted)">after "put": the 0.67</text>
+    <text x="268" y="146" style="fill:var(--muted)">(me, to: never)</text>
+    <text x="440" y="136" style="fill:var(--ok);font-weight:700">→ the</text>
+  </g>
+</svg>
+<p>If no candidate was ever seen after the word before, pick the most common one. If there are no candidates at all, leave the word alone.</p>
+</div>
 
-<h3>Step 6: so how is ChatGPT different?</h3>
-<p>The loop is the same: give the chances of each next token, pick one, add it, repeat. When an AI chatbot writes to you, it's doing your <code>generate</code> loop, one token at a time. What modern LLMs add:</p>
-<ul>
-<li><strong>Much longer memory.</strong> Ours looks at 1 previous word. Modern models look at thousands, even hundreds of thousands, of previous tokens: your whole question and the conversation so far.</li>
-<li><strong>A neural network instead of a count table.</strong> Why not just count longer word groups? Try it: our story has 23 tokens, so a table for "last word → next" has 23 × 23 = 529 slots. English has about 50,000 common words. For "last 10 words → next" you'd need 50,000<sup>11</sup> slots, more than the number of atoms in the Earth, and almost all of them would be zero because nobody ever wrote those exact 10 words. A neural network (the neurons from <a href="04-neuron.html">week 3</a>, stacked very deep, using a trick called <em>attention</em>) learns <em>patterns</em> instead, so it can handle word combinations it has never seen.</li>
-<li><strong>Huge amounts of text.</strong> Ours read 66 tokens. Big models read trillions, from books, websites and code.</li>
-<li><strong>Smarter tokens.</strong> Instead of whole words, they use word pieces, so new words like "unboxable" become "un" + "box" + "able".</li>
-<li><strong>Extra training to be helpful.</strong> After learning to predict text, they're trained further to follow instructions and to refuse harmful requests.</li>
-</ul>
-<p>But under all that, the job is still: <em>predict the next token</em>. You've just built the smallest possible version.</p>
-
-<h3 id="typos">Step 7: the robot's first job, fixing typos</h3>
-<p>People type fast and make mistakes. The word counter you'll build in <a href="09-understanding-commands.html">Part B</a> has never seen "bleu", so for "go to the bleu block" it finds no object at all, and your robot gives up. For the correct spelling it drives to the blue block. A next-word model can fix that. Two parts.</p>
-<p><strong>Part 1: list every word one typo away.</strong> There are four kinds of typo. For "cat":</p>
-<pre><code>delete one letter          cat → at
-swap two neighbours        cat → act
-replace one letter         cat → bat   (try all 26 letters in each place)
-insert one letter          cat → cart  (try all 26 letters in each gap)</code></pre>
-<p>A 3-letter word has 3 deletes, 2 swaps, 3 × 26 = 78 replaces and 4 × 26 = 104 inserts: 187 in all. Some come out the same (replacing "c" with "c" gives "cat" back), so the <em>set</em> has 182 different strings. Almost all are nonsense like "zat". We keep only the <strong>known</strong> words: words the model has counted.</p>
-<p><strong>Part 2: let the word before decide.</strong> For the robot, the known words come from the 34 example commands of Part B (53 different tokens: 52 words, plus the full stop we add between commands). Here's the same typo with two different words before it:</p>
-<pre><code>"go te ..."   known words one typo from "te": me, the, to
-              seen after "go": to (0.25)                → to
-"put te ..."  known words one typo from "te": me, the, to
-              seen after "put": the (0.67)              → the</code></pre>
-<p>Same typo, different fix, because of the word before. That's the bigram model at work. Two fallbacks: if none of the candidates was ever seen after the previous word, pick the one that starts the most pairs (the most common word); if there are no known candidates at all, leave the word alone. A word at the start of a command uses <code>"."</code> as its previous word, because commands are joined with full stops.</p>
-<p>Real output on the 9 <code>TYPO_COMMANDS</code> in the file:</p>
-<pre><code>'put teh red blok in the bin'    -&gt; 'put the red block in the bin'
-'go to the bleu block'           -&gt; 'go to the blue block'
-'whre is the green block'        -&gt; 'where is the green block'
-'fnd the red block'              -&gt; 'find the red block'
-'stpo'                           -&gt; 'stop'
-'put the gren block away'        -&gt; 'put the green block away'
-'thorw away the blue block'      -&gt; 'throw away the blue block'
-'head to the red blokc'          -&gt; 'head to the red block'
-'put the red bclok away'         -&gt; 'put the red bclok away'   (wanted 'put the red block away')
-fixed 8 of 9</code></pre>
-<p>The last one fails on purpose. "bclok" has <em>two</em> typos (a swap and a swap), and we only look one edit away. You could look two edits away, but "bclok" has 286 one-edit strings and 36,860 two-edit strings, so there are many more chances of a wrong guess.</p>
-<details><summary>Predict first: what does it do with "drop it in the bn"?</summary>
-<p>It writes <code>drop is in the bin</code>. "bn" became "bin" (after "the", "bin" was seen and "in" and "on" weren't). But "it" was never a typo. It's just not in the 34 commands, and "is" is one letter away, so the fixer "fixes" it. A real phone keyboard has a dictionary of every proper word, so it knows "it" is fine. Ours only knows the words it has counted.</p>
-</details>
-
-<h2 id="play">3. Play with it</h2>
-<div class="card demo">
-<h3>Interactive: a bigram model you can retrain</h3>
-<p class="legend">This uses exactly the Python rules: the same tokenizer, the same counting, and the same random numbers as Python's <code>random.Random(seed)</code>. With the original story, seed 4 and start word "the", you get the three sentences printed by <code>lesson08_words.py</code>. Edit the text and everything updates.</p>
+<h2 id="play">2. Play with it</h2>
+<div class="box play"><span class="tag">🎮 Play: a bigram model you can retrain</span>
+<p class="legend">The same tokenizer, counting and random numbers as the Python. With the story, seed 4 and start word "the", you get the three sentences above. Edit the text and everything updates.</p>
 <label for="storyBox">Training text:</label>
-<textarea id="storyBox" rows="6" style="width:100%;font:inherit;font-size:.9rem">the robot picks up the red block . the robot puts the red block in the bin .
+<textarea id="storyBox" rows="5" style="width:100%;font:inherit;font-size:.9rem">the robot picks up the red block . the robot puts the red block in the bin .
 the robot sees a cat . the robot stops . the cat walks away . the robot moves on .
 the robot picks up the blue block . the robot puts the blue block in the bin .
 the robot is happy . the room is tidy .</textarea>
-<p><label for="wordIn">Show next-word chances after: </label><input id="wordIn" value="robot" size="12"></p>
-<canvas id="probs" width="700" height="220" aria-label="Bar chart of next-word probabilities"></canvas>
+<p><label for="wordIn">Next-word chances after: </label><input id="wordIn" value="robot" size="12"></p>
+<div class="demo"><canvas id="probs" width="700" height="220" aria-label="Bar chart of next-word probabilities"></canvas></div>
 <p>
 <label for="startIn">Start word </label><input id="startIn" value="the" size="8">
 <label for="seedIn"> seed </label><input id="seedIn" type="number" value="4" style="width:5em">
@@ -183,13 +111,12 @@ the robot is happy . the room is tidy .</textarea>
   <div class="stat"><div class="k">Different tokens</div><div class="v" id="sVoc">–</div></div>
   <div class="stat"><div class="k">Different pairs</div><div class="v" id="sPairs">–</div></div>
 </div>
-<p class="legend">Things to try: change the seed. Type a word that isn't in the text (nothing to show, and generation stops at once). Paste in a paragraph from a school essay of yours and see how the "style" changes.</p>
+<p class="legend">Try: change the seed. Type a word that isn't in the text. Paste in a paragraph of your own writing.</p>
 </div>
 
-<div class="card demo">
-<h3>Interactive: the typo fixer</h3>
-<p class="legend">The same <code>edits1</code>, <code>fix_word</code> and <code>fix_typos</code> as the Python. The known words and the counts come from the commands in the box, which start as Part B's 34 <code>TRAIN</code> commands, joined with full stops exactly like <code>lesson08_words.py</code> does. Type a command with typos and see how each word is chosen.</p>
-<p><label for="typoIn">Command: </label><input id="typoIn" value="put teh red blok in the bin" size="34"></p>
+<div class="box play"><span class="tag">🎮 Play: the typo fixer</span>
+<p class="legend">The same <code>edits1</code>, <code>fix_word</code> and <code>fix_typos</code> as the Python, trained on Part B's 34 commands.</p>
+<p><label for="typoIn">Command: </label><input id="typoIn" value="put teh red blok in the bin" size="30"></p>
 <p>
 <button data-t="put teh red blok in the bin">put teh red blok in the bin</button>
 <button data-t="go te the red block">go te the red block</button>
@@ -204,73 +131,106 @@ the robot is happy . the room is tidy .</textarea>
 </details>
 </div>
 
-<h2 id="homework">4. Homework</h2>
-<p>Open <code>homework/lesson08_words.py</code>. <code>STORY</code>, <code>LETTERS</code>, <code>TYPO_COMMANDS</code> and <code>known_words</code> are written for you. Write these seven functions, in order. The first four are the language model; the last three are the typo fixer.</p>
+<h2 id="homework">3. Build it</h2>
+<div class="box build"><span class="tag">🛠 Build</span>
+<p>Open <code>project/homework/lesson08_words.py</code>. <code>STORY</code>, <code>LETTERS</code>, <code>TYPO_COMMANDS</code> and <code>known_words</code> are written for you. You write seven functions, in order. Test each one from the <code>homework</code> folder before moving on.</p>
+</div>
 
-<h3>4.1 <code>tokenize(text)</code></h3>
-<p>Lowercase the text and return a list of tokens: words (letters and apostrophes) plus <code>"."</code> as its own token.</p>
-<p>Example: <code>tokenize("The cat. Sat")</code> → <code>["the", "cat", ".", "sat"]</code>.</p>
-<details><summary>Hint 1</summary><p>Two jobs: make it lowercase, then find the pieces. Python strings have a method for the first.</p></details>
-<details><summary>Hint 2</summary><p>The docstring gives you a tip: <code>re.findall</code> with a pattern. A pattern is a mini-language for "what a piece looks like". <code>[a-z']+</code> means "one or more letters or apostrophes", <code>\.</code> means "a full stop", and <code>|</code> means "or".</p></details>
-<details><summary>Hint 3</summary><p>Return <code>re.findall(</code>the pattern from the docstring<code>, text.lower())</code>. In the file, the pattern is written as a raw string: <code>r"..."</code>.</p></details>
+<ol class="steps">
+<li><p><strong><code>tokenize(text)</code></strong>: lowercase the text and return the words (letters and apostrophes) plus <code>"."</code> as its own token.</p>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>python3 -c "from lesson08_words import tokenize; print(tokenize('The cat. Sat'))"</code></pre>
+<pre><code>['the', 'cat', '.', 'sat']</code></pre>
+<p>If you see <code>['he', 'cat', '.', 'at']</code>, you forgot to lowercase first: the capital T and S were thrown away.</p></div>
+<details class="box stuck"><summary>🆘 Stuck?</summary>
+<p><b>Hint 1.</b> Use <code>re.findall(pattern, text.lower())</code>. The pattern is in the docstring: <code>r"[a-z']+|\."</code> means "letters and apostrophes, or a full stop".</p>
+<p><b>Hint 2.</b> Fill in: <code>return re.findall(r"[a-z']+|\.", ____.lower())</code></p></details></li>
 
-<h3>4.2 <code>count_bigrams(tokens)</code></h3>
-<p>Return a dictionary of dictionaries: <code>counts[word][next_word]</code> = how many times <code>next_word</code> came right after <code>word</code>.</p>
-<p>Example: <code>count_bigrams(["a", "b", "a", "b", "c"])</code> → <code>{"a": {"b": 2}, "b": {"a": 1, "c": 1}}</code>. (The pairs are a-b, b-a, a-b, b-c.)</p>
-<details><summary>Hint 1</summary><p>A list of 5 tokens has 4 pairs. Write them out on paper first.</p></details>
-<details><summary>Hint 2</summary><p>You can loop with an index, <code>for i in range(len(tokens) - 1)</code>, using <code>tokens[i]</code> and <code>tokens[i + 1]</code>. Or the neat way: <code>zip(tokens, tokens[1:])</code> gives the pairs directly.</p></details>
-<details><summary>Hint 3</summary><p>For each pair <code>(a, b)</code>: if <code>a</code> isn't in counts yet, add an empty dict for it (<code>setdefault</code> does this in one go). Then add 1 to <code>counts[a][b]</code>, using <code>.get(b, 0)</code> so a new pair starts from 0.</p></details>
+<li><p><strong><code>count_bigrams(tokens)</code></strong>: a dictionary of dictionaries. <code>counts[word][next_word]</code> = how often <code>next_word</code> came right after <code>word</code>.</p>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>python3 -c "from lesson08_words import count_bigrams; print(count_bigrams(['a','b','a','b','c']))"</code></pre>
+<pre><code>{'a': {'b': 2}, 'b': {'a': 1, 'c': 1}}</code></pre>
+<p>If you see <code>IndexError: list index out of range</code>, your loop went one too far. 5 tokens make only 4 pairs.</p></div>
+<details class="box stuck"><summary>🆘 Stuck?</summary>
+<p><b>Hint 1.</b> <code>zip(tokens, tokens[1:])</code> gives every pair <code>(a, b)</code>.</p>
+<p><b>Hint 2.</b> <code>setdefault(a, {})</code> makes an empty inner dict if needed; <code>.get(b, 0) + 1</code> adds one.</p>
+<p><b>Hint 3.</b> Fill in:</p>
+<pre><code>counts = {}
+for a, b in zip(tokens, ____):
+    inner = counts.setdefault(a, {})
+    inner[b] = inner.get(b, 0) + ____
+return counts</code></pre></details></li>
 
-<h3>4.3 <code>next_word_probs(counts, word)</code></h3>
-<p>Turn <code>counts[word]</code> into probabilities that add up to 1. If <code>word</code> was never seen, return <code>{}</code>.</p>
-<p>Example: <code>next_word_probs({"b": {"a": 1, "c": 3}}, "b")</code> → <code>{"a": 0.25, "c": 0.75}</code>.</p>
-<details><summary>Hint 1</summary><p>It's Step 3 above: each count divided by the total.</p></details>
-<details><summary>Hint 2</summary><p><code>counts.get(word, {})</code> gives an empty dict for unknown words. <code>sum(d.values())</code> gives the total.</p></details>
-<details><summary>Hint 3</summary><p>Get the inner dict and its total. If the total is 0, return <code>{}</code>. Otherwise build a new dict with each <code>next_word: count / total</code>.</p></details>
+<li><p><strong><code>next_word_probs(counts, word)</code></strong>: each count after <code>word</code>, divided by the total. Unknown word → <code>{}</code>.</p>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>python3 -c "from lesson08_words import next_word_probs; print(next_word_probs({'b': {'a': 1, 'c': 3}}, 'b'))"</code></pre>
+<pre><code>{'a': 0.25, 'c': 0.75}</code></pre>
+<p>If you see <code>{'a': 0.5, 'c': 1.5}</code>, you divided by how many <em>different</em> words there are (2), not by the total count (4).</p></div>
+<details class="box stuck"><summary>🆘 Stuck?</summary>
+<p><b>Hint 1.</b> <code>nxt = counts.get(word, {})</code> and <code>total = sum(nxt.values())</code>.</p>
+<p><b>Hint 2.</b> Fill in: <code>if total == 0: return {}</code> then <code>return {w: c / ____ for w, c in nxt.items()}</code></p></details></li>
 
-<h3>4.4 <code>generate(counts, start, n, rng)</code></h3>
-<p>Start with <code>[start]</code>. Repeat up to <code>n</code> times: get the probabilities after the <em>last</em> word, sample one with <code>rng.choices</code>, add it. Stop early if there are no options. Return the words joined with spaces.</p>
-<p>Example: <code>generate(counts, "zzz", 5, rng)</code> → <code>"zzz"</code> (no options after "zzz", so it stops at once). With a real start word and <code>n = 5</code>, you get 6 words.</p>
-<details><summary>Hint 1</summary><p>Keep a list called something like <code>out</code>. The last word is <code>out[-1]</code>.</p></details>
-<details><summary>Hint 2</summary><p><code>rng.choices(words, weights=probs_list)</code> returns a <em>list</em> with one item. Take <code>[0]</code>. Build <code>words</code> and the weights in the same order, from the probabilities dict.</p></details>
-<details><summary>Hint 3</summary><p><code>for _ in range(n)</code>: get <code>probs</code> for <code>out[-1]</code>; if empty, <code>break</code>; <code>words = list(probs)</code>; append <code>rng.choices(words, weights=[probs[w] for w in words])[0]</code>. At the end, <code>" ".join(out)</code>.</p></details>
+<li><p><strong><code>generate(counts, start, n, rng)</code></strong>: start with <code>[start]</code>. Up to <code>n</code> times: get the chances after the <em>last</em> word, sample one with <code>rng.choices</code>, add it. Stop early if there are no options. Return the words joined with spaces.</p>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>python3 -c "import random; from lesson08_words import *; c = count_bigrams(tokenize(STORY)); print(generate(c, 'the', 5, random.Random(4))); print(generate(c, 'zzz', 5, random.Random(4)))"</code></pre>
+<pre><code>the robot picks up the robot
+zzz</code></pre>
+<p>If you see <code>the robot robot robot robot robot</code>, you looked at the <em>first</em> word (<code>out[0]</code>) instead of the last (<code>out[-1]</code>).</p></div>
+<details class="box stuck"><summary>🆘 Stuck?</summary>
+<p><b>Hint 1.</b> <code>rng.choices(words, weights=...)</code> returns a <em>list</em> with one item: take <code>[0]</code>.</p>
+<p><b>Hint 2.</b> Fill in:</p>
+<pre><code>out = [start]
+for _ in range(n):
+    probs = next_word_probs(counts, out[____])
+    if not probs:
+        break
+    words = list(probs)
+    out.append(rng.choices(words, weights=[probs[w] for w in words])[____])
+return " ".join(out)</code></pre></details></li>
 
-<h3>4.5 <code>edits1(word)</code></h3>
-<p>Every string <strong>one typo</strong> away from <code>word</code>: delete one letter, swap two neighbouring letters, replace one letter (with any of <code>LETTERS</code>), or insert one letter (anywhere, including the very start and end). Return a <code>set</code>.</p>
-<p>Example: <code>edits1("cat")</code> contains <code>"at"</code>, <code>"act"</code>, <code>"bat"</code> and <code>"cart"</code> (and "cat" itself, from replacing a letter with the same letter). <code>len(edits1("ab"))</code> is 130.</p>
-<details><summary>Hint 1</summary><p>Cut the word into a left part and a right part at every position: for "cat" that's ("", "cat"), ("c", "at"), ("ca", "t"), ("cat", ""). Every kind of typo is easy to write from those pairs.</p></details>
-<details><summary>Hint 2</summary><p>With a pair <code>(a, b)</code>: delete is <code>a + b[1:]</code> (only if <code>b</code> isn't empty). Swap is <code>a + b[1] + b[0] + b[2:]</code> (only if <code>b</code> has 2 or more letters). Replace is <code>a + c + b[1:]</code> for every letter <code>c</code>. Insert is <code>a + c + b</code> for every letter <code>c</code>.</p></details>
-<details><summary>Hint 3</summary><p><code>splits = [(word[:i], word[i:]) for i in range(len(word) + 1)]</code>. Build the four lists with comprehensions over <code>splits</code> (and over <code>LETTERS</code> for replace and insert), then <code>return set(deletes + swaps + replaces + inserts)</code>.</p></details>
+<li><p><strong><code>edits1(word)</code></strong>: a <code>set</code> of every string one typo away: delete one letter, swap two neighbours, replace one letter (with any of <code>LETTERS</code>), or insert one letter anywhere.</p>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>python3 -c "from lesson08_words import edits1; e = edits1('cat'); print(len(edits1('ab')), sorted(w for w in e if w in ('at','act','bat','cart')))"</code></pre>
+<pre><code>130 ['act', 'at', 'bat', 'cart']</code></pre>
+<p>If you see <code>133</code>, you returned a list with repeats. Wrap it in <code>set(...)</code>.</p></div>
+<details class="box stuck"><summary>🆘 Stuck?</summary>
+<p><b>Hint 1.</b> Cut the word at every position: <code>splits = [(word[:i], word[i:]) for i in range(len(word) + 1)]</code>. For "cat": ("", "cat"), ("c", "at"), ("ca", "t"), ("cat", "").</p>
+<p><b>Hint 2.</b> For a split <code>(a, b)</code>: delete <code>a + b[1:]</code> (if <code>b</code>), swap <code>a + b[1] + b[0] + b[2:]</code> (if <code>len(b) &gt; 1</code>), replace <code>a + c + b[1:]</code> (if <code>b</code>), insert <code>a + c + b</code>.</p>
+<p><b>Hint 3.</b> Fill in:</p>
+<pre><code>deletes  = [a + b[1:] for a, b in splits if b]
+swaps    = [a + b[1] + b[0] + b[2:] for a, b in splits if len(b) &gt; 1]
+replaces = [a + c + b[1:] for a, b in splits if b for c in LETTERS]
+inserts  = [a + c + b for a, b in splits for c in ____]
+return ____(deletes + swaps + replaces + inserts)</code></pre></details></li>
 
-<h3>4.6 <code>fix_word(word, prev, counts, known)</code></h3>
-<p>Fix one word. If <code>word</code> is in <code>known</code>, keep it. Otherwise look at the known words in <code>edits1(word)</code>:</p>
-<ul>
-<li>if any of them was seen right after <code>prev</code>, pick the one with the highest <code>next_word_probs(counts, prev)</code>;</li>
-<li>otherwise pick the one that starts the most pairs, <code>sum(counts.get(w, {}).values())</code>, with ties going to the alphabetically first;</li>
-<li>if there are none, keep <code>word</code> as it is.</li>
-</ul>
-<p>Example: <code>fix_word("bok", "red", {"red": {"box": 1, "block": 3}}, {"red", "box", "block"})</code> → <code>"box"</code>. "block" is likelier after "red", but it's two typos from "bok", so it isn't a candidate.</p>
-<details><summary>Hint 1</summary><p>The candidates are the set <code>edits1(word) &amp; known</code>: <code>&amp;</code> keeps what's in both sets. Sort them, so ties are decided alphabetically.</p></details>
-<details><summary>Hint 2</summary><p>Get <code>probs = next_word_probs(counts, prev)</code>. The candidates seen after <code>prev</code> are the ones that are keys of <code>probs</code>. <code>max(list, key=...)</code> picks the best, and on a tie it keeps the first one, which is the alphabetical first if the list is sorted.</p></details>
-<details><summary>Hint 3</summary><p>Return early twice: <code>word</code> if it's known, and <code>word</code> if there are no candidates. Then <code>after = [w for w in candidates if w in probs]</code>; if <code>after</code>, return <code>max(after, key=lambda w: probs[w])</code>; else return <code>max(candidates, key=lambda w: sum(counts.get(w, {}).values()))</code>.</p></details>
+<li><p><strong><code>fix_word(word, prev, counts, known)</code></strong>: known word → keep it. Otherwise take the known words in <code>edits1(word)</code>: pick the one most likely after <code>prev</code>; if none was seen after <code>prev</code>, the one that starts the most pairs (ties: alphabetical); if there are none, keep <code>word</code>.</p>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>python3 -c "from lesson08_words import fix_word; print(fix_word('bok', 'red', {'red': {'box': 1, 'block': 3}}, {'red', 'box', 'block'}))"</code></pre>
+<pre><code>box</code></pre>
+<p>If you see <code>block</code>, you picked from every word seen after "red". "block" is two typos from "bok", so it isn't a candidate.</p></div>
+<details class="box stuck"><summary>🆘 Stuck?</summary>
+<p><b>Hint 1.</b> <code>candidates = sorted(edits1(word) &amp; known)</code>. <code>&amp;</code> keeps what is in both sets.</p>
+<p><b>Hint 2.</b> Fill in:</p>
+<pre><code>if word in known:
+    return word
+candidates = sorted(edits1(word) &amp; known)
+if not candidates:
+    return ____
+probs = next_word_probs(counts, prev)
+after = [w for w in candidates if w in probs]
+if after:
+    return max(after, key=lambda w: probs[w])
+return max(candidates, key=lambda w: sum(counts.get(w, {}).values()))</code></pre></details></li>
 
-<h3>4.7 <code>fix_typos(text, counts)</code></h3>
-<p>Fix each token of <code>tokenize(text)</code> with <code>fix_word</code>, using the previously <em>fixed</em> word as <code>prev</code>. Start with <code>prev = "."</code>. Return the fixed tokens joined with spaces.</p>
-<p>Example: with counts from <code>"put the red block in the bin . put the blue block in the bin"</code>, <code>fix_typos("put teh red blok", counts)</code> → <code>"put the red block"</code>.</p>
-<details><summary>Hint 1</summary><p>Work out <code>known = known_words(counts)</code> once, before the loop, not once per word.</p></details>
-<details><summary>Hint 2</summary><p>Use the <em>fixed</em> word as the next <code>prev</code>, not the typo. After "teh" is fixed to "the", the next word should be chosen by what follows "the".</p></details>
-<details><summary>Hint 3</summary><p><code>out, prev = [], "."</code>; for each <code>w</code> in <code>tokenize(text)</code>: <code>prev = fix_word(w, prev, counts, known)</code> and append <code>prev</code> to <code>out</code>. Return <code>" ".join(out)</code>.</p></details>
-
-<h3>Run it</h3>
-<pre><code>cd homework
-python3 lesson08_words.py</code></pre>
-<p>What you should see (real output of the reference solution):</p>
+<li><p><strong><code>fix_typos(text, counts)</code></strong>: fix each token with <code>fix_word</code>, using the previous <em>fixed</em> word as <code>prev</code>. Start with <code>prev = "."</code>.</p>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint: run the whole file</span>
+<pre><code>python3 lesson08_words.py</code></pre>
 <pre><code>after 'robot': {'picks': 0.25, 'puts': 0.25, 'sees': 0.12, 'stops': 0.12, 'moves': 0.12, 'is': 0.12}
 -> the robot picks up the robot puts the cat walks away . the
 -> the robot picks up the blue block in the robot stops . the
 -> the blue block in the red block . the blue block in the
 
-Fixing typos with the robot's command words (from week 5's command examples):
+Fixing typos with the robot's command words (from week 7's command examples):
   'put teh red blok in the bin'    -&gt; 'put the red block in the bin'
   'go to the bleu block'           -&gt; 'go to the blue block'
   'whre is the green block'        -&gt; 'where is the green block'
@@ -281,107 +241,117 @@ Fixing typos with the robot's command words (from week 5's command examples):
   'head to the red blokc'          -&gt; 'head to the red block'
   'put the red bclok away'         -&gt; 'put the red bclok away'   (wanted 'put the red block away')
 fixed 8 of 9</code></pre>
-<p>The typo part borrows the example commands, <code>TRAIN</code>, from <code>lesson09_commands.py</code>. They're already written in that file, so this works now, before you start that lesson. One miss: "bclok" is more than one typo away from "block", and the fixer only looks one typo away. Why 0.12 and not 0.125? The program rounds to 2 decimal places for printing, and Python rounds 0.125 to the even neighbour, 0.12.</p>
-
-<h3>Check it</h3>
+<p>The last miss is on purpose: "bclok" is <em>two</em> typos from "block". Then go up to <code>project</code> and run the checker:</p>
 <pre><code>cd ..
 python3 check.py 8</code></pre>
-<p>Six checks for your seven functions: <code>tokenize</code>, <code>count_bigrams</code>, <code>next_word_probs</code>, <code>generate</code>, <code>edits1</code> and <code>fix_typos</code> (which also tests your <code>fix_word</code>). Green ✓ per check, red ✗ with a hint, yellow <code>…</code> for "not written yet". Real hints you might see. The checker prints only the line in code; the words after <strong>What it means</strong> are our explanation, not part of its output:</p>
-<ul>
-<li><code>✗ edits1: 'ab' has exactly 130 different one-typo versions, got 133</code> <strong>What it means:</strong> You returned a list with repeats. Turn it into a <code>set</code>.</li>
-<li><code>✗ fix_typos: 'bok' is one typo from 'box' but two from 'block' -&gt; 'box'</code> <strong>What it means:</strong> Your <code>fix_word</code> picked from all the words seen after <code>prev</code>, not just the candidates one typo away.</li>
-<li><code>✗ fix_typos: known words and hopeless words stay as they are</code> <strong>What it means:</strong> "purple" has no known word one typo away, so it must come back unchanged.</li>
-<li><code>✗ count_bigrams: count_bigrams(['a','b','a','b','c']) should be {'a': {'b': 2}, 'b': {'a': 1, 'c': 1}}</code> <strong>What it means:</strong> Compare with your pairs on paper. A missing pair or an extra one at the end is the usual cause.</li>
-<li><code>✗ generate: stop when there are no options</code> <strong>What it means:</strong> Your loop crashed or kept going after a word with nothing after it.</li>
-</ul>
+<pre><code>Lesson 8: lesson08_words.py
+  ✓ tokenize
+  ✓ count_bigrams
+  ✓ next_word_probs
+  ✓ generate
+  ✓ edits1
+  ✓ fix_typos
+  6/6 passed  🎉 lesson complete!</code></pre>
+<p>If you see <code>✗ fix_typos: known words and hopeless words stay as they are</code>, your <code>fix_word</code> changed "purple", which has no known word one typo away. It must come back unchanged.</p></div>
+<details class="box stuck"><summary>🆘 Stuck?</summary>
+<p><b>Hint 1.</b> Work out <code>known = known_words(counts)</code> once, before the loop.</p>
+<p><b>Hint 2.</b> Fill in:</p>
+<pre><code>known = known_words(counts)
+out, prev = [], "."
+for w in tokenize(text):
+    prev = fix_word(w, ____, counts, known)
+    out.append(____)
+return " ".join(out)</code></pre></details></li>
+</ol>
 
-<h3>Stretch</h3>
-<ul>
-<li>Make the fixer reach <strong>two</strong> typos: if no known word is one edit away, try every edit of every edit. Does it fix "bclok"? How long does <code>edits1</code> of every string in <code>edits1("bclok")</code> take, and does it start "fixing" words it shouldn't?</li>
-<li>Replace <code>STORY</code> with a page of your own writing (an essay, a diary entry). Does the output "sound like you"?</li>
-<li>Build a <strong>trigram</strong> model: count which word follows each <em>pair</em> of words (key <code>("the", "robot")</code>). Are the sentences less wandering? What goes wrong with only 66 tokens of training text?</li>
-<li>Add a <code>greedy</code> option that always picks the most likely word. What happens to the output?</li>
-</ul>
-
-<h2 id="add-to-robot">Add it to your robot</h2>
-<p>Fill in <code>clean(self, text)</code> in <code>my_robot.py</code>: run every command through your typo fixer before the robot reads it. Its word counts come from the words your robot knows: the example commands, <code>TRAIN</code>, in <code>lesson09_commands.py</code>. <code>TRAIN</code> is a list of pairs like <code>("halt", "stop")</code>: a command and what it means. You only want the command text.</p>
-<div class="card note"><strong>New Python this time: taking one half of each pair.</strong> A loop can unpack each pair into two names, and a list comprehension keeps just the half you want:
+<h2 id="add-to-robot">4. Add it to your robot</h2>
+<div class="box bot"><span class="tag">🤖 Add it to your robot</span>
+<p>Fill in <code>clean(self, text)</code> in <code>my_robot.py</code>. It runs every command through your typo fixer before the robot reads it. The word counts come from <code>TRAIN</code> in <code>lesson09_commands.py</code> (already written for you). <code>TRAIN</code> is a list of pairs like <code>("halt", "stop")</code>, and you only want the command half:</p>
 <pre><code>pairs = [("halt", "stop"), ("go to red", "go")]
-words = [command for command, intent in pairs]     # ["halt", "go to red"]</code></pre></div>
-<details><summary>Hint 1</summary><p>Start <code>clean</code> with these two imports:</p>
+words = [command for command, intent in pairs]     # ["halt", "go to red"]</code></pre>
+<details class="box stuck"><summary>🆘 Stuck?</summary>
+<p><b>Hint 1.</b> Start with these imports:</p>
 <pre><code>from lesson08_words import tokenize, count_bigrams, fix_typos
 from lesson09_commands import TRAIN</code></pre>
-<p>Then build the counts once and keep them in <code>CACHE["counts"]</code>, exactly as the docstring says:</p>
-<pre><code>words = [command for command, intent in TRAIN]
-CACHE["counts"] = count_bigrams(tokenize(" . ".join(words)))</code></pre>
-<p>Careful: <code>" . ".join(TRAIN)</code> crashes, because <code>TRAIN</code> holds pairs, not strings.</p></details>
-<details><summary>Hint 2</summary><p>Put those two lines inside <code>if "counts" not in CACHE:</code>, so they only run once. Then <code>return fix_typos(text, CACHE["counts"])</code>. The provided <code>command()</code> prints "I think you meant…" for you.</p></details>
-<details><summary>Hint 3</summary><p>Fill in the blanks:</p>
+<p><b>Hint 2.</b> Build the counts only once, inside <code>if "counts" not in CACHE:</code>, then return <code>fix_typos(text, CACHE["counts"])</code>.</p>
+<p><b>Hint 3.</b> Fill in:</p>
 <pre><code>from lesson08_words import tokenize, count_bigrams, fix_typos
 from lesson09_commands import TRAIN
 if "counts" not in CACHE:
     words = [____ for command, intent in TRAIN]
     CACHE["counts"] = count_bigrams(tokenize(" . ".join(____)))
 return fix_typos(____, CACHE["counts"])</code></pre></details>
-<p>Check it: <code>cd ..</code> back to <code>project</code>, then <code>python3 check.py robot</code>. Your new check is <em>"week 5: fixes typos"</em>. If you joined <code>TRAIN</code> itself, you'll see:</p>
-<pre><code>  ✗ week 5: fixes typos: crashed with TypeError: sequence item 0: expected str instance, tuple found. TRAIN is a list of (command, intent) pairs: join only the commands, words = [command for command, intent in TRAIN]</code></pre>
-<p>That means "<code>join</code> wanted strings, but item 0 was a pair". Take just the commands, as in Hint 1.</p>
-<p>Then talk to your robot (<code>cd homework</code>, <code>python3 my_robot.py</code>). Real output, before Part B:</p>
-<pre><code>Zippy&gt; put teh red blok in the bin
-  (I think you meant: 'put the red block in the bin')
-  I can't do that yet: week 5. Fill in this gap in my_robot.py</code></pre>
-<p>Your robot already reads the typos right. It can't <em>do</em> sentences yet: that's the gap you fill in Part B. After Part B, the same command bins the red block.</p>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<p>From <code>project</code>, run <code>python3 check.py robot</code>. You should see:</p>
+<pre><code>  ✓ week 6: steady
+  ✓ week 7: fixes typos
+  … week 7: understands and does: not written yet (fill in understand_words() first)
+  …
+  9/21 passed</code></pre>
+<p>Then <code>cd homework</code>, <code>python3 my_robot.py</code>, and type <code>put teh red blok in the bin</code>:</p>
+<pre><code>Zippy&gt;   (I think you meant: 'put the red block in the bin')
+  I can't do that yet: week 7. Fill in this gap in my_robot.py</code></pre>
+<p>It reads the typos right. It can't <em>do</em> sentences yet: that's Part B. If you see <code>✗ week 7: fixes typos: crashed with TypeError: sequence item 0: expected str instance, tuple found</code>, you joined <code>TRAIN</code> itself. Join only the commands (Hint 3).</p>
+</div>
 
 <h2 id="challenge">5. Real-world challenge: a language model in a cup</h2>
-<p>You'll train and run a bigram model by hand on your own writing.</p>
+<div class="box play"><span class="tag">🌍 Real-world challenge</span>
 <ol>
-<li>Pick about 20 messages <em>you</em> sent (not other people's), or a page of your own writing. Copy them onto paper. Leave out anything private.</li>
-<li>Choose your 5 most common words (often "i", "the", "to", "you", "a"). For each, make a tally table of the word that came right after it.</li>
-<li>Pick one word, say "i". For each follower, write it on scraps of paper: one scrap per tally mark. If "i" was followed by "am" 3 times and "think" once, that's 3 "am" scraps and 1 "think" scrap. Put them in a cup. Now the cup <em>is</em> the probabilities.</li>
-<li>Generate: draw a scrap, write it down, then use the cup for <em>that</em> word (make cups for your other common words too; if you land on a word with no cup, stop). Make 3 "sentences".</li>
-<li>Then type the same messages into the <code>STORY</code> in your Python file (or into the demo box above) and compare the computer's sentences with yours.</li>
+<li>Copy about 20 messages <em>you</em> sent onto paper (leave out anything private).</li>
+<li>Pick your most common word, say "i". Tally the words that came right after it.</li>
+<li>Write each follower on scraps of paper, one scrap per tally mark, and put them in a cup. The cup <em>is</em> the probabilities.</li>
+<li>Make cups for a few more common words. Draw a scrap, write it down, use that word's cup next. Stop at a word with no cup. Make 3 "sentences".</li>
 </ol>
-<p><strong>Record:</strong> your tally tables, your 3 hand-made sentences, and one probability you worked out (e.g. P(am after i) = 3/4 = 0.75). <strong>What it should teach you:</strong> the "model" is just your own habits, counted. It sounds a bit like you, but it has no idea what it's saying. A model can only be as good as the text it learned from.</p>
+<p><strong>On your own:</strong> the same game works with any page of your own writing. Then paste it into the first demo and compare. <strong>Record</strong> one probability you worked out, like P(am after i) = 3/4. <strong>The lesson:</strong> the model is just your habits, counted. It can sound like you without knowing what it says.</p>
+</div>
 
-<h2 id="project">6. Your Robo-Helper so far</h2>
-<p>You've added a <strong>baby language model</strong> (<code>tokenize</code>, <code>count_bigrams</code>, <code>next_word_probs</code>, <code>generate</code>) and its first robot job, a <strong>typo fixer</strong> (<code>edits1</code>, <code>fix_word</code>, <code>fix_typos</code>).</p>
-<div class="card note"><strong>What this adds to your robot:</strong> in the course's simulator, <code>brains.clean()</code> runs your <code>fix_typos</code> in front of the small brains, using the words of every command they were trained on. Measured with <code>python3 progress.py --solutions</code>: typo commands handled exactly like the correct spelling go from <strong>6/9</strong> to <strong>9/9</strong> for the word counter. Without the fixer, "go to the bleu block" and "put the gren block away" are refused, and "fnd the red block" puts the red block in the bin instead of finding it. "put the red bclok away" stays unfixed, but the robot still gets it right, because "put" and "red" are enough for the word counter.</div>
-<p>The robot won't write stories in the final project. Two pieces live on: the typo fixer, and <code>tokenize</code>. In <a href="09-understanding-commands.html">Part B</a>, <code>lesson09_commands.py</code> starts with <code>from lesson08_words import tokenize</code> and uses it to chop up commands like "put the red block in the bin" before counting words to guess what you want. Then week 7's capstone uses that command reader, so your tokenizer ends up inside the finished Robo-Helper. And in <a href="10-llm-safety.html">week 7</a> you'll plug in a <em>real</em> LLM: the grown-up version of what you just made.</p>
+<h2 id="check">6. Check yourself</h2>
+<details><summary>What does a bigram model remember when it picks the next word?</summary><p>Only the last word. That's why its sentences wander.</p></details>
+<details><summary>Predict: what does <code>tokenize("STOP! Stop, now.")</code> return?</summary><p><code>["stop", "stop", "now", "."]</code>.</p></details>
+<details><summary>Can the model ever write "the robot sees a block"?</summary><p>No. In the story "a" is only ever followed by "cat". A bigram model can make new sentences, but never a pair it hasn't seen.</p></details>
+<details><summary>Why sample at random instead of always taking the top word?</summary><p>Always taking the top word gives the same sentence every time and often loops. Sampling gives variety while still favouring likely words.</p></details>
+<details><summary>Why does "te" become "to" after "go" but "the" after "put"?</summary><p>Both are one typo away. The fixer keeps the one most likely after the word before.</p></details>
 
-<h2 id="mistakes">7. Common mistakes</h2>
+<h2 id="deeper">7. Want to know more?</h2>
+<details><summary>Sampling: how to roll a weighted die</summary>
+<p>Picture a ruler from 0 to 1, cut into pieces as long as each probability. After "the" (robot 0.5, red 0.125, bin 0.125, cat 0.0625, blue 0.125, room 0.0625):</p>
+<pre><code>0             0.5    0.625  0.75  0.8125 0.9375  1
+|    robot     | red  | bin  | cat |  blue | room |</code></pre>
+<p>Pick a random number and see where it lands. <code>random.Random(4)</code> gives 0.236 first, so "robot". <code>rng.choices</code> does this for you.</p></details>
+<details><summary>How is ChatGPT different?</summary>
 <ul>
-<li><strong>Forgetting to lowercase.</strong> Then "The" and "the" are counted as different words. Checker hint: <em>'tokenize("The cat. Sat") -&gt; ["the", "cat", ".", "sat"]'</em>.</li>
-<li><strong>Off-by-one in the pairs.</strong> Looping <code>i</code> all the way to <code>len(tokens)</code> makes <code>tokens[i + 1]</code> crash on the last word.</li>
-<li><strong>Dividing by the wrong number.</strong> Divide by the <em>total count</em> (4 in the check), not by how many different next words there are (2). Checker hint: <em>"1 and 3 -&gt; 0.25 and 0.75"</em>.</li>
-<li><strong>Looking at the first word instead of the last.</strong> <code>out[0]</code> is always the start word. You need <code>out[-1]</code>.</li>
-<li><strong>Returning a list from <code>edits1</code>.</strong> Some edits come out the same, so a list has repeats. Checker hint: <em>"'ab' has exactly 130 different one-typo versions"</em>.</li>
-<li><strong>Using the typo as <code>prev</code>.</strong> In <code>fix_typos</code>, the next word must be chosen by the <em>fixed</em> word before it. "teh" was never seen before "red"; "the" was.</li>
-<li><strong>Counting the start word as one of the n.</strong> <code>n = 5</code> means 5 <em>new</em> words, 6 in total. Checker hint: <em>"start word + 5 new words"</em>.</li>
-</ul>
-
-<h2 id="check">8. Check yourself</h2>
-<details><summary>What does a bigram model remember when it picks the next word?</summary><p>Only the single last word. That's why the sentences wander off topic.</p></details>
-<details><summary>Predict: what does <code>tokenize("STOP! Stop, now.")</code> return?</summary><p><code>["stop", "stop", "now", "."]</code>. Lowercased, "!" and "," dropped, the full stop kept.</p></details>
-<details><summary>After "block", our story has "." twice and "in" twice. What does <code>next_word_probs(counts, "block")</code> return?</summary><p><code>{".": 0.5, "in": 0.5}</code>.</p></details>
-<details><summary>Why sample randomly instead of always picking the most likely next word?</summary><p>Always picking the top word gives the same sentence every time, and it often gets stuck in loops. Sampling gives variety while still favouring likely words.</p></details>
-<details><summary>Why does "te" become "to" after "go" but "the" after "put"?</summary><p>Both are one typo from "te". The fixer keeps the candidate most likely to come <em>after the previous word</em>. In the robot's commands, "go" is followed by "to" but never by "the", and "put" is followed by "the" two times in three.</p></details>
-<details><summary>Name two things ChatGPT has that your model doesn't.</summary><p>Any two of: a much longer context (thousands of tokens, not 1 word); a neural network instead of a count table, so it can handle combinations it never saw; training on trillions of words instead of 66; word-piece tokens; extra training to follow instructions.</p></details>
-
-<h2 id="deeper">9. Go deeper (optional)</h2>
+<li><strong>Longer memory:</strong> thousands of earlier tokens, not one word.</li>
+<li><strong>A neural network instead of a count table.</strong> Counting "last 10 words → next" with 50,000 words would need 50,000<sup>11</sup> slots, almost all zero. A network learns patterns instead. You build a small one in <a href="15-tiny-lm.html">week 8</a>.</li>
+<li><strong>Far more text:</strong> trillions of tokens, not 66.</li>
+<li><strong>Word pieces:</strong> "unboxable" becomes "un" + "box" + "able".</li>
+<li><strong>Extra training</strong> to follow instructions and refuse harmful requests.</li>
+</ul></details>
+<details><summary>More about the typo fixer</summary>
+<p>A 3-letter word has 3 deletes, 2 swaps, 78 replaces and 104 inserts: 187, or 182 different strings. Looking two typos away would fix "bclok", but "bclok" has 286 one-typo strings and 36,860 two-typo ones, so there are many more chances of a wrong guess.</p>
+<p>"drop it in the bn" becomes <code>drop is in the bin</code>. "it" isn't in the 34 commands, and "is" is one letter away, so the fixer "fixes" a correct word. A phone has a full dictionary; ours only knows what it counted.</p>
+<p>Measured with <code>python3 progress.py --solutions</code>: typo commands handled exactly like the correct spelling go from 6/9 to 9/9 for the word counter.</p></details>
+<details><summary>Stretch ideas</summary>
 <ul>
-<li><a href="../06-30u30/01-rnn-effectiveness.html">30u30 Day 01: The Unreasonable Effectiveness of RNNs</a>: the next step up from counting. A neural network that predicts the next <em>character</em> learns spelling and grammar by itself. Has a temperature demo.</li>
-<li><a href="../06-30u30/13-attention.html">30u30 Day 13: Attention Is All You Need</a>: the paper behind the "T" in GPT. How a model looks back at all earlier tokens, not just the last one.</li>
-<li><a href="../07-post-training.html">Post-training</a>: how a raw next-word predictor is turned into a helpful assistant.</li>
-<li><a href="../09-inference-engineering/index.html">Inference engineering</a> (inference means a brain answering, not learning; you'll meet it in week 8): how the generate loop is run fast for millions of people.</li>
-</ul>
+<li>Reach <strong>two</strong> typos. Does it fix "bclok"? Does it start "fixing" words it shouldn't?</li>
+<li>Build a <strong>trigram</strong> model (the next word after each <em>pair</em>). Less wandering? What goes wrong with only 66 tokens?</li>
+<li>Add a <code>greedy</code> option that always picks the top word. What happens?</li>
+</ul></details>
+<details><summary>Where this goes next, and further reading</summary>
+<p>Your <code>tokenize</code> is used straight away in <a href="09-understanding-commands.html">Part B</a>, and your typo fixer runs in front of every command for the rest of the course. In <a href="10-llm-safety.html">week 10</a> you plug in a real LLM, the grown-up version of this.</p>
+<ul>
+<li><a href="../06-30u30/01-rnn-effectiveness.html">30u30 Day 01: The Unreasonable Effectiveness of RNNs</a>: a network that predicts the next character.</li>
+<li><a href="../06-30u30/13-attention.html">30u30 Day 13: Attention Is All You Need</a>: the paper behind the "T" in GPT.</li>
+<li><a href="../07-post-training.html">Post-training</a>: turning a next-word predictor into an assistant.</li>
+<li><a href="../09-inference-engineering/index.html">Inference engineering</a>: running the generate loop fast for millions of people.</li>
+</ul></details>
 
 <nav class="pager">
-  <a href="06-pathfinding.html"><small>Previous</small>Week 4 · Finding the way</a>
-  <a class="next" href="09-understanding-commands.html"><small>Next</small>Week 5 · Part B: Understanding commands</a>
+  <a href="22-fusion.html"><small>Previous</small>Week 6 · The gyroscope, drift and sensor fusion</a>
+  <a class="next" href="09-understanding-commands.html"><small>Next</small>Week 7 · Part B: Understanding commands</a>
 </nav>
-<footer>Build a Robot Brain · Week 5 of 12 · Part A (homework file: lesson08_words.py)</footer>
+<footer>Build a Robot Brain · Week 7 of 16 · Part A (homework file: lesson08_words.py)</footer>
 </main>
-
 <script>
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 

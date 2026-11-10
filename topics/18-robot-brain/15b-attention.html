@@ -3,114 +3,116 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Week 6 stretch · Attention</title>
-<link rel="stylesheet" href="../../style.css">
+<title>Week 8 stretch · Attention</title>
+<link rel="stylesheet" href="../../style.css?v=16">
+<style>main p code, main li code, main dd code { overflow-wrap: anywhere; }</style>
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › <a href="15-tiny-lm.html">Week 6 of 12</a> › Stretch</nav>
+<nav class="crumbs"><a href="../../index.html">LLMs &amp; Robotics</a> › <a href="index.html">Build a Robot Brain</a> › <a href="15-tiny-lm.html">Week 8 of 16</a> › Stretch</nav>
 
-<div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 6 of 12 · Stretch</div>
+<div class="eyebrow"><span class="track llm">LLM</span>Build a Robot Brain · Week 8 of 16 · Stretch</div>
 <h1>Attention: how Transformers read</h1>
-<p class="lede">Your week 6 language model reads a command by averaging all its words, once. Real LLMs do something cleverer: at every word they write, they choose which words of the command to look at. That's attention, the idea at the centre of every Transformer. Here you build it, with a new file and one new function.</p>
-<div class="card note" id="journey"><strong>Stretch for week 6 (optional).</strong> Do this after you've finished <a href="15-tiny-lm.html">Week 6 · A tiny language model</a>, including its homework. It's bigger than the other stretches, and nothing later needs it: if you skip it, week 9 quietly uses your plain tiny LM instead.<br><strong>Your robot:</strong> nothing to add to <code>my_robot.py</code> here. If you build it, week 9's teacher-trained brain uses this attention model.</div>
+<p class="lede">Your tiny LM reads a command by averaging all its words, once. Real LLMs choose which words to look at, fresh for every word they write. That's attention. You write one function.</p>
+<div class="card note" id="journey"><strong>Stretch for week 8 (optional).</strong> Do it after <a href="15-tiny-lm.html">Week 8 · A tiny language model</a>, including its homework and robot step. Nothing later needs it: if you skip it, week 14 quietly uses your plain tiny LM. Nothing to add to <code>my_robot.py</code> here. Next: <a href="23-wheels.html">Week 9 · Wheels, odometry and PID</a>.</div>
 
 <div class="facts">
   <div><b>Time</b>1–2 hours</div>
-  <div><b>You'll need</b>Your finished week 6 file, <code>lesson15_tiny_lm.py</code>, and a calculator</div>
+  <div><b>You'll need</b>Your finished <code>lesson15_tiny_lm.py</code></div>
   <div><b>New words</b>query, key, dot product, attention weights</div>
   <div><b>Homework file</b><code>lesson15_attention.py</code> (one function)</div>
 </div>
 
 <section class="kid" id="start">
 <h2>Start here</h2>
-<p class="big">Averaging gives every word the same vote, at every step. Attention lets the model ask a question at each step and listen hardest to the words that answer it.</p>
-<h3>The problem</h3>
-<p>Your tiny LM reads "put the red and blue blocks away" as one average. "the", "and" and "away" get just as much say as "red" and "blue". And it's the same average whether the model is choosing the action, the first colour or the second colour.</p>
-<h3>The idea in one picture</h3>
-<p>Think of a teacher asking the class a question. Everyone could shout at once (that's averaging). Or the teacher can listen hardest to the pupils who know the answer, and a different question picks out different pupils. Attention is the model choosing who to listen to, fresh for every word it writes.</p>
-<h3>Words to know</h3>
+<p class="big">Averaging gives every word the same vote at every step. Attention lets the model ask a question at each step and listen hardest to the words that answer it.</p>
+<p>Think of a teacher asking the class a question. Everyone could shout at once (averaging). Or the teacher can listen hardest to the pupils who know the answer, and a different question picks out different pupils.</p>
 <dl>
-<dt>Query</dt><dd>The question asked at this step. Ours is the embedding of the word the model has just written.</dd>
-<dt>Key</dt><dd>What each command word offers. Ours is just its embedding.</dd>
-<dt>Dot product</dt><dd>Multiply two lists position by position and add up. Big means "these point the same way".</dd>
-<dt>Attention weights</dt><dd>How much the model listens to each word at this step. They add up to 1, like softmax probabilities.</dd>
+<dt>Query</dt><dd>The question at this step: the embedding of the word just written.</dd>
+<dt>Key</dt><dd>What each command word offers: its embedding.</dd>
+<dt>Dot product</dt><dd>Multiply two lists position by position and add up. Big means "these match".</dd>
+<dt>Attention weights</dt><dd>How much it listens to each word. They add up to 1.</dd>
 </dl>
 </section>
-<p class="deeper"><strong>Going deeper:</strong> everything below builds attention by hand, shows where the real trained model looks, measures whether it helps, and then you write <code>attend</code>.</p>
 
-<h2 id="problem">1. The problem with averaging</h2>
-<p>Look again at <a href="15-tiny-lm.html#principles">Step 2 of week 6</a>. <code>read</code> squashes the whole command into one average, <em>once</em>, before writing anything. That has two weaknesses:</p>
-<ol>
-<li><strong>Every word counts the same.</strong> In "put the red and blue blocks away", the word "red" is 1 of 7, so it gets 1/7 of the vote. "the", "and" and "away" get just as much.</li>
-<li><strong>It's the same at every step.</strong> When the model writes word 1 it needs the <em>action</em>. When it writes word 2 it needs the first colour, and for word 3 the next colour. But every step sees exactly the same average.</li>
+<h2 id="principles">1. The idea</h2>
+<div class="box idea"><span class="tag">💡 The idea: spotlights on words</span>
+<p>At every step the model shines a spotlight on the command's words. Brighter = more weight. Real weights from the trained attention model for "put the red and green blocks away":</p>
+<svg class="diagram" viewBox="0 0 520 335" role="img" aria-label="Spotlights on the words of put the red and green blocks away: spread out at the first step, mostly on red after put">
+<text x="8" y="20" style="fill:var(--fg);font:700 17px sans-serif">after &lt;start&gt;: which action? <tspan style="fill:var(--ok)">→ writes put</tspan></text>
+<path d="M41 34 L11 112 L71 112 Z" style="fill:var(--build);opacity:0.19"/>
+<rect x="8" y="112" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
+<text x="41" y="132" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">put</text>
+<text x="41" y="158" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.15</text>
+<path d="M113 34 L83 112 L143 112 Z" style="fill:var(--build);opacity:0.09"/>
+<rect x="80" y="112" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
+<text x="113" y="132" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">the</text>
+<text x="113" y="158" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.07</text>
+<path d="M185 34 L155 112 L215 112 Z" style="fill:var(--build);opacity:0.16"/>
+<rect x="152" y="112" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
+<text x="185" y="132" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">red</text>
+<text x="185" y="158" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.12</text>
+<path d="M257 34 L227 112 L287 112 Z" style="fill:var(--build);opacity:0.19"/>
+<rect x="224" y="112" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
+<text x="257" y="132" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">and</text>
+<text x="257" y="158" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.15</text>
+<path d="M329 34 L299 112 L359 112 Z" style="fill:var(--build);opacity:0.23"/>
+<rect x="296" y="112" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
+<text x="329" y="132" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">green</text>
+<text x="329" y="158" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.18</text>
+<path d="M401 34 L371 112 L431 112 Z" style="fill:var(--build);opacity:0.22"/>
+<rect x="368" y="112" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
+<text x="401" y="132" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">blocks</text>
+<text x="401" y="158" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.17</text>
+<path d="M473 34 L443 112 L503 112 Z" style="fill:var(--build);opacity:0.21"/>
+<rect x="440" y="112" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
+<text x="473" y="132" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">away</text>
+<text x="473" y="158" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.16</text>
+<text x="8" y="190" style="fill:var(--fg);font:700 17px sans-serif">after put: which colour first? <tspan style="fill:var(--ok)">→ writes red</tspan></text>
+<path d="M41 204 L11 282 L71 282 Z" style="fill:var(--build);opacity:0.06"/>
+<rect x="8" y="282" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
+<text x="41" y="302" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">put</text>
+<text x="41" y="328" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.04</text>
+<path d="M113 204 L83 282 L143 282 Z" style="fill:var(--build);opacity:0.06"/>
+<rect x="80" y="282" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
+<text x="113" y="302" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">the</text>
+<text x="113" y="328" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.02</text>
+<path d="M185 204 L155 282 L215 282 Z" style="fill:var(--build);opacity:1"/>
+<rect x="152" y="282" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
+<text x="185" y="302" text-anchor="middle" style="fill:var(--fg);font:700 16px sans-serif">red</text>
+<text x="185" y="328" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.77</text>
+<path d="M257 204 L227 282 L287 282 Z" style="fill:var(--build);opacity:0.09"/>
+<rect x="224" y="282" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
+<text x="257" y="302" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">and</text>
+<text x="257" y="328" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.07</text>
+<path d="M329 204 L299 282 L359 282 Z" style="fill:var(--build);opacity:0.06"/>
+<rect x="296" y="282" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
+<text x="329" y="302" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">green</text>
+<text x="329" y="328" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.03</text>
+<path d="M401 204 L371 282 L431 282 Z" style="fill:var(--build);opacity:0.06"/>
+<rect x="368" y="282" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
+<text x="401" y="302" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">blocks</text>
+<text x="401" y="328" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.04</text>
+<path d="M473 204 L443 282 L503 282 Z" style="fill:var(--build);opacity:0.06"/>
+<rect x="440" y="282" width="66" height="30" rx="6" style="fill:var(--card);stroke:var(--line)"/>
+<text x="473" y="302" text-anchor="middle" style="fill:var(--fg);font:16px sans-serif">away</text>
+<text x="473" y="328" text-anchor="middle" style="fill:var(--muted);font:14px sans-serif">0.03</text>
+</svg>
+<p>Choosing the action, the light is spread out. After "put", "red" grabs 0.77 of it. Nobody told it to do this: training found that it helps. If every weight were equal, you'd get the old average back.</p>
+</div>
+<div class="box idea"><span class="tag">💡 How the spotlight is aimed</span>
+<ol class="steps">
+<li><strong>Score</strong> every word: the dot product of its key with the query, divided by √E.</li>
+<li><strong>Softmax</strong> the scores into weights (your <code>softmax</code> from week 8).</li>
+<li><strong>Mix</strong>: each word's embedding times its weight, added up. That's the context.</li>
 </ol>
-<p>What we want: at each step, the model chooses which words to look at. That's <strong>attention</strong>.</p>
+<p>By hand, with 2-number embeddings: put [1, 0], red [0, 2], the [0.5, 0.5], and a query [0, 1] ("which colour?"). Scores ÷ 1.414: put 0, red 1.414, the 0.354. Softmax: <strong>put 0.153, red 0.629, the 0.218</strong>. Ask [1, 0] ("which action?") instead and put wins with 0.456. Same words, different question, different focus.</p>
+</div>
 
-<h2 id="principles">2. The idea: ask a question, score every word</h2>
-<p>At each step, the word the model has just written asks a question. Its embedding is the <strong>query</strong>. After <code>&lt;start&gt;</code>, the question is roughly "which words tell me the action?". After "put", it's "which words tell me the first colour?". Nobody writes these questions down: training learns them, just like it learns the embeddings.</p>
-<p>Each command word's embedding is its <strong>key</strong>. Then:</p>
-<ol>
-<li><strong>Score</strong> every word: how well does its key match the query? We use the <strong>dot product</strong> (multiply the two lists position by position and add up), divided by √E. A big score means "this word answers my question".</li>
-<li><strong>Softmax</strong> the scores into <strong>attention weights</strong> that add up to 1. You wrote <code>softmax</code> in week 6 (homework 4.1).</li>
-<li>The <strong>context</strong> is the <em>weighted</em> average: each word's embedding times its weight, added up.</li>
-</ol>
-<p>If every weight is equal, that's exactly the old average. Attention just lets the weights be unequal, and different at every step.</p>
-
-<h3>Worked example by hand</h3>
-<p>Three words, and embeddings of just 2 numbers (so E = 2 and √E ≈ 1.414). Made-up numbers to keep the sums easy:</p>
-<pre><code>put  → [1, 0]       red  → [0, 2]       the  → [0.5, 0.5]
-query after "put" (looking for a colour) → [0, 1]</code></pre>
-<p>Scores (dot product ÷ 1.414):</p>
-<pre><code>put:  (0×1 + 1×0)   / 1.414 = 0
-red:  (0×0 + 1×2)   / 1.414 = 1.414
-the:  (0×0.5 + 1×0.5) / 1.414 = 0.354</code></pre>
-<p>Softmax: e<sup>0</sup> = 1, e<sup>1.414</sup> ≈ 4.113, e<sup>0.354</sup> ≈ 1.424. Total ≈ 6.537.</p>
-<pre><code>weights:  put 0.153   red 0.629   the 0.218      (they add up to 1)
-context = 0.153×[1, 0] + 0.629×[0, 2] + 0.218×[0.5, 0.5] ≈ [0.262, 1.367]
-plain average                                           ≈ [0.500, 0.833]</code></pre>
-<details><summary>Predict first: now the query is [1, 0] (looking for an action). Which word wins?</summary>
-<p>Scores: put 0.707, red 0, the 0.354. Weights: <strong>put 0.456</strong>, the 0.320, red 0.225. Same three words, a different question, a different focus. That's the whole trick.</p>
-</details>
-
-<h3>The real model: where does it look?</h3>
-<p><code>AttnTinyLM</code> is your week 6 <code>TinyLM</code> with one change: instead of <code>read</code> once, it calls <code>attend</code> at every step, with the embedding of the word it just wrote as the query. It trains on exactly the same 343 examples. Real output, the top 3 weights at each step:</p>
-<pre><code>  'put the red and green blocks away'
-    after '&lt;start&gt;' looks at  green:0.18  blocks:0.17  away:0.16   -&gt; writes 'put' (1.00)
-    after 'put'     looks at  red:0.77  and:0.07  put:0.04         -&gt; writes 'red' (1.00)
-    after 'red'     looks at  red:0.41  and:0.33  away:0.07        -&gt; writes 'green' (1.00)
-    after 'green'   looks at  the:0.27  green:0.21  away:0.13      -&gt; writes '&lt;end&gt;' (1.00)
-  'throw out all of them except the blue one'
-    after '&lt;start&gt;' looks at  all:0.16  them:0.14  throw:0.13      -&gt; writes 'put' (1.00)
-    after 'put'     looks at  all:0.60  except:0.08  them:0.08     -&gt; writes 'red' (1.00)
-    after 'red'     looks at  blue:0.39  all:0.37  except:0.05     -&gt; writes 'green' (1.00)
-    after 'green'   looks at  the:0.22  one:0.17  out:0.10         -&gt; writes '&lt;end&gt;' (1.00)</code></pre>
-<p>At the first step the weights are spread out: every word gets a similar share. After "put", one word grabs most of the weight: "red" (0.77) in the first command, "all" (0.60) in the second. The second command's third step is the clever one: to decide what comes after red, it looks hardest at "blue" (0.39), the colour you said to leave out, together with "all" (0.37), and writes green. Nobody told it to do this. Training found that it helps.</p>
-
-<h2 id="results">3. Does it help?</h2>
-<p>The file trains both models on the same data with 3 different random starts (seeds) and scores exact plans on the 50 held-out examples. Real output:</p>
-<div class="table-wrap"><table>
-<tr><th>seed</th><th>averaging (TinyLM)</th><th>attention (AttnTinyLM)</th></tr>
-<tr><td>0</td><td class="num">92%</td><td class="num">92%</td></tr>
-<tr><td>1</td><td class="num">94%</td><td class="num">92%</td></tr>
-<tr><td>2</td><td class="num">80%</td><td class="num">92%</td></tr>
-<tr><td>average</td><td class="num">89%</td><td class="num">92%</td></tr>
-</table></div>
-<p>Attention is a little better on average, but not on every seed: on seed 0 they tie, and on seed 1 the averaging model wins. What attention clearly gives is <em>steadiness</em>: 92% on every seed, while the averaging model swings from 80% to 94% depending on its random start. That's why we run more than one seed. With seed 0, attention fixes "please put everything in the bin" (it writes all three colours) and writes <code>stop</code> for "stop the red block", where the averaging model wrote <code>go red</code>. But it makes a new mistake: for "go to the green block" it writes just <code>go</code>, which <code>words_to_plan</code> rejects.</p>
-<p><strong>On the robot, though, the bake-off score is the same: 8/12.</strong> The same tasks pass. On "tidy up the room" it now asks which block instead of binning two, which is safer but still a fail.</p>
-<div class="card note"><strong>Small experiments wobble.</strong> With a few hundred examples, a difference between two models can be just luck: which random start each one got. These numbers also depend on the training data: change the examples and they move. So re-run, use several seeds, and only believe a difference that shows up every time.</div>
-
-<h3>What attention does NOT fix</h3>
-<ul>
-<li><strong>Word order.</strong> "put the block in the red bin" → <code>['put', 'red']</code>, from both models. Our attention only compares embeddings, and "red" has the same embedding wherever it sits, so shuffling the words gives exactly the same weights. "go to the blue block not the red one" gives <code>['go', 'blue']</code> from the averaging model (right, but only by luck: it can't read "not") and <code>['go', 'red', 'go']</code> from attention, which <code>words_to_plan</code> rejects. Real Transformers add <strong>position information</strong> to each embedding, so "red" before "block" and "red" before "bin" look different.</li>
-<li><strong>Unknown words.</strong> For "where's the green one?", "where's" isn't in the vocabulary, so it has no key and can't be attended to. The attention model looks at "the green one" and writes <code>put green</code>, which would bin the green block. (The averaging model wrote just <code>put</code>, which was rejected. Here, being worse at writing a full plan was accidentally safer.) Attention chooses <em>among</em> the words it knows. It can't invent meaning for a word it has never seen.</li>
-</ul>
-
-<h2 id="play">4. Play with it</h2>
-<div class="card demo">
-<h3 style="margin-top:0">Interactive: the attention heatmap</h3>
-<p class="legend">The <em>real</em> trained numbers from <code>train_attn_lm()</code> (seed 0), copied out of Python, with <code>attend</code> and the step loop written in JavaScript exactly like the Python. Each row is one writing step; each column is one command word. The darker the cell, the more the model looks at that word at that step. Words in <b style="color:var(--fail)">red</b> aren't in its vocabulary.</p>
-<p><label for="attIn">Command: </label><input id="attIn" value="put the red and green blocks away" size="34"></p>
+<h2 id="play">2. Play with it</h2>
+<div class="box play"><span class="tag">🎮 Play: the attention heatmap</span>
+<p class="legend">The real trained numbers from <code>train_attn_lm()</code> (seed 0), run in JavaScript exactly like the Python. Each row is one writing step; darker = more attention. Words in <b style="color:var(--fail)">red</b> aren't in its vocabulary.</p>
+<p><label for="attIn">Command: </label><input id="attIn" value="put the red and green blocks away" size="30"></p>
 <p>
 <button data-ac="put the red and green blocks away">put the red and green blocks away</button>
 <button data-ac="throw out all of them except the blue one">throw out all of them except the blue one</button>
@@ -123,24 +125,28 @@ plain average                                           ≈ [0.500, 0.833]</code
 <div class="table-wrap"><table id="attMap" style="font-size:.85rem"></table></div>
 <p><b>Written:</b> <code id="attOut">[]</code></p>
 </div>
-<p>Things to try: compare "put the red block in the bin" with "put the block in the red bin" (same weights, just in different columns). Watch the first row of "stop the red block": "stop" gets more than half the weight. Then type a long command with lots of "the"s and see what happens to the colour's share.</p>
+<p>Try "stop the red block": "stop" gets 0.53 of the first spotlight and it writes <code>stop</code>, where the averaging model wrote <code>go red</code>. Then compare "put the red block in the bin" with "put the block in the red bin": the same weights, just in different columns. Our attention has no idea of word <em>order</em>.</p>
 
-<h2 id="homework">5. Homework</h2>
-<p>Open <code>homework/lesson15_attention.py</code>. It imports your finished week 6 file, <code>lesson15_tiny_lm.py</code>. <code>AttnTinyLM</code> (including its training, with the chain rule written out through attention) and <code>train_attn_lm</code> (which reuses your week 6 training loop with <code>cls=AttnTinyLM</code>) are provided. You write one function.</p>
-<h3><code>attend(query, keys)</code></h3>
-<p><code>query</code> is a list of E numbers; <code>keys</code> is a list of word embeddings. Score each key with the dot product ÷ √E, softmax the scores, and build the weighted average. Return <code>(context, weights)</code>. Example: <code>attend([0.0] * E, [[1.0] * E, [0.0] * E])</code> gives weights <code>[0.5, 0.5]</code> (every score is 0) and a context of twelve 0.5s.</p>
-<details><summary>Hint 1</summary><p>Three stages, the same as the worked example: a list of scores, a list of weights, then the context. <code>dot</code> is already in the file, and <code>softmax</code> comes from your week 6 file.</p></details>
-<details><summary>Hint 2</summary><p>The scores are one list comprehension over <code>keys</code>, using <code>math.sqrt(E)</code>. For the context, position <code>i</code> is the sum, over every word, of its weight times its key's position <code>i</code>. <code>zip(weights, keys)</code> pairs them up.</p></details>
-<details><summary>Hint 3</summary><p>Fill in the blanks:</p>
+<h2 id="homework">3. Build it</h2>
+<div class="box build"><span class="tag">🛠 Build</span>
+<p>Open <code>project/homework/lesson15_attention.py</code>. <code>AttnTinyLM</code>, its training and <code>train_attn_lm</code> are written for you. You write one function.</p>
+</div>
+<ol class="steps">
+<li><p><strong><code>attend(query, keys)</code></strong>: score each key with <code>dot(query, k) / math.sqrt(E)</code>, softmax the scores, build the weighted average. Return <code>(context, weights)</code>.</p>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span>
+<pre><code>python3 -c "from lesson15_attention import *; c, w = attend([0.0] * E, [[1.0] * E, [0.0] * E]); print(w, c[:3], len(c))"</code></pre>
+<pre><code>[0.5, 0.5] [0.5, 0.5, 0.5] 12</code></pre>
+<p>A query of zeros scores every word 0, so the weights are equal. If your weights don't add up to 1, you forgot the softmax.</p></div>
+<details class="box stuck"><summary>🆘 Stuck?</summary>
+<p><b>Hint 1.</b> <code>dot</code> is already in the file; <code>softmax</code> is imported from your week 8 file.</p>
+<p><b>Hint 2.</b> Position <code>i</code> of the context is the sum over every word of its weight times its key's position <code>i</code>. <code>zip(weights, keys)</code> pairs them.</p>
+<p><b>Hint 3.</b> Fill in:</p>
 <pre><code>scores = [dot(query, k) / math.sqrt(E) for k in ____]
 weights = softmax(____)
 context = [sum(w * k[i] for w, k in zip(weights, keys)) for i in range(____)]
 return context, weights</code></pre></details>
-
-<h3>Run it</h3>
-<pre><code>cd homework
-python3 lesson15_attention.py</code></pre>
-<p>It trains six models, so give it a little while (about half a minute on our laptop). What you should see (real output of the reference solution):</p>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint: run the file (about half a minute, it trains six models)</span>
+<pre><code>python3 lesson15_attention.py</code></pre>
 <pre><code>Training both models on the same data, with 3 different random starts (seeds)...
   seed 0: held-out plans  averaging  92%   attention  92%
   seed 1: held-out plans  averaging  94%   attention  92%
@@ -150,37 +156,50 @@ python3 lesson15_attention.py</code></pre>
 Where does it look? (the top 3 attention weights at each step)
   'put the red and green blocks away'
     after '&lt;start&gt;' looks at  green:0.18  blocks:0.17  away:0.16   -&gt; writes 'put' (1.00)
-    ...                                        (the 8 lines shown in section 2)
+    after 'put'     looks at  red:0.77  and:0.07  put:0.04         -&gt; writes 'red' (1.00)
+    ...
 
 What attention does NOT fix (it has no idea of word ORDER):
   'put the block in the red bin'           averaging ['put', 'red']  attention ['put', 'red']
   'go to the blue block not the red one'   averaging ['go', 'blue']  attention ['go', 'red', 'go']</code></pre>
+<p>Then <code>cd ..</code> and <code>python3 check.py 15a</code>:</p>
+<pre><code>Lesson 15a: lesson15_attention.py
+  ✓ attend: equal scores
+  ✓ attend: focus
+  ✓ attention model learns
+  3/3 passed  🎉 lesson complete!</code></pre></div></li>
+</ol>
 
-<h3>Check it</h3>
-<pre><code>cd ..
-python3 check.py 15a</code></pre>
-<p>Three checks: <code>attend: equal scores</code>, <code>attend: focus</code> and <code>attention model learns</code> (it must write <code>['put', 'red']</code> for "put the red block in the bin" and get at least 85% of held-out plans). Two real hints: <em>"a query of zeros scores every word 0, so the weights are equal (0.5, 0.5)"</em> and <em>"the weights must add up to 1"</em>.</p>
+<h2 id="results">4. Does it help?</h2>
+<p>A little on average (92% against 89%), and much <strong>steadier</strong>: 92% on every seed, while averaging swings from 80% to 94%. On seed 1, averaging wins. On the robot's 12-task exam both score 8/12. Small experiments wobble, so use several seeds and only believe a difference that shows up every time.</p>
 
-<h2 id="check">6. Check yourself</h2>
-<details><summary>If every attention weight is equal, what is the context?</summary><p>The plain average of the command's word embeddings: exactly what week 6's <code>read</code> gives.</p></details>
-<details><summary>Predict: does the attention model write something different for "away block red the put" than for "put the red block away"?</summary><p>No: <code>['put', 'red']</code> for both. Our attention scores each word by its embedding only, and a word's embedding is the same wherever it sits, so the same words get the same weights in any order. Real Transformers add position information so that order matters.</p></details>
-<details><summary>Attention scored 92% on every seed. The averaging model scored 92%, 94% and 80%. Which is "better"?</summary><p>On average attention (92% against 89%), and it's much steadier. But on seed 1 the averaging model won, and on the robot both score 8/12. One run on one seed could have told you either story.</p></details>
+<h2 id="check">5. Check yourself</h2>
+<details><summary>If every attention weight is equal, what is the context?</summary><p>The plain average: exactly what week 8's <code>read</code> gives.</p></details>
+<details><summary>Does "away block red the put" give a different plan from "put the red block away"?</summary><p>No, <code>['put', 'red']</code> for both. A word's embedding is the same wherever it sits. Real Transformers add position information.</p></details>
+<details><summary>92% every seed against 92%, 94%, 80%. Which is better?</summary><p>Attention on average, and steadier. But one run on one seed could have told you either story.</p></details>
 
-<h2 id="deeper">7. Go deeper (optional)</h2>
+<h2 id="deeper">6. Want to know more?</h2>
+<details><summary>The clever step, and the new mistakes</summary>
+<p>In "throw out all of them except the blue one", after writing red it looks hardest at "blue" (0.39), the colour to leave out, together with "all" (0.37), and writes green. With seed 0, attention fixes "please put everything in the bin" and "stop the red block". But for "go to the green block" it writes just <code>go</code>, which <code>words_to_plan</code> rejects.</p></details>
+<details><summary>What attention does NOT fix</summary>
+<ul>
+<li><strong>Word order.</strong> "go to the blue block not the red one" gives <code>['go', 'red', 'go']</code>, rejected. The averaging model's <code>['go', 'blue']</code> was right only by luck.</li>
+<li><strong>Unknown words.</strong> "where's" has no key, so for "where's the green one?" attention looks at "the green one" and writes <code>put green</code>, which would bin the block. The averaging model wrote just <code>put</code>, which was rejected: accidentally safer.</li>
+</ul></details>
+<details><summary>Further reading</summary>
 <ul>
 <li><a href="../06-30u30/13-attention.html#core">30u30 Day 13: Attention</a>: queries, keys and values, and why we divide by √E.</li>
-<li><a href="../06-30u30/14-annotated-transformer.html">30u30 Day 14: The annotated Transformer</a>: many attention layers stacked, with position information added.</li>
-</ul>
+<li><a href="../06-30u30/14-annotated-transformer.html">30u30 Day 14: The annotated Transformer</a>: many attention layers, with position information.</li>
+</ul></details>
 
 <nav class="pager">
-  <a href="15-tiny-lm.html"><small>Previous</small>Week 6 · A tiny language model</a>
-  <a class="next" href="15-tiny-lm.html"><small>Next</small>Back to week 6</a>
+  <a href="15-tiny-lm.html"><small>Previous</small>Week 8 · A tiny language model</a>
+  <a class="next" href="23-wheels.html"><small>Next</small>Week 9 · Wheels, odometry and PID</a>
 </nav>
-<footer>Build a Robot Brain · Week 6 of 12 · Stretch (homework file: lesson15_attention.py)</footer>
+<footer>Build a Robot Brain · Week 8 of 16 · Stretch (homework file: lesson15_attention.py)</footer>
 </main>
-
 <script>
-// Shared helpers, copied unchanged from week 6's page (15-tiny-lm.html), written exactly like the Python.
+// Shared helpers, copied unchanged from week 8's page (15-tiny-lm.html), written exactly like the Python.
 const OUT_WORDS = ["put", "go", "find", "stop", "ask", "none", "red", "blue", "green", "<end>"];
 const COLOURS = ["red", "blue", "green"];
 const START = "<start>", E = 12, H = 32, MAX_WORDS = 5;
