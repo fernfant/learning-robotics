@@ -74,6 +74,9 @@ MODULES = [
       ("openpi", "https://github.com/Physical-Intelligence/openpi"), ("Isaac-GR00T", "https://github.com/NVIDIA/Isaac-GR00T")]),
     ("22", "https://x.com/matheorems/status/2119505986381901899", "Matheorems", "8 Nov 2026", "X post with an animation",
      [("3Blue1Brown: Divergence and curl", "https://www.youtube.com/watch?v=rB83DpBJQsE")]),
+    ("23", "https://x.com/DeRonin_/status/2095180126359105955", "Ronin (@DeRonin_)", "2 Sep 2026", "X article",
+     [("Tinkercad Circuits", "https://www.tinkercad.com/circuits"), ("Falstad circuit simulator", "https://www.falstad.com/circuit/"),
+      ("ROS 2 Jazzy tutorials", "https://docs.ros.org/en/jazzy/Tutorials.html"), ("LeRobot docs", "https://huggingface.co/docs/lerobot/index")]),
 ]
 
 e = html.escape

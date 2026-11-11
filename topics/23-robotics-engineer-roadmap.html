@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Robotics Engineer Roadmap</title>
+<link rel="stylesheet" href="../style.css?v=16">
+<style>
+  .months { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin: 12px 0; }
+  .months a { display: block; text-decoration: none; color: inherit; border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--card, transparent); }
+  .months a:hover { border-color: var(--accent); }
+  .months .m { font-size: .8rem; color: var(--muted); }
+  .months .t { font-weight: 700; margin: 2px 0; }
+  .months .p { font-size: .85rem; }
+  .cov td:nth-child(2) { white-space: nowrap; }
+  .yes { color: var(--ok); font-weight: 700; }
+  .part { color: var(--idea); font-weight: 700; }
+  .no { color: var(--muted); font-weight: 700; }
+  .calc { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+  .calc label { font-size: .85rem; color: var(--muted); display: block; }
+  .calc input { width: 100%; }
+</style>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../index.html">← LLMs &amp; Robotics</a> · Module 23</nav>
+
+<div class="eyebrow"><span class="track robo">Robotics</span>Module 23 · Roadmap</div>
+<h1>How to become a robotics engineer in 6 months: the hardware half of robotics, mapped against what Robo-Helper already teaches</h1>
+<p class="lede">Electronics, microcontrollers, CAD, ROS 2, control maths and robot learning, one month each. Most of the maths is already in our course. The wires, motors and printed parts are not, so this page adds a safe hardware track for a 12-year-old.</p>
+<p class="meta">Source: Ronin (@DeRonin_), “How to become a Robotics Engineer in 6 months (RESOURCES)”, X article, 2 Sep 2026, about 12,000 words, 100+ links, 27 practice projects ·
+<a href="https://x.com/DeRonin_/status/2095180126359105955">X article</a>. The author says every price and link was checked in September 2026. Prices and the job-market figures below are <em>the author's</em>; we haven't re-checked them. The coverage map, the kid track and the calculator are ours.</p>
+
+<div class="card note"><strong>For Robo-Helper builders (ages 12+):</strong> Read “Start here” and the <a href="#kid-track">hardware track</a>. The rest is written for the grown-up planning it, or for an adult following the roadmap. <a href="18-robot-brain/index.html">Back to the course</a>.</div>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Robo-Helper lives in your computer. A real robot has wires, a battery, motors and a tiny computer, and things go wrong in all of them. This roadmap is about making a robot that moves in the real world.</p>
+<h3>Think of it like this</h3>
+<ul>
+<li>Your course so far built the robot's <b>brain</b> and taught it about its <b>body</b> using a simulation.</li>
+<li>This roadmap adds the <b>nerves and muscles</b>: electricity (the nerves), motors (the muscles), and a little computer called a microcontroller (the spinal cord, reacting fast).</li>
+<li>Then it puts everything together the way real robot companies do, and finishes with robots that learn by copying a human.</li>
+</ul>
+<h3>The good news</h3>
+<ol>
+<li>You already know the hard ideas: the <a href="18-robot-brain/22-fusion.html">gyro + accelerometer mix (week 6)</a> is the exact formula the roadmap gives for balancing robots, and your <a href="18-robot-brain/23-wheels.html">PID from week 9</a> is the one it uses for line followers.</li>
+<li>You can start for free in a browser: a circuit simulator lets you wire things wrong without breaking anything.</li>
+<li>A first real kit costs about the same as a video game.</li>
+</ol>
+<h3>Why robots care</h3>
+<p>On a real robot, the bug is sometimes a loose wire or a tired battery, not your code. Knowing the electrical layer is how you find it.</p>
+<h3>Try it</h3>
+<p>Use the <a href="#calc">LED calculator</a> below to work out which resistor keeps an LED from burning out. Then build it for free in Tinkercad Circuits.</p>
+<h3>Words to know</h3>
+<dl>
+<dt>Microcontroller</dt><dd>A tiny computer on one chip (Arduino, ESP32) that reads sensors and drives motors many times a second.</dd>
+<dt>Resistor</dt><dd>A part that limits how much electricity flows. Like a narrow pipe.</dd>
+<dt>PWM</dt><dd>Switching power on and off very fast to make a motor go half speed.</dd>
+<dt>ROS 2</dt><dd>The software toolkit most robot companies use to connect a robot's parts.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> the six months at a glance, what each month asks you to build, which parts our course already covers (with our measured numbers), what's missing, a safe hardware track for a kid, and an honest read of the job-market claims.</p>
+
+<div class="toc">
+<strong>In this module</strong>
+<ol>
+<li><a href="#summary">Summary</a></li>
+<li><a href="#why-robotics">Why this matters for robotics</a></li>
+<li><a href="#months">Deep dive: the six months</a></li>
+<li><a href="#coverage">Deep dive: what our course already covers</a></li>
+<li><a href="#kid-track">The hardware track for a 12-year-old</a></li>
+<li><a href="#calc">Try it: LED and voltage-divider calculator (interactive)</a></li>
+<li><a href="#reality">Reality check: jobs, pay and the 6-month claim</a></li>
+<li><a href="#playbook">Playbook</a></li>
+<li><a href="#check">Self-check</a></li>
+<li><a href="#glossary">Glossary &amp; further reading</a></li>
+</ol>
+</div>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>A practical, build-first roadmap for an adult starting from zero electronics, at two to three hours a day. Each month has free resources, a focus list, practice projects and a milestone, with hardware at three budget tiers. The thesis is that robotics is less crowded than AI engineering: anyone can prompt a model, but few can make a motor turn reliably, so <em>a portfolio of things that moved</em> beats certificates. The single most repeated advice is to <b>write down what broke and how you fixed it</b>.</p>
+</div>
+<div class="months">
+<a href="#m1"><div class="m">Month 1</div><div class="t">⚡ Electronics &amp; tools</div><div class="p">Ohm's law, multimeter, soldering, Python + Git</div></a>
+<a href="#m2"><div class="m">Month 2</div><div class="t">🔌 Microcontrollers</div><div class="p">Arduino → ESP32, motors, IMU, line follower, balancer</div></a>
+<a href="#m3"><div class="m">Month 3</div><div class="t">📐 CAD &amp; printing</div><div class="p">Onshape/Fusion, 3D printing, SO-101 arm</div></a>
+<a href="#m4"><div class="m">Month 4</div><div class="t">🧩 ROS 2 &amp; simulation</div><div class="p">URDF, Gazebo, ros2_control, SLAM, Nav2</div></a>
+<a href="#m5"><div class="m">Month 5</div><div class="t">🧮 The maths</div><div class="p">PID → LQR/MPC, kinematics, vision, MoveIt</div></a>
+<a href="#m6"><div class="m">Month 6</div><div class="t">🤖 Robot learning &amp; jobs</div><div class="p">LeRobot, VLAs, RL, portfolio, interviews</div></a>
+</div>
+<ul>
+<li><strong>Order matters:</strong> electrons before Arduino, Arduino before ROS 2, using libraries before learning the maths inside them. The author's examples of failure are the people who skip a layer: ROS 2 without knowing PWM, ML without being able to turn a motor.</li>
+<li><strong>Hiring signal (from live Figure and Skild listings, per the author):</strong> both C++ and Python, real hardware experience, depth in one specialism, and debugging as a named skill. No specific degree.</li>
+<li><strong>Specific, useful warnings:</strong> don't buy the L298N motor driver (old, drops about 2 V, gets hot; use a TB6612FNG or DRV8833); write a complementary filter before a Kalman filter; ROS 1 is end-of-life, so recognise and skip its tutorials; skip PyBullet; you can do the whole ROS 2 month on a laptop without an NVIDIA GPU.</li>
+<li><strong>Ends with three directions:</strong> robot learning (highest pay, most competitive), autonomy and mobile robots (most jobs), embedded and integration (most consistently employable).</li>
+</ul>
+
+<h2 id="why-robotics">2. Why this matters for robotics</h2>
+<div class="card note">
+<p><strong>Track: Robotics.</strong> Most of this course leans on simulation and on the robot's brain. This roadmap is the physical half. Its last month connects back to the LLM side: vision-language-action models (π0, OpenVLA, GR00T, SmolVLA) are language-model ideas put in a body, covered in <a href="21-robot-math.html#diffusion">Module 21</a>.</p>
+</div>
+<ul>
+<li><strong>It answers “what next after Robo-Helper?”</strong> The course ends with a simulated robot that maps, localises and rescues a block. The roadmap is how you'd do that for real: same ideas, real motors.</li>
+<li><strong>It confirms the course's choices.</strong> The roadmap's month-2 balancing tip (angle = a × (angle + gyro × dt) + (1 − a) × accel angle, with a ≈ 0.98) is the formula from <a href="18-robot-brain/22-fusion.html">week 6</a>, with the same 0.98. Its month-4 warning, that a smeared SLAM map is almost always an odometry problem, is what <a href="18-robot-brain/24-map.html">week 11</a> measures: 100% of squares right with the true pose, 55% with odometry.</li>
+<li><strong>It names what we skipped:</strong> electronics, microcontrollers, CAD, ROS 2, inverse kinematics, camera calibration. See <a href="#coverage">the coverage map</a>.</li>
+</ul>
+
+<h2 id="months">3. Deep dive: the six months</h2>
+<p>For each month: the goal, the best starting resource (the article lists 4–6 per topic), the projects, and how you know you're done.</p>
+
+<h3 id="m1">Month 1 · Electronics, the bench and tools</h3>
+<p><b>Goal:</b> read a schematic, build a circuit that works, find the fault when it doesn't.</p>
+<ul>
+<li><b>Learn:</b> Ohm's law and voltage dividers until automatic, current draw (why a stalling motor resets your microcontroller), pull-up resistors, decoupling capacitors, LiPo safety; soldering (heat the joint, not the solder; use flux); Python, terminal and Git.</li>
+<li><b>Start with:</b> <a href="https://www.falstad.com/circuit/">Falstad circuit simulator</a> (animated current, free) and <a href="https://www.tinkercad.com/circuits">Tinkercad Circuits</a> (virtual breadboard, Arduino and multimeter). Reference: <a href="https://www.allaboutcircuits.com/textbook/">All About Circuits textbook</a>. Soldering: <a href="https://learn.adafruit.com/adafruit-guide-excellent-soldering">Adafruit's guide</a>. Coding: <a href="https://cs50.harvard.edu/python/">CS50P</a>, <a href="https://missing.csail.mit.edu/">Missing Semester</a>, <a href="https://learngitbranching.js.org/">Learn Git Branching</a>.</li>
+<li><b>Build:</b> a voltage divider calculated by hand, then checked in the simulator; a transistor switch that lets a logic pin turn on an LED; measure five resistors against their colour bands and find a broken wire with continuity mode; solder headers three times.</li>
+<li><b>Budget tiers:</b> $0 (simulators), about $45–60 (starter kit + multimeter, e.g. Elegoo UNO R3 Super Starter Kit $42.99), about $110–160 (add soldering iron, e.g. Pinecil V2), about $200–300 (bench supply, chassis).</li>
+</ul>
+
+<h3 id="m2">Month 2 · Microcontrollers, motors, sensors, first moving robots</h3>
+<p><b>Goal:</b> a robot that moves, senses and corrects itself. A line follower is a closed control loop, the same idea as a humanoid but cheaper to break.</p>
+<ul>
+<li><b>Learn:</b> digital/analog I/O and PWM, interrupts, I2C/SPI from a datasheet, serial debugging, non-blocking timing (<code>millis()</code>, never <code>delay()</code>). Then ESP32 (WiFi, two cores). Four motor types: DC gearmotor, hobby servo, smart bus servo, stepper. Sensors: ultrasonic vs time-of-flight, IMUs.</li>
+<li><b>Start with:</b> <a href="https://toptechboy.com/arduino-lessons/">Paul McWhorter's Arduino lessons</a>, <a href="https://randomnerdtutorials.com/getting-started-with-esp32/">Random Nerd Tutorials (ESP32)</a>, Roger Labbe's free <a href="https://rlabbe.github.io/Kalman-and-Bayesian-Filters-in-Python/">Kalman and Bayesian Filters in Python</a>.</li>
+<li><b>Build:</b> a reaction-timer game (interrupts, debouncing); a web page served from the ESP32 that drives a servo; a motor that turns exactly one revolution using its encoder; an IMU whose angle drifts, then doesn't once filtered; a <b>line follower</b> (about $38 budget, $105 quality) tuned P then PD, filming both; a <b>self-balancing robot</b> (about $62 / $134).</li>
+</ul>
+
+<h3 id="m3">Month 3 · CAD and making your own parts</h3>
+<p><b>Goal:</b> design a part, make it, and have it fit.</p>
+<ul>
+<li><b>Learn:</b> fully constrained, parametric sketches; assemblies whose mates behave like joints; designing from a datasheet drawing; 3D-printing materials (PLA for prototypes, PETG for real parts, TPU for grippers); gear ratios and backlash.</li>
+<li><b>Start with:</b> <a href="https://learn.onshape.com/learning-paths/onshape-fundamentals-cad">Onshape Learning Center</a> (free, browser-based), or Fusion Personal, or FreeCAD. Calibration: <a href="https://github.com/OrcaSlicer/OrcaSlicer/wiki/Calibration">OrcaSlicer wiki</a>. No printer? Fab Labs, library makerspaces or print services.</li>
+<li><b>Build:</b> a bracket for your exact servo; a tolerance gauge and a snap-fit ESP32 case; a small gearbox (and measure its backlash); the <b>SO-101 arm</b>, an open-source leader/follower pair from TheRobotStudio and Hugging Face (about $230 in parts for the pair, plus printing). Hand-guiding the leader makes the follower copy it, and that's how you record demonstrations in month 6.</li>
+</ul>
+
+<h3 id="m4">Month 4 · ROS 2, simulation, building robots the way companies do</h3>
+<p><b>Goal:</b> a robot in ROS 2 that maps a room and navigates on its own. All of it works on a normal laptop.</p>
+<ul>
+<li><b>Learn:</b> nodes, topics, services, actions, launch files, bags; URDF/xacro and TF frames; Gazebo; <code>ros2_control</code> (the author's “fastest way to stand out”); SLAM Toolbox and Nav2 (costmaps, behaviour trees). Start on ROS 2 Jazzy with Gazebo Harmonic; ROS 1 and Gazebo Classic are end-of-life.</li>
+<li><b>Start with:</b> the <a href="https://docs.ros.org/en/jazzy/Tutorials.html">official ROS 2 tutorials</a>, <a href="https://articulatedrobotics.xyz/tutorials/">Articulated Robotics</a> (design → simulate → real Pi + lidar → SLAM), <a href="https://docs.nav2.org/rolling/getting_started/index.html">Nav2 Getting Started</a>.</li>
+<li><b>Build:</b> a multi-node system with no robot; your own robot in xacro (not TurtleBot) with correct inertias; it in Gazebo with lidar and camera; <code>diff_drive_controller</code> driven by keyboard; SLAM a world, save the map, switch to localisation and send navigation goals.</li>
+</ul>
+
+<h3 id="m5">Month 5 · The maths that makes robots work</h3>
+<p><b>Goal:</b> understand what the libraries were doing, so you can fix them when they misbehave.</p>
+<ul>
+<li><b>Learn:</b> PID properly (integrator windup, filtering the D term, feedforward), state space, LQR and MPC; transforms, forward and inverse kinematics, Jacobians and singularities; camera calibration, pixel → 3D, point clouds; MoveIt 2 pick-and-place.</li>
+<li><b>Start with:</b> Brian Douglas's <a href="https://www.mathworks.com/videos/series/understanding-pid-control.html">Understanding PID Control</a>, Steve Brunton's <a href="https://www.youtube.com/playlist?list=PLMrJAkhIeNNR20Mz-VpzgfQs5zrYi085m">Control Bootcamp</a>, Tedrake's <a href="https://underactuated.csail.mit.edu/">Underactuated Robotics</a> and <a href="https://manipulation.csail.mit.edu/">Robotic Manipulation</a>, Lynch's <a href="http://hades.mech.northwestern.edu/index.php/Modern_Robotics">Modern Robotics</a>, Peter Corke's <a href="https://github.com/petercorke/robotics-toolbox-python">Robotics Toolbox for Python</a>, the <a href="https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html">OpenCV calibration tutorial</a>.</li>
+<li><b>Build:</b> P vs PD vs PID+feedforward on the balancer, logged and plotted; LQR vs PID on a simulated cart-pole; forward kinematics of your arm by hand, then a numerical IK solver driven into a singularity; a calibrated camera finding a coloured object in 3D, then broken by changing the lights, then fixed.</li>
+</ul>
+
+<h3 id="m6">Month 6 · Robot learning, a specialism, and getting hired</h3>
+<p><b>Goal:</b> one portfolio piece in a chosen direction, and start applying.</p>
+<ul>
+<li><b>Learn:</b> <a href="https://huggingface.co/docs/lerobot/index">LeRobot</a>'s teleoperate → record → train → deploy loop; ACT (predicts a chunk of future actions) and Diffusion Policy; which VLAs have open weights (π0 family, OpenVLA, GR00T, SmolVLA; RT-2 has none); RL in <a href="https://github.com/google-deepmind/mujoco_playground">MuJoCo Playground</a>; Levine's <a href="https://rail.eecs.berkeley.edu/deeprlcourse">CS 285</a>. No hardware? The <a href="https://huggingface.co/learn/robotics-course/unit0/1">Hugging Face robotics course</a> runs in simulation.</li>
+<li><b>Build:</b> 50 demonstrations of pick-cube-into-bin on the SO-101, train ACT, measure the success rate (the author expects about half), record 50 more on the failures, retrain, report before and after. Train a simulated quadruped and change its reward.</li>
+<li><b>Portfolio:</b> each README gets a video, a wiring or architecture diagram, measured numbers and a “what broke and how I fixed it” section. Then have someone question you on your own code for 20 minutes; if you can't answer three levels deep, it isn't ready.</li>
+</ul>
+
+<h2 id="coverage">4. Deep dive: what our course already covers</h2>
+<p>A map from the roadmap's topics to this course. <span class="yes">Covered</span> means you build it and measure it here, in simulation or on real data. <span class="part">Partly</span> means the idea is here but not the real tool. <span class="no">Not yet</span> means it isn't in the course.</p>
+<div class="table-wrap"><table class="cov">
+<tr><th>Roadmap topic</th><th>Here?</th><th>Where, and what we measured</th></tr>
+<tr><td>IMU drift, complementary filter (M2)</td><td class="yes">Covered</td><td><a href="18-robot-brain/22-fusion.html">Week 6</a>, real phone data: gyro bias −0.155°/s (about 93° off after 10 min); walking wobble 9.5° → 2.1° fused with a = 0.98.</td></tr>
+<tr><td>Reading noisy sensors, smoothing (M2)</td><td class="yes">Covered</td><td><a href="18-robot-brain/02-sensors.html">Week 2</a> and <a href="18-robot-brain/21-phone.html">week 3</a>: tilt 9° / 33° / 79° and about 1.8 steps a second from a real recording.</td></tr>
+<tr><td>Encoders, odometry, P vs PD (M2, M5)</td><td class="yes">Covered</td><td><a href="18-robot-brain/23-wheels.html">Week 9</a>: P only overshoots 43°, PD settles in 0.6 s; a 2% bigger wheel puts odometry 0.63 m off over 3.5 m.</td></tr>
+<tr><td>SLAM, and “smeared maps are odometry” (M4)</td><td class="yes">Covered</td><td><a href="18-robot-brain/24-map.html">Week 11</a>: map 100% right with the true pose, 55% with odometry.</td></tr>
+<tr><td>Localisation mode (M4)</td><td class="yes">Covered</td><td><a href="18-robot-brain/25-localise.html">Week 12</a>: a particle filter finds a kidnapped robot to within 0.04 m.</td></tr>
+<tr><td>Path planning (interviews: A*, RRT)</td><td class="part">Partly</td><td>A* in <a href="18-robot-brain/06-pathfinding.html">week 5</a>; potential fields in <a href="22-vector-fields.html">Module 22</a>. No RRT.</td></tr>
+<tr><td>Kalman filters (M2, interviews)</td><td class="part">Partly</td><td>Interactive explainer in <a href="21-robot-math.html#kalman">Module 21</a>; not built on a robot.</td></tr>
+<tr><td>Frames and transforms (M4, M5)</td><td class="part">Partly</td><td>Robot frame → room frame in <a href="18-robot-brain/24-map.html">week 11</a>; linear algebra in <a href="21-robot-math.html#linalg">Module 21</a>. No TF trees, no 3D.</td></tr>
+<tr><td>RL (M6)</td><td class="part">Partly</td><td>Q-learning in <a href="18-robot-brain/07-trial-and-error.html">week 5 bonus</a>; DQN in <a href="20-from-scratch/06-minimalrl.html">Module 20</a>. No locomotion.</td></tr>
+<tr><td>VLAs, imitation learning (M6)</td><td class="part">Partly</td><td>How π0 and GR00T work in <a href="21-robot-math.html#diffusion">Module 21</a>; the bake-off and honest README in <a href="18-robot-brain/19-bakeoff.html">week 15</a> and <a href="18-robot-brain/14-go-real.html">week 16</a>. No demonstrations recorded.</td></tr>
+<tr><td>Portfolio: “what broke and how I fixed it” (M6)</td><td class="part">Partly</td><td>Week 16's README has an honesty check; add a “what broke” section (see <a href="#playbook">playbook</a>).</td></tr>
+<tr><td>Electronics, multimeter, soldering (M1)</td><td class="no">Not yet</td><td>Start with the <a href="#kid-track">kid track</a>, stage 1.</td></tr>
+<tr><td>Microcontrollers, PWM, motors (M2)</td><td class="no">Not yet</td><td>Kid track stages 2–3.</td></tr>
+<tr><td>CAD, 3D printing, gearing (M3)</td><td class="no">Not yet</td><td>Kid track stage 4 (Tinkercad 3D, then Onshape).</td></tr>
+<tr><td>ROS 2, URDF, Gazebo, Nav2 (M4)</td><td class="no">Not yet</td><td>After the course; it needs Linux comfort. Simulation only, so no hardware cost.</td></tr>
+<tr><td>Inverse kinematics, LQR/MPC, camera calibration, MoveIt (M5)</td><td class="no">Not yet</td><td>Good next modules for an older learner.</td></tr>
+<tr><td>C++</td><td class="no">Not yet</td><td>Arduino code is C++, so stage 2 of the kid track is a gentle start.</td></tr>
+</table></div>
+<p><b>Verdict:</b> on the roadmap's months 2, 4 and 5, the course already teaches the estimation and control ideas, measured on real data or a realistic body. What it lacks is everything with a wire in it, and the industry tools (ROS 2, Gazebo). That's the gap the next section fills.</p>
+
+<h2 id="kid-track">5. The hardware track for a 12-year-old</h2>
+<div class="box idea"><span class="tag">💡 The idea</span>
+<p>Take the roadmap's month 1–3 projects, cut the dangerous parts, and attach each one to a Robo-Helper week the learner has already done, so the real robot repeats what the simulated one taught.</p>
+</div>
+<div class="box safety"><span class="tag">⚠️ Safety first (grown-ups, read this)</span>
+<ul>
+<li>Use AA batteries or a USB power bank, <b>not LiPo</b> packs. The roadmap itself warns never to leave a LiPo charging unattended.</li>
+<li>Soldering only with an adult, eye protection and ventilation, and only from stage 3 on. The early stages are solderless.</li>
+<li>Keep to the low voltages (5 V and below) on the starter kits. Never open a mains device.</li>
+<li>Ask an adult before ordering or installing anything.</li>
+</ul>
+</div>
+<ol class="steps">
+<li><b>Stage 0 · free, in the browser (1–2 weekends).</b> Falstad and Tinkercad Circuits: an LED with a resistor (use the <a href="#calc">calculator</a>), a voltage divider, a button. Tinkercad also simulates an Arduino, so you can write a first sketch with nothing bought.
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span> In Tinkercad, the virtual multimeter on your divider reads what the calculator predicted, give or take a little.</div></li>
+<li><b>Stage 1 · a starter kit and a multimeter (about $45–60, the author's prices).</b> Blink, then a reaction-timer game with a button. Measure resistors against their colour bands.
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span> Five resistors measured; each one is within the tolerance its last band promises (usually ±5%).</div></li>
+<li><b>Stage 2 · the real IMU (after Robo-Helper week 6).</b> An MPU-6050 (about $13) on the Arduino. Print its angle, keep it still, watch it drift. Then type in the same complementary filter from week 6.
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span> Gyro-only angle drifts while the board sits still; fused angle stays put. Same story as week 6, now on your own sensor.</div></li>
+<li><b>Stage 3 · a line follower (after week 9; budget build about $38).</b> Two motors with a <b>TB6612FNG or DRV8833</b> driver (not the L298N), reflectance sensors, AA batteries. Tune P first, then add D, filming both like the roadmap says.
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span> P-only wiggles along the line; PD runs smoother. Same lesson as week 9's 43° overshoot vs 0.6 s settle.</div></li>
+<li><b>Stage 4 · design a part (Tinkercad 3D, then Onshape).</b> A sensor holder for the line follower, printed at a library makerspace or Fab Lab if there's no printer at home.
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span> It fits on the first or second print, and you wrote down what was off the first time.</div></li>
+<li><b>Stage 5 · the README.</b> Photo or video, wiring diagram, measured numbers, and “What broke and how I fixed it”. This is the roadmap's number-one piece of advice, and the week 16 README already has the other sections.</li>
+</ol>
+<p class="meta">Later, for an older learner: the balancing robot, the SO-101 arm with LeRobot, and ROS 2 in simulation. Prices are the author's from September 2026; check before ordering.</p>
+
+<h2 id="calc">6. Try it: LED and voltage-divider calculator</h2>
+<div class="box idea"><span class="tag">💡 The idea</span>
+<p>Electricity is like water: <b>voltage</b> is the pressure, <b>current</b> is how much flows, and a <b>resistor</b> is a narrow pipe. Ohm's law ties them together: current = voltage ÷ resistance. An LED needs only a little current, so you put a resistor in front of it to keep the flow small.</p>
+<svg class="diagram" viewBox="0 0 320 120" role="img" aria-label="Battery, resistor and LED in a loop">
+  <rect x="20" y="30" width="44" height="60" rx="6" fill="none" stroke="var(--fg)" stroke-width="2"/>
+  <text x="42" y="66" text-anchor="middle" font-size="14" fill="var(--fg)">5 V</text>
+  <path d="M64 40 H120 M184 40 H230 M270 40 H300 V100 H64 V80" fill="none" stroke="var(--fg)" stroke-width="2"/>
+  <rect x="120" y="30" width="64" height="20" rx="4" fill="var(--idea)" opacity=".35" stroke="var(--idea)"/>
+  <text x="152" y="22" text-anchor="middle" font-size="13" fill="var(--fg)">resistor</text>
+  <polygon points="230,28 230,52 270,40" fill="var(--bot)" opacity=".6" stroke="var(--fg)"/>
+  <text x="250" y="22" text-anchor="middle" font-size="13" fill="var(--fg)">LED</text>
+  <text x="180" y="118" text-anchor="middle" font-size="13" fill="var(--muted)">current flows round the loop</text>
+</svg>
+</div>
+<div class="card demo">
+<h3>LED resistor</h3>
+<div class="calc">
+<label>Supply voltage (V)<input id="cVs" type="number" value="5" step="0.1" min="0"></label>
+<label>LED voltage drop (V)<input id="cVf" type="number" value="2" step="0.1" min="0"></label>
+<label>LED current (mA)<input id="cI" type="number" value="15" step="1" min="1"></label>
+</div>
+<p id="cOut" class="big-number"></p>
+<p id="cNote" class="meta"></p>
+<h3>Voltage divider</h3>
+<div class="calc">
+<label>Input voltage (V)<input id="dV" type="number" value="5" step="0.1" min="0"></label>
+<label>R1, top (Ω)<input id="dR1" type="number" value="10000" step="100" min="1"></label>
+<label>R2, bottom (Ω)<input id="dR2" type="number" value="10000" step="100" min="1"></label>
+</div>
+<p id="dOut" class="big-number"></p>
+<p class="meta">Output = input × R2 ÷ (R1 + R2). Try R1 = 10000 and R2 = 20000 with 5 V: about 3.3 V, the safe level for an ESP32 pin.</p>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span> With 5 V, a 2 V LED and 15 mA, the calculator says <b>200 Ω</b> and suggests the next standard size up, <b>220 Ω</b>, the resistor most starter kits give you for LEDs.</div>
+
+<h2 id="reality">7. Reality check: jobs, pay and the 6-month claim</h2>
+<ul>
+<li><b>“Six months” means an adult at 2–3 hours a day</b>, about 400–550 hours. The author is clear it won't make you senior (five or more years of real-time systems on physical robots, per the listings checked). For a 12-year-old, the kid track above is a year of weekends, and that's fine.</li>
+<li><b>The author separates capital from hiring, which is honest.</b> Their figures: physical-AI startups raised $47.4B in H1 2026 (Crunchbase), but North American robot orders grew only 2.0% (A3), US installations fell 9% in 2024 (IFR), and the official growth projection for the occupation group is 1–2%, not the 10% often quoted. Their summary is that money is arriving faster than qualified people, in specific specialisms.</li>
+<li><b>Pay, as quoted:</b> official US median $122,930 for robotics engineers (O*NET/BLS); entry about $80–100k; frontier robot-learning roles listed at $200–400k base. Entry doors with no degree: teleoperation and data collection around $25–35/hour, robotics technician median $73,900. Sources disagree, and the author says so.</li>
+<li><b>Dated details to re-check:</b> ROS 2 distro status (Jazzy recommended, Lyrical the new LTS, as of September 2026), prices and kits.</li>
+<li><b>Not checked by us:</b> prices, job numbers, the claim that “every” listing names the same four requirements. The page also promotes the author's YouTube channel; the resources it recommends are mostly long-standing, well-known free ones.</li>
+</ul>
+
+<h2 id="playbook">8. Playbook</h2>
+<ol class="steps">
+<li><b>For the 12-year-old:</b> finish Robo-Helper first. Do kid-track stage 0 any time (it's free), stage 2 after week 6, stage 3 after week 9.</li>
+<li><b>Add “What broke and how I fixed it” to the week 16 README</b>, with one real bug from the course (the wrap-around angle in week 6 and the cat swap in week 11 are good ones).</li>
+<li><b>Buy once, buy right:</b> first kit from a fast, supported seller; TB6612FNG or DRV8833, never L298N; AA power before LiPo.</li>
+<li><b>For an adult following the roadmap:</b> do months 1–2 on hardware, month 4 entirely in simulation, and use this course's weeks 6, 9, 11 and 12 as the month-5 warm-up on estimation and control.</li>
+<li><b>Always measure:</b> every project ends with a number (success rate, overshoot, drift), the same habit as every <code>check.py</code> in this course.</li>
+</ol>
+
+<h2 id="check">9. Self-check</h2>
+<details><summary>Why does the roadmap start with a multimeter, not Arduino?</summary>
+<p>On real robots, bugs are often electrical: a loose wire, a sagging battery, a stalling motor pulling more current than the regulator can give, which resets the microcontroller. Without the electrical layer you can't find those.</p></details>
+<details><summary>Why write a complementary filter before a Kalman filter?</summary>
+<p>It's four lines and fixes the main problem (gyro drifts, accelerometer is noisy). Robo-Helper week 6 does exactly this: wobble 9.5° → 2.1° with a = 0.98. A Kalman filter is the principled version once that works.</p></details>
+<details><summary>Your SLAM map looks smeared. What does the roadmap say to suspect first?</summary>
+<p>Odometry, not the SLAM algorithm. Week 11 shows it: the same mapping code scores 100% with the true pose and 55% with odometry from a 2% bigger wheel.</p></details>
+<details><summary>Why avoid the L298N motor driver?</summary>
+<p>It's an old bipolar-transistor design that drops about 2 V, heats up and wastes battery. A TB6612FNG or DRV8833 does the same job efficiently.</p></details>
+<details><summary>What's the single highest-value section of a self-taught robotics README?</summary>
+<p>“What broke and how I fixed it”, with measured numbers. It shows real engineering and can't be copied from a tutorial.</p></details>
+<details><summary>Which three directions does month 6 offer, and what's each best for?</summary>
+<p>Robot learning and embodied AI (frontier companies, highest ceiling, most competitive); autonomy and mobile robotics (most jobs: ROS 2, Nav2, SLAM, C++); embedded, mechatronics and integration (work soonest, including contracting; functional safety is underserved).</p></details>
+
+<h2 id="glossary">10. Glossary &amp; further reading</h2>
+<div class="table-wrap"><table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<tr><td>Ohm's law</td><td>Current = voltage ÷ resistance.</td></tr>
+<tr><td>Voltage divider</td><td>Two resistors that turn a bigger voltage into a smaller one.</td></tr>
+<tr><td>PWM</td><td>Fast on/off switching that sets average power, e.g. motor speed.</td></tr>
+<tr><td>H-bridge / motor driver</td><td>Circuit that lets a small pin drive a motor both ways.</td></tr>
+<tr><td>IMU</td><td>Accelerometer + gyroscope (sometimes magnetometer) in one chip.</td></tr>
+<tr><td>Encoder</td><td>Counts how far a wheel or motor has turned.</td></tr>
+<tr><td>Backlash</td><td>Slop in gears: the output doesn't move until the input takes up the gap.</td></tr>
+<tr><td>URDF / xacro</td><td>The file format that describes a robot's links and joints in ROS.</td></tr>
+<tr><td>TF</td><td>ROS's tree of coordinate frames.</td></tr>
+<tr><td>SLAM</td><td>Building a map while working out where you are on it.</td></tr>
+<tr><td>Inverse kinematics</td><td>Working out joint angles that put an arm's hand at a chosen spot.</td></tr>
+<tr><td>Singularity</td><td>An arm pose where it loses the ability to move in some direction.</td></tr>
+<tr><td>LQR / MPC</td><td>Control methods that pick gains or plan moves by optimising a cost.</td></tr>
+<tr><td>ACT</td><td>Action Chunking Transformer: predicts a short sequence of future actions from demonstrations.</td></tr>
+<tr><td>VLA</td><td>Vision-language-action model: sees, reads an instruction, outputs robot actions.</td></tr>
+</table></div>
+<ul>
+<li><a href="https://x.com/DeRonin_/status/2095180126359105955">The article</a> (all 100+ links are there)</li>
+<li>Free starting points: <a href="https://www.tinkercad.com/circuits">Tinkercad Circuits</a> · <a href="https://www.falstad.com/circuit/">Falstad</a> · <a href="https://learn.sparkfun.com/tutorials/how-to-use-a-multimeter">SparkFun: how to use a multimeter</a> · <a href="https://articulatedrobotics.xyz/tutorials/">Articulated Robotics</a> · <a href="https://huggingface.co/learn/robotics-course/unit0/1">Hugging Face robotics course</a></li>
+<li>Related: <a href="18-robot-brain/index.html">Module 18</a> (Robo-Helper) · <a href="21-robot-math.html">Module 21</a> (Kalman, A*, diffusion, VLAs) · <a href="17-free-ai-curriculum.html#robotics">Module 17</a> (free robotics courses) · <a href="22-vector-fields.html">Module 22</a> (potential fields) · <a href="20-from-scratch/index.html">Module 20</a> (from-scratch repos)</li>
+</ul>
+
+<footer>Module 23 · added 2026-11-11 · <a href="../index.html">Back to course index</a></footer>
+</main>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const E12 = [10, 12, 15, 18, 22, 27, 33, 39, 47, 56, 68, 82];
+  const nextStd = r => {
+    for (let p = 1; p < 1e7; p *= 10) for (const v of E12) if (v * p >= r - 1e-9) return v * p;
+    return r;
+  };
+  const ohms = r => r >= 1000 ? (r / 1000).toFixed(r % 1000 ? 1 : 0) + ' kΩ' : Math.round(r) + ' Ω';
+  function led() {
+    const vs = +$('cVs').value, vf = +$('cVf').value, i = +$('cI').value / 1000;
+    if (vs <= vf || i <= 0) {
+      $('cOut').textContent = '–';
+      $('cNote').textContent = 'The supply must be higher than the LED drop, or the LED stays dark.';
+      return;
+    }
+    const r = (vs - vf) / i, std = nextStd(r);
+    $('cOut').textContent = `${ohms(r)} → use ${ohms(std)}`;
+    $('cNote').textContent = `R = (${vs} − ${vf}) V ÷ ${(i * 1000).toFixed(0)} mA. With ${ohms(std)} the LED gets ${((vs - vf) / std * 1000).toFixed(1)} mA, a little under the target, which is the safe side. The resistor turns ${((vs - vf) * (vs - vf) / std * 1000).toFixed(0)} mW into heat.`;
+  }
+  function divider() {
+    const v = +$('dV').value, r1 = +$('dR1').value, r2 = +$('dR2').value;
+    $('dOut').textContent = r1 + r2 > 0 ? `${(v * r2 / (r1 + r2)).toFixed(2)} V out` : '–';
+  }
+  ['cVs', 'cVf', 'cI'].forEach(id => $(id).addEventListener('input', led));
+  ['dV', 'dR1', 'dR2'].forEach(id => $(id).addEventListener('input', divider));
+  led(); divider();
+})();
+</script>
+</body>
+</html>

@@ -321,3 +321,20 @@ Set up the folder structure, schema (CLAUDE.md), shared styles and the index.
   - Transcripts wrap on phones.
   - SVG labels are at least 12px at 375px.
 - Checks: validator 120 pages, 0 problems. `check.py`: 147/147 on the solutions, robot 21/21. `_kit-test.html` deleted.
+
+## [2026-11-11] ingest | How to become a Robotics Engineer in 6 months (Ronin)
+- Link: https://x.com/DeRonin_/status/2095180126359105955. X article from 2 Sep 2026, about 12,000 words, 100+ links. Saved to `sources/23-ronin-robotics-6-months.json` (fxtwitter).
+- Module 23: `topics/23-robotics-engineer-roadmap.html`, track Robotics.
+  - The six months, each with its goal, best free resources, projects and milestone.
+  - A coverage map against Robo-Helper, with our measured numbers: the same 0.98 complementary filter (week 6), P vs PD (week 9), and odometry smearing the map 100% → 55% (week 11).
+  - The gaps: electronics, microcontrollers, CAD, ROS 2, IK, camera calibration, C++.
+  - A six-stage hardware track for a 12-year-old: free simulators, a starter kit, a real IMU after week 6, a line follower after week 9, a designed part, and a "what broke" README. It has safety rules (no LiPo, soldering only with an adult) and checkpoints.
+  - An LED-resistor and voltage-divider calculator.
+  - A reality check: prices and job figures are the author's and not re-checked by us.
+- All external links on the page appear in the source.
+- Index:
+  - new card and summary row;
+  - concept map gets "Electronics, microcontrollers & motors" and "Robotics careers & portfolios", and 23 is added to transforms and filtering;
+  - kid line links the hardware track;
+  - counts are now 23 modules and 116 pages.
+- The Robo-Helper hub links the hardware track. `build_sources.py` has the new entry and `sources.html` is regenerated.

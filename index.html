@@ -21,7 +21,7 @@
   The blue block is in the bin.</code></pre>
 <p>You write every clever part yourself: moving, sensing, reading your phone's sensors, stopping for the cat, planning a route, steering wheels, mapping the room, understanding words. <code>check.py</code> marks it as you go: 21 checks on your robot, 147 in the whole course. If you can write a Python loop that prints 1 to 10, you're ready.</p>
 <p style="margin:18px 0"><a href="topics/18-robot-brain/index.html" style="display:inline-block;font-size:1.2rem;font-weight:700;padding:12px 24px;border-radius:10px;background:var(--accent);color:var(--bg);text-decoration:none">Start the course →</a></p>
-<p class="meta">After the course, for fun: <a href="topics/21-robot-math.html">robot maths, by playing</a> and <a href="topics/22-vector-fields.html">steering with a field of arrows</a> (both fine after week 5), then <a href="topics/20-from-scratch/index.html">real code from the pros</a> (some installs; ask an adult).</p>
+<p class="meta">After the course, for fun: <a href="topics/21-robot-math.html">robot maths, by playing</a> and <a href="topics/22-vector-fields.html">steering with a field of arrows</a> (both fine after week 5), <a href="topics/23-robotics-engineer-roadmap.html#kid-track">building a real robot with wires</a> (with an adult), then <a href="topics/20-from-scratch/index.html">real code from the pros</a> (some installs; ask an adult).</p>
 </section>
 
 <div class="eyebrow">Personal course · living document</div>
@@ -30,12 +30,12 @@
 
 <div class="card"><p style="margin:0"><span class="track llm">LLM</span> how large language models are built, trained, evaluated and served. &nbsp; <span class="track robo">Robotics</span> how robots perceive, decide and act. &nbsp; <span class="track both">LLM + Robotics</span> shared foundations, or ideas that carry across both. Robot foundation models (VLAs) are built on LLM backbones, so the two tracks keep meeting.</p></div>
 <p><a href="sources.html"><strong>Sources &amp; summaries →</strong></a> every link added, its summary, the primary sources behind it, saved files and all external references.</p>
-<p class="meta">22 modules (115 pages) · last updated 2026-11-10</p>
+<p class="meta">23 modules (116 pages) · last updated 2026-11-11</p>
 
 <h2 id="grown-ups">For grown-ups and later</h2>
 <p>Notes on LLMs and robotics for grown-ups, and for later once you've finished the robot course. Each module still opens with a Start-here box you can read any time.</p>
 <details id="all-modules">
-<summary>Show all 22 modules, the summaries and the concept map</summary>
+<summary>Show all 23 modules, the summaries and the concept map</summary>
 
 <h2>Modules</h2>
 <!-- MODULES: newest at the bottom; keep numbering sequential -->
@@ -215,6 +215,15 @@
   <p class="meta">Source: @matheorems X post · Nov 2026</p>
 </a>
 
+
+<a class="card module" href="topics/23-robotics-engineer-roadmap.html">
+  <div class="n">23 · roadmap</div>
+  <h3><span class="track robo">Robotics</span>How to become a robotics engineer in 6 months: the hardware half, mapped against Robo-Helper (plus a safe kid track)</h3>
+  <p>Ronin's build-first roadmap: electronics and the bench, Arduino/ESP32 with motors and IMUs (line follower, self-balancer), CAD and 3D printing (the SO-101 arm), ROS 2 with Gazebo, SLAM and Nav2, the control and kinematics maths, then LeRobot, VLAs and getting hired. Each month has its goal, best free resources, practice projects and milestone. A coverage map shows what Robo-Helper already teaches with measured numbers (the same 0.98 complementary filter, P vs PD, odometry smearing the map 100% → 55%) and what's missing (everything with a wire, ROS 2, IK). Adds a six-stage hardware track for a 12-year-old with safety rules and checkpoints, an LED-resistor and voltage-divider calculator, and a reality check on the job and pay claims.</p>
+  <span class="tag">roadmap</span><span class="tag">electronics</span><span class="tag">Arduino/ESP32</span><span class="tag">ROS 2</span><span class="tag">LeRobot</span><span class="tag">careers</span><span class="tag">beginner-friendly</span>
+  <p class="meta">Source: @DeRonin_ X article · Sep 2026</p>
+</a>
+
 <h2>Summaries at a glance</h2>
 <div class="table-wrap"><table>
 <tr><th>#</th><th>Track</th><th>Topic</th><th>Key takeaway</th></tr>
@@ -240,6 +249,7 @@
 <tr><td>20</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/20-from-scratch/index.html">Six from-scratch repos</a></td><td>Read tiny code that does the real thing, run it, then use it to try to make your own robot better, and measure whether it did. Bigger models need more data; a fast brain on a laptop can be too slow on a robot; learned control is great until the world changes.</td></tr>
 <tr><td>21</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/21-robot-math.html">Robot maths, played with</a></td><td>Play with each idea first, then use it on your own robot and measure it. Estimation (Bayes, Kalman, Fourier) beats plain averaging once the robot moves; a model of the world only helps if the world has patterns; π0 and GR00T are a scene-understanding Transformer plus a noise-to-motion head.</td></tr>
 <tr><td>22</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/22-vector-fields.html">Gradient, divergence, curl</a></td><td>Gradient = uphill, divergence = spreading out or draining in, curl = swirl. A robot can drive by following a field, but pure gradients get stuck in dips; a little curl around obstacles gets it round. Measure from many starts, not one.</td></tr>
+<tr><td>23</td><td><span class="track robo">Robotics</span></td><td><a href="topics/23-robotics-engineer-roadmap.html">Robotics engineer in 6 months</a></td><td>Learn the layers in order (electrons, microcontrollers, parts, ROS 2, maths, learning), build something every month, measure it, and write down what broke. Robo-Helper already covers the estimation and control ideas; the wires are what is missing.</td></tr>
 </table></div>
 
 <h2>Concept map</h2>
@@ -256,9 +266,11 @@
 <tr><td>Error analysis (reading outputs, failure taxonomies)</td><td>19</td></tr>
 <tr><td>Agent evaluation (final state, pass^k, reliability, cost per success)</td><td>10, 18, 19</td></tr>
 <tr><td>Linear algebra for robots (rotations, SVD, Jacobians)</td><td>02, 21</td></tr>
-<tr><td>Homogeneous transforms &amp; forward kinematics</td><td>02</td></tr>
+<tr><td>Homogeneous transforms &amp; forward kinematics</td><td>02, 23</td></tr>
 <tr><td>Probability for estimation (Bayes, covariance, Monte Carlo)</td><td>02, 03, 21</td></tr>
-<tr><td>State estimation &amp; filtering (Kalman, Fourier, Markov chains)</td><td>21</td></tr>
+<tr><td>State estimation &amp; filtering (Kalman, Fourier, Markov chains)</td><td>21, 23</td></tr>
+<tr><td>Electronics, microcontrollers &amp; motors (Ohm's law, PWM, motor drivers, IMUs, encoders)</td><td>23</td></tr>
+<tr><td>Robotics careers &amp; portfolios (ROS 2, CAD, "what broke and how I fixed it")</td><td>08, 23</td></tr>
 <tr><td>Vector calculus (gradient, divergence, curl) &amp; potential-field navigation</td><td>21, 22</td></tr>
 <tr><td>Vision-language-action models (π0, GR00T: VLM + flow-matching action head, action chunks)</td><td>05, 08, 21</td></tr>
 <tr><td>Computer vision for perception (CNNs, ResNet, dilated convs, detection)</td><td>02, 06</td></tr>
