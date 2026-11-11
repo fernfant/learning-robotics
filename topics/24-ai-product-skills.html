@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Product Skills</title>
+<link rel="stylesheet" href="../style.css?v=16">
+<style>
+  .posts { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); margin: 12px 0; }
+  .posts a { display: block; text-decoration: none; color: inherit; border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--card); }
+  .posts a:hover { border-color: var(--accent); }
+  .posts .m { font-size: .8rem; color: var(--muted); }
+  .posts .t { font-weight: 700; margin: 2px 0; }
+  .posts .p { font-size: .85rem; }
+  .gulfs { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin: 12px 0; }
+  .gulfs div { border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--card); }
+  .gulfs b { display: block; }
+  .ladder { list-style: none; padding: 0; margin: 12px 0; }
+  .ladder li { border-left: 6px solid var(--line); padding: 6px 10px; margin: 6px 0; background: var(--card); border-radius: 0 8px 8px 0; }
+  .ladder li:nth-child(1) { border-color: var(--ok); }
+  .ladder li:nth-child(2) { border-color: var(--play); }
+  .ladder li:nth-child(3) { border-color: var(--build); }
+  .ladder li:nth-child(4) { border-color: var(--fail); }
+  .sort { border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin: 10px 0; background: var(--card); }
+  .sort .q { margin: 0 0 6px; }
+  .sort .opts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sort .fb { margin: 6px 0 0; font-size: .9rem; min-height: 1.2em; }
+  .sort.right { border-color: var(--ok); }
+  .sort.wrong { border-color: var(--fail); }
+  .calc { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+  .calc label { font-size: .85rem; color: var(--muted); display: block; }
+  .calc input { width: 100%; }
+  .big-out { font-size: 1.4rem; font-weight: 700; }
+</style>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../index.html">← LLMs &amp; Robotics</a> · Module 24</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 24 · AI product skills</div>
+<h1>Shipping AI products: evals, testing, prototypes, agents and a Claude Code “operating system”</h1>
+<p class="lede">Five posts from Aakash Gupta's Product Growth newsletter, for product managers building with AI. The core is Hamel Husain's evals method: read real failures, sort them into a few yes/no types, and only then automate the checks, cheapest first. The rest covers testing AI features, prototyping tools, agent workflows and a Claude Code setup for PMs.</p>
+<p class="meta">Sources: five Product Growth posts (paid; read in full through a subscriber's account, 11 Nov 2026), Mar 2025 – Feb 2026 ·
+<a href="https://www.news.aakashg.com/p/ai-evals">Evals</a> ·
+<a href="https://www.news.aakashg.com/p/ai-testing">Testing</a> ·
+<a href="https://www.news.aakashg.com/p/ai-prototyping-tutorial">Prototyping</a> ·
+<a href="https://www.news.aakashg.com/p/practical-ai-agents-pms">Agents</a> ·
+<a href="https://www.news.aakashg.com/p/pm-os">PM OS</a>.
+This page summarises them in our own words and quotes almost nothing. Prices, valuations, revenue and time-saved figures are <em>the authors'</em> and not re-checked. The Robo-Helper links, the failure sorter and the judge calculator are ours.</p>
+
+<div class="card note"><strong>For Robo-Helper builders (ages 12+):</strong> Read “Start here” and play the <a href="#sorter">failure sorter</a>. It uses your own robot's mistakes. The rest is written for grown-ups who build AI products. <a href="18-robot-brain/index.html">Back to the course</a>.</div>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">An AI brain doesn't fail the same way twice. So the most useful job on an AI team is being a really good tester: finding <em>how</em> it fails, and building a cheap check for each kind of failure.</p>
+<h3>Think of it like this</h3>
+<ul>
+<li>When Robo-Helper gets a command wrong, there are only three reasons. You <b>didn't look</b> at enough real commands (you didn't know people say “pls”). You <b>didn't say clearly</b> what you wanted (should it ask “where?” or guess?). Or you said it clearly and it <b>still got it wrong</b> on a new kind of sentence.</li>
+<li>The first two you fix yourself, by reading and by writing clearer instructions. Only the third one needs a test that runs again and again.</li>
+<li>Tests come in prices. A few lines of code that check “is this valid JSON?” cost nothing. Asking another AI to mark the answer costs money, and you have to check that AI too.</li>
+</ul>
+<h3>You already do this</h3>
+<ol>
+<li><code>check.py</code> compares your code's answers with known right answers. That's a <b>reference-based</b> test.</li>
+<li>Your <a href="18-robot-brain/10-llm-safety.html">week 10 safety layer</a> blocks bad AI answers before the robot moves. That's a <b>guardrail</b>.</li>
+<li>The <a href="18-robot-brain/19-bakeoff.html">bake-off</a> looks at the room afterwards, not at what the brain says it did. That's an <b>application eval</b>.</li>
+</ol>
+<h3>Try it</h3>
+<p>Play the <a href="#sorter">failure sorter</a>: six real-looking Robo-Helper mistakes. For each one, pick which of the three reasons it is.</p>
+<h3>Words to know</h3>
+<dl>
+<dt>Eval</dt><dd>A repeatable way to measure how often an AI does the right thing.</dd>
+<dt>Trace</dt><dd>Everything that happened for one request: the command, every step the brain took, and the result.</dd>
+<dt>Pass/Fail</dt><dd>Marking each answer just right or wrong, instead of 1 to 5. Easier to agree on.</dd>
+<dt>Judge</dt><dd>A second AI that marks the first one's answers. Only trust it after checking it against your own marks.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> the full evals method (three gulfs, open and axial coding, the cost ladder, building and checking a judge, correcting its score), why AI features break normal testing, how prototyping tools change product work, 21 agent use cases and 8 mistakes, the Claude Code PM setup, and an honest read of what's sponsored or dated.</p>
+
+<div class="toc">
+<strong>In this module</strong>
+<ol>
+<li><a href="#summary">Summary</a></li>
+<li><a href="#why-robotics">Why this matters for robotics</a></li>
+<li><a href="#evals">Deep dive: evals (Analyze → Measure → Improve)</a></li>
+<li><a href="#judge-calc">Try it: correct a judge's score (interactive)</a></li>
+<li><a href="#testing">Deep dive: testing AI features</a></li>
+<li><a href="#prototyping">Deep dive: AI prototyping tools</a></li>
+<li><a href="#agents">Deep dive: practical agents for PMs</a></li>
+<li><a href="#pm-os">Deep dive: the PM operating system in Claude Code (and MCP)</a></li>
+<li><a href="#sorter">Try it: the failure sorter (interactive)</a></li>
+<li><a href="#reality">Reality check: sponsors, dates and claims</a></li>
+<li><a href="#playbook">Playbook</a></li>
+<li><a href="#check">Self-check</a></li>
+<li><a href="#glossary">Glossary &amp; further reading</a></li>
+</ol>
+</div>
+
+<h2 id="summary">1. Summary</h2>
+<div class="posts">
+<a href="#evals"><div class="m">Jun 2025 · with Hamel Husain</div><div class="t">Evals</div><div class="p">Read ~100 traces, name the failures, fix specification gaps in the prompt, then build one cheap check per remaining failure.</div></a>
+<a href="#testing"><div class="m">Oct 2025 · with Testkube</div><div class="t">Testing</div><div class="p">AI breaks testing four ways. Business-driven evals, automated tests and one place to see results.</div></a>
+<a href="#prototyping"><div class="m">Mar 2025 · with Colin Matthews</div><div class="t">Prototyping</div><div class="p">v0, Bolt, Lovable, Replit. Prototypes replace sketches at every stage. Plan before code; change one thing at a time.</div></a>
+<a href="#agents"><div class="m">Nov 2025</div><div class="t">Agents</div><div class="p">21 PM use cases with a pick for each, and 8 mistakes: silent failures, no human review, expensive models everywhere.</div></a>
+<a href="#pm-os"><div class="m">Feb 2026</div><div class="t">PM OS</div><div class="p">A Claude Code folder: CLAUDE.md, a context library, 41 skills, 7 reviewer sub-agents and MCP links to your data.</div></a>
+</div>
+<p><b>Your labels, checked:</b> “Model information” goes to the testing post. “LLM with MCP” goes to the PM OS post, which covers MCP as its setup step 5 (connecting Claude Code to analytics, tickets, calendar). The evals post is the heavyweight; the others are practitioner guides.</p>
+
+<h2 id="why-robotics">2. Why this matters for robotics</h2>
+<p>A robot with an LLM brain is an AI product with a body. Every warning in these posts gets sharper once outputs move things.</p>
+<ul>
+<li><b>Non-determinism:</b> the same command can produce a different plan tomorrow. One passing run proves little; measure rates (Robo-Helper's <a href="19-evals-field-guide.html">Module 19</a> pass^k).</li>
+<li><b>Blast radius:</b> the testing post's example is a recommender suggesting out-of-stock items, which spills into inventory and support. For a robot the blast radius is physical, which is why week 10's checks sit <em>before</em> the motors.</li>
+<li><b>Regression across model versions:</b> swapping the model behind the planner (week 15) is a change. Re-run the bake-off before trusting it.</li>
+<li><b>Gulf of generalization:</b> the evals post's example is a name in the email body taken as the sender. Robo-Helper's version: “tell Sam the red block is in the bin” read as “pick up Sam”.</li>
+<li><b>Last line of defence:</b> the agents post's worst mistake was auto-posting without review. Robo-Helper's <a href="18-robot-brain/20-mcp.html">MCP week</a> keeps the never-break rules on the robot's side of the plug, for the same reason.</li>
+</ul>
+
+<h2 id="evals">3. Deep dive: evals (Analyze → Measure → Improve)</h2>
+<p>An eval is a systematic measurement of pipeline quality whose result anyone can read without arguing. It's used three ways: <b>background monitoring</b> (spot drift without blocking anything), <b>guardrails</b> (in the path: block, retry or fall back) and <b>improvement</b> (label data, pick few-shot examples, find failures worth an architecture change).</p>
+
+<h3>The three gulfs</h3>
+<p>From the paper “Who Validates the Validators?”, using an email assistant that extracts the sender, summarises requests and files the email:</p>
+<div class="gulfs">
+<div><b>1 · Comprehension</b>Developer ↔ data. You can't read every input or every output, so you don't know what your traffic really looks like or how it fails.</div>
+<div><b>2 · Specification</b>Developer ↔ pipeline. The prompt doesn't say what you meant: how long a summary, bullets or prose, display name or address.</div>
+<div><b>3 · Generalization</b>Data ↔ pipeline. Clear instructions, still wrong on some inputs: a famous name in the body taken as the sender. Never fully closes.</div>
+</div>
+<p>Why evals are hard: every app needs its own; requirements appear only after you see outputs; the right metric isn't obvious; nothing replaces reading real outputs on real data.</p>
+
+<h3>Basics before the loop</h3>
+<ul>
+<li><b>LLM weak spots:</b> algorithmic work (trained on 3-digit sums, fails 5-digit), unreliability, prompt sensitivity, confident falsehoods.</li>
+<li><b>Seven prompt parts:</b> role and objective, rules (including what not to do), context, examples, reasoning steps, output format, delimiters. Precision closes the specification gulf.</li>
+<li><b>Write prompts yourself at first.</b> Writing forces you to state the spec; outsourcing it early hides your failure modes.</li>
+<li><b>Reference-based</b> metrics compare with a known answer (exact match, run the SQL and compare tables). <b>Reference-free</b> ones check rules (no medical advice, the SQL runs, the summary adds nothing absent from the source). Prefer reference-based when you can: cheaper to keep.</li>
+<li><b>Application evals beat foundation benchmarks</b> (MMLU and friends help pick a model, not judge your app). A dashboard of generic “helpfulness_score”-style numbers is the smell of an eval gone wrong.</li>
+<li><b>Binary pass/fail beats 1–5.</b> Adjacent scale points are subjective and people drift to the middle. For progress, count sub-checks (“4 of 5 expected facts present”). Pairwise and ranking are for comparing systems.</li>
+</ul>
+
+<h3>Step 1 · Analyze</h3>
+<ol class="steps">
+<li><b>About 100 traces.</b> Real ones if you have them. Otherwise synthetic, built in two steps: pick the <em>dimensions</em> where it's likely to fail (feature, persona, how clear the request is), sample <em>tuples</em> of values, then write one query per tuple. Asking an LLM straight for “user queries” gives bland, repetitive ones. Throw away awkward ones aggressively.</li>
+<li><b>Open coding.</b> Read each whole trace and write a short note on the first (most upstream) thing that went wrong. No categories yet. Stop at ≥20 bad traces with no new kinds appearing (<em>saturation</em>).</li>
+<li><b>Axial coding.</b> Cluster the notes into a small, non-overlapping set of binary failure modes. An LLM can propose groupings from 30–50 notes; you check them. Their example: “invented a house feature” and “invented a tour the user never asked for” look alike but differ (wrong facts vs invented intent).</li>
+<li><b>Label.</b> One 0/1 column per failure mode, every trace. Now you have prevalences to prioritise with. Expect to revise the definitions.</li>
+</ol>
+<div class="box stuck"><span class="tag">🧩 Common pitfalls</span> Unrepresentative data; skipping open coding for generic labels (“hallucination”, “verbosity”); 1–5 scales in early labelling; freezing the failure list too early.</div>
+
+<h3>Step 2 · Measure</h3>
+<p><b>Fix the specification gaps first, then measure generalization.</b> If the prompt never asked for the price limit, adding it is faster than building a check, and a check would measure your vagueness, not the model. Build evaluators only for failures that persist with clear instructions. Try to give each one a reference-based and a reference-free version, plus “does it run” checks where outputs are executable.</p>
+<ol class="ladder">
+<li><b>Code assertions:</b> JSON parses, SQL runs, regex for forbidden words, “3 bullets”, “asked for pets, says pets allowed”. Fast, free, deterministic.</li>
+<li><b>Reference comparisons:</b> a golden set of inputs with correct outputs. Good as CI checks.</li>
+<li><b>Execution checks:</b> run the generated code or query against a test database.</li>
+<li><b>LLM-as-judge:</b> only for nuance code can't capture (tone for a persona, faithfulness). One judge per failure mode, pass/fail. Needs 100+ labels and upkeep.</li>
+</ol>
+<p><b>A judge prompt has four parts:</b> one narrow criterion; exact Pass and Fail definitions; a few clear examples of each from your labelled traces; JSON output with a short reason and the verdict.</p>
+<p><b>Build it like a classifier.</b> Split your labelled traces three ways. <em>Train</em> (10–20%): examples you may put in the prompt. <em>Dev</em> (40–45%): measure after each prompt edit. <em>Test</em> (40–45%): touch once, at the end. Aim for 30–50 Pass and 30–50 Fail in dev and test, even if real failures are rarer. Few-shot gains usually plateau after 1–8 examples, so spend the data on evaluation. Any trace in the prompt must stay out of dev and test.</p>
+<p><b>Score it with two rates.</b> TPR = share of human-Pass the judge also passes. TNR = share of human-Fail the judge also fails. Iterate until both are high (they suggest &gt;90%). If stuck: a stronger model, split the criterion into smaller checks, or better labels. Labels from people without context on the app are a common mistake.</p>
+<p><b>Correct the judge's score.</b> On new, unlabelled traces the judge's raw pass rate is biased. The correction is θ̂ = (p_obs + TNR − 1) ÷ (TPR + TNR − 1), clipped to 0–1. If TPR + TNR ≈ 1 the judge is a coin flip and nothing can be corrected. For error bars, bootstrap the test set's (human, judge) pairs: resample, recompute TPR and TNR, re-correct, take the 2.5th and 97.5th percentiles. In their simulation the correction removes the bias, and judge errors mostly widen the interval; better TPR narrows it most. <a href="#judge-calc">Try it below.</a></p>
+<div class="box stuck"><span class="tag">🧩 Judge pitfalls</span> No examples in the prompt; several criteria in one verdict; assuming it “just works” without measuring alignment; testing on the same traces used as examples; never re-checking. They suggest re-labelling a handful of traces weekly and recomputing TPR, TNR and the interval.</div>
+
+<h3>Step 3 · Improve</h3>
+<ul>
+<li><b>Prompts first:</b> clarify, add targeted examples (kept out of the golden set), ask for step-by-step reasoning.</li>
+<li><b>Decompose:</b> extract preferences → query tool → pick listings → draft email, each its own call.</li>
+<li><b>RAG:</b> query rewriting, chunking, how many documents, re-ranking.</li>
+<li><b>Tool schemas:</b> clear descriptions and parameter rules (how to handle “West Berkeley” vs a made-up “Berkeley West”).</li>
+<li><b>Guardrails:</b> fast deterministic checks before output; weigh false blocks.</li>
+<li><b>Fine-tune last</b>, for persistent, well-defined failures with lots of good examples.</li>
+</ul>
+<p><b>The flywheel:</b> analyze → build evals → put the golden set in CI → ship with monitoring on sampled traffic and <em>pinned</em> judge models → watch corrected failure rates with intervals → spot drift or new failures → re-analyze → add the new case to the golden set and evaluators → improve → redeploy.</p>
+<div class="box bot"><span class="tag">🤖 In Robo-Helper</span> <code>check.py</code> is reference-based CI. The <a href="18-robot-brain/10-llm-safety.html">week 10 checks</a> (JSON, allow-list, fallback) are code-level guardrails. The <a href="18-robot-brain/19-bakeoff.html">bake-off</a> judges by the final room, which is an execution check. <a href="19-evals-field-guide.html#judge">Module 19</a> shows why an unchecked judge misleads (it uses kappa; this post uses TPR/TNR and corrects the rate).</div>
+
+<h2 id="judge-calc">4. Try it: correct a judge's score</h2>
+<div class="box idea"><span class="tag">💡 The idea</span> A judge that lets some failures through inflates the pass rate; one that fails good answers deflates it. If you know how often it does each (TPR and TNR from your labelled test set), you can undo the bias.</div>
+<div class="box play"><span class="tag">🎮 Play</span>
+<div class="calc">
+<div><label for="jT">Judge TPR (% of real passes it passes)</label><input id="jT" type="number" min="0" max="100" value="90"></div>
+<div><label for="jN">Judge TNR (% of real fails it fails)</label><input id="jN" type="number" min="0" max="100" value="80"></div>
+<div><label for="jP">Judge's raw pass rate on new traces (%)</label><input id="jP" type="number" min="0" max="100" value="76"></div>
+</div>
+<p class="big-out" id="jOut">–</p>
+<p id="jNote"></p>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span> With TPR 90%, TNR 80% and a raw 76%, the corrected pass rate is <b>80%</b>: the judge passes 72% of traces correctly plus 4% of failures it missed. Now set TPR and TNR both to 50%: the calculator refuses, because that judge is a coin flip.</div>
+
+<h2 id="testing">5. Deep dive: testing AI features</h2>
+<p>Teams write AI code 3–5× faster, the post says, but releases haven't sped up because testing hasn't caught up. Its anecdote: one company's AI feature builds took 4 hours vs 15 minutes for normal features.</p>
+<h3>Four ways AI breaks traditional testing</h3>
+<ol>
+<li><b>Non-deterministic outputs:</b> good on Tuesday, nonsense on Wednesday, both pass the unit tests.</li>
+<li><b>Bigger blast radius:</b> effects spread to systems far from the AI feature.</li>
+<li><b>New test types:</b> functional tests of outputs, load tests on inference endpoints, regression across model versions, chaos tests for when the AI fails.</li>
+<li><b>Scale:</b> thousands of scenarios where suites were built for hundreds.</li>
+</ol>
+<p>The model underneath also changes: a new model version can shift behaviour as much as your own code change. Tests must expect drift.</p>
+<h3>The framework (three parts)</h3>
+<ol class="steps">
+<li><b>Business-driven evals, written with the spec:</b> e.g. billing issues go to a human, no refunds over a limit without approval.</li>
+<li><b>Automated tests:</b> model performance within bounds, integration with existing systems, load.</li>
+<li><b>Observability and orchestration:</b> one place for all results, run tests on demand, trends over time, different suites for different situations. Without it you can't answer “are we ready to ship?”</li>
+</ol>
+<p><b>The PM's stack, in four boxes:</b> test orchestration (e.g. Testkube, Argo), model/eval tooling (Braintrust, Langfuse, PromptLayer, W&amp;B, Arize), load (k6, Locust, Gatling), observability (Datadog, Grafana, OpenTelemetry). You don't configure them, but you should know which you have and where the gaps are. Load tests also catch cost: one team found a $50K/month bill before launch.</p>
+<p><b>Working with DevOps:</b> agree “ready to ship” before specs; ask about eval coverage and repeat failures during the build; after launch, turn patterns where users abandon AI outputs into new evals. The “self-healing loop” it describes (AI diagnoses a failing test, opens a fix PR, re-runs) is a direction, not a measured result.</p>
+<div class="box bot"><span class="tag">🤖 In Robo-Helper</span> Weeks 13–14 measure latency and cost per command, the robot's load test. The bake-off is the regression suite to re-run when the planner model changes.</div>
+
+<h2 id="prototyping">6. Deep dive: AI prototyping tools</h2>
+<div class="table-wrap"><table>
+<tr><th>Tool</th><th>Best for (their one-liner)</th><th>Notes</th></tr>
+<tr><td>v0 (Vercel)</td><td>Polished front-end design by default</td><td>Figma import, community templates; databases via add-ons like Supabase.</td></tr>
+<tr><td>Bolt</td><td>Fast prototypes with room to grow</td><td>Runs in the browser, not on a VM; terminal access; deploys to Netlify.</td></tr>
+<tr><td>Lovable</td><td>Non-technical users</td><td>Visual editing, read-only code, Supabase sync.</td></tr>
+<tr><td>Replit</td><td>Persistent data, internal tools</td><td>Built-in database and auth, agent plus assistant, multiplayer editing.</td></tr>
+</table></div>
+<p>Chatbots (Claude Artifacts, ChatGPT) suit one-off, single-file prototypes; coding tools (Cursor, Copilot) suit people shipping to production. A common path: start in a prototyping tool, sync to GitHub, continue in a coding tool.</p>
+<h3>Old way vs new way</h3>
+<p>Before, prototypes appeared mostly at design exploration (~75% of teams by their estimate) and rarely at ideation or in PRDs (~5%). Now PMs use them at every stage: to think, to pitch roadmap ideas, in front of customers, attached to the PRD, as a starting point for designers and even for engineers.</p>
+<h3>How to build one</h3>
+<ol class="steps">
+<li><b>Context:</b> Figma import beats screenshots beats a napkin photo beats nothing.</li>
+<li><b>A short PRD in a .md file</b> before any code.</li>
+<li><b>Describe the whole, then the parts</b>, with exact behaviour (“clicking Save stores the form and goes to the dashboard”).</li>
+<li><b>Iterate one change at a time</b>, keeping a copy of the last working version.</li>
+</ol>
+<div class="box stuck"><span class="tag">🧩 Debugging</span> A system prompt about <em>how</em> to build (data model first, mock data before a database, small files, one change at a time, ask when unclear); state the behaviour you want, not the symptom; ask for “a plan, no code yet”; learn what tidy code looks like. To scale: secrets out of the code, real auth, proper hosting, a domain. Many internal tools never need to scale.</div>
+
+<h2 id="agents">7. Deep dive: practical agents for PMs</h2>
+<p>Twenty-one use cases in four groups, each with a tool pick:</p>
+<ul>
+<li><b>Monitoring and analysis:</b> weekly feedback analysis, feature-request tallies, competitor watching (with a “worth telling me?” filter), adoption tracking, anomaly detection, beta feedback (NotebookLM as a free start).</li>
+<li><b>Scheduled reporting:</b> weekly metrics drafts you edit, retro prep, post-launch reports at 7 and 30 days.</li>
+<li><b>Triggered docs and dev:</b> PRD drafts on a ticket status change, auto-fixing simple tickets as reviewable PRs, prototypes from specs, release notes, changelogs, help docs.</li>
+<li><b>Communication:</b> email and Slack drafts, meeting briefs, follow-ups, interview synthesis, launch announcements.</li>
+</ul>
+<h3>The eight mistakes (the most useful part)</h3>
+<div class="table-wrap"><table>
+<tr><th>Mistake</th><th>What happened</th><th>Fix</th></tr>
+<tr><td>Too complex first</td><td>A 15-competitor strategy agent that couldn't be debugged</td><td>One workflow, one job; grow it</td></tr>
+<tr><td>No error alerts</td><td>An expired token; silent for a week</td><td>Failure alerts on every workflow</td></tr>
+<tr><td>No human review</td><td>A template placeholder posted to customers; a misread chart told the CEO things were up</td><td>Review anything customer-facing or important</td></tr>
+<tr><td>Big models everywhere</td><td>$200/month to sort emails</td><td>Small models for sorting; $30/month</td></tr>
+<tr><td>Stale prompts</td><td>Product changed, prompts didn't</td><td>Quarterly prompt review</td></tr>
+<tr><td>Dirty data</td><td>Inconsistent tags merged unrelated requests</td><td>Clean the inputs first</td></tr>
+<tr><td>Agents for bad UI</td><td>Two weeks automating chart-finding</td><td>Learn or fix the tool instead</td></tr>
+<tr><td>Too many alerts</td><td>50 Slack messages a day, ignored</td><td>Score relevance before alerting</td></tr>
+</table></div>
+<p><b>Getting access at work:</b> a personal proof of concept, then a 30-day pilot of one tool on one non-sensitive use case with a success number, an ROI estimate, and the security answers ready (SOC 2, no training on your data, SSO, deletion policy, read-only to start).</p>
+<div class="box bot"><span class="tag">🤖 In Robo-Helper</span> “Small model for sorting, big model for thinking” is week 14's cache/quantise/distil lesson. “Never auto-act on what matters” is week 10 and the MCP week's last line of defence.</div>
+
+<h2 id="pm-os">8. Deep dive: the PM operating system in Claude Code (and MCP)</h2>
+<p>A $49 folder that makes Claude Code a PM's workbench. The structure is the idea worth keeping:</p>
+<ul>
+<li><b>CLAUDE.md</b>, the master context Claude reads first (he says he revised it 100+ times).</li>
+<li><b>context-library/</b>: company, users, competitors, metrics, strategy, writing style, your own background. Fill it by talking to Claude, not by hand.</li>
+<li><b>.claude/skills/</b>: 41 slash commands (<code>/prd-draft</code>, <code>/meeting-notes</code>, <code>/user-interview</code>, <code>/competitor-analysis</code>, <code>/create-tickets</code> …).</li>
+<li><b>sub-agents/</b>: 7 reviewers (engineer, designer, exec, legal, researcher, skeptic, customer) to critique a PRD in parallel.</li>
+<li><b>templates/</b>: launch checklists, roadmaps, OKRs, retros.</li>
+<li><b>MCP connections</b> (setup step 5) to analytics (PostHog, Amplitude, Pendo), tickets (Linear), support, research and calendar, so Claude can query live data. This is the “LLM with MCP” part.</li>
+</ul>
+<p>Other tips: keep it in a git repo (version, revert, share with a new PM), use plan mode for big tasks, run separate sessions per initiative, pick cheaper models for simple steps, and “Ralph Wiggum” loops that retry a task until a clear completion signal appears, with an iteration cap.</p>
+<div class="box safety"><span class="tag">⚠️ Careful</span> The post's setup starts Claude Code with permission checks switched off. Skip that until you trust a workflow, and never with MCP connections that can write to real systems. Its own FAQ says the same, more quietly.</div>
+<div class="box bot"><span class="tag">🤖 In this course</span> This course runs on the same pattern: a CLAUDE.md schema, an index, an append-only log and repeatable workflows. Robo-Helper's <a href="18-robot-brain/20-mcp.html">MCP week</a> builds the server side: your robot's tools behind the plug that Claude Code would connect to.</div>
+
+<h2 id="sorter">9. Try it: the failure sorter</h2>
+<div class="box idea"><span class="tag">💡 The idea</span> Every failure belongs to one gulf, and the gulf tells you what to do first: <b>look</b> at more data, <b>say it clearly</b> in the prompt, or <b>build a check</b>.</div>
+<div class="box play"><span class="tag">🎮 Play</span> For each Robo-Helper mistake, pick the gulf. The answer tells you the cheapest first move.
+<div id="sorter-list"></div>
+<p class="big-out" id="sScore"></p>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span> You get at least 5 of 6, and you can say why “it answered in a sentence instead of JSON” is a <em>specification</em> problem (the prompt never asked for JSON), not a model problem.</div>
+
+<h2 id="reality">10. Reality check: sponsors, dates and claims</h2>
+<ul>
+<li><b>Evals:</b> the method is sound and matches Hamel Husain's public writing and <a href="19-evals-field-guide.html">Module 19</a>. The post also sells his course with an affiliate discount.</li>
+<li><b>Testing:</b> written in partnership with Testkube, whose product fills the “orchestration” box. The case study (4 h → 20 min builds, 40% fewer bugs, $200K saved) is an unnamed company with no method.</li>
+<li><b>Prototyping:</b> from March 2025; the revenue and valuation figures were out of date within months, and the tools change monthly. The workflow advice ages better than the rankings.</li>
+<li><b>Agents:</b> model names and prices are from 2025. The mistakes table is the durable part.</li>
+<li><b>PM OS:</b> a paid product. “Basically AGI” is marketing. Time savings (PRD 4–8 h → 30 min) are the author's estimates, not measurements; it also says most users will need a Max plan.</li>
+</ul>
+
+<h2 id="playbook">11. Playbook</h2>
+<ol class="steps">
+<li><b>Before any eval tool:</b> collect ~100 traces, read them, note the first failure in each, cluster into binary failure modes, count them.</li>
+<li><b>Fix what you never specified</b> in the prompt before automating anything.</li>
+<li><b>Climb the cost ladder:</b> assertions → golden set → execution → judge. One judge per failure mode, pass/fail, measured on held-out labels, corrected and reported with an interval.</li>
+<li><b>Treat a model upgrade as a release:</b> golden set in CI, judge models pinned, re-run before switching.</li>
+<li><b>Prototype to decide, not to ship:</b> plan first, one change at a time, nothing secret in the code.</li>
+<li><b>Agents:</b> one job each, failure alerts, a human before anything customer-facing, small models for sorting.</li>
+<li><b>Keep your context in files</b> (CLAUDE.md, a context folder, skills), in git, and connect data with MCP read-only first.</li>
+<li><b>For the 12-year-old:</b> play the sorter; then, in the bake-off week, write each failed task as one line of open coding and group them.</li>
+</ol>
+
+<h2 id="check">12. Self-check</h2>
+<details><summary>A judge passes 95% of outputs. Why isn't 95% the pass rate?</summary>
+<p>Because the judge makes mistakes in both directions. With its TPR and TNR from a labelled test set, the corrected rate is (p_obs + TNR − 1) ÷ (TPR + TNR − 1). A lenient judge (low TNR) pushes the raw number up.</p></details>
+<details><summary>Why fix specification failures before writing evals?</summary>
+<p>They're cheap to fix by editing the prompt, and an eval on them would measure how vague you were, not how well the model generalises.</p></details>
+<details><summary>Why pass/fail rather than 1–5?</summary>
+<p>People disagree on 3 vs 4 and drift to the middle. Binary labels are faster and more consistent; track progress by counting sub-checks.</p></details>
+<details><summary>How should you split 200 labelled traces to build a judge?</summary>
+<p>Roughly 10–20% train (prompt examples), 40–45% dev (tune), 40–45% test (final, untouched), with 30–50 passes and 30–50 fails in dev and test. Nothing in the prompt may appear in dev or test.</p></details>
+<details><summary>What's open coding, and when do you stop?</summary>
+<p>Reading whole traces and writing a free note on the first thing that went wrong, without categories. Stop after at least 20 bad traces when no new kinds of failure appear (saturation).</p></details>
+<details><summary>Name the four ways AI features break traditional testing.</summary>
+<p>Non-deterministic outputs, a wider blast radius, new test types (output quality, inference load, cross-model regression, chaos), and far more scenarios.</p></details>
+<details><summary>Which agent mistake would hurt a robot most, and what's the guard?</summary>
+<p>Acting without review on something that matters. The guard is checks the AI can't bypass, on the robot's side (week 10's safety layer, the MCP week's last line of defence).</p></details>
+
+<h2 id="glossary">13. Glossary &amp; further reading</h2>
+<div class="table-wrap"><table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<tr><td>Trace</td><td>The full record of one request: input, every model output and tool call, final result.</td></tr>
+<tr><td>Three gulfs</td><td>Comprehension (you don't know your data), specification (the prompt doesn't say what you mean), generalization (clear prompt, still wrong).</td></tr>
+<tr><td>Open / axial coding</td><td>Free notes on each trace, then clustering them into named failure modes (from grounded theory).</td></tr>
+<tr><td>Saturation</td><td>When more traces stop revealing new kinds of failure.</td></tr>
+<tr><td>Reference-based / -free</td><td>Compared with a known answer / checked against rules.</td></tr>
+<tr><td>Golden set</td><td>Inputs with known correct outputs, run on every change.</td></tr>
+<tr><td>TPR / TNR</td><td>Share of real passes the judge passes / real fails it fails.</td></tr>
+<tr><td>Guardrail</td><td>A check in the live path that can block, retry or fall back.</td></tr>
+<tr><td>Orchestration</td><td>Coordinating which tests run when, and collecting results in one place.</td></tr>
+<tr><td>CDE</td><td>Cloud development environment: v0, Bolt, Lovable, Replit.</td></tr>
+<tr><td>Skill / sub-agent</td><td>In Claude Code: a reusable instruction file run as a slash command / a separate agent with its own role.</td></tr>
+<tr><td>MCP</td><td>Model Context Protocol: a standard plug between AI apps and tools or data.</td></tr>
+</table></div>
+<ul>
+<li>The posts (paid): <a href="https://www.news.aakashg.com/p/ai-evals">evals</a> · <a href="https://www.news.aakashg.com/p/ai-testing">testing</a> · <a href="https://www.news.aakashg.com/p/ai-prototyping-tutorial">prototyping</a> · <a href="https://www.news.aakashg.com/p/practical-ai-agents-pms">agents</a> · <a href="https://www.news.aakashg.com/p/pm-os">PM OS</a></li>
+<li>Free primary sources: <a href="https://arxiv.org/abs/2404.12272">Shankar et al., Who Validates the Validators? (2024)</a> · <a href="https://hamel.dev/blog/posts/evals-faq/">Husain &amp; Shankar, AI Evals FAQ</a> · <a href="https://eugeneyan.com/writing/abstractive/">Eugene Yan on reference-based and reference-free metrics</a></li>
+<li>Related: <a href="19-evals-field-guide.html">Module 19</a> (evals field guide: kappa, error bars, pass^k) · <a href="01-decision-model-evals.html">Module 01</a> (thresholds, precision and recall) · <a href="10-rlm-harness.html">Module 10</a> (agent harnesses) · <a href="18-robot-brain/10-llm-safety.html">week 10</a>, <a href="18-robot-brain/19-bakeoff.html">bake-off</a>, <a href="18-robot-brain/20-mcp.html">MCP</a> in Robo-Helper</li>
+</ul>
+
+<footer>Module 24 · added 2026-11-11 · <a href="../index.html">Back to course index</a></footer>
+</main>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  function judge() {
+    const t = +$('jT').value / 100, n = +$('jN').value / 100, p = +$('jP').value / 100;
+    const d = t + n - 1;
+    if (d <= 0.02) {
+      $('jOut').textContent = 'Can\'t correct';
+      $('jNote').textContent = 'TPR + TNR is about 100% or less: the judge is no better than a coin flip, so its verdicts carry no information. Improve the judge first.';
+      return;
+    }
+    const raw = (p + n - 1) / d, th = Math.min(1, Math.max(0, raw));
+    $('jOut').textContent = `True pass rate ≈ ${(th * 100).toFixed(0)}%`;
+    const bias = p - th;
+    $('jNote').textContent = `(${(p * 100).toFixed(0)}% + ${(n * 100).toFixed(0)}% − 100%) ÷ (${(t * 100).toFixed(0)}% + ${(n * 100).toFixed(0)}% − 100%) = ${(raw * 100).toFixed(1)}%` +
+      (raw !== th ? ', clipped to the 0–100% range' : '') + '. ' +
+      (Math.abs(bias) < 0.005 ? 'Here the judge\'s two kinds of mistake cancel out.' :
+        bias > 0 ? `The raw score flatters the system by ${(bias * 100).toFixed(0)} points: the judge lets failures through.` :
+          `The raw score undersells the system by ${(-bias * 100).toFixed(0)} points: the judge fails good answers.`);
+  }
+  ['jT', 'jN', 'jP'].forEach(id => $(id).addEventListener('input', judge));
+  judge();
+
+  const G = ['Didn\'t look (comprehension)', 'Didn\'t say clearly (specification)', 'Said clearly, still wrong (generalization)'];
+  const items = [
+    ['You logged 2,000 commands but read none. You don\'t know that lots of people type "pls" or write in Portuguese.', 0,
+      'Comprehension. First move: read a sample of ~100 real commands and note what surprises you. No check yet.'],
+    ['"Put the red block in the bin" comes back as a friendly sentence, not JSON. Your prompt never mentioned JSON.', 1,
+      'Specification. First move: say "reply with JSON only, keys intent and object" in the prompt. Then a free code check: does it parse?'],
+    ['"Move the red block" — the robot guesses a place. You never decided whether it should ask "where to?"', 1,
+      'Specification. First move: decide, then write the rule into the prompt. Nothing to measure until you\'ve decided.'],
+    ['"Tell Sam the red block is in the bin" makes it try to pick up "Sam". The prompt clearly lists the allowed objects.', 2,
+      'Generalization. First move: a cheap code check — is the object in the allow-list? (Your week 10 guardrail.)'],
+    ['It says "Done! The block is in the bin", but the room shows it on the table.', 2,
+      'Generalization. First move: compare the final room with the expected room, like the bake-off. Don\'t trust the words.'],
+    ['You asked for "one short, friendly sentence". Most replies are, but some are curt in a way no rule can catch.', 2,
+      'Generalization, and nuanced. This is the one place for an AI judge: pass/fail on "friendly", checked against your own labels first.']
+  ];
+  const done = new Set(), right = new Set();
+  const list = $('sorter-list');
+  items.forEach(([q, ans, why], i) => {
+    const box = document.createElement('div');
+    box.className = 'sort';
+    box.innerHTML = `<p class="q"><b>${i + 1}.</b> ${q}</p><div class="opts"></div><p class="fb" aria-live="polite"></p>`;
+    G.forEach((g, k) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = g;
+      b.addEventListener('click', () => {
+        const ok = k === ans;
+        box.className = 'sort ' + (ok ? 'right' : 'wrong');
+        box.querySelector('.fb').textContent = (ok ? '✓ ' : '✗ Not quite. ') + why;
+        if (!done.has(i) && ok) right.add(i);
+        done.add(i);
+        $('sScore').textContent = done.size === items.length ? `${right.size} of ${items.length} right first time` : '';
+      });
+      box.querySelector('.opts').appendChild(b);
+    });
+    list.appendChild(box);
+  });
+})();
+</script>
+</body>
+</html>

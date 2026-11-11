@@ -77,6 +77,10 @@ MODULES = [
     ("23", "https://x.com/DeRonin_/status/2095180126359105955", "Ronin (@DeRonin_)", "2 Sep 2026", "X article",
      [("Tinkercad Circuits", "https://www.tinkercad.com/circuits"), ("Falstad circuit simulator", "https://www.falstad.com/circuit/"),
       ("ROS 2 Jazzy tutorials", "https://docs.ros.org/en/jazzy/Tutorials.html"), ("LeRobot docs", "https://huggingface.co/docs/lerobot/index")]),
+    ("24", "https://www.news.aakashg.com/p/ai-evals", "Aakash Gupta (with Hamel Husain, Colin Matthews)", "Mar 2025 – Feb 2026", "Five paid newsletter posts (read in full via a subscriber's account, 11 Nov 2026)",
+     [("AI Testing for PMs", "https://www.news.aakashg.com/p/ai-testing"), ("AI prototyping tools", "https://www.news.aakashg.com/p/ai-prototyping-tutorial"),
+      ("Practical AI agents for PMs", "https://www.news.aakashg.com/p/practical-ai-agents-pms"), ("PM OS in Claude Code", "https://www.news.aakashg.com/p/pm-os"),
+      ("Shankar et al., Who Validates the Validators?", "https://arxiv.org/abs/2404.12272")]),
 ]
 
 e = html.escape

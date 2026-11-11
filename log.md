@@ -338,3 +338,13 @@ Set up the folder structure, schema (CLAUDE.md), shared styles and the index.
   - kid line links the hardware track;
   - counts are now 23 modules and 116 pages.
 - The Robo-Helper hub links the hardware track. `build_sources.py` has the new entry and `sources.html` is regenerated.
+
+## [2026-11-11] ingest | Product Growth: evals, testing, prototyping, agents, PM OS (Aakash Gupta)
+- Links: five lnkd.in short links resolving to paid Product Growth posts (Mar 2025 – Feb 2026). Free previews fetched; full posts read through the owner's subscription in Chrome. Paid text not saved; `sources/24-aakash-product-growth.md` lists URLs and dates.
+- Module 24: `topics/24-ai-product-skills.html`, track LLM.
+  - Hamel Husain's evals method in full: three gulfs, ~100 traces (two-step synthetic tuples), open/axial coding, fix specification before measuring, cost ladder, judge prompt anatomy, train/dev/test splits, TPR/TNR, bias-corrected pass rate with bootstrap CI, improve strategies, flywheel.
+  - Testing AI features (4 ways it breaks testing, 3-part framework, 4-box stack), prototyping tools (v0/Bolt/Lovable/Replit, old vs new way, debugging), 21 agent use cases and the 8-mistakes table, the PM OS structure and its MCP step.
+  - Two interactives: judge-correction calculator (90/80/76 → 80%) and a 6-item Robo-Helper failure sorter (kid).
+  - Reality check: affiliate course links, Testkube partnership, dated ARR/valuations, unmeasured time savings, permission-skipping setup flagged.
+- Labels checked: "Model information" = testing post; "LLM with MCP" = PM OS post (MCP is its setup step 5).
+- Index: card, summary row, concept map (judges/evals, error analysis, new "AI product practice" row), kid line links the sorter, counts 24 modules / 117 pages. `build_sources.py` entry added and `sources.html` regenerated.

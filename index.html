@@ -21,7 +21,7 @@
   The blue block is in the bin.</code></pre>
 <p>You write every clever part yourself: moving, sensing, reading your phone's sensors, stopping for the cat, planning a route, steering wheels, mapping the room, understanding words. <code>check.py</code> marks it as you go: 21 checks on your robot, 147 in the whole course. If you can write a Python loop that prints 1 to 10, you're ready.</p>
 <p style="margin:18px 0"><a href="topics/18-robot-brain/index.html" style="display:inline-block;font-size:1.2rem;font-weight:700;padding:12px 24px;border-radius:10px;background:var(--accent);color:var(--bg);text-decoration:none">Start the course →</a></p>
-<p class="meta">After the course, for fun: <a href="topics/21-robot-math.html">robot maths, by playing</a> and <a href="topics/22-vector-fields.html">steering with a field of arrows</a> (both fine after week 5), <a href="topics/23-robotics-engineer-roadmap.html#kid-track">building a real robot with wires</a> (with an adult), then <a href="topics/20-from-scratch/index.html">real code from the pros</a> (some installs; ask an adult).</p>
+<p class="meta">After the course, for fun: <a href="topics/21-robot-math.html">robot maths, by playing</a> and <a href="topics/22-vector-fields.html">steering with a field of arrows</a> (both fine after week 5), <a href="topics/23-robotics-engineer-roadmap.html#kid-track">building a real robot with wires</a> (with an adult), <a href="topics/24-ai-product-skills.html#sorter">sorting your robot's mistakes like an AI tester</a> (after week 10), then <a href="topics/20-from-scratch/index.html">real code from the pros</a> (some installs; ask an adult).</p>
 </section>
 
 <div class="eyebrow">Personal course · living document</div>
@@ -30,12 +30,12 @@
 
 <div class="card"><p style="margin:0"><span class="track llm">LLM</span> how large language models are built, trained, evaluated and served. &nbsp; <span class="track robo">Robotics</span> how robots perceive, decide and act. &nbsp; <span class="track both">LLM + Robotics</span> shared foundations, or ideas that carry across both. Robot foundation models (VLAs) are built on LLM backbones, so the two tracks keep meeting.</p></div>
 <p><a href="sources.html"><strong>Sources &amp; summaries →</strong></a> every link added, its summary, the primary sources behind it, saved files and all external references.</p>
-<p class="meta">23 modules (116 pages) · last updated 2026-11-11</p>
+<p class="meta">24 modules (117 pages) · last updated 2026-11-11</p>
 
 <h2 id="grown-ups">For grown-ups and later</h2>
 <p>Notes on LLMs and robotics for grown-ups, and for later once you've finished the robot course. Each module still opens with a Start-here box you can read any time.</p>
 <details id="all-modules">
-<summary>Show all 23 modules, the summaries and the concept map</summary>
+<summary>Show all 24 modules, the summaries and the concept map</summary>
 
 <h2>Modules</h2>
 <!-- MODULES: newest at the bottom; keep numbering sequential -->
@@ -223,6 +223,13 @@
   <span class="tag">roadmap</span><span class="tag">electronics</span><span class="tag">Arduino/ESP32</span><span class="tag">ROS 2</span><span class="tag">LeRobot</span><span class="tag">careers</span><span class="tag">beginner-friendly</span>
   <p class="meta">Source: @DeRonin_ X article · Sep 2026</p>
 </a>
+<a class="card module" href="topics/24-ai-product-skills.html">
+  <div class="n">24 · AI product skills</div>
+  <h3><span class="track llm">LLM</span>Shipping AI products: evals, testing, prototypes, agents and a Claude Code “operating system”</h3>
+  <p>Five Product Growth posts by Aakash Gupta (with Hamel Husain, Colin Matthews and Testkube), read in full. The core is Hamel's evals method: the three gulfs (comprehension, specification, generalization), ~100 traces, open and axial coding into binary failure modes, fixing what the prompt never said before measuring, a cost ladder from code assertions to LLM judges, building a judge like a classifier (train/dev/test, TPR and TNR) and correcting its score with a bootstrap interval. Also: four ways AI breaks testing, v0/Bolt/Lovable/Replit and prototyping at every stage, 21 agent use cases and 8 mistakes, and a Claude Code setup for PMs (CLAUDE.md, skills, reviewer sub-agents, MCP to live data). Includes a judge-correction calculator and a failure sorter built on Robo-Helper's own mistakes, plus notes on what's sponsored or dated.</p>
+  <span class="tag">evals</span><span class="tag">LLM-as-judge</span><span class="tag">testing</span><span class="tag">prototyping</span><span class="tag">agents</span><span class="tag">Claude Code</span><span class="tag">MCP</span><span class="tag">product management</span>
+  <p class="meta">Source: Product Growth newsletter (paid) · Mar 2025 – Feb 2026</p>
+</a>
 
 <h2>Summaries at a glance</h2>
 <div class="table-wrap"><table>
@@ -250,6 +257,7 @@
 <tr><td>21</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/21-robot-math.html">Robot maths, played with</a></td><td>Play with each idea first, then use it on your own robot and measure it. Estimation (Bayes, Kalman, Fourier) beats plain averaging once the robot moves; a model of the world only helps if the world has patterns; π0 and GR00T are a scene-understanding Transformer plus a noise-to-motion head.</td></tr>
 <tr><td>22</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/22-vector-fields.html">Gradient, divergence, curl</a></td><td>Gradient = uphill, divergence = spreading out or draining in, curl = swirl. A robot can drive by following a field, but pure gradients get stuck in dips; a little curl around obstacles gets it round. Measure from many starts, not one.</td></tr>
 <tr><td>23</td><td><span class="track robo">Robotics</span></td><td><a href="topics/23-robotics-engineer-roadmap.html">Robotics engineer in 6 months</a></td><td>Learn the layers in order (electrons, microcontrollers, parts, ROS 2, maths, learning), build something every month, measure it, and write down what broke. Robo-Helper already covers the estimation and control ideas; the wires are what is missing.</td></tr>
+<tr><td>24</td><td><span class="track llm">LLM</span></td><td><a href="topics/24-ai-product-skills.html">AI product skills</a></td><td>Read about 100 traces and name the failures before measuring anything. Fix what the prompt never said, then automate the cheapest check that catches each remaining failure; trust an AI judge only after measuring TPR and TNR, and correct its score.</td></tr>
 </table></div>
 
 <h2>Concept map</h2>
@@ -261,9 +269,10 @@
 <tr><td>Cross-validation, honest splits (by day/episode, drift cutoff)</td><td>01, 04</td></tr>
 <tr><td>Probability calibration (Platt, Brier), MC-dropout uncertainty</td><td>01, 03, 06</td></tr>
 <tr><td>Cost / latency / quality trade-offs</td><td>01, 02, 04, 09</td></tr>
-<tr><td>LLM judges &amp; evals</td><td>01, 18, 19</td></tr>
-<tr><td>Judge agreement (Cohen's kappa, catch rate), judge biases</td><td>18, 19</td></tr>
-<tr><td>Error analysis (reading outputs, failure taxonomies)</td><td>19</td></tr>
+<tr><td>LLM judges &amp; evals</td><td>01, 18, 19, 24</td></tr>
+<tr><td>Judge agreement (Cohen's kappa, catch rate, TPR/TNR and bias-corrected pass rates), judge biases</td><td>18, 19, 24</td></tr>
+<tr><td>Error analysis (reading outputs, failure taxonomies, open/axial coding, three gulfs)</td><td>19, 24</td></tr>
+<tr><td>AI product practice (testing AI features, prototyping tools, agent workflows, Claude Code skills &amp; MCP)</td><td>24</td></tr>
 <tr><td>Agent evaluation (final state, pass^k, reliability, cost per success)</td><td>10, 18, 19</td></tr>
 <tr><td>Linear algebra for robots (rotations, SVD, Jacobians)</td><td>02, 21</td></tr>
 <tr><td>Homogeneous transforms &amp; forward kinematics</td><td>02, 23</td></tr>
