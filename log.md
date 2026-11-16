@@ -348,3 +348,9 @@ Set up the folder structure, schema (CLAUDE.md), shared styles and the index.
   - Reality check: affiliate course links, Testkube partnership, dated ARR/valuations, unmeasured time savings, permission-skipping setup flagged.
 - Labels checked: "Model information" = testing post; "LLM with MCP" = PM OS post (MCP is its setup step 5).
 - Index: card, summary row, concept map (judges/evals, error analysis, new "AI product practice" row), kid line links the sorter, counts 24 modules / 117 pages. `build_sources.py` entry added and `sources.html` regenerated.
+
+## [2026-11-16] ingest | Who to follow in robot learning (Ilir Aliu)
+- Source: X post by @IlirAliu_ (15 Nov 2026) listing 12 researchers to follow after CoRL 2026. Raw saved to sources/25-ilir-aliu-follow-12.json.
+- Researched each person on their homepage/lab page/arXiv (16 Nov 2026); all links checked. Unconfirmed: exact titles for Stone Tao (Physical Intelligence) and Kyle Morgenstein (Apptronik).
+- New page topics/25-who-to-follow.html (Robotics): six big questions mapped to Robo-Helper weeks, 12 profiles with three works each, topic filter, kid matching game, reading order by course week, reality check (one person's list, newsletter plug, missing names, X is 13+).
+- Index: card, summary row, concept map (RL, VLAs, new research-frontier row), kid line. Back-links from Modules 21 and 23.

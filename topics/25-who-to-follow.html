@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Who to Follow in Robot Learning</title>
+<link rel="stylesheet" href="../style.css?v=16">
+<style>
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+  .chips button[aria-pressed="true"] { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .people { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); margin: 12px 0; }
+  .people a { display: block; text-decoration: none; color: inherit; border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--card); }
+  .people a:hover { border-color: var(--accent); }
+  .people a[hidden] { display: none; }
+  .people .m { font-size: .8rem; color: var(--muted); }
+  .people .t { font-weight: 700; margin: 2px 0; }
+  .people .p { font-size: .85rem; }
+  .who { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 14px 0; background: var(--card); }
+  .who h3 { margin-top: 4px; }
+  .who .role { font-size: .9rem; color: var(--muted); margin: 0 0 6px; }
+  .who .kidline { font-style: italic; }
+  .sort { border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin: 10px 0; background: var(--card); }
+  .sort .q { margin: 0 0 6px; }
+  .sort .opts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sort .fb { margin: 6px 0 0; font-size: .9rem; min-height: 1.2em; }
+  .sort.right { border-color: var(--ok); }
+  .sort.wrong { border-color: var(--fail); }
+  .big-out { font-size: 1.4rem; font-weight: 700; }
+</style>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../index.html">← LLMs &amp; Robotics</a> · Module 25</nav>
+
+<div class="eyebrow"><span class="track robo">Robotics</span>Module 25 · People &amp; research map</div>
+<h1>Who to follow in robot learning: 12 researchers, what each one builds, and where it meets our course</h1>
+<p class="lede">A list of names is only useful if you know what each person works on. This page turns a “follow these 12” post into a map of robot learning: six big questions, who is working on each, their best-known papers, and the Robo-Helper week where a 12-year-old has already met the same idea.</p>
+<p class="meta">Source: Ilir Aliu (@IlirAliu_), post on X, 15 Nov 2026 · <a href="https://x.com/IlirAliu_/status/2121960912244420933">post</a>. The post gives only handles and affiliations. Everything else on this page (roles, papers, links) we looked up on each person's own homepage, lab page or arXiv on 16 Nov 2026, and every link was checked. Where we couldn't confirm something, we say so.</p>
+
+<div class="card note"><strong>For Robo-Helper builders (ages 12+):</strong> Read “Start here”, then play <a href="#match">the matching game</a>. The <a href="#people">profiles</a> have one kid-sized sentence each and a video-friendly project page to look at with a grown-up. <a href="18-robot-brain/index.html">Back to the course</a>.</div>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Every clever trick in Robo-Helper was first worked out by a real person, wrote up as a paper, and shared. These 12 people are inventing the next tricks right now.</p>
+<h3>Think of it like this</h3>
+<ul>
+<li>Robot learning is like a giant science fair. Each scientist has a stand with one big question: “Can a robot learn by watching?”, “Can it learn by practising?”, “Can it follow what I say?”</li>
+<li>You already built small versions of most of these stands. Your robot learned from data, practised by trial and error, and followed spoken-style commands.</li>
+<li>Following a scientist just means checking their stand every so often to see what they tried next.</li>
+</ul>
+<h3>What they make robots do</h3>
+<ol>
+<li>Pick up any random object from a messy pile, like winning the claw game every time.</li>
+<li>Fly a drone through a race course faster than the world champion.</li>
+<li>Tidy your room the way <em>you</em> like it.</li>
+<li>Do a chore after watching a video of a person doing it.</li>
+<li>Walk, jump and balance like an athlete, after practising in a video-game world first.</li>
+</ol>
+<h3>Why robots care</h3>
+<p>Nobody writes every rule for a robot by hand any more. These people work out how robots can <em>learn</em> the rules, which is exactly what Robo-Helper does on a small scale.</p>
+<h3>Try it</h3>
+<p>Play the <a href="#match">matching game</a>: six real robot feats, four big ideas. Then pick one project page and watch its video with a grown-up.</p>
+<h3>Words to know</h3>
+<dl>
+<dt>Paper</dt><dd>A write-up of an experiment: what they tried, what happened, with numbers.</dd>
+<dt>Simulation</dt><dd>A video-game version of the world where a robot can practise without breaking anything.</dd>
+<dt>Sim-to-real</dt><dd>Taking what a robot learned in the game world and making it work on a real robot.</dd>
+<dt>World model</dt><dd>A robot's “imagination”: a way to guess what will happen before it acts.</dd>
+<dt>Humanoid</dt><dd>A robot shaped like a person, with two legs and two arms.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> the six questions the field is working on, a profile of each researcher with three signature papers, a reading order matched to the course, and an honest read of what a follow list can and can't do.</p>
+
+<div class="toc">
+<strong>In this module</strong>
+<ol>
+<li><a href="#summary">Summary (with a filter by topic)</a></li>
+<li><a href="#why-robotics">Why this matters for robotics</a></li>
+<li><a href="#questions">Deep dive: six big questions</a></li>
+<li><a href="#people">Deep dive: the 12 profiles</a></li>
+<li><a href="#match">Try it: the matching game (interactive)</a></li>
+<li><a href="#reading">A reading order that follows the course</a></li>
+<li><a href="#reality">Reality check</a></li>
+<li><a href="#playbook">Playbook</a></li>
+<li><a href="#check">Self-check</a></li>
+<li><a href="#glossary">Glossary &amp; further reading</a></li>
+</ol>
+</div>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Twelve researchers who post about their own work: eight professors, three PhD students (one also works at Apptronik) and one researcher at Physical Intelligence. Several professors also hold company roles. Together they cover most of modern robot learning: <b>grasping and manipulation</b>, <b>robots that follow language</b> (including OpenVLA, the open vision-language-action model), <b>learning from human video</b>, <b>reinforcement learning on real robots</b>, <b>agile legs, humanoids and drones</b>, and <b>fast simulators and world models</b>. The post is a starting list, not a curriculum. Its value comes from knowing which question each person is answering.</p>
+</div>
+<p>Filter by topic, or tap a card to jump to the profile:</p>
+<div class="chips" id="chips" role="group" aria-label="Filter researchers by topic"></div>
+<div class="people" id="grid">
+<a href="#goldberg" data-t="hands sim"><div class="m">UC Berkeley · professor</div><div class="t">Ken Goldberg</div><div class="p">Grasping messy real-world objects, trained on simulated data (Dex-Net)</div></a>
+<a href="#shi" data-t="agile sim"><div class="m">CMU · professor</div><div class="t">Guanya Shi</div><div class="p">Agile humanoids and drones; closing the sim-to-real physics gap</div></a>
+<a href="#bohg" data-t="hands words"><div class="m">Stanford · professor</div><div class="t">Jeannette Bohg</div><div class="p">Perceiving by touching and moving things; TidyBot</div></a>
+<a href="#huang" data-t="words"><div class="m">Stanford · PhD student</div><div class="t">Wenlong Huang</div><div class="p">Language and vision models that plan robot actions (VoxPoser, ReKep)</div></a>
+<a href="#yli" data-t="hands sim"><div class="m">Columbia · professor</div><div class="t">Yunzhu Li</div><div class="p">World models for squishy things; vision plus touch</div></a>
+<a href="#gupta" data-t="practice watch"><div class="m">U. Washington · professor</div><div class="t">Abhishek Gupta</div><div class="p">Reinforcement learning that keeps improving on real robots (SERL)</div></a>
+<a href="#karamcheti" data-t="words watch"><div class="m">Georgia Tech · professor</div><div class="t">Siddharth Karamcheti</div><div class="p">OpenVLA and the DROID dataset; robots you teach by talking</div></a>
+<a href="#bharadhwaj" data-t="watch hands"><div class="m">Johns Hopkins · professor</div><div class="t">Homanga Bharadhwaj</div><div class="p">Chores learned from videos of people (Track2Act, Gen2Act)</div></a>
+<a href="#cli" data-t="agile sim practice"><div class="m">ETH Zurich · PhD student</div><div class="t">Chenhao Li</div><div class="p">Learned simulators (“robotic world models”) for legged robots</div></a>
+<a href="#scaramuzza" data-t="agile practice"><div class="m">U. Zurich · professor</div><div class="t">Davide Scaramuzza</div><div class="p">Vision-based drone racing that beat world champions; event cameras</div></a>
+<a href="#tao" data-t="sim practice"><div class="m">Physical Intelligence</div><div class="t">Stone Tao</div><div class="p">ManiSkill, a GPU-fast simulator; sim-to-real</div></a>
+<a href="#morgenstein" data-t="agile practice"><div class="m">Apptronik · PhD student</div><div class="t">Kyle Morgenstein</div><div class="p">Practical RL for humanoid walking that survives real hardware</div></a>
+</div>
+
+<h2 id="why-robotics">2. Why this matters for robotics</h2>
+<div class="card note">
+<p><strong>Track: Robotics.</strong> This is the research frontier that our robotics modules point towards. It reaches back to the LLM side through two people in particular: Wenlong Huang showed that language models can plan robot tasks, and Siddharth Karamcheti co-led OpenVLA, which puts a vision-language model in charge of a robot arm (see <a href="21-robot-math.html#diffusion">Module 21</a> on VLAs and <a href="23-robotics-engineer-roadmap.html#m6">Module 23, month 6</a>).</p>
+</div>
+<ul>
+<li><strong>It answers “who invented this?”</strong> for ideas already in the course: Robo-Helper's trial-and-error side quest is a toy version of the RL these labs run on real robots, and week 9's 2%-bigger wheel is a tiny sim-to-real gap.</li>
+<li><strong>It shows where the field is going.</strong> Three trends run through the list: learning from human video instead of expensive robot data, learned simulators (“world models”), and getting simulation-trained skills to survive real hardware.</li>
+<li><strong>It gives open tools to try next:</strong> ManiSkill (simulation), OpenVLA (a VLA you can download), SERL (real-robot RL), TidyBot++ (an open mobile robot), DROID and RoboSet (datasets).</li>
+</ul>
+
+<h2 id="questions">3. Deep dive: six big questions</h2>
+<p>Each question, who on the list works on it, and where Robo-Helper already touched it.</p>
+<div class="table-wrap"><table>
+<tr><th>Question</th><th>Who</th><th>Where you met it</th></tr>
+<tr><td><b>How does a robot grasp and handle real, messy things?</b> Objects are unknown, soft, hidden or fragile.</td><td>Goldberg, Bohg, Yunzhu Li, Bharadhwaj</td><td><a href="18-robot-brain/11-capstone.html">Week 10 capstone</a>: moving blocks to the bin (with the grasping skipped)</td></tr>
+<tr><td><b>Can a robot follow plain language?</b> LLMs plan; VLAs turn image + words straight into motion.</td><td>Wenlong Huang, Karamcheti, Bohg</td><td><a href="18-robot-brain/09-understanding-commands.html">Week 7, understanding commands</a> and <a href="18-robot-brain/10-llm-safety.html">using a real LLM safely</a></td></tr>
+<tr><td><b>Can it learn by watching people?</b> Video of humans is plentiful; robot data is scarce.</td><td>Bharadhwaj, Gupta, Karamcheti</td><td><a href="18-robot-brain/03-learning-from-data.html">Week 2, learning from data</a></td></tr>
+<tr><td><b>Can it learn by practising, on a real robot?</b> Reinforcement learning, made fast and safe enough for hardware.</td><td>Gupta, Scaramuzza, Tao, Chenhao Li, Morgenstein</td><td><a href="18-robot-brain/07-trial-and-error.html">Bonus side quest: trial and error</a>; PPO in <a href="06-30u30/29-ppo.html">Module 06</a></td></tr>
+<tr><td><b>Can it move like an athlete?</b> Legs, humanoids, drones, at speed.</td><td>Shi, Chenhao Li, Scaramuzza, Morgenstein</td><td><a href="18-robot-brain/22-fusion.html">Week 6 gyro and fusion</a>, <a href="18-robot-brain/23-wheels.html">week 9 PID</a></td></tr>
+<tr><td><b>Can it practise in a simulator, or imagine first?</b> Fast simulators, learned world models, and closing the sim-to-real gap.</td><td>Tao, Chenhao Li, Yunzhu Li, Shi, Goldberg</td><td><a href="18-robot-brain/23-wheels.html">Week 9 odometry drift</a>; the predict step in <a href="18-robot-brain/25-localise.html">week 12's particle filter</a></td></tr>
+</table></div>
+
+<h2 id="people">4. Deep dive: the 12 profiles</h2>
+<p>Roles were checked on 16 Nov 2026. Each profile lists three signature works (title, year, link) and what you can download.</p>
+
+<div class="who" id="goldberg">
+<h3>Ken Goldberg <a href="https://x.com/Ken_Goldberg">@Ken_Goldberg</a></h3>
+<p class="role">Distinguished Professor, UC Berkeley (IEOR, EECS, Art Practice); AUTOLab; co-founder and Chief Scientist of Ambi Robotics · <a href="https://goldberg.berkeley.edu/">homepage</a></p>
+<p>Robot grasping and handling of messy real-world objects, often by training on large amounts of synthetic data. Also surgical robots and cloud robotics.</p>
+<ul>
+<li><a href="https://arxiv.org/abs/1703.09312">Dex-Net 2.0</a> (RSS 2017): a grasping network trained only on 6.7 million synthetic examples grasps objects it has never seen.</li>
+<li><a href="https://goldberg.berkeley.edu/pubs/Ambidextrous-Grasping-Science-Robotics-Jan-2019.pdf">Learning ambidextrous robot grasping policies</a> (Dex-Net 4.0, Science Robotics 2019): chooses between suction and a gripper; over 95% reliable, 300+ picks per hour on bins.</li>
+<li><a href="https://arxiv.org/abs/2205.09778">FogROS2</a> (2022): hands a robot's heavy computing to the cloud.</li>
+</ul>
+<p><b>Try:</b> <a href="https://berkeleyautomation.github.io/dex-net">Dex-Net code and data</a>. <span class="kidline">For a kid: the claw game, but it wins almost every time.</span></p>
+</div>
+
+<div class="who" id="shi">
+<h3>Guanya Shi <a href="https://x.com/GuanyaShi">@GuanyaShi</a></h3>
+<p class="role">Assistant Professor, Robotics Institute, CMU; LeCAR Lab; Amazon Scholar · <a href="https://www.gshi.me/">homepage</a></p>
+<p>Combines learning with control theory for agile, adaptive robots. Recent work is whole-body humanoids, sim-to-real transfer, and learning from human motion.</p>
+<ul>
+<li><a href="https://arxiv.org/abs/2205.06908">Neural-Fly</a> (Science Robotics 2022): drones adapt within seconds to fly steadily in strong wind.</li>
+<li><a href="https://agile.human2humanoid.com/">ASAP</a> (RSS 2025): learns the gap between simulated and real physics so humanoids can do athletic moves.</li>
+<li><a href="https://omni.human2humanoid.com/">OmniH2O</a> (CoRL 2024): a person drives a humanoid's whole body remotely, and the robot learns from that data.</li>
+</ul>
+<p><b>Try:</b> the <a href="https://lecar-lab.github.io/publications.html">LeCAR Lab repos</a> (human2humanoid, ASAP, dial-mpc). <span class="kidline">For a kid: humanoids and drones that move like athletes.</span></p>
+</div>
+
+<div class="who" id="bohg">
+<h3>Jeannette Bohg <a href="https://x.com/leto__jean">@leto__jean</a></h3>
+<p class="role">Associate Professor of Computer Science, Stanford; Interactive Perception and Robot Learning Lab · <a href="https://web.stanford.edu/~bohg/">homepage</a></p>
+<p>Grasping and manipulation across robotics, ML and vision. Her central idea: robots understand the world better by touching and moving things, not just looking.</p>
+<ul>
+<li><a href="https://arxiv.org/abs/1604.03670">Interactive Perception</a> (IEEE T-RO 2017): the survey that defined perceiving through action.</li>
+<li><a href="https://tidybot.cs.princeton.edu">TidyBot</a> (IROS 2023): an LLM learns one person's tidying preferences from a few examples; 85% of objects put away correctly in real tests.</li>
+<li><a href="https://arxiv.org/abs/2412.10447">TidyBot++</a> (CoRL 2024): an open mobile manipulator for robot learning, about $5–6k to build.</li>
+</ul>
+<p><b>Try:</b> <a href="https://github.com/jimmyyhwu/tidybot2">TidyBot++ hardware and code</a>. TidyBot is the grown-up version of <a href="18-robot-brain/12-preferences.html">week 16, learning what people prefer</a>. <span class="kidline">For a kid: a robot that tidies your room the way you like it.</span></p>
+</div>
+
+<div class="who" id="huang">
+<h3>Wenlong Huang <a href="https://x.com/wenlong_huang">@wenlong_huang</a></h3>
+<p class="role">Final-year PhD student, Stanford Vision and Learning Lab (advised by Fei-Fei Li) · <a href="https://wenlonghuang.com/">homepage</a></p>
+<p>Uses language and vision-language models to help robots reason and plan, aiming for robots that generalise across tasks, places and bodies without retraining.</p>
+<ul>
+<li><a href="https://github.com/huangwl18/language-planner">Language Models as Zero-Shot Planners</a> (ICML 2022): LLMs already know enough to break everyday tasks into steps.</li>
+<li><a href="https://voxposer.github.io">VoxPoser</a> (CoRL 2023): language and vision models draw 3D “go here, avoid there” maps that a robot follows, with no task-specific training. It's a cousin of the <a href="22-vector-fields.html">potential fields in Module 22</a>.</li>
+<li><a href="https://rekep-robot.github.io">ReKep</a> (CoRL 2024): describes tasks as rules about key points on objects, so the robot can plan multi-step manipulation.</li>
+</ul>
+<p><span class="kidline">For a kid: tell the robot what to do in plain English, and it works out how.</span></p>
+</div>
+
+<div class="who" id="yli">
+<h3>Yunzhu Li <a href="https://x.com/YunzhuLiYZ">@YunzhuLiYZ</a></h3>
+<p class="role">Assistant Professor of Computer Science, Columbia; RoboPIL lab; also leads robotics at World Labs · <a href="https://yunzhuli.github.io/">homepage</a></p>
+<p>Learned world models that predict how objects, including squishy and deformable ones, move when a robot acts; combines vision, touch, audio and language.</p>
+<ul>
+<li><a href="https://arxiv.org/abs/1810.01566">Learning Particle Dynamics</a> (ICLR 2019): a learned particle simulator for solids, foam and liquids.</li>
+<li><a href="https://arxiv.org/abs/2402.15487">RoboEXP</a> (CoRL 2024): the robot opens drawers and doors to explore and maps what's hidden where.</li>
+<li><a href="https://binghao-huang.github.io/3D-ViTac/">3D-ViTac</a> (CoRL 2024): cheap touch sensors plus vision for handling fragile objects.</li>
+</ul>
+<p><span class="kidline">For a kid: giving robots an imagination, so they can guess what dough or water will do before touching it.</span></p>
+</div>
+
+<div class="who" id="gupta">
+<h3>Abhishek Gupta <a href="https://x.com/abhishekunique7">@abhishekunique7</a></h3>
+<p class="role">Assistant Professor, Allen School, University of Washington; WEIRD Lab · <a href="https://homes.cs.washington.edu/~abhgupta/">homepage</a></p>
+<p>Reinforcement learning that lets robots learn and keep improving in real homes and offices, starting from models pretrained on video, simulation and generated data.</p>
+<ul>
+<li><a href="https://arxiv.org/abs/2401.16013">SERL</a> (ICRA 2024): an open toolkit for real robots to learn skills by trial and error in hours.</li>
+<li><a href="https://arxiv.org/abs/2504.02792">Unified World Models</a> (RSS 2025, Best Paper): one model predicts video and chooses actions, so it can learn from videos with no action labels.</li>
+<li><a href="https://arxiv.org/abs/2506.15799">Steering Your Diffusion Policy with Latent Space RL</a> (CoRL 2025): improves a pretrained robot policy with RL without retraining it.</li>
+</ul>
+<p><span class="kidline">For a kid: robots that get better by practising, like you at a video game.</span></p>
+</div>
+
+<div class="who" id="karamcheti">
+<h3>Siddharth Karamcheti <a href="https://x.com/siddkaramcheti">@siddkaramcheti</a></h3>
+<p class="role">Assistant Professor of Interactive Computing, Georgia Tech; Autonomy Research Lead, Walden Robotics; Stanford PhD 2025 · <a href="https://www.siddkaramcheti.com/">homepage</a></p>
+<p>Foundation models that help robots see and act, and robots that keep learning from the people they work with.</p>
+<ul>
+<li><a href="https://arxiv.org/abs/2406.09246">OpenVLA</a> (CoRL 2024): an open 7B vision-language-action model, camera image + instruction → arm actions. A standard baseline.</li>
+<li><a href="https://arxiv.org/abs/2403.12945">DROID</a> (RSS 2024): a large robot manipulation dataset collected in many real homes and labs.</li>
+<li><a href="https://arxiv.org/abs/2411.02599">Vocal Sandbox</a> (CoRL 2024): people teach a robot new skills by talking and showing while working together. Related to <a href="03-shared-autonomy.html">Module 03, shared autonomy</a>.</li>
+</ul>
+<p><b>Try:</b> <a href="https://github.com/openvla/openvla">OpenVLA</a>, <a href="https://github.com/TRI-ML/prismatic-vlms">Prismatic VLMs</a>. <span class="kidline">For a kid: robot brains that follow spoken instructions and learn tricks from people.</span></p>
+</div>
+
+<div class="who" id="bharadhwaj">
+<h3>Homanga Bharadhwaj <a href="https://x.com/mangahomanga">@mangahomanga</a></h3>
+<p class="role">Assistant Professor of Computer Science, Johns Hopkins; Brains, Bots, and Behavior Lab · <a href="https://homangab.github.io/">homepage</a></p>
+<p>Robots doing everyday chores in messy homes and kitchens, largely by learning to predict what happens next in videos of people.</p>
+<ul>
+<li><a href="https://homangab.github.io/track2act/">Track2Act</a> (ECCV 2024): predicts how points in a scene will move, learned from internet video, so the robot can do unseen tasks.</li>
+<li><a href="https://homangab.github.io/gen2act/">Gen2Act</a> (CoRL 2025): generates a video of a person doing the task, then the robot copies it.</li>
+<li><a href="https://robopen.github.io/">RoboAgent</a> (ICRA 2024): many manipulation skills from a small amount of robot data.</li>
+</ul>
+<p><b>Try:</b> the <a href="https://robopen.github.io/roboset/">RoboSet dataset</a>. <span class="kidline">For a kid: robots that learn chores by watching videos of people.</span></p>
+</div>
+
+<div class="who" id="cli">
+<h3>Chenhao Li <a href="https://x.com/breadli428">@breadli428</a></h3>
+<p class="role">Doctoral Fellow, ETH AI Center (advised by Marco Hutter and Andreas Krause); Student Researcher, Gemini Robotics at Google DeepMind since April 2026 · <a href="https://breadli428.github.io/">homepage</a></p>
+<p>Learning methods for complex, agile skills: reinforcement learning, world models (learned simulators) and VLAs.</p>
+<ul>
+<li><a href="https://arxiv.org/abs/2501.10100">Robotic World Model</a> (NeurIPS 2025 workshop, Outstanding Paper): a neural network that learns to be the simulator robots train in.</li>
+<li><a href="https://arxiv.org/abs/2504.16680">Uncertainty-Aware Robotic World Model</a> (2026): trains real robots from logged data only, no new trial and error.</li>
+<li><a href="https://arxiv.org/abs/2402.13820">FLD: Fourier Latent Dynamics</a> (ICLR 2024): packs movements like gaits into a compact form robots can learn and blend. Its maths is the Fourier idea in <a href="21-robot-math.html#fourier">Module 21</a>.</li>
+</ul>
+<p><b>Try:</b> <a href="https://github.com/mit-biomimetics/fld">FLD code</a>. <span class="kidline">For a kid: legged robots practise in a learned imagination before trying for real.</span></p>
+</div>
+
+<div class="who" id="scaramuzza">
+<h3>Davide Scaramuzza <a href="https://x.com/davsca1">@davsca1</a></h3>
+<p class="role">Professor, Department of Informatics, University of Zurich; Director, Robotics and Perception Group · <a href="https://rpg.ifi.uzh.ch/people_scaramuzza.html">homepage</a></p>
+<p>Fast, agile, camera-based navigation for drones and mobile robots; known for event cameras, which react to change with very little delay.</p>
+<ul>
+<li><a href="https://www.nature.com/articles/s41586-023-06419-4">Champion-level drone racing using deep reinforcement learning</a> (Nature 2023): the Swift drone beat human world-champion pilots.</li>
+<li><a href="https://www.nature.com/articles/s41586-024-07409-w">Low-latency automotive vision with event cameras</a> (Nature 2024): faster, lower-power perception for cars.</li>
+<li><a href="https://rpg.ifi.uzh.ch/AgileAutonomy.html">Learning High-Speed Flight in the Wild</a> (Science Robotics 2021): fast flight through forests with only onboard sensing.</li>
+</ul>
+<p><b>Try:</b> <a href="https://github.com/uzh-rpg">uzh-rpg code</a>, the <a href="https://dsec.ifi.uzh.ch/">DSEC event-camera dataset</a>. <span class="kidline">For a kid: drones that fly a race course faster than the best human pilots.</span></p>
+</div>
+
+<div class="who" id="tao">
+<h3>Stone Tao <a href="https://x.com/Stone_Tao">@Stone_Tao</a></h3>
+<p class="role">Physical Intelligence, “simulation and research” per his GitHub bio (exact title not confirmed); previously a UC San Diego PhD student with Hao Su · <a href="https://github.com/StoneT2000">GitHub</a></p>
+<p>Fast, GPU-parallel robot simulation and data-efficient RL, and getting simulation-trained skills onto real robots.</p>
+<ul>
+<li><a href="https://arxiv.org/abs/2410.00425">ManiSkill3</a> (2024): a very fast simulator that trains robot arms on many tasks at once.</li>
+<li><a href="https://arxiv.org/abs/2405.03379">Reverse Forward Curriculum Learning</a> (ICLR 2024): hard tasks from only a few demonstrations.</li>
+<li><a href="https://arxiv.org/abs/2607.04616">SILO</a> (2026): cable routing learned in simulation, then done on real hardware.</li>
+</ul>
+<p><b>Try:</b> <a href="https://github.com/mani-skill/ManiSkill">ManiSkill</a>, <a href="https://github.com/StoneT2000/lerobot-sim2real">lerobot-sim2real</a>. <span class="kidline">For a kid: super-fast game worlds where robots practise thousands of times.</span></p>
+</div>
+
+<div class="who" id="morgenstein">
+<h3>Kyle Morgenstein <a href="https://x.com/KyleMorgenstein">@KyleMorgenstein</a></h3>
+<p class="role">Roboticist at Apptronik since June 2025 (exact title not confirmed); PhD student, Human Centered Robotics Lab, UT Austin · <a href="https://www.alphaxiv.org/@kyle-morgenstein">profile</a></p>
+<p>Reinforcement learning for legged and humanoid robots, especially the practical tricks that make simulation-trained policies work on real hardware.</p>
+<ul>
+<li><a href="https://arxiv.org/abs/2606.02636">Too Much of a Good Thing: When sim2real Efforts Impede Policy Learning</a> (2026): too much effort on a realistic simulator can hold learning back; proposes “sim2sim2real”.</li>
+<li><a href="https://thehumanoid.ai/deployment-ready-rl-pitfalls-lessons-and-best-practices/">Deployment-ready RL: pitfalls, lessons and best practices</a> (talk, Aug 2025): motor gains, reward design, and why measuring the real robot (system identification) matters most.</li>
+<li><a href="https://arxiv.org/abs/2303.01455">Learning Contact-based Navigation in Crowds</a> (HRI 2023 workshop): a robot gently pushes through crowds instead of freezing.</li>
+</ul>
+<p><span class="kidline">For a kid: humanoids that learn to walk safely by practising in a simulation first.</span> His “measure the real robot” advice is week 9 in one line: with a left wheel 2% bigger than the code assumes, the robot thinks it has arrived but is really 0.63 m away.</p>
+</div>
+
+<h2 id="match">5. Try it: the matching game</h2>
+<div class="box idea"><span class="tag">💡 The idea</span> Almost every robot-learning result uses one of four big ideas: learn by <b>watching</b>, learn by <b>practising</b>, <b>follow words</b>, or <b>imagine first</b> (a simulator or world model).</div>
+<div class="box play"><span class="tag">🎮 Play</span> For each real robot feat from this page, pick the main big idea. The answer tells you where you did the same thing in Robo-Helper.
+<div id="match-list"></div>
+<p class="big-out" id="mScore"></p>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span> You get at least 5 of 6, and you can explain why the drone race is “practising” even though the drone learned most of it in a simulator.</div>
+
+<h2 id="reading">6. A reading order that follows the course</h2>
+<p>Start with project pages and videos, not PDFs. One per stage of Robo-Helper:</p>
+<ol class="steps">
+<li><b>After week 2 (learning from data):</b> <a href="https://homangab.github.io/track2act/">Track2Act</a>. Watch how points in a video predict a robot's motion.</li>
+<li><b>After the trial-and-error side quest:</b> the <a href="https://www.nature.com/articles/s41586-023-06419-4">Swift drone race</a>. Same idea as your Q-table, scaled up to a real drone.</li>
+<li><b>After week 7 (understanding commands):</b> <a href="https://voxposer.github.io">VoxPoser</a>, then <a href="https://arxiv.org/abs/2406.09246">OpenVLA</a>. Words become a map; then words become motion directly.</li>
+<li><b>After week 9 (wheels and PID):</b> Morgenstein's <a href="https://thehumanoid.ai/deployment-ready-rl-pitfalls-lessons-and-best-practices/">deployment-ready RL talk</a> and Shi's <a href="https://agile.human2humanoid.com/">ASAP</a>. Both are about the sim-to-real gap you measured.</li>
+<li><b>After week 16 (preferences):</b> <a href="https://tidybot.cs.princeton.edu">TidyBot</a>. Learning what one person wants, on a real robot.</li>
+<li><b>Grown-up, hands-on:</b> install <a href="https://github.com/mani-skill/ManiSkill">ManiSkill</a> and run one task, then read Gupta's <a href="https://arxiv.org/abs/2401.16013">SERL</a> to see what changes on hardware.</li>
+</ol>
+
+<h2 id="reality">7. Reality check</h2>
+<ul>
+<li><b>It's one person's list.</b> The author says so (“Who would you add?”), and the post ends by promoting his newsletter, Signal, a briefing on European robotics. The picks are reasonable, but they lean towards academic labs in the US and Europe.</li>
+<li><b>Big names not on it</b> who also post about their work include Sergey Levine, Chelsea Finn, Russ Tedrake, Shuran Song and Pieter Abbeel. Add them if you want wider coverage; we haven't profiled them here.</li>
+<li><b>Roles change fast.</b> The post's affiliations were right but incomplete. Bohg is now Associate Professor, Yunzhu Li also leads robotics at World Labs, Karamcheti also works at Walden Robotics, and Chenhao Li also works with Google DeepMind. Three are PhD students, not faculty. Stone Tao's and Kyle Morgenstein's company roles rest on their own profiles; we couldn't confirm exact titles.</li>
+<li><b>We didn't verify the handles against every profile.</b> Most homepages link their X account. For Bohg and Gupta we matched by name, role and GitHub username.</li>
+<li><b>Numbers are the papers' own</b> (6.7M synthetic grasps, 95% reliability, 85% tidying, $5–6k). We haven't reproduced them.</li>
+<li><b>X is for 13 and up</b> under its own terms. A 12-year-old should explore project pages and videos with a grown-up instead.</li>
+<li><b>Following isn't learning.</b> A feed shows you headlines. The value is in picking one paper a month and reading its project page properly.</li>
+</ul>
+
+<h2 id="playbook">8. Playbook</h2>
+<ol class="steps">
+<li><b>Make an X list</b> (not a follow-spree) with the 12, so their posts stay in one place and out of the main feed.</li>
+<li><b>Sort by question.</b> Pick the one of the <a href="#questions">six questions</a> you care about most and follow those 3–5 people closely.</li>
+<li><b>Read project page → video → abstract → figures → method</b>, in that order. Stop when you've got the idea.</li>
+<li><b>Run one thing:</b> ManiSkill, OpenVLA or SERL. Running code teaches more than ten threads.</li>
+<li><b>For the 12-year-old:</b> play the matching game, then watch one project video a week with a grown-up, matched to the week they've finished (see <a href="#reading">the reading order</a>).</li>
+<li><b>Write it down</b> as a log entry here: what the paper did, one number, and which week it connects to.</li>
+</ol>
+
+<h2 id="check">9. Self-check</h2>
+<details><summary>Why do so many people on this list work on learning from human video?</summary>
+<p>Robot data is slow and expensive to collect (one robot, one demo at a time). Human video is everywhere. Track2Act, Gen2Act and Unified World Models all find ways to learn robot actions from it.</p></details>
+<details><summary>What's the difference between VoxPoser and OpenVLA?</summary>
+<p>VoxPoser uses existing language and vision models to draw a 3D map of where to go and what to avoid, and a planner follows it, with no robot training. OpenVLA is trained end-to-end on robot data to output actions directly from an image and an instruction.</p></details>
+<details><summary>What's a world model, and who on the list builds them?</summary>
+<p>A learned model that predicts what happens next when the robot acts, so it can plan or practise in its “imagination”. Yunzhu Li (particles, deformable objects), Chenhao Li (Robotic World Model for legged robots) and Gupta (Unified World Models).</p></details>
+<details><summary>Morgenstein says measuring the real robot matters most. Where did you see that in Robo-Helper?</summary>
+<p>Week 9: with a left wheel 2% bigger than the code assumed, the robot thought it had arrived but was really 0.63 m away. Knowing the true wheel size (system identification) fixes it better than any controller tuning.</p></details>
+<details><summary>Why did Dex-Net train on synthetic data?</summary>
+<p>Millions of labelled grasps are cheap to generate in simulation and impossible to collect by hand. Dex-Net 2.0 used 6.7 million and still worked on real, unseen objects.</p></details>
+<details><summary>What does an event camera do differently?</summary>
+<p>Instead of whole frames at a fixed rate, each pixel reports changes as they happen, with very low delay. That helps fast drones and cars react sooner.</p></details>
+
+<h2 id="glossary">10. Glossary &amp; further reading</h2>
+<div class="table-wrap"><table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<tr><td>CoRL</td><td>Conference on Robot Learning, the main yearly conference for this field.</td></tr>
+<tr><td>VLA</td><td>Vision-language-action model: image + instruction in, robot actions out.</td></tr>
+<tr><td>Sim-to-real</td><td>Transferring a skill learned in simulation to a real robot.</td></tr>
+<tr><td>System identification</td><td>Measuring a real robot's physical parameters (mass, friction, wheel size) so models match it.</td></tr>
+<tr><td>World model</td><td>A learned predictor of what happens next, used to plan or practise.</td></tr>
+<tr><td>Teleoperation</td><td>A person controlling a robot remotely, often to collect training data.</td></tr>
+<tr><td>Diffusion policy</td><td>A policy that generates actions the way image diffusion generates pictures.</td></tr>
+<tr><td>Event camera</td><td>A sensor whose pixels report brightness changes as they happen.</td></tr>
+<tr><td>Zero-shot</td><td>Doing a task with no examples of that task in training.</td></tr>
+</table></div>
+<ul>
+<li><a href="https://x.com/IlirAliu_/status/2121960912244420933">The post</a></li>
+<li>Open tools: <a href="https://github.com/mani-skill/ManiSkill">ManiSkill</a> · <a href="https://github.com/openvla/openvla">OpenVLA</a> · <a href="https://arxiv.org/abs/2401.16013">SERL</a> · <a href="https://github.com/jimmyyhwu/tidybot2">TidyBot++</a> · <a href="https://berkeleyautomation.github.io/dex-net">Dex-Net</a> · <a href="https://robopen.github.io/roboset/">RoboSet</a></li>
+<li>Related: <a href="18-robot-brain/index.html">Module 18</a> (Robo-Helper) · <a href="21-robot-math.html">Module 21</a> (RL, Fourier, diffusion, VLAs) · <a href="23-robotics-engineer-roadmap.html">Module 23</a> (roadmap, month 6 robot learning) · <a href="03-shared-autonomy.html">Module 03</a> (shared autonomy) · <a href="06-30u30/29-ppo.html">Module 06, PPO</a></li>
+</ul>
+
+<footer>Module 25 · added 2026-11-16 · <a href="../index.html">Back to course index</a></footer>
+</main>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const T = { all: 'All', hands: '✋ Grasping', words: '💬 Language', watch: '👀 Learning from video', practice: '🔁 Practising (RL)', agile: '🏃 Legs & drones', sim: '🧪 Simulators & world models' };
+  const cards = [...document.querySelectorAll('#grid a')];
+  const chips = $('chips');
+  Object.entries(T).forEach(([k, label]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    b.setAttribute('aria-pressed', k === 'all');
+    b.addEventListener('click', () => {
+      chips.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+      cards.forEach(c => c.hidden = k !== 'all' && !c.dataset.t.split(' ').includes(k));
+    });
+    chips.appendChild(b);
+  });
+
+  const G = ['👀 Watching', '🔁 Practising', '💬 Following words', '🧪 Imagining first'];
+  const items = [
+    ['A drone beats world-champion pilots on a race course (Scaramuzza).', 1,
+      'Practising: it learned by trial and error with rewards, mostly in simulation. Your trial-and-error side quest does the same with a Q-table.'],
+    ['A robot does a kitchen task after generating a video of a person doing it (Bharadhwaj, Gen2Act).', 0,
+      'Watching: the robot copies a human video. Like week 2, it learns from examples instead of rules.'],
+    ['You say “put the sponge away but don\'t touch the vase” and the arm plans a safe path (Huang, VoxPoser).', 2,
+      'Following words: language and vision models turn the sentence into a map of where to go and what to avoid. Week 7 turns commands into actions too.'],
+    ['A robot predicts how dough will squish before pressing it (Yunzhu Li).', 3,
+      'Imagining first: a learned world model predicts the result of an action. The predict step of week 12\'s particle filter is the same idea.'],
+    ['A tidying robot learns that you keep shirts in the drawer, not on the shelf (Bohg, TidyBot).', 2,
+      'Following words: an LLM sums up your examples as a rule in words. Week 16 also learns what one person prefers.'],
+    ['A legged robot trains inside a neural-network simulator learned from real data (Chenhao Li).', 3,
+      'Imagining first: the simulator itself is learned. The robot practises in it, but the new idea is the learned imagination.']
+  ];
+  const done = new Set(), right = new Set();
+  const list = $('match-list');
+  items.forEach(([q, ans, why], i) => {
+    const box = document.createElement('div');
+    box.className = 'sort';
+    box.innerHTML = `<p class="q"><b>${i + 1}.</b> ${q}</p><div class="opts"></div><p class="fb" aria-live="polite"></p>`;
+    G.forEach((g, k) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = g;
+      b.addEventListener('click', () => {
+        const ok = k === ans;
+        box.className = 'sort ' + (ok ? 'right' : 'wrong');
+        box.querySelector('.fb').textContent = (ok ? '✓ ' : '✗ Not quite. ') + why;
+        if (!done.has(i) && ok) right.add(i);
+        done.add(i);
+        $('mScore').textContent = done.size === items.length ? `${right.size} of ${items.length} right first time` : '';
+      });
+      box.querySelector('.opts').appendChild(b);
+    });
+    list.appendChild(box);
+  });
+})();
+</script>
+</body>
+</html>

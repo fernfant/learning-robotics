@@ -81,6 +81,10 @@ MODULES = [
      [("AI Testing for PMs", "https://www.news.aakashg.com/p/ai-testing"), ("AI prototyping tools", "https://www.news.aakashg.com/p/ai-prototyping-tutorial"),
       ("Practical AI agents for PMs", "https://www.news.aakashg.com/p/practical-ai-agents-pms"), ("PM OS in Claude Code", "https://www.news.aakashg.com/p/pm-os"),
       ("Shankar et al., Who Validates the Validators?", "https://arxiv.org/abs/2404.12272")]),
+    ("25", "https://x.com/IlirAliu_/status/2121960912244420933", "Ilir Aliu (@IlirAliu_)", "15 Nov 2026", "X post (list of 12 researchers; profiles researched 16 Nov 2026)",
+     [("Dex-Net 2.0", "https://arxiv.org/abs/1703.09312"), ("OpenVLA", "https://arxiv.org/abs/2406.09246"), ("VoxPoser", "https://voxposer.github.io"),
+      ("SERL", "https://arxiv.org/abs/2401.16013"), ("ManiSkill3", "https://arxiv.org/abs/2410.00425"), ("Champion-level drone racing", "https://www.nature.com/articles/s41586-023-06419-4"),
+      ("Robotic World Model", "https://arxiv.org/abs/2501.10100"), ("Track2Act", "https://homangab.github.io/track2act/")]),
 ]
 
 e = html.escape

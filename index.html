@@ -21,7 +21,7 @@
   The blue block is in the bin.</code></pre>
 <p>You write every clever part yourself: moving, sensing, reading your phone's sensors, stopping for the cat, planning a route, steering wheels, mapping the room, understanding words. <code>check.py</code> marks it as you go: 21 checks on your robot, 147 in the whole course. If you can write a Python loop that prints 1 to 10, you're ready.</p>
 <p style="margin:18px 0"><a href="topics/18-robot-brain/index.html" style="display:inline-block;font-size:1.2rem;font-weight:700;padding:12px 24px;border-radius:10px;background:var(--accent);color:var(--bg);text-decoration:none">Start the course →</a></p>
-<p class="meta">After the course, for fun: <a href="topics/21-robot-math.html">robot maths, by playing</a> and <a href="topics/22-vector-fields.html">steering with a field of arrows</a> (both fine after week 5), <a href="topics/23-robotics-engineer-roadmap.html#kid-track">building a real robot with wires</a> (with an adult), <a href="topics/24-ai-product-skills.html#sorter">sorting your robot's mistakes like an AI tester</a> (after week 10), then <a href="topics/20-from-scratch/index.html">real code from the pros</a> (some installs; ask an adult).</p>
+<p class="meta">After the course, for fun: <a href="topics/21-robot-math.html">robot maths, by playing</a> and <a href="topics/22-vector-fields.html">steering with a field of arrows</a> (both fine after week 5), <a href="topics/23-robotics-engineer-roadmap.html#kid-track">building a real robot with wires</a> (with an adult), <a href="topics/24-ai-product-skills.html#sorter">sorting your robot's mistakes like an AI tester</a> (after week 10), <a href="topics/25-who-to-follow.html#match">meeting the scientists who invent robot tricks</a>, then <a href="topics/20-from-scratch/index.html">real code from the pros</a> (some installs; ask an adult).</p>
 </section>
 
 <div class="eyebrow">Personal course · living document</div>
@@ -30,12 +30,12 @@
 
 <div class="card"><p style="margin:0"><span class="track llm">LLM</span> how large language models are built, trained, evaluated and served. &nbsp; <span class="track robo">Robotics</span> how robots perceive, decide and act. &nbsp; <span class="track both">LLM + Robotics</span> shared foundations, or ideas that carry across both. Robot foundation models (VLAs) are built on LLM backbones, so the two tracks keep meeting.</p></div>
 <p><a href="sources.html"><strong>Sources &amp; summaries →</strong></a> every link added, its summary, the primary sources behind it, saved files and all external references.</p>
-<p class="meta">24 modules (117 pages) · last updated 2026-11-11</p>
+<p class="meta">25 modules (118 pages) · last updated 2026-11-16</p>
 
 <h2 id="grown-ups">For grown-ups and later</h2>
 <p>Notes on LLMs and robotics for grown-ups, and for later once you've finished the robot course. Each module still opens with a Start-here box you can read any time.</p>
 <details id="all-modules">
-<summary>Show all 24 modules, the summaries and the concept map</summary>
+<summary>Show all 25 modules, the summaries and the concept map</summary>
 
 <h2>Modules</h2>
 <!-- MODULES: newest at the bottom; keep numbering sequential -->
@@ -230,6 +230,13 @@
   <span class="tag">evals</span><span class="tag">LLM-as-judge</span><span class="tag">testing</span><span class="tag">prototyping</span><span class="tag">agents</span><span class="tag">Claude Code</span><span class="tag">MCP</span><span class="tag">product management</span>
   <p class="meta">Source: Product Growth newsletter (paid) · Mar 2025 – Feb 2026</p>
 </a>
+<a class="card module" href="topics/25-who-to-follow.html">
+  <div class="n">25 · Who to follow</div>
+  <h3><span class="track robo">Robotics</span>Who to follow in robot learning: 12 researchers mapped to six big questions</h3>
+  <p>Ilir Aliu's “follow these 12 after CoRL 2026” list, turned into a map of the field. Each researcher has a checked profile with three signature works and the code you can run: Goldberg (Dex-Net grasping), Shi (agile humanoids, ASAP), Bohg (TidyBot), Wenlong Huang (VoxPoser, ReKep), Yunzhu Li (world models, touch), Abhishek Gupta (SERL, real-robot RL), Karamcheti (OpenVLA, DROID), Bharadhwaj (learning chores from human video), Chenhao Li (robotic world models), Scaramuzza (champion drone racing, event cameras), Stone Tao (ManiSkill) and Kyle Morgenstein (deployment-ready humanoid RL). Six big questions link each person to the Robo-Helper week where the same idea appears. Includes a filter by topic, a matching game for the kid and a reading order that follows the course.</p>
+  <span class="tag">robot learning</span><span class="tag">VLAs</span><span class="tag">sim-to-real</span><span class="tag">world models</span><span class="tag">humanoids</span><span class="tag">drones</span><span class="tag">grasping</span><span class="tag">reading list</span>
+  <p class="meta">Source: @IlirAliu_ post on X · 15 Nov 2026</p>
+</a>
 
 <h2>Summaries at a glance</h2>
 <div class="table-wrap"><table>
@@ -258,6 +265,7 @@
 <tr><td>22</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/22-vector-fields.html">Gradient, divergence, curl</a></td><td>Gradient = uphill, divergence = spreading out or draining in, curl = swirl. A robot can drive by following a field, but pure gradients get stuck in dips; a little curl around obstacles gets it round. Measure from many starts, not one.</td></tr>
 <tr><td>23</td><td><span class="track robo">Robotics</span></td><td><a href="topics/23-robotics-engineer-roadmap.html">Robotics engineer in 6 months</a></td><td>Learn the layers in order (electrons, microcontrollers, parts, ROS 2, maths, learning), build something every month, measure it, and write down what broke. Robo-Helper already covers the estimation and control ideas; the wires are what is missing.</td></tr>
 <tr><td>24</td><td><span class="track llm">LLM</span></td><td><a href="topics/24-ai-product-skills.html">AI product skills</a></td><td>Read about 100 traces and name the failures before measuring anything. Fix what the prompt never said, then automate the cheapest check that catches each remaining failure; trust an AI judge only after measuring TPR and TNR, and correct its score.</td></tr>
+<tr><td>25</td><td><span class="track robo">Robotics</span></td><td><a href="topics/25-who-to-follow.html">Who to follow in robot learning</a></td><td>Know which question each researcher is answering: grasping, following language, learning from video, practising with RL, agile bodies, or simulators and world models. Read project pages and videos first, then run one open tool (ManiSkill, OpenVLA, SERL).</td></tr>
 </table></div>
 
 <h2>Concept map</h2>
@@ -283,8 +291,9 @@
 <tr><td>Vector calculus (gradient, divergence, curl) &amp; potential-field navigation</td><td>21, 22</td></tr>
 <tr><td>Vision-language-action models (π0, GR00T: VLM + flow-matching action head, action chunks)</td><td>05, 08, 21</td></tr>
 <tr><td>Computer vision for perception (CNNs, ResNet, dilated convs, detection)</td><td>02, 06</td></tr>
-<tr><td>Reinforcement learning (Bellman → Q-learning → DQN → PPO/GAE, SAC, RLHF)</td><td>02, 06, 18, 20</td></tr>
-<tr><td>Transformers, attention, ViT, diffusion → VLAs / diffusion policy</td><td>02, 05, 06, 18, 20</td></tr>
+<tr><td>Reinforcement learning (Bellman → Q-learning → DQN → PPO/GAE, SAC, RLHF)</td><td>02, 06, 18, 20, 25</td></tr>
+<tr><td>Transformers, attention, ViT, diffusion → VLAs / diffusion policy</td><td>02, 05, 06, 18, 20, 25</td></tr>
+<tr><td>Robot-learning research frontier (sim-to-real, world models, learning from human video, who works on what)</td><td>23, 25</td></tr>
 <tr><td>Autograd &amp; from-scratch implementations (micrograd, minGPT, nanoGPT, llm.c, tinygrad)</td><td>18, 20</td></tr>
 <tr><td>On-device inference &amp; GPU (quantisation, ONNX, QAT, speculative decoding)</td><td>02, 04, 05</td></tr>
 <tr><td>Human–robot interaction, levels of automation</td><td>03</td></tr>
