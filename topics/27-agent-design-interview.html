@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Design Interview</title>
+<link rel="stylesheet" href="../style.css?v=16">
+<style>
+  .tips { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin: 12px 0; }
+  .tips div { border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--card); }
+  .tips b { display: block; margin-bottom: 2px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+  .chips button[aria-pressed="true"] { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .canvas label { display: block; font-weight: 700; margin: 10px 0 2px; }
+  .canvas .hint { font-weight: 400; font-size: .85rem; color: var(--muted); }
+  .canvas textarea { width: 100%; min-height: 70px; box-sizing: border-box; font: inherit; padding: 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: inherit; }
+  .rubric label { display: block; margin: 4px 0; }
+  .timer { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .big-out { font-size: 1.4rem; font-weight: 700; }
+</style>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../index.html">← LLMs &amp; Robotics</a> · Module 27</nav>
+
+<div class="eyebrow"><span class="track llm">LLM</span>Module 27 · Agent design interview</div>
+<h1>The agentic system design interview: discover, assume out loud, structure, think from first principles</h1>
+<p class="lede">How OpenAI's Startups team tests whether someone can design an AI agent for a real customer, and a practice board to rehearse it on three scenarios, one of them Robo-Helper. The hiring manager's point: more people fail on understanding the customer than on technical knowledge.</p>
+<p class="meta">Source: Wulfie Bain (Applied AI Leadership, OpenAI Startups team), LinkedIn post, 18 Nov 2026, part 4 of a series of hiring tips · <a href="https://www.linkedin.com/feed/update/urn:li:activity:7528814957145047040/">post</a>. Read in full through your LinkedIn. The post is short (four tips); the worked answers, rubric and practice board are ours, built from earlier modules.</p>
+
+<div class="card note"><strong>For Robo-Helper builders (ages 12+):</strong> Read “Start here”, then try the <a href="#practice">practice board</a> on the “Robo-Helper for a care home” scenario with a grown-up playing the customer. <a href="18-robot-brain/index.html">Back to the course</a>.</div>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">Before you build a robot for someone, find out what they actually need. The cleverest robot is useless if it solves the wrong problem.</p>
+<h3>Think of it like this</h3>
+<ul>
+<li>If someone asks you to bake a cake, you ask first: what's it for, how many people, any allergies? You don't just start baking chocolate.</li>
+<li>Designing an AI helper is the same. Ask questions, then say your guesses out loud (“I'm guessing nobody is allergic to nuts”), then make a plan, big picture first.</li>
+</ul>
+<h3>The four rules</h3>
+<ol>
+<li><b>Ask before you build.</b> Who is it for? What does “working” look like?</li>
+<li><b>Say your guesses out loud.</b> “I'll assume it's OK if it's a bit slow, because being right matters more.”</li>
+<li><b>Big picture first, then details.</b> And every so often, sum up where you are.</li>
+<li><b>It's fine not to know.</b> Think out loud and work it out from what you do know.</li>
+</ol>
+<h3>Why robots care</h3>
+<p>Your Robo-Helper does what <em>you</em> decided. A real one would be for someone else: a grandparent, a nurse, a shop. Their needs decide what it should do, how careful it must be, and when it should ask a human.</p>
+<h3>Try it</h3>
+<p>Pick “Robo-Helper for a care home” on the <a href="#practice">practice board</a>. A grown-up pretends to be the care-home manager. Write three questions before you design anything.</p>
+<h3>Words to know</h3>
+<dl>
+<dt>Customer</dt><dd>The person or company you're building for.</dd>
+<dt>Requirement</dt><dd>Something the system must do, or a limit it must stay within.</dd>
+<dt>Assumption</dt><dd>A guess you choose to work with until someone corrects it.</dd>
+<dt>Agent</dt><dd>An AI that can decide its own next step and use tools, not just answer once.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> the four tips and what they test, a step-by-step method, three worked answers, a timed practice board with a self-scoring rubric, and an honest note on what the post doesn't cover.</p>
+
+<div class="toc">
+<strong>In this module</strong>
+<ol>
+<li><a href="#summary">Summary</a></li>
+<li><a href="#why-robotics">Why this matters for robotics</a></li>
+<li><a href="#tips">Deep dive: the four tips, and what each tests</a></li>
+<li><a href="#method">Deep dive: a 45-minute method</a></li>
+<li><a href="#practice">Try it: the practice board (interactive)</a></li>
+<li><a href="#answers">Three worked answers</a></li>
+<li><a href="#reality">Reality check</a></li>
+<li><a href="#playbook">Playbook</a></li>
+<li><a href="#check">Self-check</a></li>
+<li><a href="#glossary">Glossary &amp; further reading</a></li>
+</ol>
+</div>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>The “technical decomp” is the hardest interview in the author's loop, and both managers and individual contributors take it. You design an agentic system for a customer. Technical knowledge of LLMs, agents and evals is the baseline; <b>how you approach the problem is the differentiator</b>. The four tips: <b>discover before you design</b>, <b>state assumptions out loud</b> (say why you favour quality or cost), <b>structure your communication</b> (outline first, then detail, and recap), and <b>think from first principles</b> when the interviewer deliberately takes you past what you know.</p>
+</div>
+<div class="tips">
+<div><b>1 · Discover, then design</b>Ask about the customer and the requirements first. Listen for the interviewer's hints.</div>
+<div><b>2 · Assume out loud</b>Assumptions are fine; say them and why, so they can be corrected.</div>
+<div><b>3 · Structure</b>High level → outline → detail. Recap every so often.</div>
+<div><b>4 · First principles</b>The interview goes past what you know on purpose. Think out loud.</div>
+</div>
+
+<h2 id="why-robotics">2. Why this matters for robotics</h2>
+<div class="card note">
+<p><strong>Track: LLM.</strong> The interview is about LLM agents for software customers, but the same discipline decides robot projects: who it's for, what “done” means, which actions are risky enough to need a human, how you'll measure it. Robo-Helper already practises the parts: the <a href="18-robot-brain/10-llm-safety.html">week 10 safety rules</a> are guardrails, the <a href="18-robot-brain/19-bakeoff.html">bake-off</a> is an eval, and <a href="03-shared-autonomy.html#askactwait">Module 03's ask / act / wait</a> is a human-in-the-loop policy.</p>
+</div>
+<ul>
+<li><strong>It's the design half of <a href="24-ai-product-skills.html">Module 24</a>.</strong> Module 24 covers evals and the eight agent mistakes; this module is how you present a design that avoids them, under time pressure.</li>
+<li><strong>It's useful beyond OpenAI.</strong> Any applied-AI, solutions or AI product role runs a version of this interview, and the method is also how you'd scope a real project.</li>
+</ul>
+
+<h2 id="tips">3. Deep dive: the four tips, and what each tests</h2>
+<div class="table-wrap"><table>
+<tr><th>Tip</th><th>What it tests</th><th>What failing looks like</th><th>What good looks like</th></tr>
+<tr><td><b>Discover, then design</b></td><td>Customer focus. The team is client-facing.</td><td>Drawing a multi-agent diagram in minute two.</td><td>Five to ten minutes of questions: users, volume, what success means, what's risky, existing systems, budget, latency. Picking up the interviewer's hints.</td></tr>
+<tr><td><b>State assumptions out loud</b></td><td>Judgement you can inspect and correct.</td><td>Silent choices; the interviewer can't tell if you meant them.</td><td>“I'll assume quality matters more than cost here, because a wrong refund costs more than a model call. Correct me if not.”</td></tr>
+<tr><td><b>Structure your comms</b></td><td>Whether a customer could follow you.</td><td>Diving into prompt wording before anyone knows the overall shape.</td><td>A one-line summary, then the four or five boxes, then one box at a time. A recap at each turn.</td></tr>
+<tr><td><b>First principles</b></td><td>Ability, not memory.</td><td>Freezing or bluffing when you hit something unfamiliar.</td><td>“I haven't used that. Here's how I'd reason about it…” and working from latency, cost, failure modes and what the user needs.</td></tr>
+</table></div>
+<p>The post names the baseline knowledge as LLMs, agents and evals. In this course that's <a href="24-ai-product-skills.html#evals">Module 24's evals method</a> and <a href="24-ai-product-skills.html#agents">agent mistakes</a>, <a href="19-evals-field-guide.html">Module 19</a> (eval field guide), <a href="10-rlm-harness.html">Module 10</a> (agent harnesses and context) and <a href="09-inference-engineering/index.html">Module 09</a> (latency and cost).</p>
+
+<h2 id="method">4. Deep dive: a 45-minute method</h2>
+<p>Our method, built on the four tips. Times are a guide for a 45-minute slot.</p>
+<ol class="steps">
+<li><b>Discover (8–10 min).</b> Who uses it, and for what job? What does success look like, as a number? Volume and peaks? What actions can it take, and which are irreversible or regulated? What systems and data exist? Latency and budget? What's failed before?</li>
+<li><b>Play it back (1 min).</b> “So: X users need Y; success is Z; the risky part is W.” This is the first recap.</li>
+<li><b>Assumptions (2 min).</b> Say three or four out loud with a reason each: quality versus cost versus latency, what's in scope, what you're not building.</li>
+<li><b>Outline (5 min).</b> One sentence on the approach, then the boxes: input, the model or workflow, tools, guardrails and human handoff, evals and monitoring. Prefer the simplest thing that works: a fixed workflow before a free-roaming agent, one agent before many.</li>
+<li><b>Go deep where it matters (15 min).</b> Usually the risky action (permissions, confirmation, human review), the tool design (small, typed, read-only first), and the eval plan (trace review, failure modes, a golden set, a judge only where needed).</li>
+<li><b>Cost and latency (3 min).</b> Rough numbers: tokens per task × tasks per day; which steps can use a small model; where to cache.</li>
+<li><b>Recap and next steps (2 min).</b> What you'd ship first, what you'd measure in week one, and what would make you change the design.</li>
+<li><b>Throughout:</b> when pushed past your knowledge, say so and reason it out loud.</li>
+</ol>
+
+<h2 id="practice">5. Try it: the practice board</h2>
+<div class="box idea"><span class="tag">💡 The idea</span> Rehearse the structure, not a script. Pick a scenario, start the timer, fill the five boxes in order, then score yourself honestly. Ideally someone plays the customer and answers your discovery questions.</div>
+<div class="box play"><span class="tag">🎮 Play</span>
+<div class="chips" id="scen" role="group" aria-label="Choose a scenario"></div>
+<p id="brief" class="big"></p>
+<div class="timer"><button type="button" id="tStart">Start 45:00</button><button type="button" id="tReset">Reset</button><span class="big-out" id="tOut">45:00</span><span class="meta" id="tPhase"></span></div>
+<div class="canvas" id="canvas"></div>
+<h3>Score yourself</h3>
+<div class="rubric" id="rubric"></div>
+<p class="big-out" id="rScore"></p>
+<p class="meta">Your notes and ticks are saved in this browser only, per scenario.</p>
+</div>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span> You asked at least three questions before drawing anything, said every assumption with its reason, and gave the outline before any detail. Then compare with the <a href="#answers">worked answer</a>.</div>
+
+<h2 id="answers">6. Three worked answers</h2>
+<p>Read after you've tried. These are one reasonable answer each, not the answer.</p>
+
+<details id="ans-support"><summary><b>A. Support agent with refunds</b> for a 30-person online shop</summary>
+<p><b>Discover:</b> How many tickets a day, and what share are refunds, order status, product questions? What's the refund policy, and up to what amount can staff approve alone? Which systems (helpdesk, order database, payments)? What's success: resolution rate, time to answer, customer satisfaction, cost per ticket? Which languages and channels? What happened with any past chatbot?</p>
+<p><b>Assume out loud:</b> about 500 tickets a day, 20% refunds; quality and trust beat cost, because a wrong refund or rude answer costs more than tokens; email and chat only; English first.</p>
+<p><b>Outline:</b> a router classifies the ticket → a fixed workflow per type (status lookup, FAQ answer, refund). Only the refund path uses an agent with tools: look up the order (read-only), check the policy, <em>propose</em> a refund. Refunds under a set amount that match policy are issued automatically; anything else goes to a human with the evidence attached. Every reply is logged as a trace.</p>
+<p><b>Deep dive:</b> tools are small and typed; the payment tool can only refund an existing order up to its amount, with an idempotency key. Evals: read 100 real tickets first, open-code the failures, build a golden set per failure mode, code assertions for the format and amount, an LLM judge only for tone, measured against human labels (see <a href="24-ai-product-skills.html#judge-calc">Module 24</a>).</p>
+<p><b>Cost and latency:</b> a small model for routing, a larger one for the refund reasoning; a few thousand tokens per ticket, so cents a ticket at most. Answers in seconds are fine for email.</p>
+<p><b>Recap:</b> ship status and FAQ first, refunds in shadow mode (agent proposes, human approves) for two weeks, then auto-approve the low-value, in-policy cases once the agreement rate is high.</p>
+</details>
+
+<details id="ans-property"><summary><b>B. Home-search assistant</b> for a property portal: shortlist homes and book viewings</summary>
+<p><b>Discover:</b> Buyers, renters or both? Which markets and languages? What does success mean: viewings booked, enquiries that lead to a deal, time to shortlist? How fresh and complete is listing data, and are prices and availability reliable? How do agents take viewings today (calendar, phone, WhatsApp)? What must never happen: fake listings, discriminatory filtering, booking without consent?</p>
+<p><b>Assume out loud:</b> renters first in one city; quality of the shortlist beats speed; booking needs the user's explicit confirmation and the agent's calendar; nothing about protected characteristics is used to filter.</p>
+<p><b>Outline:</b> a conversational front end turns needs into a structured search (budget, area, bedrooms, commute), which runs on the existing search API (the model doesn't invent listings), then the model explains trade-offs between results. Booking is a separate, confirmed tool call against the agent's calendar, with a human fallback.</p>
+<p><b>Deep dive:</b> grounding: every claim in an answer must come from listing fields, checked by code. Evals: shortlist relevance judged against what users then saved or enquired about; a golden set of tricky requests (contradictory needs, vague areas). Guardrails: fair-housing and discrimination checks on the query translation; no booking without a yes.</p>
+<p><b>Cost and latency:</b> search is cheap and fast; keep model turns short and cache common area descriptions. Aim for answers in a couple of seconds on mobile.</p>
+<p><b>Recap:</b> launch the search and explanation first and measure saves and enquiries per session; add booking for agents who opt in; then expand markets.</p>
+</details>
+
+<details id="ans-robo"><summary><b>C. Robo-Helper for a care home:</b> fetch items for residents on spoken request</summary>
+<p><b>Discover:</b> Who asks: residents, staff, or both? Which items, and which are off-limits (medicines, sharp things)? How big is the building, with stairs or lifts? How noisy is it, and do residents speak clearly? What happens if the robot is wrong or blocks a corridor? Who's on duty to help it?</p>
+<p><b>Assume out loud:</b> one floor; a fixed list of safe items (glasses, remote, a book, water); safety beats speed every time; staff can see and override every request.</p>
+<p><b>Outline:</b> speech → text → a small language model turns the request into one of a fixed set of commands (like <a href="18-robot-brain/09-understanding-commands.html">week 7</a>) → a planner finds the route (<a href="18-robot-brain/06-pathfinding.html">A*</a>) → the robot drives, localises (<a href="18-robot-brain/25-localise.html">particle filter</a>) and fetches. Anything not on the list, or unclear, gets “I'll ask a nurse” instead of a guess.</p>
+<p><b>Deep dive:</b> the <a href="18-robot-brain/10-llm-safety.html">week 10 safety rules</a> become hard checks in code, not just prompt text; slow speed near people; stop if anything moves in front (the cat test). Evals: a set of 50 recorded requests from residents with the right command for each, scored like the <a href="18-robot-brain/19-bakeoff.html">bake-off</a>.</p>
+<p><b>Cost and latency:</b> a small on-device model so it works without the internet and answers fast (<a href="18-robot-brain/16-speed.html">week 13</a>).</p>
+<p><b>Recap:</b> start with three items in one corridor while staff watch, count successes and “asked a nurse” cases, then add items.</p>
+</details>
+
+<h2 id="reality">7. Reality check</h2>
+<ul>
+<li><b>It's a hiring post</b> for the author's own team. It describes his loop; other teams and companies run this interview differently.</li>
+<li><b>Four tips, not a rubric.</b> He doesn't say how it's scored or how long it is. The 45-minute method and the rubric on this page are ours.</li>
+<li><b>“Thousands of applications”</b> is his figure; we can't check it.</li>
+<li><b>We read part 4 only.</b> The series' other parts (one on CVs is linked in his comments) aren't covered here.</li>
+<li><b>The advice is standard and sound.</b> It matches how good system-design and consulting interviews work: clarify, assume, structure, recap.</li>
+</ul>
+
+<h2 id="playbook">8. Playbook</h2>
+<ol class="steps">
+<li><b>Open with questions, not boxes.</b> Aim for five to ten minutes of discovery, then play it back in one sentence.</li>
+<li><b>Every assumption gets a “because”,</b> especially quality versus cost versus latency.</li>
+<li><b>Outline first:</b> one sentence, then four or five boxes, then one box at a time.</li>
+<li><b>Choose the simplest design that works:</b> a fixed workflow before an agent; one agent before many; read-only tools before write tools; a human before anything irreversible.</li>
+<li><b>Always bring the eval plan:</b> read traces, name failure modes, build a golden set, use a judge only where code can't check.</li>
+<li><b>Recap at each turn</b> and end with what you'd ship first and measure in week one.</li>
+<li><b>Practise aloud</b> on the board above, with someone playing the customer.</li>
+<li><b>For the 12-year-old:</b> scenario C with a grown-up as the care-home manager. Three questions first, then the plan.</li>
+</ol>
+
+<h2 id="check">9. Self-check</h2>
+<details><summary>According to the author, do more people fail on technical knowledge or on customer focus?</summary>
+<p>Customer focus. Technical knowledge of LLMs, agents and evals is the baseline; the approach is the differentiator.</p></details>
+<details><summary>Why say an assumption out loud instead of just making it?</summary>
+<p>So the interviewer knows why you chose it and can correct it. A silent choice looks like a mistake or a blind spot.</p></details>
+<details><summary>What does “structure your comms” mean in practice?</summary>
+<p>Start high level, give the outline of the solution, then go into detail one part at a time, and recap every so often to check you're still on track.</p></details>
+<details><summary>The interviewer asks about something you've never used. What do you do?</summary>
+<p>Say so, then reason from first principles out loud: what it must do, likely costs and failure modes, how you'd test it. The interview is designed to go past what you know.</p></details>
+<details><summary>In the refund design, why does the agent only <em>propose</em> refunds at first?</summary>
+<p>Refunds are irreversible and cost money. Shadow mode lets you measure how often the agent agrees with humans before letting it act alone, and only on low-value, in-policy cases.</p></details>
+
+<h2 id="glossary">10. Glossary &amp; further reading</h2>
+<div class="table-wrap"><table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<tr><td>Technical decomposition</td><td>Breaking a vague customer problem into a concrete system design, out loud.</td></tr>
+<tr><td>IC</td><td>Individual contributor: a role without people management.</td></tr>
+<tr><td>Agentic system</td><td>A system where a model chooses steps and calls tools, rather than answering once.</td></tr>
+<tr><td>Workflow</td><td>Fixed steps decided in code, with models doing parts of them.</td></tr>
+<tr><td>Human in the loop</td><td>A person approves or handles certain actions.</td></tr>
+<tr><td>Shadow mode</td><td>The system suggests actions but doesn't take them, so you can measure it safely.</td></tr>
+<tr><td>Golden set</td><td>A fixed set of test inputs with known good answers.</td></tr>
+<tr><td>Idempotency key</td><td>An ID that makes repeating the same request safe (it won't refund twice).</td></tr>
+</table></div>
+<ul>
+<li><a href="https://www.linkedin.com/feed/update/urn:li:activity:7528814957145047040/">The post</a></li>
+<li>Related: <a href="24-ai-product-skills.html">Module 24</a> (evals, agents, the judge calculator) · <a href="19-evals-field-guide.html">Module 19</a> (evals field guide) · <a href="10-rlm-harness.html">Module 10</a> (agent harness) · <a href="03-shared-autonomy.html">Module 03</a> (when a robot should ask) · <a href="09-inference-engineering/index.html">Module 09</a> (latency and cost)</li>
+</ul>
+
+<footer>Module 27 · added 2026-11-18 · <a href="../index.html">Back to course index</a></footer>
+</main>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const S = {
+    support: ['A. Support agent', 'A 30-person online shop wants an AI agent to handle customer support, including refunds.'],
+    property: ['B. Home search', 'A property portal wants an assistant that helps people shortlist homes and book viewings.'],
+    robo: ['C. Robo-Helper care home', 'A care home wants Robo-Helper to fetch items for residents when they ask out loud.']
+  };
+  const BOX = [
+    ['disc', 'Discover', 'Your questions to the customer, and their answers.'],
+    ['assume', 'Assumptions', 'Each one with a “because”: quality vs cost vs latency, scope.'],
+    ['outline', 'Outline', 'One sentence, then the 4–5 boxes.'],
+    ['deep', 'Deep dive', 'The risky action, tools and permissions, evals.'],
+    ['recap', 'Recap and next steps', 'What ships first; what you measure in week one.']
+  ];
+  const R = [
+    'Asked at least 3 discovery questions before designing',
+    'Named the user and a measurable success metric',
+    'Stated assumptions out loud, each with a reason',
+    'Gave a one-line approach and outline before any detail',
+    'Chose the simplest design (workflow before agent) and said why',
+    'Listed the tools and what each is allowed to do',
+    'Put a human before risky or irreversible actions',
+    'Gave an eval plan (traces, failure modes, golden set)',
+    'Gave rough cost and latency numbers',
+    'Recapped and checked back with the customer'
+  ];
+  const load = k => { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch (e) { return {}; } };
+  const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+  let cur = 'support';
+  function render() {
+    const notes = load('m27-notes-' + cur), ticks = load('m27-ticks-' + cur);
+    $('brief').textContent = S[cur][1];
+    $('canvas').innerHTML = '';
+    BOX.forEach(([k, label, hint]) => {
+      const l = document.createElement('label');
+      l.innerHTML = `${label} <span class="hint">${hint}</span>`;
+      const t = document.createElement('textarea');
+      t.value = notes[k] || '';
+      t.setAttribute('aria-label', label);
+      t.addEventListener('input', () => { notes[k] = t.value; save('m27-notes-' + cur, notes); });
+      $('canvas').append(l, t);
+    });
+    $('rubric').innerHTML = '';
+    R.forEach((r, i) => {
+      const l = document.createElement('label');
+      const c = document.createElement('input');
+      c.type = 'checkbox';
+      c.checked = !!ticks[i];
+      c.addEventListener('change', () => { ticks[i] = c.checked; save('m27-ticks-' + cur, ticks); score(ticks); });
+      l.append(c, ' ' + r);
+      $('rubric').appendChild(l);
+    });
+    score(ticks);
+  }
+  function score(ticks) {
+    const n = R.filter((_, i) => ticks[i]).length;
+    $('rScore').textContent = `${n} of ${R.length}` + (n >= 8 ? ' · strong' : n >= 5 ? ' · getting there' : '');
+  }
+  Object.entries(S).forEach(([k, [label]]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    b.setAttribute('aria-pressed', k === cur);
+    b.addEventListener('click', () => {
+      cur = k;
+      $('scen').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+      render();
+    });
+    $('scen').appendChild(b);
+  });
+
+  const PH = [[45, 'Discover'], [35, 'Play back & assume'], [32, 'Outline'], [27, 'Deep dive'], [12, 'Cost & latency'], [9, 'Recap'], [7, 'Buffer']];
+  let left = 2700, iv = null;
+  const show = () => {
+    $('tOut').textContent = `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`;
+    const p = PH.filter(([m]) => left <= m * 60).pop();
+    $('tPhase').textContent = iv || left < 2700 ? 'Now: ' + (p ? p[1] : '') : '';
+  };
+  $('tStart').addEventListener('click', () => {
+    if (iv) { clearInterval(iv); iv = null; $('tStart').textContent = 'Resume'; show(); return; }
+    iv = setInterval(() => { left = Math.max(0, left - 1); show(); if (!left) { clearInterval(iv); iv = null; } }, 1000);
+    $('tStart').textContent = 'Pause';
+    show();
+  });
+  $('tReset').addEventListener('click', () => { clearInterval(iv); iv = null; left = 2700; $('tStart').textContent = 'Start 45:00'; show(); });
+  render(); show();
+})();
+</script>
+</body>
+</html>

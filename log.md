@@ -360,3 +360,8 @@ Set up the folder structure, schema (CLAUDE.md), shared styles and the index.
 - All 17 links opened. Items 6 (Google PAIR) and 8 (Abhik Sarkar) linked TensorFlow Playground by mistake; corrected to pair.withgoogle.com/explorables and abhik.xyz/concepts/category/transformers. Distill on hiatus since 2 Jul 2021.
 - New page topics/26-visual-explainers.html (LLM + Robotics): five-stage path, level and course link for each, filterable checklist (ticks saved in the browser), week-by-week kid plan, reality check.
 - Index: card, summary row, concept map, kid line. Back-link from Module 21.
+
+## [2026-11-18] ingest | Agentic system design interview (Wulfie Bain, OpenAI)
+- LinkedIn post, part 4 of a hiring-tips series: the "technical decomp" interview (design an agentic system for a customer). Read in full via the user's LinkedIn; text saved to sources/27-wulfie-bain-technical-decomp.md.
+- New page topics/27-agent-design-interview.html (LLM): four tips and what each tests, our 45-minute method, three worked answers (support refunds, property-portal home search, Robo-Helper care home), practice board (scenario picker, phase timer, five boxes, 10-point rubric; saved per browser).
+- Index: card, summary row, concept map. Back-link from Module 24.

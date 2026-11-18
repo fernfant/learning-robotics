@@ -30,12 +30,12 @@
 
 <div class="card"><p style="margin:0"><span class="track llm">LLM</span> how large language models are built, trained, evaluated and served. &nbsp; <span class="track robo">Robotics</span> how robots perceive, decide and act. &nbsp; <span class="track both">LLM + Robotics</span> shared foundations, or ideas that carry across both. Robot foundation models (VLAs) are built on LLM backbones, so the two tracks keep meeting.</p></div>
 <p><a href="sources.html"><strong>Sources &amp; summaries →</strong></a> every link added, its summary, the primary sources behind it, saved files and all external references.</p>
-<p class="meta">26 modules (119 pages) · last updated 2026-11-18</p>
+<p class="meta">27 modules (120 pages) · last updated 2026-11-18</p>
 
 <h2 id="grown-ups">For grown-ups and later</h2>
 <p>Notes on LLMs and robotics for grown-ups, and for later once you've finished the robot course. Each module still opens with a Start-here box you can read any time.</p>
 <details id="all-modules">
-<summary>Show all 26 modules, the summaries and the concept map</summary>
+<summary>Show all 27 modules, the summaries and the concept map</summary>
 
 <h2>Modules</h2>
 <!-- MODULES: newest at the bottom; keep numbering sequential -->
@@ -244,6 +244,13 @@
   <span class="tag">visualisation</span><span class="tag">neural networks</span><span class="tag">transformers</span><span class="tag">embeddings</span><span class="tag">attention variants</span><span class="tag">inference</span><span class="tag">diffusion</span><span class="tag">probability</span>
   <p class="meta">Source: @techNmak post on X · 17 Nov 2026</p>
 </a>
+<a class="card module" href="topics/27-agent-design-interview.html">
+  <div class="n">27 · Agent design interview</div>
+  <h3><span class="track llm">LLM</span>The agentic system design interview: discover, assume out loud, structure, think from first principles</h3>
+  <p>Wulfie Bain (OpenAI Startups team) on the hardest interview in his loop, taken by managers and ICs alike: design an agentic system for a customer. More people fail on customer focus than on technical knowledge. Four tips (discover then design, state assumptions with reasons, outline before detail with recaps, reason from first principles when pushed past what you know), turned into a 45-minute method, three worked answers (a support agent with refunds, a home-search assistant for a property portal, Robo-Helper for a care home) and a practice board with a phase timer, five design boxes and a 10-point self-scoring rubric.</p>
+  <span class="tag">system design</span><span class="tag">agents</span><span class="tag">interviews</span><span class="tag">requirements</span><span class="tag">human in the loop</span><span class="tag">evals</span>
+  <p class="meta">Source: Wulfie Bain, LinkedIn · 18 Nov 2026</p>
+</a>
 
 <h2>Summaries at a glance</h2>
 <div class="table-wrap"><table>
@@ -274,6 +281,7 @@
 <tr><td>24</td><td><span class="track llm">LLM</span></td><td><a href="topics/24-ai-product-skills.html">AI product skills</a></td><td>Read about 100 traces and name the failures before measuring anything. Fix what the prompt never said, then automate the cheapest check that catches each remaining failure; trust an AI judge only after measuring TPR and TNR, and correct its score.</td></tr>
 <tr><td>25</td><td><span class="track robo">Robotics</span></td><td><a href="topics/25-who-to-follow.html">Who to follow in robot learning</a></td><td>Know which question each researcher is answering: grasping, following language, learning from video, practising with RL, agile bodies, or simulators and world models. Read project pages and videos first, then run one open tool (ManiSkill, OpenVLA, SERL).</td></tr>
 <tr><td>26</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/26-visual-explainers.html">Visual AI explainers</a></td><td>Play first, then watch, then read. Start with TensorFlow Playground, see a real GPT-2 in Transformer Explainer, then Raschka's attention variants and the Modular handbook for inference. Match each explainer to the course page it illustrates.</td></tr>
+<tr><td>27</td><td><span class="track llm">LLM</span></td><td><a href="topics/27-agent-design-interview.html">Agent design interview</a></td><td>Ask about the customer before designing. Say every assumption with its reason, give the outline before detail and recap often. Pick the simplest design, put a human before irreversible actions, and always bring an eval plan.</td></tr>
 </table></div>
 
 <h2>Concept map</h2>
@@ -288,7 +296,8 @@
 <tr><td>LLM judges &amp; evals</td><td>01, 18, 19, 24</td></tr>
 <tr><td>Judge agreement (Cohen's kappa, catch rate, TPR/TNR and bias-corrected pass rates), judge biases</td><td>18, 19, 24</td></tr>
 <tr><td>Error analysis (reading outputs, failure taxonomies, open/axial coding, three gulfs)</td><td>19, 24</td></tr>
-<tr><td>AI product practice (testing AI features, prototyping tools, agent workflows, Claude Code skills &amp; MCP)</td><td>24</td></tr>
+<tr><td>AI product practice (testing AI features, prototyping tools, agent workflows, Claude Code skills &amp; MCP)</td><td>24, 27</td></tr>
+<tr><td>Designing an agentic system for a customer (discovery, assumptions, structure, human in the loop)</td><td>03, 24, 27</td></tr>
 <tr><td>Agent evaluation (final state, pass^k, reliability, cost per success)</td><td>10, 18, 19</td></tr>
 <tr><td>Linear algebra for robots (rotations, SVD, Jacobians)</td><td>02, 21</td></tr>
 <tr><td>Homogeneous transforms &amp; forward kinematics</td><td>02, 23</td></tr>

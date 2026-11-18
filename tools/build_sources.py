@@ -89,6 +89,7 @@ MODULES = [
      [("Transformer Explainer", "https://poloclub.github.io/transformer-explainer/"), ("LLM Visualization", "https://bbycroft.net/llm"),
       ("Google PAIR AI Explorables (corrected link)", "https://pair.withgoogle.com/explorables/"), ("Abhik Sarkar's transformer concepts (corrected link)", "https://abhik.xyz/concepts/category/transformers"),
       ("Visual Guide to Attention Variants", "https://magazine.sebastianraschka.com/p/visual-attention-variants"), ("Modular LLM Inference Handbook", "https://handbook.modular.com/llm-inference-basics/what-is-llm-inference/")]),
+    ("27", "https://www.linkedin.com/feed/update/urn:li:activity:7528814957145047040/", "Wulfie Bain (OpenAI, Startups team)", "18 Nov 2026", "LinkedIn post (part 4 of a hiring-tips series; read via the user's account)", []),
 ]
 
 e = html.escape
