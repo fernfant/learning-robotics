@@ -354,3 +354,9 @@ Set up the folder structure, schema (CLAUDE.md), shared styles and the index.
 - Researched each person on their homepage/lab page/arXiv (16 Nov 2026); all links checked. Unconfirmed: exact titles for Stone Tao (Physical Intelligence) and Kyle Morgenstein (Apptronik).
 - New page topics/25-who-to-follow.html (Robotics): six big questions mapped to Robo-Helper weeks, 12 profiles with three works each, topic filter, kid matching game, reading order by course week, reality check (one person's list, newsletter plug, missing names, X is 13+).
 - Index: card, summary row, concept map (RL, VLAs, new research-frontier row), kid line. Back-links from Modules 21 and 23.
+
+## [2026-11-18] ingest | Visual AI explainers (Tech with Mak)
+- User sent the @techNmak profile; chose the 17 Nov 2026 post "best visual resources for learning how Transformers, LLMs, embeddings, diffusion, and inference work". Raw saved to sources/26-technmak-visual-resources.json.
+- All 17 links opened. Items 6 (Google PAIR) and 8 (Abhik Sarkar) linked TensorFlow Playground by mistake; corrected to pair.withgoogle.com/explorables and abhik.xyz/concepts/category/transformers. Distill on hiatus since 2 Jul 2021.
+- New page topics/26-visual-explainers.html (LLM + Robotics): five-stage path, level and course link for each, filterable checklist (ticks saved in the browser), week-by-week kid plan, reality check.
+- Index: card, summary row, concept map, kid line. Back-link from Module 21.

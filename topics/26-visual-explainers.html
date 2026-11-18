@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visual AI Explainers</title>
+<link rel="stylesheet" href="../style.css?v=16">
+<style>
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+  .chips button[aria-pressed="true"] { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .res { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 10px 0; background: var(--card); }
+  .res[hidden] { display: none; }
+  .res.done { border-color: var(--ok); }
+  .res h3 { margin: 2px 0 4px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .res .n { color: var(--muted); font-size: .85rem; }
+  .res .who { font-size: .8rem; color: var(--muted); margin: 0 0 6px; }
+  .res label { font-size: .9rem; cursor: pointer; }
+  .res p { margin: 4px 0; }
+  .big-out { font-size: 1.4rem; font-weight: 700; }
+</style>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../index.html">← LLMs &amp; Robotics</a> · Module 26</nav>
+
+<div class="eyebrow"><span class="track both">LLM + Robotics</span>Module 26 · Visual explainers</div>
+<h1>17 visual AI explainers you can play with, sorted into a path and matched to the course</h1>
+<p class="lede">Interactive pages and illustrated essays that show how neural networks, transformers, embeddings, diffusion and inference work. The post lists them in no particular order. This page puts them into a path, says who each one suits (including which are good for a 12-year-old), fixes two wrong links, and ties every one to the course page it illustrates.</p>
+<p class="meta">Source: Tech with Mak (@techNmak), post on X, 17 Nov 2026 · <a href="https://x.com/techNmak/status/2122711743369785617">post</a>. We opened every link on 18 Nov 2026. Two of the post's links were wrong (items 6 and 8 both pointed to TensorFlow Playground); the correct pages are below. Descriptions, levels and course links are ours.</p>
+
+<div class="card note"><strong>For Robo-Helper builders (ages 12+):</strong> Read “Start here”, then tick off the <a href="#path">kid path</a> (filter “Good for kids”). Each one says which week to do it after. <a href="18-robot-brain/index.html">Back to the course</a>.</div>
+
+<section class="kid" id="start">
+<h2>Start here (no maths needed)</h2>
+<p class="big">You built a neuron, a tiny language model and a robot that learns. These websites let you <em>see</em> the same things happening inside, with sliders and buttons.</p>
+<h3>Think of it like this</h3>
+<ul>
+<li>Your Robo-Helper code is like reading a recipe. These sites are like watching the cooking show: same recipe, but you see every step.</li>
+<li>Some are toys you play with (move a slider, watch it learn). Some are pictures and videos that explain. A few are for grown-ups.</li>
+</ul>
+<h3>Three to try first</h3>
+<ol>
+<li><b>TensorFlow Playground</b> (after week 4): press play and watch a small brain learn to sort orange and blue dots. Add more neurons and see what changes.</li>
+<li><b>3Blue1Brown's neural network videos</b> (after week 4): beautiful animations of how a network recognises handwritten numbers.</li>
+<li><b>Transformer Explainer</b> (after week 8): type a sentence and watch a real GPT-2 guess the next word, the same job your tiny language model does.</li>
+</ol>
+<h3>Why robots care</h3>
+<p>Robots use the same parts: networks to see (CNN Explainer shows how), embeddings to understand words, and chance and probability to guess where they are (Seeing Theory).</p>
+<h3>Try it</h3>
+<p>Use the <a href="#path">checklist</a>. Tick each one you finish; the page remembers on this device.</p>
+<h3>Words to know</h3>
+<dl>
+<dt>Visualisation</dt><dd>A picture or animation that shows what numbers are doing.</dd>
+<dt>Neural network</dt><dd>Lots of simple neurons (like your week 4 one) joined in layers.</dd>
+<dt>Transformer</dt><dd>The kind of network inside ChatGPT and Claude. It reads all the words at once and decides which ones matter for the next word.</dd>
+<dt>Embedding</dt><dd>A word or picture turned into a list of numbers, so similar things end up close together.</dd>
+</dl>
+</section>
+<p class="deeper"><strong>Going deeper:</strong> the 17 explainers in order, with level, what each shows, the course page it goes with, and what the post got wrong.</p>
+
+<div class="toc">
+<strong>In this module</strong>
+<ol>
+<li><a href="#summary">Summary</a></li>
+<li><a href="#why-robotics">Why this matters for robotics</a></li>
+<li><a href="#path">The path: all 17, in order (interactive checklist)</a></li>
+<li><a href="#kid-plan">The kid plan, week by week</a></li>
+<li><a href="#reality">Reality check</a></li>
+<li><a href="#playbook">Playbook</a></li>
+<li><a href="#check">Self-check</a></li>
+<li><a href="#glossary">Glossary &amp; further reading</a></li>
+</ol>
+</div>
+
+<h2 id="summary">1. Summary</h2>
+<div class="card tldr">
+<h3>TL;DR</h3>
+<p>Seventeen free visual resources, from beginner toys (TensorFlow Playground, CNN Explainer, Seeing Theory) to engineer-level guides (attention variants, mixture of experts, the Modular inference handbook, Neuronpedia). Most are interactive and run in the browser with nothing to install. We put them in five stages: <b>networks → seeing → transformers → modern LLM internals → generation and probability</b>. Seven are fine for a 12-year-old with an adult nearby. None is about robots specifically, but each explains a part robots use.</p>
+</div>
+<ul>
+<li><strong>Best single starting point:</strong> TensorFlow Playground. Two minutes, no maths, and you see learning happen.</li>
+<li><strong>Best for “how does an LLM actually work”:</strong> Transformer Explainer for the flow, then Brendan Bycroft's 3D LLM Visualization for every tensor.</li>
+<li><strong>Best for engineers:</strong> Raschka's attention variants (MHA, MQA, GQA, MLA) and the Modular inference handbook (prefill, decode, KV cache, batching, quantization, speculative decoding). These two pair with <a href="09-inference-engineering/index.html">Module 09</a>.</li>
+<li><strong>Two link errors in the post,</strong> fixed here, and one resource (Distill) has published nothing new since July 2021.</li>
+</ul>
+
+<h2 id="why-robotics">2. Why this matters for robotics</h2>
+<div class="card note">
+<p><strong>Track: LLM + Robotics.</strong> Most items explain LLM internals, which matter for robots because modern robot brains (VLAs, see <a href="25-who-to-follow.html">Module 25</a>) are built from the same transformers and embeddings. Three items are directly robotic in use: CNN Explainer (how a robot's camera network sees), Seeing Theory (the Bayes behind <a href="18-robot-brain/25-localise.html">week 12's particle filter</a>), and Diffusion Explainer (diffusion is also how diffusion policies generate robot motion, see <a href="21-robot-math.html#diffusion">Module 21</a>).</p>
+</div>
+<ul>
+<li><strong>Module 21 already uses two of these</strong> (Transformer Explainer, Diffusion Explainer) and Seeing Theory. This page adds the other fourteen and orders them.</li>
+<li><strong>Seeing is what makes these useful for a kid:</strong> Robo-Helper builds each part in code; these let them watch a bigger version of the same part run.</li>
+</ul>
+
+<h2 id="path">3. The path: all 17, in order</h2>
+<p>Filter by who it suits or by stage. Tick what you've done; your ticks stay in this browser only.</p>
+<div class="chips" id="chips" role="group" aria-label="Filter explainers"></div>
+<p class="big-out" id="prog"></p>
+<div id="list">
+
+<div class="res" data-t="kid s1" data-id="tfp"><h3><span class="n">1</span><a href="https://playground.tensorflow.org">TensorFlow Playground</a></h3>
+<p class="who">Stage 1 · Networks · 👦 good for kids · interactive</p>
+<p>A small neural network learns to separate two colours of dots, live. Change layers, neurons, activation and learning rate and watch the boundary bend. Shows why one neuron can only draw a straight line and more neurons can draw curves.</p>
+<p>Goes with: <a href="18-robot-brain/04-neuron.html">week 4, the artificial neuron</a>. <label><input type="checkbox"> Done</label></p></div>
+
+<div class="res" data-t="kid s1" data-id="3b1b"><h3><span class="n">2</span><a href="https://3blue1brown.com/topics/neural-networks">3Blue1Brown: Neural networks</a></h3>
+<p class="who">Stage 1 · Networks · 👦 good for kids (first videos) · videos</p>
+<p>The famous animated series: what a network is, gradient descent, backpropagation, then attention and transformers in the later chapters. The first two chapters suit a kid; backprop and later are teen/adult.</p>
+<p>Goes with: <a href="18-robot-brain/04-neuron.html">week 4</a>, <a href="21-robot-math.html#linalg">Module 21 linear algebra</a>. <label><input type="checkbox"> Done</label></p></div>
+
+<div class="res" data-t="kid s2" data-id="cnn"><h3><span class="n">3</span><a href="https://poloclub.github.io/cnn-explainer/">CNN Explainer</a></h3>
+<p class="who">Stage 2 · Seeing · 👦 good for kids · interactive</p>
+<p>A small image classifier, layer by layer: convolutions sliding over a picture, feature maps, ReLU, pooling. Click any square to see the arithmetic that made it. This is how a robot's camera network sees.</p>
+<p>Goes with: <a href="06-30u30/08-alexnet.html">Module 06, AlexNet</a>. <label><input type="checkbox"> Done</label></p></div>
+
+<div class="res" data-t="adult s2" data-id="distill"><h3><span class="n">4</span><a href="https://distill.pub">Distill</a></h3>
+<p class="who">Stage 2 · Seeing inside · 🧑 adult · essays (archive)</p>
+<p>A journal of interactive research essays: feature visualisation (what each neuron in a vision network responds to), t-SNE done right, graph neural networks, early circuits interpretability. Superb, but <a href="https://distill.pub/2021/distill-hiatus/">on hiatus since 2 July 2021</a>, so treat it as an archive.</p>
+<p>Goes with: <a href="08-ai-research-engineer/09-mech-interp.html">Module 08, mechanistic interpretability</a>. <label><input type="checkbox"> Done</label></p></div>
+
+<div class="res" data-t="kid s3" data-id="tx"><h3><span class="n">5</span><a href="https://poloclub.github.io/transformer-explainer/">Transformer Explainer</a></h3>
+<p class="who">Stage 3 · Transformers · 👦 good for kids (with an adult) · interactive</p>
+<p>A real GPT-2 running in your browser. Type text and follow it through embeddings, attention, the MLP and the final next-token probabilities; move the temperature slider and watch the choices change.</p>
+<p>Goes with: <a href="18-robot-brain/15-tiny-lm.html">week 8, a tiny language model</a>, <a href="21-robot-math.html#transformers">Module 21 transformers</a>. <label><input type="checkbox"> Done</label></p></div>
+
+<div class="res" data-t="adult s3" data-id="illus"><h3><span class="n">6</span><a href="https://jalammar.github.io/illustrated-transformer/">The Illustrated Transformer</a> (Jay Alammar)</h3>
+<p class="who">Stage 3 · Transformers · 🧑 teen/adult · illustrated essay</p>
+<p>The classic picture-by-picture walk through the 2017 transformer: embeddings, queries, keys and values, multi-head attention, the encoder and decoder. The clearest first explanation of Q/K/V.</p>
+<p>Goes with: <a href="06-30u30/13-attention.html">Module 06, attention</a> and <a href="06-30u30/14-annotated-transformer.html">the annotated transformer</a>. <label><input type="checkbox"> Done</label></p></div>
+
+<div class="res" data-t="adult s3" data-id="bbycroft"><h3><span class="n">7</span><a href="https://bbycroft.net/llm">LLM Visualization</a> (Brendan Bycroft)</h3>
+<p class="who">Stage 3 · Transformers · 🧑 teen/adult · interactive 3D</p>
+<p>A 3D walkthrough of a tiny GPT (about 85,000 parameters, sorting six letters), every matrix drawn to scale, with GPT-2 and GPT-3 alongside for size. The best way to see that an LLM is just many small, simple steps.</p>
+<p>Goes with: <a href="18-robot-brain/15-tiny-lm.html">week 8</a>, <a href="20-from-scratch/index.html">Module 20, from-scratch repos</a>. <label><input type="checkbox"> Done</label></p></div>
+
+<div class="res" data-t="kid s3" data-id="atlas"><h3><span class="n">8</span><a href="https://apple.github.io/embedding-atlas/">Apple Embedding Atlas</a></h3>
+<p class="who">Stage 3 · Embeddings · 👦 good for kids (demo only) · interactive tool</p>
+<p>An open-source tool for exploring large sets of embeddings as a zoomable map: clusters, neighbours and outliers. The demo is fun to pan around; using it on your own data needs Python.</p>
+<p>Goes with: <a href="18-robot-brain/08-words-as-numbers.html">week 7, words as numbers</a>. <label><input type="checkbox"> Done</label></p></div>
+
+<div class="res" data-t="adult s4" data-id="raschka"><h3><span class="n">9</span><a href="https://magazine.sebastianraschka.com/p/visual-attention-variants">Visual Guide to Attention Variants</a> (Sebastian Raschka, Mar 2026)</h3>
+<p class="who">Stage 4 · LLM internals · 🧑 adult · illustrated essay</p>
+<p>Multi-head (MHA), multi-query (MQA), grouped-query (GQA) and multi-head latent attention (MLA) drawn side by side. The point of all of them is shrinking the KV cache so long contexts fit and run fast.</p>
+<p>Goes with: <a href="09-inference-engineering/02-kv-cache-attention.html">Module 09, KV cache and attention</a>. <label><input type="checkbox"> Done</label></p></div>
+
+<div class="res" data-t="adult s4" data-id="abhik"><h3><span class="n">10</span><a href="https://abhik.xyz/concepts/category/transformers">Abhik Sarkar's transformer visualisations</a></h3>
+<p class="who">Stage 4 · LLM internals · 🧑 adult · interactive pages</p>
+<p>Short interactive pages on RoPE (rotary position), KV cache, FlashAttention, attention variants, MoE routing, LoRA and more. <em>The post linked TensorFlow Playground here by mistake; this is the right site.</em></p>
+<p>Goes with: <a href="09-inference-engineering/02-kv-cache-attention.html">Module 09</a>, <a href="18-robot-brain/13-lora.html">week 14, LoRA</a>. <label><input type="checkbox"> Done</label></p></div>
+
+<div class="res" data-t="adult s4" data-id="moe"><h3><span class="n">11</span><a href="https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-mixture-of-experts">A Visual Guide to Mixture of Experts</a> (Maarten Grootendorst)</h3>
+<p class="who">Stage 4 · LLM internals · 🧑 adult · illustrated essay</p>
+<p>How a router sends each token to a few “expert” sub-networks, why only some weights run per token, and how load balancing keeps experts from going unused.</p>
+<p>Goes with: <a href="05-trillion-scale-architecture.html#moe">Module 05, MoE</a>. <label><input type="checkbox"> Done</label></p></div>
+
+<div class="res" data-t="adult s4" data-id="modular"><h3><span class="n">12</span><a href="https://handbook.modular.com/llm-inference-basics/what-is-llm-inference/">Modular LLM Inference Handbook</a></h3>
+<p class="who">Stage 4 · Inference · 🧑 adult · handbook</p>
+<p>Prefill versus decode, the KV cache, batching, quantisation and speculative decoding, from a company that builds an inference engine (so expect its own product to appear).</p>
+<p>Goes with: <a href="18-robot-brain/16-speed.html">week 13, how fast is a brain?</a>, <a href="09-inference-engineering/01-request-lifecycle.html">Module 09</a>, <a href="15-inference-engineering-companion.html">Module 15</a>. <label><input type="checkbox"> Done</label></p></div>
+
+<div class="res" data-t="adult s4" data-id="neuronpedia"><h3><span class="n">13</span><a href="https://neuronpedia.org">Neuronpedia</a></h3>
+<p class="who">Stage 4 · Inside real models · 🧑 adult · interactive platform</p>
+<p>An open interpretability platform: browse features found by sparse autoencoders inside real models, see what text activates them, and explore attribution graphs. Research-grade; the best hands-on companion to Distill's old circuits work.</p>
+<p>Goes with: <a href="08-ai-research-engineer/09-mech-interp.html">Module 08, mechanistic interpretability</a>. <label><input type="checkbox"> Done</label></p></div>
+
+<div class="res" data-t="adult s4" data-id="pair"><h3><span class="n">14</span><a href="https://pair.withgoogle.com/explorables/">Google PAIR AI Explorables</a></h3>
+<p class="who">Stage 4 · Model behaviour · 🧑 teen/adult · interactive essays</p>
+<p>Short interactive essays on how models behave: memorisation versus generalisation, fairness measures, what LLMs pick up from data, interpretability. <em>The post linked TensorFlow Playground here by mistake; this is the right site.</em></p>
+<p>Goes with: <a href="18-robot-brain/05-evaluation.html">week 4, is it any good?</a>, <a href="19-evals-field-guide.html">Module 19</a>. <label><input type="checkbox"> Done</label></p></div>
+
+<div class="res" data-t="kid s5" data-id="diff"><h3><span class="n">15</span><a href="https://poloclub.github.io/diffusion-explainer/">Diffusion Explainer</a></h3>
+<p class="who">Stage 5 · Generation · 👦 good for kids (with an adult) · interactive</p>
+<p>Stable Diffusion turning noise into a picture step by step, with the prompt and guidance controls exposed. Robots use the same idea to generate motion (diffusion policy).</p>
+<p>Goes with: <a href="21-robot-math.html#diffusion">Module 21, diffusion</a>. <label><input type="checkbox"> Done</label></p></div>
+
+<div class="res" data-t="adult s5" data-id="gan"><h3><span class="n">16</span><a href="https://poloclub.github.io/ganlab/">GAN Lab</a></h3>
+<p class="who">Stage 5 · Generation · 🧑 teen/adult · interactive</p>
+<p>Train a generative adversarial network in your browser on 2D points and watch the generator chase the real data while the discriminator pushes back. GANs are mostly replaced by diffusion now, but the two-player idea is worth seeing once.</p>
+<p>Goes with: nothing in the course yet; read it after Diffusion Explainer to compare. <label><input type="checkbox"> Done</label></p></div>
+
+<div class="res" data-t="kid s5" data-id="seeing"><h3><span class="n">17</span><a href="https://seeing-theory.brown.edu">Seeing Theory</a> (Brown University)</h3>
+<p class="who">Stage 5 · Probability · 👦 good for kids (first chapters) · interactive</p>
+<p>Probability and statistics with things to click: coin flips, dice, distributions, Bayes' rule, regression. The Bayes chapter is the maths inside a robot's “where am I?” guess.</p>
+<p>Goes with: <a href="18-robot-brain/02-sensors.html">week 2, noisy senses</a>, <a href="18-robot-brain/25-localise.html">week 12, particle filter</a>, <a href="21-robot-math.html#bayes">Module 21, Bayes</a>. <label><input type="checkbox"> Done</label></p></div>
+</div>
+
+<h2 id="kid-plan">4. The kid plan, week by week</h2>
+<ol class="steps">
+<li><b>After week 2 (noisy senses):</b> Seeing Theory, chapter 1 (chance). Flip a virtual coin 100 times and see the bar settle near half.</li>
+<li><b>After week 4 (the neuron):</b> TensorFlow Playground. Start with one neuron on the circle dataset (it fails), then add a hidden layer (it works). Then 3Blue1Brown chapter 1.</li>
+<li><b>After week 4, bonus:</b> CNN Explainer. Find the layer where the picture stops looking like a picture.</li>
+<li><b>After week 7 (words as numbers):</b> the Embedding Atlas demo. Find a cluster and guess what it's about.</li>
+<li><b>After week 8 (tiny language model):</b> Transformer Explainer. Type “the robot picked up the” and look at the next-word list. Move temperature up and down.</li>
+<li><b>After week 12 (particle filter):</b> Seeing Theory, Bayesian inference chapter, with an adult.</li>
+<li><b>Any time, for fun:</b> Diffusion Explainer.</li>
+</ol>
+<div class="box checkpoint"><span class="tag">✅ Checkpoint</span> In TensorFlow Playground, with only the X₁ and X₂ inputs switched on, the circle dataset can't be solved with no hidden layer, and can with one hidden layer of a few neurons. You can say why: one neuron draws one straight line, and a circle needs a curve.</div>
+
+<h2 id="reality">5. Reality check</h2>
+<ul>
+<li><b>Two wrong links in the post.</b> Items 6 (Google PAIR) and 8 (Abhik Sarkar) both pointed to TensorFlow Playground. We found and linked the right pages.</li>
+<li><b>“A serious AI curriculum hiding inside these links”</b> overstates it. It's a good list with no order, mixed levels and no exercises. The path above adds the order; the course adds the exercises.</li>
+<li><b>Distill is an archive:</b> it went on hiatus on 2 July 2021. Still excellent, just not current.</li>
+<li><b>Some are vendor material.</b> The Modular handbook is from a company selling an inference platform; Embedding Atlas and PAIR are from Apple and Google. The content is solid; expect their own tools to feature.</li>
+<li><b>Nothing here is robotics-specific.</b> For that, see <a href="21-robot-math.html">Module 21</a> (Kalman, A*, diffusion, with its own ten explainers) and <a href="22-vector-fields.html">Module 22</a>.</li>
+<li><b>Levels are our judgement,</b> not the post's.</li>
+</ul>
+
+<h2 id="playbook">6. Playbook</h2>
+<ol class="steps">
+<li><b>Do, then watch, then read:</b> play with the interactive one first, watch the video second, read the essay last.</li>
+<li><b>One explainer per course page:</b> after each course page, open its matching explainer from the list for 15 minutes.</li>
+<li><b>Predict before you click:</b> say what you think will happen when you move a slider, then check. That's what turns a toy into learning.</li>
+<li><b>For engineers:</b> Raschka's attention variants plus the Modular handbook, then <a href="09-inference-engineering/index.html">Module 09</a>, is a solid inference warm-up.</li>
+<li><b>For the 12-year-old:</b> follow <a href="#kid-plan">the kid plan</a>, with an adult for Transformer Explainer and Diffusion Explainer.</li>
+</ol>
+
+<h2 id="check">7. Self-check</h2>
+<details><summary>In TensorFlow Playground, why can't a network with no hidden layer separate the circle dataset?</summary>
+<p>With only X₁ and X₂ as inputs and no hidden layer, the output is one neuron, which can only draw a straight dividing line. A ring of one colour inside another needs a curved boundary, which takes hidden neurons combining several lines.</p></details>
+<details><summary>What do MQA, GQA and MLA all try to save, and why does it matter?</summary>
+<p>KV-cache memory. Sharing or compressing keys and values across heads makes the cache smaller, so longer contexts fit and decoding (which is limited by memory traffic) runs faster.</p></details>
+<details><summary>What's the difference between prefill and decode?</summary>
+<p>Prefill processes the whole prompt in one parallel pass and fills the KV cache. Decode then generates one token at a time, reusing that cache. Prefill is limited by compute; decode by memory bandwidth.</p></details>
+<details><summary>Which explainer shows the maths behind week 12's particle filter?</summary>
+<p>Seeing Theory's Bayesian inference chapter: start with a belief, see evidence, update the belief.</p></details>
+<details><summary>Why is Diffusion Explainer relevant to robots?</summary>
+<p>Diffusion policies generate robot actions the way image diffusion generates pictures: start from noise and refine step by step.</p></details>
+
+<h2 id="glossary">8. Glossary &amp; further reading</h2>
+<div class="table-wrap"><table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<tr><td>Convolution</td><td>Sliding a small filter over an image to detect a pattern like an edge.</td></tr>
+<tr><td>Q/K/V</td><td>Query, key, value: what each token looks for, what it offers, and what it passes on in attention.</td></tr>
+<tr><td>KV cache</td><td>Stored keys and values from earlier tokens so they aren't recomputed each step.</td></tr>
+<tr><td>MHA / MQA / GQA / MLA</td><td>Attention designs that share or compress keys and values to different degrees.</td></tr>
+<tr><td>Mixture of experts</td><td>A layer where a router sends each token to a few of many sub-networks.</td></tr>
+<tr><td>Sparse autoencoder (SAE)</td><td>A tool that splits a model's activations into many readable “features”.</td></tr>
+<tr><td>GAN</td><td>Two networks, one generating and one judging, trained against each other.</td></tr>
+<tr><td>Temperature</td><td>A setting that makes next-word choices more random (high) or more predictable (low).</td></tr>
+</table></div>
+<ul>
+<li><a href="https://x.com/techNmak/status/2122711743369785617">The post</a></li>
+<li>Related: <a href="21-robot-math.html">Module 21</a> (robot maths with ten more explainers) · <a href="06-30u30/index.html">Module 06</a> (the papers behind these) · <a href="09-inference-engineering/index.html">Module 09</a> (inference) · <a href="08-ai-research-engineer/index.html">Module 08</a> (research engineer path) · <a href="17-free-ai-curriculum.html">Module 17</a> (free courses)</li>
+</ul>
+
+<footer>Module 26 · added 2026-11-18 · <a href="../index.html">Back to course index</a></footer>
+</main>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const F = { all: 'All', kid: '👦 Good for kids', adult: '🧑 Teen/adult', s1: '1 Networks', s2: '2 Seeing', s3: '3 Transformers', s4: '4 LLM internals', s5: '5 Generation & probability' };
+  const items = [...document.querySelectorAll('#list .res')];
+  const KEY = 'm26-done';
+  let done = {};
+  try { done = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) {}
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(done)); } catch (e) {} };
+  const prog = () => {
+    const n = items.filter(r => done[r.dataset.id]).length;
+    $('prog').textContent = `${n} of ${items.length} done`;
+  };
+  items.forEach(r => {
+    const cb = r.querySelector('input');
+    cb.checked = !!done[r.dataset.id];
+    r.classList.toggle('done', cb.checked);
+    cb.addEventListener('change', () => {
+      done[r.dataset.id] = cb.checked;
+      r.classList.toggle('done', cb.checked);
+      save(); prog();
+    });
+  });
+  const chips = $('chips');
+  Object.entries(F).forEach(([k, label]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    b.setAttribute('aria-pressed', k === 'all');
+    b.addEventListener('click', () => {
+      chips.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+      items.forEach(r => r.hidden = k !== 'all' && !r.dataset.t.split(' ').includes(k));
+    });
+    chips.appendChild(b);
+  });
+  prog();
+})();
+</script>
+</body>
+</html>

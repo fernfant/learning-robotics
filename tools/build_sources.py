@@ -85,6 +85,10 @@ MODULES = [
      [("Dex-Net 2.0", "https://arxiv.org/abs/1703.09312"), ("OpenVLA", "https://arxiv.org/abs/2406.09246"), ("VoxPoser", "https://voxposer.github.io"),
       ("SERL", "https://arxiv.org/abs/2401.16013"), ("ManiSkill3", "https://arxiv.org/abs/2410.00425"), ("Champion-level drone racing", "https://www.nature.com/articles/s41586-023-06419-4"),
       ("Robotic World Model", "https://arxiv.org/abs/2501.10100"), ("Track2Act", "https://homangab.github.io/track2act/")]),
+    ("26", "https://x.com/techNmak/status/2122711743369785617", "Tech with Mak (@techNmak)", "17 Nov 2026", "X post (17 linked resources; two wrong links corrected)",
+     [("Transformer Explainer", "https://poloclub.github.io/transformer-explainer/"), ("LLM Visualization", "https://bbycroft.net/llm"),
+      ("Google PAIR AI Explorables (corrected link)", "https://pair.withgoogle.com/explorables/"), ("Abhik Sarkar's transformer concepts (corrected link)", "https://abhik.xyz/concepts/category/transformers"),
+      ("Visual Guide to Attention Variants", "https://magazine.sebastianraschka.com/p/visual-attention-variants"), ("Modular LLM Inference Handbook", "https://handbook.modular.com/llm-inference-basics/what-is-llm-inference/")]),
 ]
 
 e = html.escape

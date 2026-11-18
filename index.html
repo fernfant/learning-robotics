@@ -21,7 +21,7 @@
   The blue block is in the bin.</code></pre>
 <p>You write every clever part yourself: moving, sensing, reading your phone's sensors, stopping for the cat, planning a route, steering wheels, mapping the room, understanding words. <code>check.py</code> marks it as you go: 21 checks on your robot, 147 in the whole course. If you can write a Python loop that prints 1 to 10, you're ready.</p>
 <p style="margin:18px 0"><a href="topics/18-robot-brain/index.html" style="display:inline-block;font-size:1.2rem;font-weight:700;padding:12px 24px;border-radius:10px;background:var(--accent);color:var(--bg);text-decoration:none">Start the course →</a></p>
-<p class="meta">After the course, for fun: <a href="topics/21-robot-math.html">robot maths, by playing</a> and <a href="topics/22-vector-fields.html">steering with a field of arrows</a> (both fine after week 5), <a href="topics/23-robotics-engineer-roadmap.html#kid-track">building a real robot with wires</a> (with an adult), <a href="topics/24-ai-product-skills.html#sorter">sorting your robot's mistakes like an AI tester</a> (after week 10), <a href="topics/25-who-to-follow.html#match">meeting the scientists who invent robot tricks</a>, then <a href="topics/20-from-scratch/index.html">real code from the pros</a> (some installs; ask an adult).</p>
+<p class="meta">After the course, for fun: <a href="topics/21-robot-math.html">robot maths, by playing</a> and <a href="topics/22-vector-fields.html">steering with a field of arrows</a> (both fine after week 5), <a href="topics/23-robotics-engineer-roadmap.html#kid-track">building a real robot with wires</a> (with an adult), <a href="topics/24-ai-product-skills.html#sorter">sorting your robot's mistakes like an AI tester</a> (after week 10), <a href="topics/25-who-to-follow.html#match">meeting the scientists who invent robot tricks</a>, <a href="topics/26-visual-explainers.html#kid-plan">watching networks learn in your browser</a> (from week 2), then <a href="topics/20-from-scratch/index.html">real code from the pros</a> (some installs; ask an adult).</p>
 </section>
 
 <div class="eyebrow">Personal course · living document</div>
@@ -30,12 +30,12 @@
 
 <div class="card"><p style="margin:0"><span class="track llm">LLM</span> how large language models are built, trained, evaluated and served. &nbsp; <span class="track robo">Robotics</span> how robots perceive, decide and act. &nbsp; <span class="track both">LLM + Robotics</span> shared foundations, or ideas that carry across both. Robot foundation models (VLAs) are built on LLM backbones, so the two tracks keep meeting.</p></div>
 <p><a href="sources.html"><strong>Sources &amp; summaries →</strong></a> every link added, its summary, the primary sources behind it, saved files and all external references.</p>
-<p class="meta">25 modules (118 pages) · last updated 2026-11-16</p>
+<p class="meta">26 modules (119 pages) · last updated 2026-11-18</p>
 
 <h2 id="grown-ups">For grown-ups and later</h2>
 <p>Notes on LLMs and robotics for grown-ups, and for later once you've finished the robot course. Each module still opens with a Start-here box you can read any time.</p>
 <details id="all-modules">
-<summary>Show all 25 modules, the summaries and the concept map</summary>
+<summary>Show all 26 modules, the summaries and the concept map</summary>
 
 <h2>Modules</h2>
 <!-- MODULES: newest at the bottom; keep numbering sequential -->
@@ -237,6 +237,13 @@
   <span class="tag">robot learning</span><span class="tag">VLAs</span><span class="tag">sim-to-real</span><span class="tag">world models</span><span class="tag">humanoids</span><span class="tag">drones</span><span class="tag">grasping</span><span class="tag">reading list</span>
   <p class="meta">Source: @IlirAliu_ post on X · 15 Nov 2026</p>
 </a>
+<a class="card module" href="topics/26-visual-explainers.html">
+  <div class="n">26 · Visual explainers</div>
+  <h3><span class="track both">LLM + Robotics</span>17 visual AI explainers, sorted into a path and matched to the course</h3>
+  <p>Tech with Mak's list of the best visual resources, every link opened and two broken ones fixed (Google PAIR Explorables, Abhik Sarkar's transformer visualisations). Five stages: networks (TensorFlow Playground, 3Blue1Brown), seeing (CNN Explainer, Distill, now an archive), transformers (Transformer Explainer, The Illustrated Transformer, Bycroft's 3D LLM Visualization, Embedding Atlas), modern LLM internals (Raschka's attention variants, mixture of experts, the Modular inference handbook, Neuronpedia, PAIR) and generation and probability (Diffusion Explainer, GAN Lab, Seeing Theory). Each has a level, what it shows and the course page it illustrates; seven suit a 12-year-old. Includes a filterable checklist and a week-by-week kid plan.</p>
+  <span class="tag">visualisation</span><span class="tag">neural networks</span><span class="tag">transformers</span><span class="tag">embeddings</span><span class="tag">attention variants</span><span class="tag">inference</span><span class="tag">diffusion</span><span class="tag">probability</span>
+  <p class="meta">Source: @techNmak post on X · 17 Nov 2026</p>
+</a>
 
 <h2>Summaries at a glance</h2>
 <div class="table-wrap"><table>
@@ -266,6 +273,7 @@
 <tr><td>23</td><td><span class="track robo">Robotics</span></td><td><a href="topics/23-robotics-engineer-roadmap.html">Robotics engineer in 6 months</a></td><td>Learn the layers in order (electrons, microcontrollers, parts, ROS 2, maths, learning), build something every month, measure it, and write down what broke. Robo-Helper already covers the estimation and control ideas; the wires are what is missing.</td></tr>
 <tr><td>24</td><td><span class="track llm">LLM</span></td><td><a href="topics/24-ai-product-skills.html">AI product skills</a></td><td>Read about 100 traces and name the failures before measuring anything. Fix what the prompt never said, then automate the cheapest check that catches each remaining failure; trust an AI judge only after measuring TPR and TNR, and correct its score.</td></tr>
 <tr><td>25</td><td><span class="track robo">Robotics</span></td><td><a href="topics/25-who-to-follow.html">Who to follow in robot learning</a></td><td>Know which question each researcher is answering: grasping, following language, learning from video, practising with RL, agile bodies, or simulators and world models. Read project pages and videos first, then run one open tool (ManiSkill, OpenVLA, SERL).</td></tr>
+<tr><td>26</td><td><span class="track both">LLM + Robotics</span></td><td><a href="topics/26-visual-explainers.html">Visual AI explainers</a></td><td>Play first, then watch, then read. Start with TensorFlow Playground, see a real GPT-2 in Transformer Explainer, then Raschka's attention variants and the Modular handbook for inference. Match each explainer to the course page it illustrates.</td></tr>
 </table></div>
 
 <h2>Concept map</h2>
@@ -292,7 +300,8 @@
 <tr><td>Vision-language-action models (π0, GR00T: VLM + flow-matching action head, action chunks)</td><td>05, 08, 21</td></tr>
 <tr><td>Computer vision for perception (CNNs, ResNet, dilated convs, detection)</td><td>02, 06</td></tr>
 <tr><td>Reinforcement learning (Bellman → Q-learning → DQN → PPO/GAE, SAC, RLHF)</td><td>02, 06, 18, 20, 25</td></tr>
-<tr><td>Transformers, attention, ViT, diffusion → VLAs / diffusion policy</td><td>02, 05, 06, 18, 20, 25</td></tr>
+<tr><td>Transformers, attention, ViT, diffusion → VLAs / diffusion policy</td><td>02, 05, 06, 18, 20, 25, 26</td></tr>
+<tr><td>Visual and interactive explainers (play with it before reading the maths)</td><td>21, 26</td></tr>
 <tr><td>Robot-learning research frontier (sim-to-real, world models, learning from human video, who works on what)</td><td>23, 25</td></tr>
 <tr><td>Autograd &amp; from-scratch implementations (micrograd, minGPT, nanoGPT, llm.c, tinygrad)</td><td>18, 20</td></tr>
 <tr><td>On-device inference &amp; GPU (quantisation, ONNX, QAT, speculative decoding)</td><td>02, 04, 05</td></tr>
