@@ -365,3 +365,7 @@ Set up the folder structure, schema (CLAUDE.md), shared styles and the index.
 - LinkedIn post, part 4 of a hiring-tips series: the "technical decomp" interview (design an agentic system for a customer). Read in full via the user's LinkedIn; text saved to sources/27-wulfie-bain-technical-decomp.md.
 - New page topics/27-agent-design-interview.html (LLM): four tips and what each tests, our 45-minute method, three worked answers (support refunds, property-portal home search, Robo-Helper care home), practice board (scenario picker, phase timer, five boxes, 10-point rubric; saved per browser).
 - Index: card, summary row, concept map. Back-link from Module 24.
+
+## [2026-11-18] update | Module 27: learning track and three-week prep plan
+- Added "Learn LLMs and evals practically" (9 build-then-measure steps mapped to course pages and OpenAI docs, plus a refund-agent capstone) and a 15-day preparation plan with checklist and a curveball drill.
+- Sources: the author's other LinkedIn posts (roles post: startups-obsessed, technical, high agency; behavioural-interview tips), OpenAI Startups postings (via a mirror), OpenAI agent and eval docs. Noted that OpenAI's hosted Evals platform goes read-only 31 Oct 2026 and shuts down 30 Nov 2026. No public first-hand accounts of the round found.

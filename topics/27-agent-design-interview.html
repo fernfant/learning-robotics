@@ -17,6 +17,7 @@
   .rubric label { display: block; margin: 4px 0; }
   .timer { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .big-out { font-size: 1.4rem; font-weight: 700; }
+  #plan label { display: block; margin: 6px 0; }
 </style>
 </head>
 <body>
@@ -68,6 +69,8 @@
 <li><a href="#method">Deep dive: a 45-minute method</a></li>
 <li><a href="#practice">Try it: the practice board (interactive)</a></li>
 <li><a href="#answers">Three worked answers</a></li>
+<li><a href="#learn">Learn LLMs and evals practically: build one thing, then measure it</a></li>
+<li><a href="#prep">A three-week preparation plan (interactive checklist)</a></li>
 <li><a href="#reality">Reality check</a></li>
 <li><a href="#playbook">Playbook</a></li>
 <li><a href="#check">Self-check</a></li>
@@ -163,16 +166,73 @@
 <p><b>Recap:</b> start with three items in one corridor while staff watch, count successes and “asked a nurse” cases, then add items.</p>
 </details>
 
-<h2 id="reality">7. Reality check</h2>
+<h2 id="learn">7. Learn LLMs and evals practically: build one thing, then measure it</h2>
+<div class="box idea"><span class="tag">💡 The idea</span> Reading about agents and evals doesn't stick, and it doesn't give you anything to talk about in an interview. Build one small agent end to end, break it, then measure it. Every step below has a course page that already teaches it, plus the official OpenAI doc for the same thing.</div>
+<div class="table-wrap"><table>
+<tr><th>Step</th><th>Do this (hands-on)</th><th>Learn it from</th><th>You're done when</th></tr>
+<tr><td><b>1 · One call</b></td><td>Call a model from a script with a JSON-schema output. Log tokens, latency and cost per call.</td><td><a href="18-robot-brain/10-llm-safety.html">Robo-Helper week 10</a> (a real LLM, safely), <a href="18-robot-brain/16-speed.html">week 13</a> (timing)</td><td>You can say what one call costs and how long it takes, as numbers.</td></tr>
+<tr><td><b>2 · Tools</b></td><td>Give it two tools: a read-only lookup and a risky write behind a confirmation. Turn on tracing.</td><td><a href="https://developers.openai.com/learn/agents">OpenAI agents hub</a> (Agents SDK, tracing, human in the loop), <a href="18-robot-brain/20-mcp.html">Robo-Helper's MCP bonus</a></td><td>A trace shows each tool call, and the write never happens without a yes.</td></tr>
+<tr><td><b>3 · Design rules</b></td><td>Read the guide and write down when you'd use a fixed workflow, one agent, or several.</td><td><a href="https://cdn.openai.com/business-guides-and-resources/a-practical-guide-to-building-agents.pdf">A practical guide to building agents</a> (OpenAI, PDF), <a href="24-ai-product-skills.html#agents">Module 24's eight agent mistakes</a></td><td>You can justify “simplest thing that works” for each worked answer above.</td></tr>
+<tr><td><b>4 · Cost and speed</b></td><td>Swap in a smaller model for routing; put static prompt text first so it caches; measure p50 and p95 latency before and after.</td><td><a href="https://developers.openai.com/api/docs/guides/latency-optimization">Latency optimization</a>, <a href="https://developers.openai.com/api/docs/guides/prompt-caching">prompt caching</a>, <a href="https://developers.openai.com/api/docs/guides/cost-optimization">cost optimization</a>, <a href="16-hands-on-llm-serving.html">Module 16</a></td><td>You have a before/after table with real numbers.</td></tr>
+<tr><td><b>5 · Look at data</b></td><td>Run 50–100 varied inputs. Read every trace. Write one note on the first thing that went wrong in each.</td><td><a href="24-ai-product-skills.html#evals">Module 24, evals</a> (open coding), <a href="19-evals-field-guide.html">Module 19</a></td><td>Notes stop producing new kinds of failure (saturation).</td></tr>
+<tr><td><b>6 · Name failures</b></td><td>Group notes into a few pass/fail failure modes. Fix the ones that are really unclear prompts first.</td><td><a href="24-ai-product-skills.html#evals">Module 24</a> (axial coding, the three gulfs)</td><td>A count per failure mode, and the spec fixes done.</td></tr>
+<tr><td><b>7 · Regression set</b></td><td>Turn the failures into a golden set with code assertions; run it with pytest on every prompt or model change.</td><td><a href="https://developers.openai.com/api/docs/guides/evaluation-best-practices">OpenAI evaluation best practices</a>, <a href="18-robot-brain/19-bakeoff.html">the bake-off</a></td><td>One command tells you if a change made things better or worse.</td></tr>
+<tr><td><b>8 · A judge, only if needed</b></td><td>For one subjective failure (tone), write a pass/fail judge. Hand-label 40 cases, measure TPR and TNR, correct the rate.</td><td><a href="24-ai-product-skills.html#judge-calc">Module 24's judge calculator</a>, <a href="19-evals-field-guide.html">Module 19</a> (agreement, error bars)</td><td>You can quote the judge's agreement with you, and the corrected pass rate.</td></tr>
+<tr><td><b>9 · Agent evals</b></td><td>Grade traces, not just answers: right tool, right arguments, policy followed, handoff when it should.</td><td><a href="https://developers.openai.com/api/docs/guides/agent-evals/">Evaluate agent workflows</a> (OpenAI)</td><td>A tool-choice accuracy number for your agent.</td></tr>
+</table></div>
+<div class="box build"><span class="tag">🔨 Build</span> <b>The capstone that doubles as an interview story:</b> build worked answer A (the refund agent) at small scale: fake orders in a JSON file, two tools, shadow mode for refunds, 60 test tickets, a golden set, one judge. Keep it to a few hundred lines. In the interview it becomes “I built this, here's what broke, here are the numbers”, which is exactly the hands-on, prototyping evidence the role asks for. Running it costs a few dollars of API calls at most; check the price page before you start.</div>
+<div class="box safety"><span class="tag">⚠️ Current as of 18 Nov 2026</span> OpenAI <a href="https://developers.openai.com/api/docs/guides/evaluation-best-practices">is deprecating its hosted Evals platform</a>: read-only for existing users from 31 Oct 2026, shutting down 30 Nov 2026. Keep your eval harness in your own code (pytest plus a CSV of cases is enough), and know this before the interview; asking what they now recommend to startups is a good question.</div>
+
+<h2 id="prep">8. A three-week preparation plan</h2>
+<p>About an hour a day, built from the author's posts (the four tips here, his behavioural-interview tips, and the three traits his roles post asks for), public OpenAI postings for the Startups team, and the steps above. Tick as you go; ticks stay in this browser.</p>
+<p class="big-out" id="pProg"></p>
+<div id="plan">
+<h3>Week 1 · Build the baseline (LLMs and agents)</h3>
+<label><input type="checkbox" data-id="w1a"> Day 1: steps 1–2 above. A script with structured output, then two tools with tracing.</label>
+<label><input type="checkbox" data-id="w1b"> Day 2: read the practical guide to building agents; write one paragraph on workflow vs agent vs multi-agent.</label>
+<label><input type="checkbox" data-id="w1c"> Day 3: step 4, cost and latency. Keep the before/after numbers; they become interview material.</label>
+<label><input type="checkbox" data-id="w1d"> Day 4: read the <a href="https://developers.openai.com/api/docs/guides/voice-agents">voice agents guide</a> (speech-to-speech vs a chained pipeline). Many startups ask about voice.</label>
+<label><input type="checkbox" data-id="w1e"> Day 5: start the capstone: fake orders, two tools, shadow-mode refunds.</label>
+<h3>Week 2 · Evals by doing</h3>
+<label><input type="checkbox" data-id="w2a"> Day 6: run 60 tickets through the capstone; open-code every trace.</label>
+<label><input type="checkbox" data-id="w2b"> Day 7: name the failure modes, fix specification failures, count again.</label>
+<label><input type="checkbox" data-id="w2c"> Day 8: golden set plus code assertions, run with pytest.</label>
+<label><input type="checkbox" data-id="w2d"> Day 9: one judge for tone; label 40; TPR, TNR, corrected rate.</label>
+<label><input type="checkbox" data-id="w2e"> Day 10: grade tool choice on the traces; write a one-page README with the numbers and “what broke and how I fixed it”.</label>
+<h3>Week 3 · Rehearse the interview</h3>
+<label><input type="checkbox" data-id="w3a"> Day 11: a 60-second intro tailored to the role, plus one story each for his three traits: obsessed with startups, hands-on technical, high agency.</label>
+<label><input type="checkbox" data-id="w3b"> Day 12: timed mock on scenario A with a friend playing the founder. Score it on the rubric.</label>
+<label><input type="checkbox" data-id="w3c"> Day 13: timed mocks on scenarios B and C. Record yourself; check you gave the outline before detail.</label>
+<label><input type="checkbox" data-id="w3d"> Day 14: the curveball drill below, out loud, two minutes each.</label>
+<label><input type="checkbox" data-id="w3e"> Day 15: research the interviewer and the team (read his posts and essays; prepare what you <em>changed</em> because of one), check current OpenAI products and pricing, and prepare three questions for them.</label>
+</div>
+
+<h3 id="curveballs">The curveball drill</h3>
+<p>The interview deliberately goes past what you know. Practise reasoning out loud from first principles. Open each one after you've answered it.</p>
+<details><summary>“The founder needs the voice agent to reply in under 300 ms.”</summary>
+<p>Break the latency budget into parts: speech recognition, model, tools, speech output, network. Speech-to-speech avoids two hops; stream everything; start speaking before the full answer; keep tool calls off the critical path or precompute; a smaller model for the first turn. Ask which matters more if you can't hit it: speed or accuracy.</p></details>
+<details><summary>“Customer data can't leave the EU.”</summary>
+<p>Ask what counts as customer data and which contract or regulation applies. Then data residency options, minimising what's sent (IDs instead of personal details), redaction before the call, and where logs and traces are stored. Say what you'd need to confirm with their legal team rather than guessing.</p></details>
+<details><summary>“It works, but costs ten times their budget.”</summary>
+<p>Measure where the tokens go first. Then: smaller model for easy steps, routing, caching static prompt parts, shorter outputs, fewer turns, batch or flex processing for anything not real-time, and “don't default to an LLM” for steps code can do. Keep the eval set running so quality doesn't silently drop.</p></details>
+<details><summary>“A model upgrade made it worse and nobody noticed for a week.”</summary>
+<p>No regression suite in the release process. Pin model versions, run the golden set and agent trace grades before switching, watch production metrics per failure mode, and roll back. The fix is a process, not a prompt.</p></details>
+<details><summary>“Users are pasting instructions into tickets to get free refunds.”</summary>
+<p>Prompt injection. Treat ticket text as data, never instructions; the refund tool enforces policy in code (amount, order exists, one refund per order) whatever the model says; human review above a threshold; add the attack cases to the eval set.</p></details>
+<details><summary>“They want five agents talking to each other.”</summary>
+<p>Ask what problem that solves. Start with one agent and clear tools, or a fixed workflow; split only when instructions or tools become too many for one agent to follow reliably, and you can measure that the split helps.</p></details>
+
+<h2 id="reality">9. Reality check</h2>
 <ul>
 <li><b>It's a hiring post</b> for the author's own team. It describes his loop; other teams and companies run this interview differently.</li>
 <li><b>Four tips, not a rubric.</b> He doesn't say how it's scored or how long it is. The 45-minute method and the rubric on this page are ours.</li>
 <li><b>“Thousands of applications”</b> is his figure; we can't check it.</li>
-<li><b>We read part 4 only.</b> The series' other parts (one on CVs is linked in his comments) aren't covered here.</li>
+<li><b>No first-hand accounts of this round exist publicly</b> that we could find. The plan rests on the author's own posts, OpenAI's public postings for the Startups team (customer partnership, prototyping on the API, LLM best practices; founder experience “highly valued”) and OpenAI's docs. We couldn't load OpenAI's interview guide to check it.</li>
+<li><b>The rest of the series:</b> his behavioural-interview post (a short, tailored intro; structured answers that start high level; a conversation, not a recital; research the interviewer and say what you changed) is folded into the plan. The CV post isn't covered.</li>
 <li><b>The advice is standard and sound.</b> It matches how good system-design and consulting interviews work: clarify, assume, structure, recap.</li>
 </ul>
 
-<h2 id="playbook">8. Playbook</h2>
+<h2 id="playbook">10. Playbook</h2>
 <ol class="steps">
 <li><b>Open with questions, not boxes.</b> Aim for five to ten minutes of discovery, then play it back in one sentence.</li>
 <li><b>Every assumption gets a “because”,</b> especially quality versus cost versus latency.</li>
@@ -184,7 +244,7 @@
 <li><b>For the 12-year-old:</b> scenario C with a grown-up as the care-home manager. Three questions first, then the plan.</li>
 </ol>
 
-<h2 id="check">9. Self-check</h2>
+<h2 id="check">11. Self-check</h2>
 <details><summary>According to the author, do more people fail on technical knowledge or on customer focus?</summary>
 <p>Customer focus. Technical knowledge of LLMs, agents and evals is the baseline; the approach is the differentiator.</p></details>
 <details><summary>Why say an assumption out loud instead of just making it?</summary>
@@ -196,7 +256,7 @@
 <details><summary>In the refund design, why does the agent only <em>propose</em> refunds at first?</summary>
 <p>Refunds are irreversible and cost money. Shadow mode lets you measure how often the agent agrees with humans before letting it act alone, and only on low-value, in-policy cases.</p></details>
 
-<h2 id="glossary">10. Glossary &amp; further reading</h2>
+<h2 id="glossary">12. Glossary &amp; further reading</h2>
 <div class="table-wrap"><table>
 <tr><th>Term</th><th>Meaning</th></tr>
 <tr><td>Technical decomposition</td><td>Breaking a vague customer problem into a concrete system design, out loud.</td></tr>
@@ -209,7 +269,8 @@
 <tr><td>Idempotency key</td><td>An ID that makes repeating the same request safe (it won't refund twice).</td></tr>
 </table></div>
 <ul>
-<li><a href="https://www.linkedin.com/feed/update/urn:li:activity:7528814957145047040/">The post</a></li>
+<li><a href="https://www.linkedin.com/feed/update/urn:li:activity:7528814957145047040/">The post</a> · <a href="https://www.linkedin.com/in/wulfie-bain/recent-activity/all/">the author's other posts</a></li>
+<li>OpenAI: <a href="https://cdn.openai.com/business-guides-and-resources/a-practical-guide-to-building-agents.pdf">A practical guide to building agents</a> · <a href="https://developers.openai.com/learn/agents">agents hub</a> · <a href="https://developers.openai.com/api/docs/guides/agent-evals/">evaluate agent workflows</a> · <a href="https://developers.openai.com/api/docs/guides/evaluation-best-practices">evaluation best practices</a> · <a href="https://developers.openai.com/api/docs/guides/voice-agents">voice agents</a> · <a href="https://developers.openai.com/api/docs/guides/latency-optimization">latency</a> · <a href="https://jobs.thrivecap.com/companies/openai/jobs/88588831-applied-ai-engineer-startups">an Applied AI Engineer, Startups posting</a> (Aug 2026, mirror)</li>
 <li>Related: <a href="24-ai-product-skills.html">Module 24</a> (evals, agents, the judge calculator) · <a href="19-evals-field-guide.html">Module 19</a> (evals field guide) · <a href="10-rlm-harness.html">Module 10</a> (agent harness) · <a href="03-shared-autonomy.html">Module 03</a> (when a robot should ask) · <a href="09-inference-engineering/index.html">Module 09</a> (latency and cost)</li>
 </ul>
 
@@ -302,6 +363,21 @@
   });
   $('tReset').addEventListener('click', () => { clearInterval(iv); iv = null; left = 2700; $('tStart').textContent = 'Start 45:00'; show(); });
   render(); show();
+
+  const PK = 'm27-plan';
+  let plan = {};
+  try { plan = JSON.parse(localStorage.getItem(PK)) || {}; } catch (e) {}
+  const boxes = [...document.querySelectorAll('#plan input')];
+  const pprog = () => { $('pProg').textContent = `${boxes.filter(b => b.checked).length} of ${boxes.length} days done`; };
+  boxes.forEach(b => {
+    b.checked = !!plan[b.dataset.id];
+    b.addEventListener('change', () => {
+      plan[b.dataset.id] = b.checked;
+      try { localStorage.setItem(PK, JSON.stringify(plan)); } catch (e) {}
+      pprog();
+    });
+  });
+  pprog();
 })();
 </script>
 </body>
